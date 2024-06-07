@@ -1,5 +1,5 @@
 <p align="center">
-  <img  height="240" src="https://github.com/perpetual-ml/perpetual/raw/main/resources/perp_logo.png">
+  <img  height="120" src="https://github.com/perpetual-ml/perpetual/raw/main/resources/perp_logo.png">
 </p>
 
 <div align="center">
