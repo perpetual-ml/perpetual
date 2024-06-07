@@ -22,8 +22,6 @@ jobs:
       - run: |
           cp README.md python-package/README.md
           cp LICENSE python-package/LICENSE
-      - name: Update TOML
-        run: python scripts/remove-optional-deps.py
       - name: Build test data
         run: |
           cd python-package
@@ -32,7 +30,7 @@ jobs:
           python scripts/make_resources.py
       - name: Run tests
         run: cargo test --verbose
-      - name: Build Wheels with maturin
+      - name: Build wheels with maturin
         uses: PyO3/maturin-action@v1
         with:
           target: x86_64
@@ -74,8 +72,6 @@ jobs:
       - run: |
           cp README.md python-package/README.md
           cp LICENSE python-package/LICENSE
-      - name: Update TOML
-        run: python scripts/remove-optional-deps.py
       - name: Build test data
         run: |
           cd python-package
@@ -84,7 +80,7 @@ jobs:
           python scripts/make_resources.py
       - name: Run tests
         run: cargo test --verbose
-      - name: Build Wheels with maturin
+      - name: Build wheels with maturin
         uses: PyO3/maturin-action@v1
         with:
           target: x86_64
@@ -127,8 +123,6 @@ jobs:
       - run: |
           cp README.md python-package/README.md
           cp LICENSE python-package/LICENSE
-      - name: Update TOML
-        run: python scripts/remove-optional-deps.py
       - name: Build test data
         run: |
           cd python-package
@@ -137,7 +131,7 @@ jobs:
           python scripts/make_resources.py
       - name: Run tests
         run: cargo test --verbose
-      - name: Build Wheels with maturin
+      - name: Build wheels with maturin
         uses: PyO3/maturin-action@v1
         with:
           target: x86_64
@@ -177,8 +171,6 @@ jobs:
       - run: |
           cp README.md python-package/README.md
           cp LICENSE python-package/LICENSE
-      - name: Update TOML
-        run: python scripts/remove-optional-deps.py
       - name: Build test data
         run: |
           cd python-package
