@@ -1,6 +1,6 @@
 Set-Location python-package
-black python/perpetual/
-black tests/
+python -m black python/perpetual/
+python -m black tests/
 maturin develop --release
 pytest .
 Set-Location ..

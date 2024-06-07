@@ -37,11 +37,10 @@ CONTRIBUTION_METHODS = {
 }
 
 
-
-
 @dataclass
 class Node:
     """Dataclass representation of a node, this represents all of the fields present in a tree node."""
+
     num: int
     weight_value: float
     hessian_sum: float
@@ -137,8 +136,9 @@ class BoosterType(Protocol):
         """pass"""
 
 
-
-def convert_input_frame(X: FrameLike, categorical_features) -> tuple[list[str], np.ndarray, int, int, Optional[Iterable[int]], Optional[dict]]:
+def convert_input_frame(
+    X: FrameLike, categorical_features
+) -> tuple[list[str], np.ndarray, int, int, Optional[Iterable[int]], Optional[dict]]:
     """Convert data to format needed by booster.
 
     Returns:
@@ -149,18 +149,27 @@ def convert_input_frame(X: FrameLike, categorical_features) -> tuple[list[str], 
         X_ = X.to_numpy()
         features_ = X.columns.to_list()
         if categorical_features == "auto":
-            categorical_columns = X.select_dtypes(include=['category']).columns.tolist()
-            categorical_features_ = [features_.index(c) for c in categorical_columns] or None
+            categorical_columns = X.select_dtypes(include=["category"]).columns.tolist()
+            categorical_features_ = [
+                features_.index(c) for c in categorical_columns
+            ] or None
     else:
         # Assume it's a numpy array.
         X_ = X
         features_ = list(map(str, range(X_.shape[1])))
 
-    if categorical_features and all(isinstance(s, int) for s in categorical_features) and isinstance(categorical_features, list):
+    if (
+        categorical_features
+        and all(isinstance(s, int) for s in categorical_features)
+        and isinstance(categorical_features, list)
+    ):
         categorical_features_ = categorical_features
-    elif categorical_features and all(isinstance(s, str) for s in categorical_features) and isinstance(categorical_features, list):
+    elif (
+        categorical_features
+        and all(isinstance(s, str) for s in categorical_features)
+        and isinstance(categorical_features, list)
+    ):
         categorical_features_ = [features_.index(c) for c in categorical_features]
- 
 
     cat_mapping = {}  # key: feature_name, value: ordered category names
     if categorical_features_:
@@ -175,13 +184,18 @@ def convert_input_frame(X: FrameLike, categorical_features) -> tuple[list[str], 
         print(f"Mapping of categories: {cat_mapping}")
         for feature_name, categories in cat_mapping.items():
             feature_index = features_.index(feature_name)
+
             def f(x):
                 try:
-                    return np.nan if str(x[feature_index]) == "nan" else float(categories.index(str(x[feature_index])))
+                    return (
+                        np.nan
+                        if str(x[feature_index]) == "nan"
+                        else float(categories.index(str(x[feature_index])))
+                    )
                 except (ValueError, IndexError):
                     return np.nan
-            X_[:, feature_index] = np.apply_along_axis(f, 1, X_)
 
+            X_[:, feature_index] = np.apply_along_axis(f, 1, X_)
 
     if not np.issubdtype(X_.dtype, "float64"):
         X_ = X_.astype(dtype="float64", copy=False)
@@ -194,8 +208,9 @@ def convert_input_frame(X: FrameLike, categorical_features) -> tuple[list[str], 
     return features_, flat_data, rows, cols, categorical_features_, cat_mapping
 
 
-
-def transform_input_frame(X: FrameLike, cat_mapping) -> tuple[list[str], np.ndarray, int, int]:
+def transform_input_frame(
+    X: FrameLike, cat_mapping
+) -> tuple[list[str], np.ndarray, int, int]:
     """Convert data to format needed by booster.
 
     Returns:
@@ -212,18 +227,24 @@ def transform_input_frame(X: FrameLike, cat_mapping) -> tuple[list[str], np.ndar
     if cat_mapping:
         for feature_name, categories in cat_mapping.items():
             feature_index = features_.index(feature_name)
+
             def f(x):
                 try:
-                    return np.nan if str(x[feature_index]) == "nan" else float(categories.index(str(x[feature_index])))
+                    return (
+                        np.nan
+                        if str(x[feature_index]) == "nan"
+                        else float(categories.index(str(x[feature_index])))
+                    )
                 except (ValueError, IndexError):
                     return np.nan
+
             X_[:, feature_index] = np.apply_along_axis(f, 1, X_)
 
     if not np.issubdtype(X_.dtype, "float64"):
         X_ = X_.astype(dtype="float64", copy=False)
     flat_data = X_.ravel(order="F")
     rows, cols = X_.shape
-    
+
     return features_, flat_data, rows, cols
 
 
@@ -297,9 +318,9 @@ class PerpetualBooster:
                 create a separate branch for missing, creating a ternary tree, the missing node will be given the same
                 weight value as the parent node. If this parameter is `False`, missing will be sent
                 down either the left or right branch, creating a binary tree. Defaults to `False`.
-            terminate_missing_features (set[Any], optional): An optional iterable of features 
+            terminate_missing_features (set[Any], optional): An optional iterable of features
                 (either strings, or integer values specifying the feature indices if numpy arrays are used for fitting),
-                for which the missing node will always be terminated, even if `allow_missing_splits` is set to true. 
+                for which the missing node will always be terminated, even if `allow_missing_splits` is set to true.
                 This value is only valid if `create_missing_branch` is also True.
             missing_node_treatment (str, optional): Method for selecting the `weight` for the missing node, if `create_missing_branch` is set to `True`. Defaults to "None". Valid options are:
                 - "None": Calculate missing node weight values without any constraints.
@@ -319,7 +340,7 @@ class PerpetualBooster:
             force_children_to_bound_parent (bool, optional): Setting this parameter to `True` will restrict children nodes, so that they always contain the parent node inside of their range. Without setting this it's possible that both, the left and the right nodes could be greater, than or less than, the parent node. Defaults to `False`.
             log_iterations (bool, optional): Setting to a value (N) other than zero will result in information being logged about ever N iterations, info can be interacted with directly with the python [`logging`](https://docs.python.org/3/howto/logging.html) module. For an example of how to utilize the logging information see the example [here](/#logging-output).
             feature_importance_method (str, optional): The feature importance method type that will be used to calculate the `feature_importances_` attribute on the booster.
-            
+
         Raises:
             TypeError: Raised if an invalid dtype is passed.
 
@@ -353,7 +374,7 @@ class PerpetualBooster:
             ```
 
         """
-       
+
         terminate_missing_features_ = (
             set() if terminate_missing_features is None else terminate_missing_features
         )
@@ -415,14 +436,16 @@ class PerpetualBooster:
             categorical_features: The names or indices for categorical features. auto for pandas categorical data type
         """
 
-        features_, flat_data, rows, cols, categorical_features_, cat_mapping = convert_input_frame(X, categorical_features)
+        features_, flat_data, rows, cols, categorical_features_, cat_mapping = (
+            convert_input_frame(X, categorical_features)
+        )
         self.n_features_ = cols
         self._set_metadata_attributes("n_features_", self.n_features_)
         self.cat_mapping = cat_mapping
         self._set_metadata_attributes("cat_mapping", self.cat_mapping)
         self.feature_names_in_ = features_
         self._set_metadata_attributes("feature_names_in_", self.feature_names_in_)
-      
+
         y_ = _convert_input_array(y)
 
         if sample_weight is None:
@@ -434,7 +457,9 @@ class PerpetualBooster:
         # by the rust code.
         monotone_constraints_ = self._standardize_monotonicity_map(X)
         self.booster.monotone_constraints = monotone_constraints_
-        self.booster.terminate_missing_features = (self._standardize_terminate_missing_features(X))
+        self.booster.terminate_missing_features = (
+            self._standardize_terminate_missing_features(X)
+        )
 
         self.booster.fit(
             flat_data=flat_data,
@@ -479,7 +504,7 @@ class PerpetualBooster:
             cols=cols,
             parallel=parallel_,
         )
-    
+
     @property
     def feature_importances_(self) -> np.ndarray:
         vals = self.calculate_feature_importance(
@@ -530,7 +555,6 @@ class PerpetualBooster:
             parallel=parallel_,
         )
         return np.reshape(contributions, (rows, cols + 1))
-
 
     def partial_dependence(
         self,
@@ -811,7 +835,6 @@ class PerpetualBooster:
         value = self.get_metadata(key)
         return self.meta_data_attributes[key].deserialize(value)
 
-
     @property
     def number_of_trees(self) -> int:
         """The number of trees in the model.
@@ -820,7 +843,6 @@ class PerpetualBooster:
             int: The total number of trees in the model.
         """
         return self.booster.number_of_trees
-
 
     # Make picklable with getstate and setstate
     def __getstate__(self) -> dict[Any, Any]:
@@ -967,4 +989,6 @@ class PerpetualBooster:
             for n in tree
         ]
 
-        return pd.DataFrame.from_records(vals).sort_values(['Tree', 'Node'], ascending=[True, True])
+        return pd.DataFrame.from_records(vals).sort_values(
+            ["Tree", "Node"], ascending=[True, True]
+        )

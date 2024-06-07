@@ -134,6 +134,8 @@ def test_get_node_list(X_y):
 test_args = itertools.product(
     [True, False], ["Weight", "Cover", "Gain", "TotalGain", "TotalCover"]
 )
+
+
 @pytest.mark.parametrize("is_numpy,importance_method", test_args)
 def test_feature_importance_method_init(
     X_y: tuple[pd.DataFrame, pd.Series], is_numpy: bool, importance_method: str
@@ -151,7 +153,7 @@ def test_feature_importance_method_init(
 
     imp = model.calculate_feature_importance(method=importance_method, normalize=True)
 
-    #for ft, cf in zip(model.feature_names_in_, model.feature_importances_):
+    # for ft, cf in zip(model.feature_names_in_, model.feature_importances_):
     #    print(imp.get(ft, 0.0), cf)
     #    print(imp.get(ft, 0.0) == cf)
 
@@ -326,7 +328,7 @@ def test_booster_contributions(X_y):
 
     contribs_weight = model.predict_contributions(X, method="Weight")
     assert np.allclose(contribs_weight.sum(1), preds)
-    #assert not np.allclose(contribs_weight, contribs_average)
+    # assert not np.allclose(contribs_weight, contribs_average)
 
     contribs_difference = model.predict_contributions(X, method="BranchDifference")
     assert not np.allclose(contribs_difference.sum(1), preds)
@@ -388,7 +390,9 @@ def test_missing_branch_with_contributions(X_y):
     assert np.allclose(model_miss_branch_conts.sum(1), model_miss_branch_preds)
     assert not np.allclose(model_miss_branch_preds, model_miss_leaf_preds)
 
-    model_miss_branch_conts = model_miss_branch.predict_contributions(X, method="weight")
+    model_miss_branch_conts = model_miss_branch.predict_contributions(
+        X, method="weight"
+    )
     assert np.allclose(model_miss_branch_conts.sum(1), model_miss_branch_preds)
 
     model_miss_branch_conts = model_miss_branch.predict_contributions(
@@ -730,10 +734,23 @@ class TestSaveLoadFunctions:
         model_loaded = load_func(f64_model_path)
         assert all(preds == model_loaded.predict(X))
 
+
 def test_categorical(X_y):
     X = pd.read_csv("../resources/adult_test_df.csv", index_col=False)
-    y = np.array(pd.read_csv("../resources/adult_test_y.csv", index_col=False, header=None).squeeze('columns'))
-    cols = ['workclass', 'education', 'marital-status', 'occupation', 'relationship', 'race', 'native-country']
-    X[cols] = X[cols].astype('category')
+    y = np.array(
+        pd.read_csv(
+            "../resources/adult_test_y.csv", index_col=False, header=None
+        ).squeeze("columns")
+    )
+    cols = [
+        "workclass",
+        "education",
+        "marital-status",
+        "occupation",
+        "relationship",
+        "race",
+        "native-country",
+    ]
+    X[cols] = X[cols].astype("category")
     model = PerpetualBooster()
     model.fit(X, y)
