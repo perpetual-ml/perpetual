@@ -47,7 +47,7 @@ jobs:
           pytest --cov-fail-under=90 tests
           cd ..
       - name: Save Artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v3
         with:
           name: wheels
           path: dist
@@ -96,7 +96,7 @@ jobs:
           pytest --cov-fail-under=90 tests
           cd ..
       - name: Save Artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v3
         with:
           name: wheels
           path: dist
@@ -148,7 +148,7 @@ jobs:
           pytest --cov-fail-under=90 tests
           cd ..
       - name: Save Artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v3
         with:
           name: wheels
           path: dist
