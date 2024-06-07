@@ -25,7 +25,11 @@ jobs:
       - name: Update TOML
         run: python scripts/remove-optional-deps.py
       - name: Build test data
-        run: python scripts/make_resources.py
+        run: |
+          cd python-package
+          python -m pip install -e .[dev]
+          cd ..
+          python scripts/make_resources.py
       - name: Run tests
         run: cargo test --verbose
       - name: Build Wheels with maturin
@@ -73,7 +77,11 @@ jobs:
       - name: Update TOML
         run: python scripts/remove-optional-deps.py
       - name: Build test data
-        run: python scripts/make_resources.py
+        run: |
+          cd python-package
+          python -m pip install -e .[dev]
+          cd ..
+          python scripts/make_resources.py
       - name: Run tests
         run: cargo test --verbose
       - name: Build Wheels with maturin
@@ -122,7 +130,11 @@ jobs:
       - name: Update TOML
         run: python scripts/remove-optional-deps.py
       - name: Build test data
-        run: python scripts/make_resources.py
+        run: |
+          cd python-package
+          python -m pip install -e .[dev]
+          cd ..
+          python scripts/make_resources.py
       - name: Run tests
         run: cargo test --verbose
       - name: Build Wheels with maturin
@@ -168,7 +180,11 @@ jobs:
       - name: Update TOML
         run: python scripts/remove-optional-deps.py
       - name: Build test data
-        run: python scripts/make_resources.py
+        run: |
+          cd python-package
+          python -m pip install -e .[dev]
+          cd ..
+          python scripts/make_resources.py
       - name: Run tests
         run: cargo test --verbose
       - if: "startsWith(github.ref, 'refs/tags/')"
