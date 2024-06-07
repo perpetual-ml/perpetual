@@ -1,0 +1,47 @@
+site_name: forust
+repo_name: forust
+repo_url: https://github.com/jinlow/forust
+theme:
+  name: material
+  icon:
+    repo: fontawesome/brands/github
+    logo: material/forest-outline
+  palette: 
+        # Palette toggle for light mode
+    - scheme: default
+      primary: deep purple
+      toggle:
+        icon: material/toggle-switch
+        name: Switch to dark mode
+      # Palette toggle for dark mode
+    - scheme: slate
+      primary: deep purple
+      toggle:
+        icon: material/toggle-switch-off-outline
+        name: Switch to light mode
+
+markdown_extensions:
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.superfences
+    
+plugins:
+  - search
+  - autorefs
+  - mkdocstrings:
+      handlers:
+        python:
+          options:
+            heading_level: 2
+            docstring_section_style: list
+            members_order: source
+            show_root_heading: true
+            show_root_full_path: false
+            separate_signature: true
+            show_source: false
+            show_signature_annotations: true
+            merge_init_into_class: true

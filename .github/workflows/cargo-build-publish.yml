@@ -1,0 +1,31 @@
+name: Cargo Build Publish
+on: [workflow_dispatch]
+
+jobs:
+  cargo-build-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Install latests stable Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+      - uses: actions/setup-python@v4
+        with:
+          python-version: "3.10"
+          architecture: x64
+      - name: Install deps
+        run: pip install numpy pandas seaborn scikit-learn toml
+      - run: |
+          cp README.md python-package/README.md
+          cp LICENSE python-package/LICENSE
+      - name: Update TOML
+        run: python scripts/remove-optional-deps.py
+      - name: Build test data
+        run: python scripts/make_resources.py
+      - name: Run tests
+        run: cargo test --verbose
+      - name: Publish Crate
+        run: cargo publish --token ${CRATES_TOKEN} --allow-dirty
+        env:
+          CRATES_TOKEN: ${{ secrets.CRATES_TOKEN }}

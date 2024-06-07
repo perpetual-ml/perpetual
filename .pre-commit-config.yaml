@@ -1,0 +1,20 @@
+repos:
+-   repo: https://github.com/doublify/pre-commit-rust
+    rev: "v1.0"
+    hooks:
+    -   id: fmt
+    -   id: cargo-check
+    -   id: clippy
+-   repo: https://github.com/pycqa/isort
+    rev: "5.12.0"
+    hooks:
+    -   id: isort
+-   repo: https://github.com/psf/black
+    rev: "22.6.0"
+    hooks:
+    -   id: black
+- repo: https://github.com/astral-sh/ruff-pre-commit
+  # Ruff version.
+  rev: v0.0.277
+  hooks:
+    - id: ruff
