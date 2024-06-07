@@ -56,17 +56,17 @@ jobs:
     strategy:
       matrix:
         pyversion: ["3.11", "3.12"]
+        platform: [x64, arm64]
     runs-on: "macos-latest"
     steps:
       - uses: actions/checkout@v4
-      - name: Install latests stable Rust
+      - name: Install latest stable Rust
         uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: stable
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.pyversion }}
-          architecture: x64
       - name: Install deps
         run: pip install numpy pandas seaborn scikit-learn toml ucimlrepo
       - run: |
@@ -83,7 +83,6 @@ jobs:
       - name: Build wheels with maturin
         uses: PyO3/maturin-action@v1
         with:
-          target: x86_64
           command: build
           args: --release --strip --interpreter python --manifest-path python-package/Cargo.toml --out dist
       - name: Install wheel
