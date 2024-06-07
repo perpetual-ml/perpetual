@@ -55,7 +55,7 @@ jobs:
   macos-build-test:
     strategy:
       matrix:
-        pyversion: ["3.8", "3.9", "3.10", "3.11", "3.12"]
+        pyversion: ["3.11", "3.12"]
     runs-on: "macos-latest"
     steps:
       - uses: actions/checkout@v4

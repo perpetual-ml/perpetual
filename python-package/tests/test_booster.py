@@ -34,7 +34,6 @@ def test_booster_no_variance(X_y):
 
     model = PerpetualBooster(objective="LogLoss")
     model.fit(X, y)
-    preds = model.predict(X)
     assert model.feature_importances_[1] == 0.0
     assert model.feature_importances_[3] == 0.0
 

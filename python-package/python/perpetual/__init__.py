@@ -178,7 +178,7 @@ def convert_input_frame(X: FrameLike, categorical_features) -> tuple[list[str], 
             def f(x):
                 try:
                     return np.nan if str(x[feature_index]) == "nan" else float(categories.index(str(x[feature_index])))
-                except:
+                except (ValueError, IndexError):
                     return np.nan
             X_[:, feature_index] = np.apply_along_axis(f, 1, X_)
 
@@ -215,7 +215,7 @@ def transform_input_frame(X: FrameLike, cat_mapping) -> tuple[list[str], np.ndar
             def f(x):
                 try:
                     return np.nan if str(x[feature_index]) == "nan" else float(categories.index(str(x[feature_index])))
-                except:
+                except (ValueError, IndexError):
                     return np.nan
             X_[:, feature_index] = np.apply_along_axis(f, 1, X_)
 
