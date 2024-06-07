@@ -83,6 +83,8 @@ if __name__ == "__main__":
     features_, adult_train_flat, rows, cols, categorical_features_, cat_mapping = convert_input_frame(data_train, "auto")
     features_, adult_test_flat, rows, cols = transform_input_frame(data_test, cat_mapping)
 
+    data_test.to_csv("resources/adult_test_df.csv", index=False)
+
     pd.Series(adult_train_flat).to_csv("resources/adult_train_flat.csv", index=False, header=False)
     pd.Series(adult_test_flat).to_csv("resources/adult_test_flat.csv", index=False, header=False)
     pd.Series(y_train).to_csv("resources/adult_train_y.csv", index=False, header=False)

@@ -144,11 +144,13 @@ def convert_input_frame(X: FrameLike, categorical_features) -> tuple[list[str], 
     Returns:
         tuple[list[str], np.ndarray, int, int, Optional[Iterable[int]], Optional[dict]]: Return column names, the flat data, number of rows, the number of columns, cat_index, cat_mapping
     """
+    categorical_features_ = None
     if isinstance(X, pd.DataFrame):
         X_ = X.to_numpy()
         features_ = X.columns.to_list()
         if categorical_features == "auto":
-            categorical_features_ = [features_.index(c) for c in X.select_dtypes(include=['category']).columns.tolist()] or None
+            categorical_columns = X.select_dtypes(include=['category']).columns.tolist()
+            categorical_features_ = [features_.index(c) for c in categorical_columns] or None
     else:
         # Assume it's a numpy array.
         X_ = X
@@ -158,8 +160,7 @@ def convert_input_frame(X: FrameLike, categorical_features) -> tuple[list[str], 
         categorical_features_ = categorical_features
     elif categorical_features and all(isinstance(s, str) for s in categorical_features) and isinstance(categorical_features, list):
         categorical_features_ = [features_.index(c) for c in categorical_features]
-    else:
-        categorical_features_ = None
+ 
 
     cat_mapping = {}  # key: feature_name, value: ordered category names
     if categorical_features_:

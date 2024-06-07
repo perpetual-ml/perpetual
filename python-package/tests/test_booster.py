@@ -730,3 +730,11 @@ class TestSaveLoadFunctions:
         save_func(model, f64_model_path)
         model_loaded = load_func(f64_model_path)
         assert all(preds == model_loaded.predict(X))
+
+def test_categorical(X_y):
+    X = pd.read_csv("../resources/adult_test_df.csv", index_col=False)
+    y = np.array(pd.read_csv("../resources/adult_test_y.csv", index_col=False, header=None).squeeze('columns'))
+    cols = ['workclass', 'education', 'marital-status', 'occupation', 'relationship', 'race', 'native-country']
+    X[cols] = X[cols].astype('category')
+    model = PerpetualBooster()
+    model.fit(X, y)

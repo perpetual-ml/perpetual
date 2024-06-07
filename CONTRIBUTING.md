@@ -32,7 +32,7 @@ Prior to running the tests, you should install `python-package` in editable mode
 cd python-package
 # Install the project in editable mode and all development dependencies
 python -m pip install -e .[dev]
-# You can now return to the rood directory and run the tests...
+# You can now return to the root directory and run the tests...
 cd ..
 
 # Prior to running the tests, build all required test artifacts
