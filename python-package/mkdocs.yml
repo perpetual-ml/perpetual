@@ -1,13 +1,13 @@
-site_name: forust
-repo_name: forust
-repo_url: https://github.com/jinlow/forust
+site_name: perpetual
+repo_name: perpetual
+repo_url: https://github.com/perpetual-ml/perpetual/
 theme:
   name: material
   icon:
     repo: fontawesome/brands/github
     logo: material/forest-outline
-  palette: 
-        # Palette toggle for light mode
+  palette:
+    # Palette toggle for light mode
     - scheme: default
       primary: deep purple
       toggle:
@@ -28,7 +28,7 @@ markdown_extensions:
   - pymdownx.inlinehilite
   - pymdownx.snippets
   - pymdownx.superfences
-    
+
 plugins:
   - search
   - autorefs
