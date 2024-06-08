@@ -18,9 +18,7 @@ PerpetualBooster is a gradient boosting machine (GBM) algorithm which doesn't ha
 
 Hyperparameter optimization usually takes 100 iterations with plain GBM algorithms. PerpetualBooster achieves the same accuracy in the single run. Thus, it achieves around 100x speed-up at the same accuracy with different `budget` levels and with different datasets. The speed-up might be slightly lower or significantly higher than 100x depending on the dataset.
 
-PerpetualBooster prevents overfitting with a generalization algorithm. The paper is work-in-progress to explain the algorithm.
-
-All of the algorithm code is written in [Rust](https://www.rust-lang.org/) with a python wrapper. All of the rust code for the package can be found in the [src](src/) directory, while all of the python wrapper code is in the [python-package](python-package/) directory.
+PerpetualBooster prevents overfitting with a generalization algorithm. The paper is work-in-progress to explain how the algorithm works.
 
 ## Usage
 
@@ -35,7 +33,7 @@ model.fit(X, y, budget=0.4)
 
 ## Documentation
 
-Documentation for the python API can be found [here](https://perpetual-ml.com/docs/).
+Documentation for the python API can be found [here](https://perpetual-ml.github.io/perpetual/).
 
 ## Installation
 
@@ -48,5 +46,5 @@ pip install perpetual
 To use in a rust project, add the following to your Cargo.toml file.
 
 ```toml
-perpetual = "0.0.4"
+perpetual = "0.0.5"
 ```

@@ -4,7 +4,7 @@ build-backend = "maturin"
 
 [project]
 name = "perpetual"
-description = "A gradient boosting implementation in Rust."
+description = "A self-generalizing, hyperparameter-free gradient boosting machine"
 license = { file = "LICENSE" }
 keywords = [
   "rust",
@@ -21,8 +21,12 @@ dependencies = ["numpy>=1.21", "pandas>=2.0"]
 requires-python = ">=3.8"
 classifiers = [
   "Programming Language :: Rust",
-  "Programming Language :: Python :: Implementation :: CPython",
-  "Programming Language :: Python :: Implementation :: PyPy",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.8",
+  "Programming Language :: Python :: 3.9",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
 ]
 
 [project.optional-dependencies]

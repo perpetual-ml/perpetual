@@ -2,13 +2,9 @@
 
 ## Python API Reference
 
-<div align="center">
+<img alt="PyPI - Version" src="https://img.shields.io/pypi/v/perpetual?link=https%3A%2F%2Fpypi.org%2Fproject%2Fperpetual%2F">
 
-[![Python Versions](https://img.shields.io/pypi/pyversions/perpetual.svg?logo=python&logoColor=white)](https://pypi.org/project/perpetual)
-[![PyPI Version](https://img.shields.io/pypi/v/perpetual.svg?logo=pypi&logoColor=white)](https://pypi.org/project/perpetual)
-[![Crates.io Version](https://img.shields.io/crates/v/:perpetual?logo=rust&logoColor=white)](https://crates.io/crates/perpetual)
-
-</div>
+<img alt="Crates.io Version" src="https://img.shields.io/crates/v/perpetual?link=https%3A%2F%2Fcrates.io%2Fcrates%2Fperpetual">
 
 The `PerpetualBooster` class is currently the only public facing class in the package, and can be used to train gradient boosted decision tree ensembles with multiple objective functions.
 
