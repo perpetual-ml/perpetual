@@ -191,13 +191,11 @@ jobs:
       url: https://pypi.org/p/perpetual
     permissions:
       id-token: write
-
     steps:
       - name: Retrieve release distributions
         uses: actions/download-artifact@v3
         with:
           name: release-dists
           path: dist/
-
       - name: Publish release distributions to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
