@@ -187,7 +187,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: ["windows-build-test", "macos-build-test", "linux-build-test"]
     environment:
-      name: pypi
+      name: Test and Deploy
       url: https://pypi.org/p/perpetual
     permissions:
       id-token: write
