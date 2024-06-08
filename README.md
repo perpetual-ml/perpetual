@@ -48,5 +48,5 @@ pip install perpetual
 To use in a rust project, add the following to your Cargo.toml file.
 
 ```toml
-perpetual = "0.0.2"
+perpetual = "0.0.3"
 ```
