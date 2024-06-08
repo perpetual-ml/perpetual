@@ -1,4 +1,4 @@
-name: test and deploy
+name: Test and Deploy
 on: [pull_request, push]
 
 jobs:

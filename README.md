@@ -6,7 +6,7 @@
 
 [![Python Versions](https://img.shields.io/pypi/pyversions/perpetual.svg?logo=python&logoColor=white)](https://pypi.org/project/perpetual)
 [![PyPI Version](https://img.shields.io/pypi/v/perpetual.svg?logo=pypi&logoColor=white)](https://pypi.org/project/perpetual)
-[![Crates.io Version](https://img.shields.io/crates/v/:perpetual?logo=rust&logoColor=white)](https://crates.io/crates/perpetual)
+[![Crates.io Version](https://img.shields.io/crates/v/perpetual?logo=rust&logoColor=white)](https://crates.io/crates/perpetual)
 
 </div>
 
