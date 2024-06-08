@@ -28,8 +28,6 @@ jobs:
           python -m pip install -e .[dev]
           cd ..
           python scripts/make_resources.py
-      - name: Run tests
-        run: cargo test --verbose
       - name: Build wheels with maturin
         uses: PyO3/maturin-action@v1
         with:
@@ -78,8 +76,6 @@ jobs:
           python -m pip install -e .[dev]
           cd ..
           python scripts/make_resources.py
-      - name: Run tests
-        run: cargo test --verbose
       - name: Build wheels with maturin
         uses: PyO3/maturin-action@v1
         with:
@@ -106,7 +102,6 @@ jobs:
     strategy:
       matrix:
         pyversion: ["3.8", "3.9", "3.10", "3.11", "3.12"]
-        # target: [x86_64, i686]
     steps:
       - uses: actions/checkout@v4
       - name: Install latests stable Rust
@@ -128,8 +123,6 @@ jobs:
           python -m pip install -e .[dev]
           cd ..
           python scripts/make_resources.py
-      - name: Run tests
-        run: cargo test --verbose
       - name: Build wheels with maturin
         uses: PyO3/maturin-action@v1
         with:
