@@ -16,9 +16,19 @@
 
 PerpetualBooster is a gradient boosting machine (GBM) algorithm which doesn't have hyperparameters to be tuned so that you can use it without needing hyperparameter optimization packages unlike other GBM algorithms. Similar to AutoML libraries, it has a `budget` parameter which ranges between `(0, 1)`. Increasing the `budget` parameter increases predictive power of the algorithm and gives better results on unseen data. Start with a small budget and increase it once you are confident with your features. If you don't see any improvement with further increasing `budget`, it means that you are already extracting the most predictive power out of your data.
 
+## Benchmark
+
 Hyperparameter optimization usually takes 100 iterations with plain GBM algorithms. PerpetualBooster achieves the same accuracy in the single run. Thus, it achieves around 100x speed-up at the same accuracy with different `budget` levels and with different datasets. The speed-up might be slightly lower or significantly higher than 100x depending on the dataset.
 
-PerpetualBooster prevents overfitting with a generalization algorithm. The paper is work-in-progress to explain how the algorithm works.
+The following table summarizes the results for the [California Housing](https://scikit-learn.org/stable/modules/generated/sklearn.datasets.fetch_california_housing.html) dataset:
+
+| Perpetual budget | LightGBM n_estimators | Perpetual mse | LightGBM mse | Perpetual cpu time | LightGBM cpu time | Speed-up |
+| ---------------- | --------------------- | ------------- | ------------ | ------------------ | ----------------- | -------- |
+| 0.33             | 100                   | 0.192         | 0.192        | 10.1               | 990               | 98x      |
+| 0.35             | 200                   | 0.190         | 0.191        | 11.0               | 2030              | 186x     |
+| 0.45             | 300                   | 0.187         | 0.188        | 18.7               | 3272              | 179x     |
+
+You can reproduce the results using the [performance_benchmark.ipynb](./python-package/examples/performance_benchmark.ipynb) notebook in the [examples](./python-package/examples) folder.
 
 ## Usage
 
@@ -33,18 +43,22 @@ model.fit(X, y, budget=0.4)
 
 ## Documentation
 
-Documentation for the python API can be found [here](https://perpetual-ml.github.io/perpetual/).
+Documentation for the Python API can be found [here](https://perpetual-ml.github.io/perpetual) and for the Rust API [here](https://docs.rs/perpetual/latest/perpetual/).
 
 ## Installation
 
-The package can be installed directly from [pypi](https://pypi.org/project/perpetual/).
+The package can be installed directly from [pypi](https://pypi.org/project/perpetual).
 
 ```shell
 pip install perpetual
 ```
 
-To use in a rust project, add the following to your Cargo.toml file.
+To use in a rust project, add the following to your Cargo.toml file to get the package from [crates.io](https://crates.io/crates/perpetual).
 
 ```toml
-perpetual = "0.0.5"
+perpetual = "0.1.0"
 ```
+
+## Paper
+
+PerpetualBooster prevents overfitting with a generalization algorithm. The paper is work-in-progress to explain how the algorithm works.
