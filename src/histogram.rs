@@ -232,13 +232,13 @@ impl HistogramMatrix {
         _parallel: bool,
         sort: bool,
     ) {
-        // Sort gradients and hessians to reduce cache hits.
+        // Sort gradients and hessians to improve cache hits.
         // This made a really sizeable difference on larger datasets
-        // Bringing training time down from nearly 6 minutes, to 2 minutes.
+        // Bringing training time down from nearly 6 minutes to 2 minutes.
 
         // TODO: calculate g_sum_folded and h_sum_folded
-        //let mut sorted_grad: Vec<f32>;
-        //let mut sorted_hess: Option<Vec<f32>>;
+        // let mut sorted_grad: Vec<f32>;
+        // let mut sorted_hess: Option<Vec<f32>>;
         let (sorted_grad, sorted_hess) = match hess {
             Some(hess) => {
                 if !sort {

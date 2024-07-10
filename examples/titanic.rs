@@ -7,8 +7,7 @@ use std::error::Error;
 
 fn main() -> Result<(), Box<dyn Error>> {
     let args: Vec<String> = env::args().collect();
-    let growth_control = &args[1].parse::<f32>().unwrap();
-    let budget = &args[2].parse::<f32>().unwrap();
+    let budget = &args[1].parse::<f32>().unwrap();
 
     let features_and_target = ["survived", "pclass", "age", "sibsp", "parch", "fare"];
 
@@ -47,9 +46,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     // To provide parameters generate a default booster, and then use
     // the relevant `set_` methods for any parameters you would like to
     // adjust.
-    let mut model = PerpetualBooster::default()
-        .set_objective(Objective::LogLoss)
-        .set_growth_control(*growth_control);
+    let mut model = PerpetualBooster::default().set_objective(Objective::LogLoss);
     model.fit(&matrix, &y, None, None, *budget, None, None)?;
 
     println!("Model prediction: {:?} ...", &model.predict(&matrix, true, None)[0..10]);

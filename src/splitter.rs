@@ -74,11 +74,7 @@ pub trait Splitter {
     }
     fn get_constraint(&self, feature: &usize) -> Option<&Constraint>;
     // fn get_allow_missing_splits(&self) -> bool;
-    fn get_gamma(&self) -> f32;
-    fn get_l1(&self) -> f32;
-    fn get_l2(&self) -> f32;
-    fn get_max_delta_step(&self) -> f32;
-    fn get_learning_rate(&self) -> f32;
+    fn get_eta(&self) -> f32;
 
     /// Perform any post processing on the tree that is
     /// relevant for the specific splitter, empty default
@@ -311,7 +307,7 @@ pub trait Splitter {
                 Some(v) => v,
             };
 
-            let split_gain = node.get_split_gain(&left_node_info, &right_node_info, &missing_info, self.get_gamma());
+            let split_gain = node.get_split_gain(&left_node_info, &right_node_info, &missing_info);
 
             // Check monotonicity holds
             let split_gain = cull_gain(split_gain, left_node_info.weight, right_node_info.weight, constraint);
@@ -494,7 +490,7 @@ pub trait Splitter {
                 Some(v) => v,
             };
 
-            let split_gain = node.get_split_gain(&left_node_info, &right_node_info, &missing_info, self.get_gamma());
+            let split_gain = node.get_split_gain(&left_node_info, &right_node_info, &missing_info);
 
             // Check monotonicity holds
             let split_gain = cull_gain(split_gain, left_node_info.weight, right_node_info.weight, constraint);
@@ -587,12 +583,7 @@ pub trait Splitter {
 /// If this node is able, it will be split further, otherwise it will
 /// a leaf node will be generated.
 pub struct MissingBranchSplitter {
-    pub l1: f32,
-    pub l2: f32,
-    pub max_delta_step: f32,
-    pub gamma: f32,
-    pub min_leaf_weight: f32,
-    pub learning_rate: f32,
+    pub eta: f32,
     pub allow_missing_splits: bool,
     pub constraints_map: ConstraintMap,
     pub terminate_missing_features: HashSet<usize>,
@@ -665,23 +656,8 @@ impl Splitter for MissingBranchSplitter {
         self.constraints_map.get(feature)
     }
 
-    fn get_gamma(&self) -> f32 {
-        self.gamma
-    }
-
-    fn get_l1(&self) -> f32 {
-        self.l1
-    }
-
-    fn get_l2(&self) -> f32 {
-        self.l2
-    }
-    fn get_max_delta_step(&self) -> f32 {
-        self.max_delta_step
-    }
-
-    fn get_learning_rate(&self) -> f32 {
-        self.learning_rate
+    fn get_eta(&self) -> f32 {
+        self.eta
     }
 
     fn evaluate_split(
@@ -707,26 +683,8 @@ impl Splitter for MissingBranchSplitter {
             return None;
         }
 
-        let mut left_weight = constrained_weight(
-            &self.l1,
-            &self.l2,
-            &self.max_delta_step,
-            left_gradient,
-            left_hessian,
-            lower_bound,
-            upper_bound,
-            constraint,
-        );
-        let mut right_weight = constrained_weight(
-            &self.l1,
-            &self.l2,
-            &self.max_delta_step,
-            right_gradient,
-            right_hessian,
-            lower_bound,
-            upper_bound,
-            constraint,
-        );
+        let mut left_weight = constrained_weight(left_gradient, left_hessian, lower_bound, upper_bound, constraint);
+        let mut right_weight = constrained_weight(right_gradient, right_hessian, lower_bound, upper_bound, constraint);
 
         if self.force_children_to_bound_parent {
             (left_weight, right_weight) = bound_to_parent(parent_weight, left_weight, right_weight);
@@ -734,14 +692,8 @@ impl Splitter for MissingBranchSplitter {
             assert!(between(lower_bound, upper_bound, right_weight));
         }
 
-        let left_gain = gain_given_weight(&self.l2, left_gradient, left_hessian, left_weight);
-        let right_gain = gain_given_weight(&self.l2, right_gradient, right_hessian, right_weight);
-
-        // Check the min_hessian constraint first
-        if (right_hessian < self.min_leaf_weight) || (left_hessian < self.min_leaf_weight) {
-            // Update for new value
-            return None;
-        }
+        let left_gain = gain_given_weight(left_gradient, left_hessian, left_weight);
+        let right_gain = gain_given_weight(right_gradient, right_hessian, right_weight);
 
         // We have not considered missing at all up until this point, we could if we wanted
         // to give more predictive power probably to missing.
@@ -751,9 +703,6 @@ impl Splitter for MissingBranchSplitter {
         // Set weight based on the missing node treatment.
         let missing_weight = match self.missing_node_treatment {
             MissingNodeTreatment::AssignToParent => constrained_weight(
-                &self.get_l1(),
-                &self.get_l2(),
-                &self.max_delta_step,
                 missing_gradient + left_gradient + right_gradient,
                 missing_hessian + left_hessian + right_hessian,
                 lower_bound,
@@ -771,20 +720,12 @@ impl Splitter for MissingBranchSplitter {
                 if missing_hessian == 0. || missing_gradient == 0. {
                     parent_weight
                 } else {
-                    constrained_weight(
-                        &self.get_l1(),
-                        &self.get_l2(),
-                        &self.max_delta_step,
-                        missing_gradient,
-                        missing_hessian,
-                        lower_bound,
-                        upper_bound,
-                        constraint,
-                    )
+                    constrained_weight(missing_gradient, missing_hessian, lower_bound, upper_bound, constraint)
                 }
             }
         };
-        let missing_gain = gain_given_weight(&self.get_l2(), missing_gradient, missing_hessian, missing_weight);
+
+        let missing_gain = gain_given_weight(missing_gradient, missing_hessian, missing_weight);
         let missing_info = NodeInfo {
             gain: missing_gain,
             grad: missing_gradient,
@@ -807,10 +748,6 @@ impl Splitter for MissingBranchSplitter {
             )
         };
 
-        if (right_hessian < self.min_leaf_weight) || (left_hessian < self.min_leaf_weight) {
-            // Update for new value
-            return None;
-        }
         Some((
             NodeInfo {
                 gain: left_gain,
@@ -1171,12 +1108,7 @@ impl Splitter for MissingBranchSplitter {
 /// them down either the right or left branch, depending
 /// on which results in a higher increase in gain.
 pub struct MissingImputerSplitter {
-    pub l1: f32,
-    pub l2: f32,
-    pub max_delta_step: f32,
-    pub gamma: f32,
-    pub min_leaf_weight: f32,
-    pub learning_rate: f32,
+    pub eta: f32,
     pub allow_missing_splits: bool,
     pub constraints_map: ConstraintMap,
 }
@@ -1184,23 +1116,9 @@ pub struct MissingImputerSplitter {
 impl MissingImputerSplitter {
     /// Generate a new missing imputer splitter object.
     #[allow(clippy::too_many_arguments)]
-    pub fn new(
-        l1: f32,
-        l2: f32,
-        max_delta_step: f32,
-        gamma: f32,
-        min_leaf_weight: f32,
-        learning_rate: f32,
-        allow_missing_splits: bool,
-        constraints_map: ConstraintMap,
-    ) -> Self {
+    pub fn new(eta: f32, allow_missing_splits: bool, constraints_map: ConstraintMap) -> Self {
         MissingImputerSplitter {
-            l1,
-            l2,
-            max_delta_step,
-            gamma,
-            min_leaf_weight,
-            learning_rate,
+            eta,
             allow_missing_splits,
             constraints_map,
         }
@@ -1212,23 +1130,8 @@ impl Splitter for MissingImputerSplitter {
         self.constraints_map.get(feature)
     }
 
-    fn get_gamma(&self) -> f32 {
-        self.gamma
-    }
-
-    fn get_l1(&self) -> f32 {
-        self.l1
-    }
-
-    fn get_l2(&self) -> f32 {
-        self.l2
-    }
-    fn get_max_delta_step(&self) -> f32 {
-        self.max_delta_step
-    }
-
-    fn get_learning_rate(&self) -> f32 {
-        self.learning_rate
+    fn get_eta(&self) -> f32 {
+        self.eta
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -1264,38 +1167,11 @@ impl Splitter for MissingImputerSplitter {
         let mut right_gradient = right_gradient;
         let mut right_hessian = right_hessian;
 
-        let mut left_weight = constrained_weight(
-            &self.l1,
-            &self.l2,
-            &self.max_delta_step,
-            left_gradient,
-            left_hessian,
-            lower_bound,
-            upper_bound,
-            constraint,
-        );
-        let mut right_weight = constrained_weight(
-            &self.l1,
-            &self.l2,
-            &self.max_delta_step,
-            right_gradient,
-            right_hessian,
-            lower_bound,
-            upper_bound,
-            constraint,
-        );
+        let mut left_weight = constrained_weight(left_gradient, left_hessian, lower_bound, upper_bound, constraint);
+        let mut right_weight = constrained_weight(right_gradient, right_hessian, lower_bound, upper_bound, constraint);
 
-        let mut left_gain = gain_given_weight(&self.l2, left_gradient, left_hessian, left_weight);
-        let mut right_gain = gain_given_weight(&self.l2, right_gradient, right_hessian, right_weight);
-
-        if !self.allow_missing_splits {
-            // Check the min_hessian constraint first, if we do not
-            // want to allow missing only splits.
-            if (right_hessian < self.min_leaf_weight) || (left_hessian < self.min_leaf_weight) {
-                // Update for new value
-                return None;
-            }
-        }
+        let mut left_gain = gain_given_weight(left_gradient, left_hessian, left_weight);
+        let mut right_gain = gain_given_weight(right_gradient, right_hessian, right_weight);
 
         // Check Missing direction
         // Don't even worry about it, if there are no missing values
@@ -1306,9 +1182,6 @@ impl Splitter for MissingImputerSplitter {
             // back to f32...
             // The weight if missing went left
             let missing_left_weight = constrained_weight(
-                &self.l1,
-                &self.l2,
-                &self.max_delta_step,
                 left_gradient + missing_gradient,
                 left_hessian + missing_hessian,
                 lower_bound,
@@ -1317,7 +1190,6 @@ impl Splitter for MissingImputerSplitter {
             );
             // The gain if missing went left
             let missing_left_gain = gain_given_weight(
-                &self.l2,
                 left_gradient + missing_gradient,
                 left_hessian + missing_hessian,
                 missing_left_weight,
@@ -1327,9 +1199,6 @@ impl Splitter for MissingImputerSplitter {
 
             // The gain if missing went right
             let missing_right_weight = constrained_weight(
-                &self.l1,
-                &self.l2,
-                &self.max_delta_step,
                 right_gradient + missing_gradient,
                 right_hessian + missing_hessian,
                 lower_bound,
@@ -1338,7 +1207,6 @@ impl Splitter for MissingImputerSplitter {
             );
             // The gain is missing went right
             let missing_right_gain = gain_given_weight(
-                &self.l2,
                 right_gradient + missing_gradient,
                 right_hessian + missing_hessian,
                 missing_right_weight,
@@ -1361,11 +1229,6 @@ impl Splitter for MissingImputerSplitter {
                 right_weight = missing_right_weight;
                 missing_info = MissingInfo::Right;
             }
-        }
-
-        if (right_hessian < self.min_leaf_weight) || (left_hessian < self.min_leaf_weight) {
-            // Update for new value
-            return None;
         }
 
         Some((
@@ -1691,12 +1554,7 @@ mod tests {
         let (grad, hess) = LogLoss::calc_grad_hess(&y, &yhat, None, None);
 
         let splitter = MissingImputerSplitter {
-            l1: 0.0,
-            l2: 1.0,
-            max_delta_step: 0.0,
-            gamma: 3.0,
-            min_leaf_weight: 1.0,
-            learning_rate: 0.3,
+            eta: 0.3,
             allow_missing_splits: true,
             constraints_map: ConstraintMap::new(),
         };
@@ -1705,14 +1563,8 @@ mod tests {
             Some(ref hess) => hess.iter().copied().sum(),
             None => grad.len() as f32,
         };
-        let root_weight = weight(
-            &splitter.l1,
-            &splitter.l2,
-            &splitter.max_delta_step,
-            gradient_sum,
-            hessian_sum,
-        );
-        let root_gain = gain(&splitter.l2, gradient_sum, hessian_sum);
+        let root_weight = weight(gradient_sum, hessian_sum);
+        let root_gain = gain(gradient_sum, hessian_sum);
         let data = Matrix::new(&data_vec, 891, 5);
 
         let b = bin_matrix(&data, None, 10, f64::NAN, None).unwrap();
@@ -1818,12 +1670,7 @@ mod tests {
         let (grad, hess) = SquaredLoss::calc_grad_hess(&y_test, &yhat, None, None);
 
         let splitter = MissingImputerSplitter {
-            l1: 0.0,
-            l2: 0.0,
-            max_delta_step: 0.0,
-            gamma: 0.0,
-            min_leaf_weight: 1.0,
-            learning_rate: 0.3,
+            eta: 0.3,
             allow_missing_splits: false,
             constraints_map: ConstraintMap::new(),
         };
@@ -1832,14 +1679,8 @@ mod tests {
             Some(ref hess) => hess.iter().copied().sum(),
             None => grad.len() as f32,
         };
-        let root_weight = weight(
-            &splitter.l1,
-            &splitter.l2,
-            &splitter.max_delta_step,
-            gradient_sum,
-            hessian_sum,
-        );
-        let root_gain = gain(&splitter.l2, gradient_sum, hessian_sum);
+        let root_weight = weight(gradient_sum, hessian_sum);
+        let root_gain = gain(gradient_sum, hessian_sum);
         let data = Matrix::new(&data_test, y_test.len(), n_cols);
 
         let b = bin_matrix(&data, None, n_bins, f64::NAN, None).unwrap();
@@ -1879,8 +1720,6 @@ mod tests {
         Ok(())
     }
 
-    // cargo test test_categorical -- --exact -- --nocapture -- --show-output
-    // cargo test --package perpetual_ml --lib -- splitter::tests::test_categorical --exact --nocapture --show-output
     #[test]
     fn test_categorical() -> Result<(), Box<dyn Error>> {
         let _n_bins = 256;
@@ -1900,12 +1739,7 @@ mod tests {
         let (grad, hess) = LogLoss::calc_grad_hess(&y, &yhat, None, None);
 
         let splitter = MissingImputerSplitter {
-            l1: 0.0,
-            l2: 0.0,
-            max_delta_step: 0.0,
-            gamma: 0.0,
-            min_leaf_weight: 1.0,
-            learning_rate: 0.3,
+            eta: 0.3,
             allow_missing_splits: false,
             constraints_map: ConstraintMap::new(),
         };
@@ -1914,14 +1748,8 @@ mod tests {
             Some(ref hess) => hess.iter().copied().sum(),
             None => grad.len() as f32,
         };
-        let root_weight = weight(
-            &splitter.l1,
-            &splitter.l2,
-            &splitter.max_delta_step,
-            gradient_sum,
-            hessian_sum,
-        );
-        let root_gain = gain(&splitter.l2, gradient_sum, hessian_sum);
+        let root_weight = weight(gradient_sum, hessian_sum);
+        let root_gain = gain(gradient_sum, hessian_sum);
 
         let cat_index = vec![1, 3, 5, 6, 7, 8, 13];
 

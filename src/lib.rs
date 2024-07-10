@@ -5,6 +5,7 @@ mod shapley;
 // Modules
 pub mod binning;
 pub mod booster;
+pub mod constants;
 pub mod constraints;
 pub mod data;
 pub mod errors;

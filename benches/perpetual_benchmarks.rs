@@ -2,6 +2,7 @@ use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use hashbrown::HashMap;
 use perpetual::binning::bin_matrix;
 use perpetual::booster::PerpetualBooster;
+use perpetual::constants::N_NODES_ALLOCATED;
 use perpetual::constraints::ConstraintMap;
 use perpetual::data::Matrix;
 use perpetual::histogram::HistogramMatrix;
@@ -34,12 +35,7 @@ pub fn tree_benchmarks(c: &mut Criterion) {
 
     let data = Matrix::new(&data_vec, y.len(), 5);
     let splitter = MissingImputerSplitter {
-        l1: 0.0,
-        l2: 1.0,
-        max_delta_step: 0.,
-        gamma: 3.0,
-        min_leaf_weight: 1.0,
-        learning_rate: 0.3,
+        eta: 0.3,
         allow_missing_splits: true,
         constraints_map: ConstraintMap::new(),
     };
@@ -50,9 +46,8 @@ pub fn tree_benchmarks(c: &mut Criterion) {
     let col_index: Vec<usize> = (0..data.cols).collect();
 
     let hist_init = HistogramMatrix::empty(&bdata, &bindata.cuts, &col_index, true, false);
-    let hist_capacity = 3000;
-    let mut hist_map: HashMap<usize, HistogramMatrix> = HashMap::with_capacity(hist_capacity);
-    for i in 0..hist_capacity {
+    let mut hist_map: HashMap<usize, HistogramMatrix> = HashMap::with_capacity(N_NODES_ALLOCATED);
+    for i in 0..N_NODES_ALLOCATED {
         hist_map.insert(i, hist_init.clone());
     }
 
@@ -64,8 +59,6 @@ pub fn tree_benchmarks(c: &mut Criterion) {
         &g,
         h.as_deref(),
         &splitter,
-        usize::MAX,
-        5,
         true,
         Some(f32::MAX),
         &loss,
@@ -92,8 +85,6 @@ pub fn tree_benchmarks(c: &mut Criterion) {
                 black_box(&g),
                 black_box(h.as_deref()),
                 black_box(&splitter),
-                black_box(usize::MAX),
-                black_box(10),
                 black_box(false),
                 Some(f32::MAX),
                 black_box(&loss),
@@ -120,8 +111,6 @@ pub fn tree_benchmarks(c: &mut Criterion) {
                 black_box(&g),
                 black_box(h.as_deref()),
                 black_box(&splitter),
-                black_box(usize::MAX),
-                black_box(10),
                 black_box(false),
                 Some(f32::MAX),
                 black_box(&loss),
@@ -167,9 +156,7 @@ pub fn tree_benchmarks(c: &mut Criterion) {
     });
     booster_train.bench_function("train_booster_with_column_sampling", |b| {
         b.iter(|| {
-            let mut booster = PerpetualBooster::default()
-                .set_parallel(false)
-                .set_colsample_bytree(0.5);
+            let mut booster = PerpetualBooster::default().set_parallel(false);
             booster
                 .fit(
                     black_box(&data),

@@ -416,7 +416,7 @@ class PerpetualBooster:
         X: FrameLike,
         y: ArrayLike,
         sample_weight: Union[ArrayLike, None] = None,
-        budget: float = 0.35,
+        budget: float = 1.0,
         reset: Union[bool, None] = None,
         categorical_features: Union[Iterable[int], Iterable[str], str, None] = "auto",
     ) -> PerpetualBooster:
@@ -428,8 +428,8 @@ class PerpetualBooster:
                 was the objective type specified, then this should only contain 1 or 0 values,
                 where 1 is the positive class being predicted. If "SquaredLoss" is the
                 objective type, then any continuous variable can be provided.
-            budget: a number between 0.0 and 1.0 for fitting budget. Increasing this number will more
-                likely result in increasing accuracy.
+            budget: a positive for fitting budget. Increasing this number will more
+                likely result in increased accuracy.
             sample_weight (Union[ArrayLike, None], optional): Instance weights to use when
                 training the model. If None is passed, a weight of 1 will be used for every record.
                 Defaults to None.

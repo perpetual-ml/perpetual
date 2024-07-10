@@ -39,8 +39,7 @@ pub fn multiclass_log_loss(y_true: &[f64], y_pred: &[Vec<f64>]) -> f64 {
 
 fn main() -> Result<(), Box<dyn Error>> {
     let args: Vec<String> = env::args().collect();
-    let growth_control = &args[1].parse::<f32>().unwrap();
-    let budget = &args[2].parse::<f32>().unwrap();
+    let budget = &args[1].parse::<f32>().unwrap();
 
     let mut features: Vec<&str> = [
         "Elevation",
@@ -140,9 +139,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     for i in 1..8 {
         println!();
 
-        let mut model = PerpetualBooster::default()
-            .set_objective(Objective::LogLoss)
-            .set_growth_control(*growth_control);
+        let mut model = PerpetualBooster::default().set_objective(Objective::LogLoss);
 
         let y_tr: Vec<f64> = y_train
             .iter()

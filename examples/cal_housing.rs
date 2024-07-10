@@ -25,9 +25,7 @@ pub fn mse(y_test: &[f64], y_pred: &[f64]) -> f32 {
 
 fn main() -> Result<(), Box<dyn Error>> {
     let args: Vec<String> = env::args().collect();
-    let growth_control = &args[1].parse::<f32>().unwrap();
-    let budget = &args[2].parse::<f32>().unwrap();
-    let es = &args[3].parse::<usize>().unwrap_or(1);
+    let budget = &args[1].parse::<f32>().unwrap();
 
     let _all_names = [
         "MedInc",
@@ -114,10 +112,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     // To provide parameters generate a default booster, and then use
     // the relevant `set_` methods for any parameters you would like to
     // adjust.
-    let mut model = PerpetualBooster::default()
-        .set_objective(Objective::SquaredLoss)
-        .set_growth_control(*growth_control)
-        .set_early_stopping_rounds(*es);
+    let mut model = PerpetualBooster::default().set_objective(Objective::SquaredLoss);
     model.fit(&matrix_train, &y_train, None, None, *budget, None, None)?;
 
     let trees = model.get_prediction_trees();

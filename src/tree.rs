@@ -1,3 +1,4 @@
+use crate::constants::N_NODES_ALLOCATED;
 use crate::data::{JaggedMatrix, Matrix};
 use crate::grower::Grower;
 use crate::histogram::{reorder_cat_bins, sort_cat_bins, HistogramMatrix};
@@ -53,8 +54,6 @@ impl Tree {
         grad: &[f32],
         hess: Option<&[f32]>,
         splitter: &T,
-        _max_leaves: usize,
-        max_depth: usize,
         parallel: bool,
         target_loss_decrement: Option<f32>,
         loss: &[f32],
@@ -83,9 +82,8 @@ impl Tree {
             reorder_cat_bins(histograms, c_index, is_const_hess);
         }
 
-        let root_node = create_root_node(&index, grad, hess.as_deref(), splitter);
-        self.nodes
-            .insert(root_node.num, root_node.as_node(splitter.get_learning_rate()));
+        let root_node = create_root_node(&index, grad, hess.as_deref());
+        self.nodes.insert(root_node.num, root_node.as_node(splitter.get_eta()));
 
         let mut growable = BinaryHeap::<SplittableNode>::default();
 
@@ -95,8 +93,8 @@ impl Tree {
 
         growable.add_node(root_node);
         while !growable.is_empty() {
-            // If this will push us over the max leaves parameter, break.
-            if self.nodes.len() > 9990 {
+            // If this will push us over the number of allocated nodes, break.
+            if self.nodes.len() > (N_NODES_ALLOCATED - 5) {
                 break;
             }
 
@@ -113,15 +111,6 @@ impl Tree {
             // tree nodes children.
             let mut node = growable.get_next_node();
             let n_idx = node.num;
-
-            let node_depth = node.depth + 1;
-
-            // If we have hit max depth, skip this node
-            // but keep going, because there may be other
-            // valid shallower nodes.
-            if node_depth > max_depth {
-                continue;
-            }
 
             // For max_leaves, subtract 1 from the n_leaves
             // every time we pop from the growable stack
@@ -157,7 +146,7 @@ impl Tree {
                 n_nodes += n_new_nodes;
 
                 for n in new_nodes {
-                    let node = n.as_node(splitter.get_learning_rate());
+                    let node = n.as_node(splitter.get_eta());
 
                     if let Some(_tld) = target_loss_decrement {
                         for i in index[n.start_idx..n.stop_idx].iter() {
@@ -560,25 +549,14 @@ impl Display for Tree {
     }
 }
 
-pub fn create_root_node<T: Splitter>(
-    index: &[usize],
-    grad: &[f32],
-    hess: Option<&[f32]>,
-    splitter: &T,
-) -> SplittableNode {
+pub fn create_root_node(index: &[usize], grad: &[f32], hess: Option<&[f32]>) -> SplittableNode {
     let (gradient_sum, hessian_sum) = match hess {
         Some(hess) => (fast_f64_sum(grad), fast_f64_sum(hess)),
         None => (fast_f64_sum(grad), grad.len() as f32),
     };
 
-    let root_gain = gain(&splitter.get_l2(), gradient_sum, hessian_sum);
-    let root_weight = weight(
-        &splitter.get_l1(),
-        &splitter.get_l2(),
-        &splitter.get_max_delta_step(),
-        gradient_sum,
-        hessian_sum,
-    );
+    let root_gain = gain(gradient_sum, hessian_sum);
+    let root_weight = weight(gradient_sum, hessian_sum);
 
     SplittableNode::new(
         0,
@@ -629,12 +607,7 @@ mod tests {
 
         let data = Matrix::new(&data_vec, 891, 5);
         let splitter = MissingImputerSplitter {
-            l1: 0.0,
-            l2: 1.0,
-            max_delta_step: 0.,
-            gamma: 3.0,
-            min_leaf_weight: 1.0,
-            learning_rate: 0.3,
+            eta: 0.3,
             allow_missing_splits: true,
             constraints_map: ConstraintMap::new(),
         };
@@ -650,9 +623,8 @@ mod tests {
         let is_const_hess = false;
 
         let hist_init = HistogramMatrix::empty(&bdata, &b.cuts, &col_index, is_const_hess, false);
-        let hist_capacity = 3000;
-        let mut hist_map: BrownHashMap<usize, HistogramMatrix> = BrownHashMap::with_capacity(hist_capacity);
-        for i in 0..hist_capacity {
+        let mut hist_map: BrownHashMap<usize, HistogramMatrix> = BrownHashMap::with_capacity(N_NODES_ALLOCATED);
+        for i in 0..N_NODES_ALLOCATED {
             hist_map.insert(i, hist_init.clone());
         }
 
@@ -664,8 +636,6 @@ mod tests {
             &g,
             h.as_deref(),
             &splitter,
-            usize::MAX,
-            5,
             true,
             Some(f32::MAX),
             &loss,
@@ -693,12 +663,7 @@ mod tests {
 
         let data = Matrix::new(&data_vec, 891, 5);
         let splitter = MissingImputerSplitter {
-            l1: 0.0,
-            l2: 1.0,
-            max_delta_step: 0.0,
-            gamma: 3.0,
-            min_leaf_weight: 1.0,
-            learning_rate: 0.3,
+            eta: 0.3,
             allow_missing_splits: true,
             constraints_map: ConstraintMap::new(),
         };
@@ -710,9 +675,8 @@ mod tests {
         let is_const_hess = false;
 
         let hist_node = HistogramMatrix::empty(&bdata, &b.cuts, &col_index, is_const_hess, false);
-        let hist_capacity = 3000;
-        let mut hist_tree: BrownHashMap<usize, HistogramMatrix> = BrownHashMap::with_capacity(hist_capacity);
-        for i in 0..hist_capacity {
+        let mut hist_tree: BrownHashMap<usize, HistogramMatrix> = BrownHashMap::with_capacity(N_NODES_ALLOCATED);
+        for i in 0..N_NODES_ALLOCATED {
             hist_tree.insert(i, hist_node.clone());
         }
 
@@ -724,8 +688,6 @@ mod tests {
             &g,
             h.as_deref(),
             &splitter,
-            usize::MAX,
-            5,
             true,
             Some(f32::MAX),
             &loss,
@@ -788,12 +750,7 @@ mod tests {
 
         let data = Matrix::new(&data_vec, 891, 5);
         let splitter = MissingImputerSplitter {
-            l1: 0.0,
-            l2: 1.0,
-            max_delta_step: 0.0,
-            gamma: 3.0,
-            min_leaf_weight: 1.0,
-            learning_rate: 0.3,
+            eta: 0.3,
             allow_missing_splits: true,
             constraints_map: ConstraintMap::new(),
         };
@@ -806,9 +763,8 @@ mod tests {
 
         let c_index: Vec<usize> = (0..data.cols).collect();
         let hist_node = HistogramMatrix::empty(&bdata, &b.cuts, &c_index, is_const_hess, false);
-        let hist_capacity = 3000;
-        let mut hist_tree: BrownHashMap<usize, HistogramMatrix> = BrownHashMap::with_capacity(hist_capacity);
-        for i in 0..hist_capacity {
+        let mut hist_tree: BrownHashMap<usize, HistogramMatrix> = BrownHashMap::with_capacity(N_NODES_ALLOCATED);
+        for i in 0..N_NODES_ALLOCATED {
             hist_tree.insert(i, hist_node.clone());
         }
 
@@ -820,8 +776,6 @@ mod tests {
             &g,
             h.as_deref(),
             &splitter,
-            usize::MAX,
-            5,
             false,
             Some(f32::MAX),
             &loss,
@@ -857,12 +811,7 @@ mod tests {
         let data = Matrix::new(data_.get_col(1), 891, 1);
         let map = ConstraintMap::from([(0, Constraint::Negative)]);
         let splitter = MissingImputerSplitter {
-            l1: 0.0,
-            l2: 1.0,
-            max_delta_step: 0.0,
-            gamma: 0.0,
-            min_leaf_weight: 1.0,
-            learning_rate: 0.3,
+            eta: 0.3,
             allow_missing_splits: true,
             constraints_map: map,
         };
@@ -874,9 +823,8 @@ mod tests {
         let is_const_hess = false;
 
         let hist_node = HistogramMatrix::empty(&bdata, &b.cuts, &col_index, is_const_hess, false);
-        let hist_capacity = 3000;
-        let mut hist_tree: BrownHashMap<usize, HistogramMatrix> = BrownHashMap::with_capacity(hist_capacity);
-        for i in 0..hist_capacity {
+        let mut hist_tree: BrownHashMap<usize, HistogramMatrix> = BrownHashMap::with_capacity(N_NODES_ALLOCATED);
+        for i in 0..N_NODES_ALLOCATED {
             hist_tree.insert(i, hist_node.clone());
         }
 
@@ -888,8 +836,6 @@ mod tests {
             &g,
             None,
             &splitter,
-            usize::MAX,
-            5,
             true,
             Some(f32::MAX),
             &loss,
@@ -951,12 +897,7 @@ mod tests {
 
         let data = Matrix::new(&data_vec, 891, 5);
         let splitter = MissingImputerSplitter {
-            l1: 0.0,
-            l2: 1.0,
-            max_delta_step: 0.0,
-            gamma: 3.0,
-            min_leaf_weight: 1.0,
-            learning_rate: 0.3,
+            eta: 0.3,
             allow_missing_splits: false,
             constraints_map: ConstraintMap::new(),
         };
@@ -968,9 +909,8 @@ mod tests {
         let is_const_hess = false;
 
         let hist_node = HistogramMatrix::empty(&bdata, &b.cuts, &col_index, is_const_hess, false);
-        let hist_capacity = 3000;
-        let mut hist_tree: BrownHashMap<usize, HistogramMatrix> = BrownHashMap::with_capacity(hist_capacity);
-        for i in 0..hist_capacity {
+        let mut hist_tree: BrownHashMap<usize, HistogramMatrix> = BrownHashMap::with_capacity(N_NODES_ALLOCATED);
+        for i in 0..N_NODES_ALLOCATED {
             hist_tree.insert(i, hist_node.clone());
         }
 
@@ -982,8 +922,6 @@ mod tests {
             &g,
             h.as_deref(),
             &splitter,
-            usize::MAX,
-            usize::MAX,
             true,
             Some(f32::MAX),
             &loss,
@@ -1094,12 +1032,7 @@ mod tests {
         let loss = SquaredLoss::calc_loss(&y_test, &yhat, None, None);
 
         let splitter = MissingImputerSplitter {
-            l1: 0.0,
-            l2: 0.0,
-            max_delta_step: 0.0,
-            gamma: 0.0,
-            min_leaf_weight: 0.0,
-            learning_rate: 0.1,
+            eta: 0.1,
             allow_missing_splits: false,
             constraints_map: ConstraintMap::new(),
         };
@@ -1111,9 +1044,8 @@ mod tests {
         let is_const_hess = true;
 
         let hist_node = HistogramMatrix::empty(&bdata, &b.cuts, &col_index, is_const_hess, false);
-        let hist_capacity = 10000;
-        let mut hist_tree: BrownHashMap<usize, HistogramMatrix> = BrownHashMap::with_capacity(hist_capacity);
-        for i in 0..hist_capacity {
+        let mut hist_tree: BrownHashMap<usize, HistogramMatrix> = BrownHashMap::with_capacity(N_NODES_ALLOCATED);
+        for i in 0..N_NODES_ALLOCATED {
             hist_tree.insert(i, hist_node.clone());
         }
 
@@ -1126,8 +1058,6 @@ mod tests {
             &grad,
             hess.as_deref(),
             &splitter,
-            usize::MAX,
-            usize::MAX,
             true,
             Some(f32::MAX),
             &loss,
@@ -1167,12 +1097,7 @@ mod tests {
         let loss = LogLoss::calc_loss(&y, &yhat, None, None);
 
         let splitter = MissingImputerSplitter {
-            l1: 0.0,
-            l2: 0.0,
-            max_delta_step: 0.0,
-            gamma: 0.0,
-            min_leaf_weight: 1.0,
-            learning_rate: 0.3,
+            eta: 0.3,
             allow_missing_splits: false,
             constraints_map: ConstraintMap::new(),
         };
@@ -1186,9 +1111,8 @@ mod tests {
 
         let mut hist_node = HistogramMatrix::empty(&bdata, &b.cuts, &col_index, false, false);
         hist_node.update(&bdata, &b.cuts, &grad, hess.as_deref(), &index, &col_index, true, false);
-        let hist_capacity = 10000;
-        let mut hist_tree: BrownHashMap<usize, HistogramMatrix> = BrownHashMap::with_capacity(hist_capacity);
-        for i in 0..hist_capacity {
+        let mut hist_tree: BrownHashMap<usize, HistogramMatrix> = BrownHashMap::with_capacity(N_NODES_ALLOCATED);
+        for i in 0..N_NODES_ALLOCATED {
             hist_tree.insert(i, hist_node.clone());
         }
 
@@ -1201,8 +1125,6 @@ mod tests {
             &grad,
             hess.as_deref(),
             &splitter,
-            usize::MAX,
-            9,
             true,
             Some(f32::MAX),
             &loss,

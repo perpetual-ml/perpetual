@@ -77,6 +77,7 @@ mod tests {
 
     use super::*;
     use crate::binning::bin_matrix;
+    use crate::constants::N_NODES_ALLOCATED;
     use crate::constraints::ConstraintMap;
     use crate::data::Matrix;
     use crate::histogram::HistogramMatrix;
@@ -98,12 +99,7 @@ mod tests {
 
         let data = Matrix::new(&data_vec, 891, 5);
         let splitter = MissingImputerSplitter {
-            l1: 0.0,
-            l2: 1.0,
-            max_delta_step: 0.,
-            gamma: 3.0,
-            min_leaf_weight: 1.0,
-            learning_rate: 0.3,
+            eta: 0.3,
             allow_missing_splits: true,
             constraints_map: ConstraintMap::new(),
         };
@@ -114,9 +110,8 @@ mod tests {
         let col_index: Vec<usize> = (0..data.cols).collect();
 
         let hist_init = HistogramMatrix::empty(&bdata, &b.cuts, &col_index, false, false);
-        let hist_capacity = 10000;
-        let mut hist_tree: HashMap<usize, HistogramMatrix> = HashMap::with_capacity(hist_capacity);
-        for i in 0..hist_capacity {
+        let mut hist_tree: HashMap<usize, HistogramMatrix> = HashMap::with_capacity(N_NODES_ALLOCATED);
+        for i in 0..N_NODES_ALLOCATED {
             hist_tree.insert(i, hist_init.clone());
         }
 
@@ -128,8 +123,6 @@ mod tests {
             &g,
             h.as_deref(),
             &splitter,
-            usize::MAX,
-            5,
             true,
             Some(f32::MAX),
             &loss,

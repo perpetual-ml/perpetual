@@ -220,12 +220,7 @@ impl SplittableNode {
         self.left_child = left_child;
         self.right_child = right_child;
         self.split_feature = split_info.split_feature;
-        self.split_gain = self.get_split_gain(
-            &split_info.left_node,
-            &split_info.right_node,
-            &split_info.missing_node,
-            0.0,
-        );
+        self.split_gain = self.get_split_gain(&split_info.left_node, &split_info.right_node, &split_info.missing_node);
         self.split_value = split_info.split_value;
         self.missing_node = missing_child;
         self.is_leaf = false;
@@ -238,19 +233,18 @@ impl SplittableNode {
         left_node_info: &NodeInfo,
         right_node_info: &NodeInfo,
         missing_node_info: &MissingInfo,
-        gamma: f32,
     ) -> f32 {
         let missing_split_gain = match &missing_node_info {
             MissingInfo::Branch(ni) | MissingInfo::Leaf(ni) => ni.gain,
             _ => 0.,
         };
-        left_node_info.gain + right_node_info.gain + missing_split_gain - self.gain_value - gamma
+        left_node_info.gain + right_node_info.gain + missing_split_gain - self.gain_value
     }
 
-    pub fn as_node(&self, learning_rate: f32) -> Node {
+    pub fn as_node(&self, eta: f32) -> Node {
         Node {
             num: self.num,
-            weight_value: self.weight_value * learning_rate,
+            weight_value: self.weight_value * eta,
             hessian_sum: self.hessian_sum,
             depth: self.depth,
             missing_node: self.missing_node,

@@ -39,12 +39,17 @@ pub fn validate_float_parameter<T: FloatData<T>>(value: T, min: T, max: T, param
     if value.is_nan() || value < min || max < value {
         msg.push_str(&value.to_string());
         let ex_msg = format!("real value within rang {} and {}", min, max);
-        Err(ForustError::InvalidParameter(parameter.to_string(), ex_msg, value.to_string()))
+        Err(ForustError::InvalidParameter(
+            parameter.to_string(),
+            ex_msg,
+            value.to_string(),
+        ))
     } else {
         Ok(())
     }
 }
 
+/*
 macro_rules! validate_positive_float_field {
     ($var: expr) => {
         let var_name = stringify!($var).split(".").nth(1).unwrap();
@@ -53,6 +58,7 @@ macro_rules! validate_positive_float_field {
 }
 
 pub(crate) use validate_positive_float_field;
+*/
 
 /// Calculate if a value is missing.
 #[inline]
@@ -71,16 +77,13 @@ pub fn is_missing(value: &f64, missing: &f64) -> bool {
 #[allow(clippy::too_many_arguments)]
 #[inline]
 pub fn constrained_weight(
-    l1: &f32,
-    l2: &f32,
-    max_delta_step: &f32,
     gradient_sum: f32,
     hessian_sum: f32,
     lower_bound: f32,
     upper_bound: f32,
     constraint: Option<&Constraint>,
 ) -> f32 {
-    let weight = weight(l1, l2, max_delta_step, gradient_sum, hessian_sum);
+    let weight = weight(gradient_sum, hessian_sum);
     match constraint {
         None | Some(Constraint::Unconstrained) => weight,
         _ => {
@@ -99,7 +102,13 @@ pub fn constrained_weight(
 /// and a constraint.
 #[allow(clippy::too_many_arguments)]
 #[inline]
-pub fn constrained_weight_const_hess(gradient_sum: f32, counts: usize, lower_bound: f32, upper_bound: f32, constraint: Option<&Constraint>) -> f32 {
+pub fn constrained_weight_const_hess(
+    gradient_sum: f32,
+    counts: usize,
+    lower_bound: f32,
+    upper_bound: f32,
+    constraint: Option<&Constraint>,
+) -> f32 {
     let weight = -1.0 * gradient_sum / counts as f32;
     match constraint {
         None | Some(Constraint::Unconstrained) => weight,
@@ -171,16 +180,16 @@ pub fn odds(v: f64) -> f64 {
 
 /// Calculate the gain given the gradient and hessian of the node.
 #[inline]
-pub fn gain(l2: &f32, gradient_sum: f32, hessian_sum: f32) -> f32 {
-    (gradient_sum * gradient_sum) / (hessian_sum + l2) // no -0.5 multiplier term!
+pub fn gain(gradient_sum: f32, hessian_sum: f32) -> f32 {
+    (gradient_sum * gradient_sum) / hessian_sum // no -0.5 multiplier term!
 }
 
 /// Calculate the gain of a split given a specific weight value.
 /// This is for if the weight has to be constrained, for example for
 /// monotonicity constraints.
 #[inline]
-pub fn gain_given_weight(l2: &f32, gradient_sum: f32, hessian_sum: f32, weight: f32) -> f32 {
-    -(2.0 * gradient_sum * weight + (hessian_sum + l2) * (weight * weight))
+pub fn gain_given_weight(gradient_sum: f32, hessian_sum: f32, weight: f32) -> f32 {
+    -(2.0 * gradient_sum * weight + hessian_sum * (weight * weight))
 }
 
 #[inline]
@@ -210,28 +219,11 @@ pub fn cull_gain(gain: f32, left_weight: f32, right_weight: f32, constraint: Opt
     }
 }
 
-/// Calculate l1 regularization
-#[inline]
-pub fn l1_regularization(w: &f32, l1: &f32) -> f32 {
-    if l1 == &0. {
-        *w
-    } else if w > l1 {
-        w - l1
-    } else if w < &-l1 {
-        w + l1
-    } else {
-        0.0
-    }
-}
-
 /// Calculate the weight of a given node, given the sum
 /// of the gradients, and the hessians in a node.
 #[inline]
-pub fn weight(l1: &f32, l2: &f32, max_delta_step: &f32, gradient_sum: f32, hessian_sum: f32) -> f32 {
-    let w = -(l1_regularization(&gradient_sum, l1) / (hessian_sum + l2));
-    if (max_delta_step != &0.) && (&w.abs() > max_delta_step) {
-        return max_delta_step.copysign(w);
-    }
+pub fn weight(gradient_sum: f32, hessian_sum: f32) -> f32 {
+    let w = -(&gradient_sum / hessian_sum);
     w
 }
 
@@ -383,7 +375,13 @@ pub fn map_bin<T: FloatData<T>>(x: &[T], v: &T, missing: &T) -> Option<u16> {
 /// * `missing_right` - Should missing values go to the left, or
 ///    to the right of the split value.
 #[inline]
-pub fn pivot_on_split(index: &mut [usize], feature: &[u16], split_value: u16, missing_right: bool, left_cat: Option<&[u16]>) -> usize {
+pub fn pivot_on_split(
+    index: &mut [usize],
+    feature: &[u16],
+    split_value: u16,
+    missing_right: bool,
+    left_cat: Option<&[u16]>,
+) -> usize {
     let length = index.len();
     let mut last_idx = length - 1;
     let mut rv = None;
@@ -432,7 +430,12 @@ pub fn pivot_on_split(index: &mut [usize], feature: &[u16], split_value: u16, mi
 /// * `feature` - The feature vector to use to sort the index by.
 /// * `split_value` - the split value to use to pivot on.
 #[inline]
-pub fn pivot_on_split_exclude_missing(index: &mut [usize], feature: &[u16], split_value: u16, left_cat: Option<&[u16]>) -> (usize, usize) {
+pub fn pivot_on_split_exclude_missing(
+    index: &mut [usize],
+    feature: &[u16],
+    split_value: u16,
+    left_cat: Option<&[u16]>,
+) -> (usize, usize) {
     // I think we can do this in O(n) time...
     let mut low = 0;
     let mut high = index.len() - 1;

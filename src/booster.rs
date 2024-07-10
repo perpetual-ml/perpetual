@@ -1,16 +1,14 @@
 use crate::binning::bin_matrix;
+use crate::constants::{ITERATIONS_LIMIT, N_NODES_ALLOCATED, STOPPING_ROUNDS};
 use crate::constraints::ConstraintMap;
 use crate::data::Matrix;
 use crate::errors::ForustError;
-use crate::grower::GrowPolicy;
 use crate::histogram::HistogramMatrix;
-use crate::metric::Metric;
 use crate::objective::{calc_init_callables, gradient_hessian_callables, loss_callables, Objective};
-use crate::sampler::SampleMethod;
 use crate::shapley::predict_contributions_row_shapley;
 use crate::splitter::{MissingBranchSplitter, MissingImputerSplitter, Splitter};
 use crate::tree::{Tree, TreeStopper};
-use crate::utils::{odds, validate_positive_float_field};
+use crate::utils::odds;
 use hashbrown::HashMap as BrownHashMap;
 use log::info;
 use rayon::prelude::*;
@@ -73,33 +71,6 @@ pub struct PerpetualBooster {
     /// Valid options include "LogLoss" to use logistic loss as the objective function,
     /// or "SquaredLoss" to use Squared Error as the objective function.
     pub objective: Objective,
-    /// Total number of trees to train in the ensemble.
-    iterations: usize,
-    /// Step size to use at each iteration. Each
-    /// leaf weight is multiplied by this number. The smaller the value, the more
-    /// conservative the weights will be.
-    learning_rate: f32,
-    /// Maximum depth of an individual tree. Valid values are 0 to infinity.
-    max_depth: usize,
-    /// Maximum number of leaves allowed on a tree. Valid values
-    /// are 0 to infinity. This is the total number of final nodes.
-    max_leaves: usize,
-    /// L1 regularization term applied to the weights of the tree. Valid values
-    /// are 0 to infinity. 0 Means no regularization applied.
-    #[serde(default = "default_l1")]
-    l1: f32,
-    /// L2 regularization term applied to the weights of the tree. Valid values
-    /// are 0 to infinity.
-    l2: f32,
-    /// The minimum amount of loss required to further split a node.
-    /// Valid values are 0 to infinity.
-    gamma: f32,
-    /// Maximum delta step allowed at each leaf. This is the maximum magnitude a leaf can take. Setting to 0 results in no constrain.
-    #[serde(default = "default_max_delta_step")]
-    max_delta_step: f32,
-    /// Minimum sum of the hessian values of the loss function
-    /// required to be in a node.
-    min_leaf_weight: f32,
     /// The initial prediction value of the model.
     pub base_score: f64,
     /// Number of bins to calculate to partition the data. Setting this to
@@ -107,6 +78,7 @@ pub struct PerpetualBooster {
     /// accuracy. If there are more bins, than unique values in a column, all unique values
     /// will be used.
     pub nbins: u16,
+    /// Whether to use parallelism during training.
     pub parallel: bool,
     /// Should the algorithm allow splits that completed seperate out missing
     /// and non-missing values, in the case where `create_missing_branch` is false. When `create_missing_branch`
@@ -115,40 +87,14 @@ pub struct PerpetualBooster {
     /// Constraints that are used to enforce a specific relationship
     /// between the training features and the target variable.
     pub monotone_constraints: Option<ConstraintMap>,
-    /// Percent of records to randomly sample at each iteration when training a tree.
-    subsample: f32,
-    /// Used only in goss. The retain ratio of large gradient data.
-    #[serde(default = "default_top_rate")]
-    top_rate: f64,
-    /// Used only in goss. the retain ratio of small gradient data.
-    #[serde(default = "default_other_rate")]
-    other_rate: f64,
-    /// Specify the fraction of columns that should be sampled at each iteration, valid values are in the range (0.0,1.0].
-    #[serde(default = "default_colsample_bytree")]
-    colsample_bytree: f64,
-    /// Integer value used to seed any randomness used in the algorithm.
-    seed: u64,
     /// Value to consider missing.
     #[serde(deserialize_with = "parse_missing")]
     pub missing: f64,
     /// Should missing be split out it's own separate branch?
     pub create_missing_branch: bool,
-    /// Specify the method that records should be sampled when training?
-    #[serde(default = "default_sample_method")]
-    sample_method: SampleMethod,
-    /// Growth policy to use when training a tree, this is how the next node is selected.
-    #[serde(default = "default_grow_policy")]
-    grow_policy: GrowPolicy,
-    /// Define the evaluation metric to record at each iterations.
-    #[serde(default = "default_evaluation_metric")]
-    evaluation_metric: Option<Metric>,
-    /// Number of rounds where the evaluation metric value must improve in
-    /// to keep training.
-    #[serde(default = "default_early_stopping_rounds")]
-    early_stopping_rounds: usize,
     /// If this is specified, the base_score will be calculated using the sample_weight and y data in accordance with the requested objective_type.
     #[serde(default = "default_initialize_base_score")]
-    initialize_base_score: bool,
+    pub initialize_base_score: bool,
     /// A set of features for which the missing node will always be terminated, even
     /// if `allow_missing_splits` is set to true. This value is only valid if
     /// `create_missing_branch` is also True.
@@ -168,46 +114,20 @@ pub struct PerpetualBooster {
     pub trees: Vec<Tree>,
     // Metadata for the booster
     metadata: HashMap<String, String>,
-    // Growth control
-    growth_control: f32,
-}
-
-fn default_l1() -> f32 {
-    0.0
-}
-fn default_max_delta_step() -> f32 {
-    0.0
+    /// Step size to use at each iteration. Each
+    /// leaf weight is multiplied by this number. The smaller the value, the more
+    /// conservative the weights will be.
+    eta: f32,
 }
 
 fn default_initialize_base_score() -> bool {
     false
 }
 
-fn default_grow_policy() -> GrowPolicy {
-    GrowPolicy::LossGuide
-}
-
-fn default_top_rate() -> f64 {
-    0.1
-}
-fn default_other_rate() -> f64 {
-    0.2
-}
-fn default_sample_method() -> SampleMethod {
-    SampleMethod::None
-}
-fn default_evaluation_metric() -> Option<Metric> {
-    None
-}
-fn default_early_stopping_rounds() -> usize {
-    3
-}
 fn default_terminate_missing_features() -> HashSet<usize> {
     HashSet::new()
 }
-fn default_colsample_bytree() -> f64 {
-    1.0
-}
+
 fn default_missing_node_treatment() -> MissingNodeTreatment {
     MissingNodeTreatment::AssignToParent
 }
@@ -230,31 +150,13 @@ impl Default for PerpetualBooster {
     fn default() -> Self {
         Self::new(
             Objective::LogLoss,
-            100000,
-            0.1,
-            99,
-            usize::MAX,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
             0.5,
             256,
             true,
             true,
             None,
-            1.0,
-            0.1,
-            0.2,
-            1.0,
-            0,
             f64::NAN,
             false,
-            SampleMethod::None,
-            GrowPolicy::LossGuide,
-            None,
-            3,
             true,
             HashSet::new(),
             MissingNodeTreatment::AssignToParent,
@@ -272,20 +174,6 @@ impl PerpetualBooster {
     /// * `objective` - The name of objective function used to optimize.
     ///   Valid options include "LogLoss" to use logistic loss as the objective function,
     ///   or "SquaredLoss" to use Squared Error as the objective function.
-    /// * `iterations` - Total number of trees to train in the ensemble.
-    /// * `learning_rate` - Step size to use at each iteration. Each
-    ///   leaf weight is multiplied by this number. The smaller the value, the more
-    ///   conservative the weights will be.
-    /// * `max_depth` - Maximum depth of an individual tree. Valid values
-    ///   are 0 to infinity.
-    /// * `max_leaves` - Maximum number of leaves allowed on a tree. Valid values
-    ///   are 0 to infinity. This is the total number of final nodes.
-    /// * `l2` - L2 regularization term applied to the weights of the tree. Valid values
-    ///   are 0 to infinity.
-    /// * `gamma` - The minimum amount of loss required to further split a node.
-    ///   Valid values are 0 to infinity.
-    /// * `min_leaf_weight` - Minimum sum of the hessian values of the loss function
-    ///   required to be in a node.
     /// * `base_score` - The initial prediction value of the model. If set to None the parameter `initialize_base_score` will automatically be set to `true`, in which case the base score will be chosen based on the objective function at fit time.
     /// * `nbins` - Number of bins to calculate to partition the data. Setting this to
     ///   a smaller number, will result in faster training time, while potentially sacrificing
@@ -297,81 +185,41 @@ impl PerpetualBooster {
     /// is true, setting this to true will result in the missin branch being further split.
     /// * `monotone_constraints` - Constraints that are used to enforce a specific relationship
     ///   between the training features and the target variable.
-    /// * `subsample` - Percent of records to randomly sample at each iteration when training a tree.
-    /// * `top_rate` - Used only in goss. The retain ratio of large gradient data.
-    /// * `other_rate` - Used only in goss. the retain ratio of small gradient data.
-    /// * `colsample_bytree` - Specify the fraction of columns that should be sampled at each iteration, valid values are in the range (0.0,1.0].
-    /// * `seed` - Integer value used to seed any randomness used in the algorithm.
     /// * `missing` - Value to consider missing.
     /// * `create_missing_branch` - Should missing be split out it's own separate branch?
-    /// * `sample_method` - Specify the method that records should be sampled when training?
-    /// * `evaluation_metric` - Define the evaluation metric to record at each iterations.
-    /// * `early_stopping_rounds` - Number of rounds that must
     /// * `initialize_base_score` - If this is specified, the base_score will be calculated using the sample_weight and y data in accordance with the requested objective_type.
     /// * `missing_node_treatment` - specify how missing nodes should be handled during training.
     /// * `log_iterations` - Setting to a value (N) other than zero will result in information being logged about ever N iterations.
+    /// * `force_children_to_bound_parent` - force_children_to_bound_parent.
+    /// * `eta` - Step size to use at each iteration. Each
+    ///   leaf weight is multiplied by this number. The smaller the value, the more
+    ///   conservative the weights will be.
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         objective: Objective,
-        iterations: usize,
-        learning_rate: f32,
-        max_depth: usize,
-        max_leaves: usize,
-        l1: f32,
-        l2: f32,
-        gamma: f32,
-        max_delta_step: f32,
-        min_leaf_weight: f32,
         base_score: f64,
         nbins: u16,
         parallel: bool,
         allow_missing_splits: bool,
         monotone_constraints: Option<ConstraintMap>,
-        subsample: f32,
-        top_rate: f64,
-        other_rate: f64,
-        colsample_bytree: f64,
-        seed: u64,
         missing: f64,
         create_missing_branch: bool,
-        sample_method: SampleMethod,
-        grow_policy: GrowPolicy,
-        evaluation_metric: Option<Metric>,
-        early_stopping_rounds: usize,
         initialize_base_score: bool,
         terminate_missing_features: HashSet<usize>,
         missing_node_treatment: MissingNodeTreatment,
         log_iterations: usize,
         force_children_to_bound_parent: bool,
-        growth_control: f32,
+        eta: f32,
     ) -> Result<Self, ForustError> {
         let booster = PerpetualBooster {
             objective,
-            iterations,
-            learning_rate,
-            max_depth,
-            max_leaves,
-            l1,
-            l2,
-            gamma,
-            max_delta_step,
-            min_leaf_weight,
             base_score,
             nbins,
             parallel,
             allow_missing_splits,
             monotone_constraints,
-            subsample,
-            top_rate,
-            other_rate,
-            colsample_bytree,
-            seed,
             missing,
             create_missing_branch,
-            sample_method,
-            grow_policy,
-            evaluation_metric,
-            early_stopping_rounds,
             initialize_base_score,
             terminate_missing_features,
             missing_node_treatment,
@@ -379,23 +227,13 @@ impl PerpetualBooster {
             force_children_to_bound_parent,
             trees: Vec::new(),
             metadata: HashMap::new(),
-            growth_control,
+            eta,
         };
         booster.validate_parameters()?;
         Ok(booster)
     }
 
     pub fn validate_parameters(&self) -> Result<(), ForustError> {
-        validate_positive_float_field!(self.learning_rate);
-        validate_positive_float_field!(self.l1);
-        validate_positive_float_field!(self.l2);
-        validate_positive_float_field!(self.gamma);
-        validate_positive_float_field!(self.max_delta_step);
-        validate_positive_float_field!(self.min_leaf_weight);
-        validate_positive_float_field!(self.subsample);
-        validate_positive_float_field!(self.top_rate);
-        validate_positive_float_field!(self.other_rate);
-        validate_positive_float_field!(self.colsample_bytree);
         Ok(())
     }
 
@@ -428,31 +266,39 @@ impl PerpetualBooster {
 
         if self.create_missing_branch {
             let splitter = MissingBranchSplitter {
-                l1: self.l1,
-                l2: self.l2,
-                max_delta_step: self.max_delta_step,
-                gamma: self.gamma,
-                min_leaf_weight: self.min_leaf_weight,
-                learning_rate: self.learning_rate,
+                eta: self.eta,
                 allow_missing_splits: self.allow_missing_splits,
                 constraints_map,
                 terminate_missing_features: self.terminate_missing_features.clone(),
                 missing_node_treatment: self.missing_node_treatment,
                 force_children_to_bound_parent: self.force_children_to_bound_parent,
             };
-            self.fit_trees(y, sample_weight, data, &splitter, quantile, reset, categorical_features)?;
+            self.fit_trees(
+                y,
+                sample_weight,
+                data,
+                &splitter,
+                quantile,
+                budget,
+                reset,
+                categorical_features,
+            )?;
         } else {
             let splitter = MissingImputerSplitter {
-                l1: self.l1,
-                l2: self.l2,
-                max_delta_step: self.max_delta_step,
-                gamma: self.gamma,
-                min_leaf_weight: self.min_leaf_weight,
-                learning_rate: self.learning_rate,
+                eta: self.eta,
                 allow_missing_splits: self.allow_missing_splits,
                 constraints_map,
             };
-            self.fit_trees(y, sample_weight, data, &splitter, quantile, reset, categorical_features)?;
+            self.fit_trees(
+                y,
+                sample_weight,
+                data,
+                &splitter,
+                quantile,
+                budget,
+                reset,
+                categorical_features,
+            )?;
         };
 
         Ok(())
@@ -465,6 +311,7 @@ impl PerpetualBooster {
         data: &Matrix<f64>,
         splitter: &T,
         alpha: Option<f32>,
+        budget: f32,
         reset: Option<bool>,
         categorical_features: Option<&[u64]>,
     ) -> Result<(), ForustError> {
@@ -487,10 +334,13 @@ impl PerpetualBooster {
         let mut loss = calc_loss(y, &yhat, sample_weight, alpha);
 
         let loss_base = calc_loss(y, &vec![self.base_score; y.len()], sample_weight, alpha);
-        // let loss_base = loss.clone();
         let loss_avg = loss_base.iter().sum::<f32>() / loss_base.len() as f32;
-        let lr = splitter.get_learning_rate();
-        let target_loss_decrement = self.growth_control * lr * loss_avg;
+        let eta = splitter.get_eta();
+        let target_loss_decrement = (budget / 10.0) * eta * loss_avg;
+
+        // let eta = splitter.get_eta();
+        // let grad_avg = grad.iter().map(|g| g.abs()).sum::<f32>() / grad.len() as f32;
+        // let target_loss_decrement = eta * eta * grad_avg;
 
         let is_const_hess = match sample_weight {
             Some(_sample_weight) => false,
@@ -512,19 +362,18 @@ impl PerpetualBooster {
         let mut n_low_loss_rounds = 0;
 
         let hist_node = HistogramMatrix::empty(&bdata, &binned_data.cuts, &col_index, is_const_hess, self.parallel);
-        let hist_capacity = 10000;
-        let mut hist_tree: BrownHashMap<usize, HistogramMatrix> = BrownHashMap::with_capacity(hist_capacity);
-        for i in 0..hist_capacity {
+        let mut hist_tree: BrownHashMap<usize, HistogramMatrix> = BrownHashMap::with_capacity(N_NODES_ALLOCATED);
+        for i in 0..N_NODES_ALLOCATED {
             hist_tree.insert(i, hist_node.clone());
         }
 
-        for i in 0..self.iterations {
+        for i in 0..ITERATIONS_LIMIT {
             let verbose = if self.log_iterations == 0 {
                 false
             } else {
                 i % self.log_iterations == 0
             };
-            let tld = if n_low_loss_rounds > (self.early_stopping_rounds + 1) {
+            let tld = if n_low_loss_rounds > (STOPPING_ROUNDS + 1) {
                 None
             } else {
                 Some(target_loss_decrement)
@@ -539,8 +388,6 @@ impl PerpetualBooster {
                 &grad,
                 hess.as_deref(),
                 splitter,
-                self.max_leaves,
-                self.max_depth,
                 self.parallel,
                 tld,
                 &loss,
@@ -583,7 +430,7 @@ impl PerpetualBooster {
 
             self.trees.push(tree);
 
-            if es >= self.early_stopping_rounds {
+            if es >= STOPPING_ROUNDS {
                 break;
             }
 
@@ -591,7 +438,7 @@ impl PerpetualBooster {
             loss = calc_loss(y, &yhat, sample_weight, alpha);
 
             if verbose {
-                info!("Completed iteration {} of {}", i, self.iterations);
+                info!("Completed iteration {}", i);
             }
         }
 
@@ -902,17 +749,10 @@ impl PerpetualBooster {
     /// Set model fitting budget.
     /// * `budget` - A fractional number for fitting.
     pub fn set_budget(&mut self, budget: f32) {
-        let budget = f32::max(0.0, f32::min(1.0, budget));
-        let power = budget * -3.0;
+        let budget = f32::max(0.0, budget);
+        let power = budget * -1.0;
         let base = 10_f32;
-        self.learning_rate = base.powf(power);
-    }
-
-    /// Set the iterations on the booster.
-    /// * `iterations` - The number of iterations of the booster.
-    pub fn set_iterations(mut self, iterations: usize) -> Self {
-        self.iterations = iterations;
-        self
+        self.eta = base.powf(power);
     }
 
     /// Set the log iterations on the booster.
@@ -922,24 +762,10 @@ impl PerpetualBooster {
         self
     }
 
-    /// Set the learning_rate on the booster.
-    /// * `learning_rate` - The learning rate of the booster.
-    pub fn set_learning_rate(mut self, learning_rate: f32) -> Self {
-        self.learning_rate = learning_rate;
-        self
-    }
-
-    /// Set the max_depth on the booster.
-    /// * `max_depth` - The maximum tree depth of the booster.
-    pub fn set_max_depth(mut self, max_depth: usize) -> Self {
-        self.max_depth = max_depth;
-        self
-    }
-
-    /// Set the max_leaves on the booster.
-    /// * `max_leaves` - The maximum number of leaves of the booster.
-    pub fn set_max_leaves(mut self, max_leaves: usize) -> Self {
-        self.max_leaves = max_leaves;
+    /// Set the eta on the booster.
+    /// * `eta` - The step size of the booster.
+    pub fn set_eta(mut self, eta: f32) -> Self {
+        self.eta = eta;
         self
     }
 
@@ -950,48 +776,6 @@ impl PerpetualBooster {
     ///   will be used.
     pub fn set_nbins(mut self, nbins: u16) -> Self {
         self.nbins = nbins;
-        self
-    }
-
-    /// Set the l1 on the booster.
-    /// * `l1` - The l1 regulation term of the booster.
-    pub fn set_l1(mut self, l1: f32) -> Self {
-        self.l1 = l1;
-        self
-    }
-
-    /// Set the l2 on the booster.
-    /// * `l2` - The l2 regulation term of the booster.
-    pub fn set_l2(mut self, l2: f32) -> Self {
-        self.l2 = l2;
-        self
-    }
-
-    /// Set the gamma on the booster.
-    /// * `gamma` - The gamma value of the booster.
-    pub fn set_gamma(mut self, gamma: f32) -> Self {
-        self.gamma = gamma;
-        self
-    }
-
-    /// Set the max_delta_step on the booster.
-    /// * `max_delta_step` - The max_delta_step value of the booster.
-    pub fn set_max_delta_step(mut self, max_delta_step: f32) -> Self {
-        self.max_delta_step = max_delta_step;
-        self
-    }
-
-    /// Set the min_leaf_weight on the booster.
-    /// * `min_leaf_weight` - The minimum sum of the hession values allowed in the
-    ///     node of a tree of the booster.
-    pub fn set_min_leaf_weight(mut self, min_leaf_weight: f32) -> Self {
-        self.min_leaf_weight = min_leaf_weight;
-        self
-    }
-
-    /// Set the growth_control on the booster.
-    pub fn set_growth_control(mut self, growth_control: f32) -> Self {
-        self.growth_control = growth_control;
         self
     }
 
@@ -1044,27 +828,6 @@ impl PerpetualBooster {
         self
     }
 
-    /// Set the subsample on the booster.
-    /// * `subsample` - Percent of the data to randomly sample when training each tree.
-    pub fn set_subsample(mut self, subsample: f32) -> Self {
-        self.subsample = subsample;
-        self
-    }
-
-    /// Set the colsample_bytree on the booster.
-    /// * `colsample_bytree` - Percent of the columns to randomly sample when training each tree.
-    pub fn set_colsample_bytree(mut self, colsample_bytree: f64) -> Self {
-        self.colsample_bytree = colsample_bytree;
-        self
-    }
-
-    /// Set the seed on the booster.
-    /// * `seed` - Integer value used to see any randomness used in the algorithm.
-    pub fn set_seed(mut self, seed: u64) -> Self {
-        self.seed = seed;
-        self
-    }
-
     /// Set missing value of the booster
     /// * `missing` - Float value to consider as missing.
     pub fn set_missing(mut self, missing: f64) -> Self {
@@ -1079,34 +842,6 @@ impl PerpetualBooster {
         self.create_missing_branch = create_missing_branch;
         self
     }
-
-    /// Set sample method on the booster.
-    /// * `sample_method` - Sample method.
-    pub fn set_sample_method(mut self, sample_method: SampleMethod) -> Self {
-        self.sample_method = sample_method;
-        self
-    }
-
-    /// Set sample method on the booster.
-    /// * `evaluation_metric` - Sample method.
-    pub fn set_evaluation_metric(mut self, evaluation_metric: Option<Metric>) -> Self {
-        self.evaluation_metric = evaluation_metric;
-        self
-    }
-
-    /// Set early stopping rounds.
-    /// * `early_stopping_rounds` - Early stoppings rounds.
-    pub fn set_early_stopping_rounds(mut self, early_stopping_rounds: usize) -> Self {
-        self.early_stopping_rounds = early_stopping_rounds;
-        self
-    }
-
-    /// Set prediction iterations.
-    /// * `early_stopping_rounds` - Early stoppings rounds.
-    ///pub fn set_prediction_iteration(mut self, prediction_iteration: Option<usize>) -> Self {
-    ///     self.prediction_iteration = prediction_iteration.map(|i| i + 1);
-    ///      self
-    ///  }
 
     /// Set the features where whose missing nodes should
     /// always be terminated.
@@ -1147,12 +882,9 @@ mod tests {
         let y: Vec<f64> = file.lines().map(|x| x.parse::<f64>().unwrap()).collect();
 
         let data = Matrix::new(&data_vec, 891, 5);
-        //let data = Matrix::new(data.get_col(1), 891, 1);
+        // let data = Matrix::new(data.get_col(1), 891, 1);
         let mut booster = PerpetualBooster::default()
-            .set_iterations(10)
             .set_nbins(300)
-            .set_max_depth(3)
-            .set_subsample(0.5)
             .set_base_score(0.5)
             .set_initialize_base_score(false);
         booster.fit(&data, &y, None, None, 0.3, None, None).unwrap();
@@ -1176,9 +908,7 @@ mod tests {
         let data = Matrix::new(&data_vec, 891, 5);
         //let data = Matrix::new(data.get_col(1), 891, 1);
         let mut booster = PerpetualBooster::default()
-            .set_iterations(10)
             .set_nbins(300)
-            .set_max_depth(3)
             .set_base_score(0.5)
             .set_initialize_base_score(false);
 
@@ -1203,9 +933,7 @@ mod tests {
         let data = Matrix::new(&data_vec, 891, 5);
         //let data = Matrix::new(data.get_col(1), 891, 1);
         let mut booster = PerpetualBooster::default()
-            .set_iterations(10)
             .set_nbins(300)
-            .set_max_depth(3)
             .set_base_score(0.5)
             .set_initialize_base_score(false);
 
@@ -1232,9 +960,7 @@ mod tests {
         //let data = Matrix::new(data.get_col(1), 891, 1);
         let mut booster = PerpetualBooster::default()
             .set_objective(Objective::SquaredLoss)
-            .set_iterations(10)
             .set_nbins(300)
-            .set_max_depth(3)
             .set_initialize_base_score(true);
 
         booster.fit(&data, &y, None, None, 0.3, None, None).unwrap();
@@ -1259,9 +985,7 @@ mod tests {
 
         //let data = Matrix::new(data.get_col(1), 891, 1);
         let mut booster = PerpetualBooster::default()
-            .set_iterations(10)
             .set_nbins(300)
-            .set_max_depth(3)
             .set_base_score(0.5)
             .set_initialize_base_score(false);
 
@@ -1296,9 +1020,7 @@ mod tests {
         let cat_index = vec![1, 3, 5, 6, 7, 8, 13];
 
         let mut booster = PerpetualBooster::default()
-            .set_iterations(10)
             .set_nbins(n_bins)
-            .set_max_depth(3)
             .set_base_score(0.5)
             .set_initialize_base_score(false);
 
