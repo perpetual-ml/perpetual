@@ -376,15 +376,24 @@ pub fn map_bin<T: FloatData<T>>(x: &[T], v: &T, missing: &T) -> Option<u16> {
 ///    to the right of the split value.
 #[inline]
 pub fn pivot_on_split(
-    index: &mut [usize],
+    start: usize,
+    stop: usize,
+    ind: &mut [usize],
+    grad: &mut [f32],
+    hess: &mut [f32],
     feature: &[u16],
     split_value: u16,
     missing_right: bool,
     left_cat: Option<&[u16]>,
 ) -> usize {
+    let index = &mut ind[start..stop];
+    let g = &mut grad[start..stop];
+    let h = &mut hess[start..stop];
+
     let length = index.len();
     let mut last_idx = length - 1;
     let mut rv = None;
+
     for i in 0..length {
         loop {
             match missing_compare(&split_value, feature[index[i]], missing_right, left_cat) {
@@ -394,6 +403,55 @@ pub fn pivot_on_split(
                         break;
                     }
                     index.swap(i, last_idx);
+                    g.swap(i, last_idx);
+                    h.swap(i, last_idx);
+                    if last_idx == 0 {
+                        rv = Some(0);
+                        break;
+                    }
+                    last_idx -= 1;
+                }
+                Ordering::Greater => break,
+            }
+        }
+        if i >= last_idx {
+            break;
+        }
+    }
+    match rv {
+        Some(r) => r,
+        None => last_idx + 1,
+    }
+}
+
+#[inline]
+pub fn pivot_on_split_const_hess(
+    start: usize,
+    stop: usize,
+    ind: &mut [usize],
+    grad: &mut [f32],
+    feature: &[u16],
+    split_value: u16,
+    missing_right: bool,
+    left_cat: Option<&[u16]>,
+) -> usize {
+    let index = &mut ind[start..stop];
+    let g = &mut grad[start..stop];
+
+    let length = index.len();
+    let mut last_idx = length - 1;
+    let mut rv = None;
+
+    for i in 0..length {
+        loop {
+            match missing_compare(&split_value, feature[index[i]], missing_right, left_cat) {
+                Ordering::Less | Ordering::Equal => {
+                    if last_idx <= i {
+                        rv = Some(i);
+                        break;
+                    }
+                    index.swap(i, last_idx);
+                    g.swap(i, last_idx);
                     if last_idx == 0 {
                         rv = Some(0);
                         break;
@@ -626,8 +684,10 @@ mod tests {
         }
 
         let mut idx = vec![2, 6, 9, 5, 8, 13, 11, 7];
+        let mut grad = vec![0.2, 0.6, 0.9, 0.5, 0.8, 0.1, 0.1, 0.7];
+        let mut hess = vec![1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0];
         let f = vec![15, 10, 10, 11, 3, 18, 9, 3, 5, 2, 6, 13, 19, 14];
-        let split_i = pivot_on_split(&mut idx, &f, 10, true, None);
+        let split_i = pivot_on_split(0, idx.len(), &mut idx, &mut grad, &mut hess, &f, 10, true, None);
         println!("split_i: {}", split_i);
         println!("idx: {:?}", idx);
         println!("sorted: {:?}", idx.iter().map(|i| f[*i]).collect::<Vec<_>>());
@@ -635,6 +695,8 @@ mod tests {
 
         let missing_right = true;
         let mut idx = vec![2, 6, 9, 5, 8, 13, 11, 7];
+        let mut grad = vec![0.2, 0.6, 0.9, 0.5, 0.8, 0.1, 0.1, 0.7];
+        let mut hess = vec![1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0];
         let f = vec![15, 10, 10, 11, 3, 18, 9, 3, 5, 2, 6, 13, 19, 14];
         idx.sort_by_key(|i| {
             if f[*i] == 0 {
@@ -655,7 +717,7 @@ mod tests {
 
         let mut idx = vec![2, 6, 9, 5, 8, 13, 11, 7];
         let f = vec![15, 10, 10, 11, 3, 18, 0, 9, 3, 5, 2, 6, 13, 19, 14];
-        let split_i = pivot_on_split(&mut idx, &f, 10, false, None);
+        let split_i = pivot_on_split(0, idx.len(), &mut idx, &mut grad, &mut hess, &f, 10, false, None);
         println!("{}", split_i);
         println!("{:?}", idx);
         println!("{:?}", idx.iter().map(|i| f[*i]).collect::<Vec<_>>());
@@ -663,24 +725,32 @@ mod tests {
 
         // Test Minimum value...
         let mut idx = vec![2, 6, 9, 5, 8, 13, 11, 7];
+        let mut grad = vec![0.2, 0.6, 0.9, 0.5, 0.8, 0.1, 0.1, 0.7];
+        let mut hess = vec![1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0];
         let f = vec![15, 10, 10, 11, 3, 18, 0, 9, 3, 5, 2, 6, 13, 19, 14];
-        let split_i = pivot_on_split(&mut idx, &f, 1, true, None);
+        let split_i = pivot_on_split(0, idx.len(), &mut idx, &mut grad, &mut hess, &f, 1, true, None);
         pivot_assert(&f, &idx, split_i, true, 1);
 
         let mut idx = vec![2, 6, 9, 5, 8, 13, 11, 7];
+        let mut grad = vec![0.2, 0.6, 0.9, 0.5, 0.8, 0.1, 0.1, 0.7];
+        let mut hess = vec![1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0];
         let f = vec![15, 10, 10, 11, 3, 18, 0, 9, 3, 5, 2, 6, 13, 19, 14];
-        let split_i = pivot_on_split(&mut idx, &f, 1, false, None);
+        let split_i = pivot_on_split(0, idx.len(), &mut idx, &mut grad, &mut hess, &f, 1, false, None);
         pivot_assert(&f, &idx, split_i, false, 1);
 
         // Test Maximum value...
         let mut idx = vec![2, 6, 9, 5, 8, 13, 11, 7];
+        let mut grad = vec![0.2, 0.6, 0.9, 0.5, 0.8, 0.1, 0.1, 0.7];
+        let mut hess = vec![1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0];
         let f = vec![15, 10, 10, 11, 3, 18, 0, 9, 3, 5, 2, 6, 13, 19, 14];
-        let split_i = pivot_on_split(&mut idx, &f, 19, true, None);
+        let split_i = pivot_on_split(0, idx.len(), &mut idx, &mut grad, &mut hess, &f, 19, true, None);
         pivot_assert(&f, &idx, split_i, true, 19);
 
         let mut idx = vec![2, 6, 9, 5, 8, 13, 11, 7];
+        let mut grad = vec![0.2, 0.6, 0.9, 0.5, 0.8, 0.1, 0.1, 0.7];
+        let mut hess = vec![1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0];
         let f = vec![15, 10, 10, 11, 3, 18, 0, 9, 3, 5, 2, 6, 13, 19, 14];
-        let split_i = pivot_on_split(&mut idx, &f, 19, false, None);
+        let split_i = pivot_on_split(0, idx.len(), &mut idx, &mut grad, &mut hess, &f, 19, false, None);
         pivot_assert(&f, &idx, split_i, false, 19);
 
         // Random tests... right...
@@ -689,16 +759,18 @@ mod tests {
         let mut rng = StdRng::seed_from_u64(0);
         let f = (0..100).map(|_| rng.gen_range(0..15)).collect::<Vec<u16>>();
         let mut idx = index.choose_multiple(&mut rng, 73).copied().collect::<Vec<usize>>();
-        let split_i = pivot_on_split(&mut idx, &f, 7, true, None);
+        let mut grad = idx.iter().map(|i| *i as f32).collect::<Vec<f32>>();
+        let mut hess = grad.clone();
+        let split_i = pivot_on_split(0, idx.len(), &mut idx, &mut grad, &mut hess, &f, 7, true, None);
         pivot_assert(&f, &idx, split_i, true, 7);
 
         // Already sorted...
-        let split_i = pivot_on_split(&mut idx, &f, 7, true, None);
+        let split_i = pivot_on_split(0, idx.len(), &mut idx, &mut grad, &mut hess, &f, 7, true, None);
         pivot_assert(&f, &idx, split_i, true, 7);
 
         // Reversed
         idx.reverse();
-        let split_i = pivot_on_split(&mut idx, &f, 7, true, None);
+        let split_i = pivot_on_split(0, idx.len(), &mut idx, &mut grad, &mut hess, &f, 7, true, None);
         pivot_assert(&f, &idx, split_i, true, 7);
 
         // Without missing...
@@ -706,7 +778,9 @@ mod tests {
         let mut rng = StdRng::seed_from_u64(0);
         let f = (0..100).map(|_| rng.gen_range(1..15)).collect::<Vec<u16>>();
         let mut idx = index.choose_multiple(&mut rng, 73).copied().collect::<Vec<usize>>();
-        let split_i = pivot_on_split(&mut idx, &f, 5, true, None);
+        let mut grad = idx.iter().map(|i| *i as f32).collect::<Vec<f32>>();
+        let mut hess = grad.clone();
+        let split_i = pivot_on_split(0, idx.len(), &mut idx, &mut grad, &mut hess, &f, 5, true, None);
         pivot_assert(&f, &idx, split_i, true, 5);
 
         // Using max...
@@ -715,7 +789,9 @@ mod tests {
         let f = (0..100).map(|_| rng.gen_range(0..15)).collect::<Vec<u16>>();
         let mut idx = index.choose_multiple(&mut rng, 73).copied().collect::<Vec<usize>>();
         let sv = idx.iter().map(|i| f[*i]).max().unwrap();
-        let split_i = pivot_on_split(&mut idx, &f, sv, true, None);
+        let mut grad = idx.iter().map(|i| *i as f32).collect::<Vec<f32>>();
+        let mut hess = grad.clone();
+        let split_i = pivot_on_split(0, idx.len(), &mut idx, &mut grad, &mut hess, &f, sv, true, None);
         pivot_assert(&f, &idx, split_i, true, sv);
 
         // Using non-0 minimum...
@@ -724,7 +800,9 @@ mod tests {
         let f = (0..100).map(|_| rng.gen_range(0..15)).collect::<Vec<u16>>();
         let mut idx = index.choose_multiple(&mut rng, 73).copied().collect::<Vec<usize>>();
         let sv = idx.iter().filter(|i| f[**i] > 0).map(|i| f[*i]).min().unwrap();
-        let split_i = pivot_on_split(&mut idx, &f, sv, true, None);
+        let mut grad = idx.iter().map(|i| *i as f32).collect::<Vec<f32>>();
+        let mut hess = grad.clone();
+        let split_i = pivot_on_split(0, idx.len(), &mut idx, &mut grad, &mut hess, &f, sv, true, None);
         pivot_assert(&f, &idx, split_i, true, sv);
 
         // Using non-0 minimum with no missing...
@@ -733,7 +811,9 @@ mod tests {
         let f = (0..100).map(|_| rng.gen_range(1..15)).collect::<Vec<u16>>();
         let mut idx = index.choose_multiple(&mut rng, 73).copied().collect::<Vec<usize>>();
         let sv = idx.iter().filter(|i| f[**i] > 0).map(|i| f[*i]).min().unwrap();
-        let split_i = pivot_on_split(&mut idx, &f, sv, true, None);
+        let mut grad = idx.iter().map(|i| *i as f32).collect::<Vec<f32>>();
+        let mut hess = grad.clone();
+        let split_i = pivot_on_split(0, idx.len(), &mut idx, &mut grad, &mut hess, &f, sv, true, None);
         pivot_assert(&f, &idx, split_i, true, sv);
 
         // Left
@@ -741,16 +821,18 @@ mod tests {
         let mut rng = StdRng::seed_from_u64(0);
         let f = (0..100).map(|_| rng.gen_range(0..15)).collect::<Vec<u16>>();
         let mut idx = index.choose_multiple(&mut rng, 73).copied().collect::<Vec<usize>>();
-        let split_i = pivot_on_split(&mut idx, &f, 7, false, None);
+        let mut grad = idx.iter().map(|i| *i as f32).collect::<Vec<f32>>();
+        let mut hess = grad.clone();
+        let split_i = pivot_on_split(0, idx.len(), &mut idx, &mut grad, &mut hess, &f, 7, false, None);
         pivot_assert(&f, &idx, split_i, false, 7);
 
         // Already sorted...
-        let split_i = pivot_on_split(&mut idx, &f, 7, false, None);
+        let split_i = pivot_on_split(0, idx.len(), &mut idx, &mut grad, &mut hess, &f, 7, false, None);
         pivot_assert(&f, &idx, split_i, false, 7);
 
         // Reversed
         idx.reverse();
-        let split_i = pivot_on_split(&mut idx, &f, 7, false, None);
+        let split_i = pivot_on_split(0, idx.len(), &mut idx, &mut grad, &mut hess, &f, 7, false, None);
         pivot_assert(&f, &idx, split_i, false, 7);
 
         // Without missing...
@@ -758,7 +840,9 @@ mod tests {
         let mut rng = StdRng::seed_from_u64(0);
         let f = (0..100).map(|_| rng.gen_range(1..15)).collect::<Vec<u16>>();
         let mut idx = index.choose_multiple(&mut rng, 73).copied().collect::<Vec<usize>>();
-        let split_i = pivot_on_split(&mut idx, &f, 5, false, None);
+        let mut grad = idx.iter().map(|i| *i as f32).collect::<Vec<f32>>();
+        let mut hess = grad.clone();
+        let split_i = pivot_on_split(0, idx.len(), &mut idx, &mut grad, &mut hess, &f, 5, false, None);
         pivot_assert(&f, &idx, split_i, false, 5);
 
         // Using max...
@@ -767,7 +851,9 @@ mod tests {
         let f = (0..100).map(|_| rng.gen_range(0..15)).collect::<Vec<u16>>();
         let mut idx = index.choose_multiple(&mut rng, 73).copied().collect::<Vec<usize>>();
         let sv = idx.iter().map(|i| f[*i]).max().unwrap();
-        let split_i = pivot_on_split(&mut idx, &f, sv, false, None);
+        let mut grad = idx.iter().map(|i| *i as f32).collect::<Vec<f32>>();
+        let mut hess = grad.clone();
+        let split_i = pivot_on_split(0, idx.len(), &mut idx, &mut grad, &mut hess, &f, sv, false, None);
         pivot_assert(&f, &idx, split_i, false, sv);
 
         // Using non-0 minimum...
@@ -776,7 +862,9 @@ mod tests {
         let f = (0..100).map(|_| rng.gen_range(0..15)).collect::<Vec<u16>>();
         let mut idx = index.choose_multiple(&mut rng, 73).copied().collect::<Vec<usize>>();
         let sv = idx.iter().filter(|i| f[**i] > 0).map(|i| f[*i]).min().unwrap();
-        let split_i = pivot_on_split(&mut idx, &f, sv, false, None);
+        let mut grad = idx.iter().map(|i| *i as f32).collect::<Vec<f32>>();
+        let mut hess = grad.clone();
+        let split_i = pivot_on_split(0, idx.len(), &mut idx, &mut grad, &mut hess, &f, sv, false, None);
         pivot_assert(&f, &idx, split_i, false, sv);
 
         // Using non-0 minimum with no missing...
@@ -785,7 +873,9 @@ mod tests {
         let f = (0..100).map(|_| rng.gen_range(1..15)).collect::<Vec<u16>>();
         let mut idx = index.choose_multiple(&mut rng, 73).copied().collect::<Vec<usize>>();
         let sv = idx.iter().filter(|i| f[**i] > 0).map(|i| f[*i]).min().unwrap();
-        let split_i = pivot_on_split(&mut idx, &f, sv, false, None);
+        let mut grad = idx.iter().map(|i| *i as f32).collect::<Vec<f32>>();
+        let mut hess = grad.clone();
+        let split_i = pivot_on_split(0, idx.len(), &mut idx, &mut grad, &mut hess, &f, sv, false, None);
         pivot_assert(&f, &idx, split_i, false, sv);
     }
 

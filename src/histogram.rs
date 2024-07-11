@@ -223,6 +223,8 @@ impl HistogramMatrix {
     #[allow(clippy::too_many_arguments)]
     pub fn update(
         &mut self,
+        start: usize,
+        stop: usize,
         data: &Matrix<u16>,
         cuts: &JaggedMatrix<f64>,
         grad: &[f32],
@@ -242,24 +244,19 @@ impl HistogramMatrix {
         let (sorted_grad, sorted_hess) = match hess {
             Some(hess) => {
                 if !sort {
-                    (grad.to_vec(), Some(hess.to_vec()))
+                    (grad, Some(hess))
                 } else {
-                    let mut n_grad = Vec::with_capacity(index.len());
-                    let mut n_hess = Vec::with_capacity(index.len());
-                    for i in index {
-                        let i_ = *i;
-                        n_grad.push(grad[i_]);
-                        n_hess.push(hess[i_]);
-                    }
-                    (n_grad, Some(n_hess))
+                    let g = &grad[start..stop];
+                    let h = &hess[start..stop];
+                    (g, Some(h))
                 }
             }
             None => {
                 if !sort {
-                    (grad.to_vec(), None::<Vec<f32>>)
+                    (grad, None)
                 } else {
-                    let n_grad = index.iter().map(|i| grad[*i]).collect::<Vec<f32>>();
-                    (n_grad, None::<Vec<f32>>)
+                    let g = &grad[start..stop];
+                    (g, None)
                 }
             }
         };
@@ -271,7 +268,7 @@ impl HistogramMatrix {
                 cuts.get_col(*col),
                 &sorted_grad,
                 sorted_hess.as_deref(),
-                index,
+                &index[start..stop],
             );
         });
     }
@@ -454,7 +451,18 @@ mod tests {
         let mut hist_init = HistogramMatrix::empty(&bdata, &b.cuts, &col_index, false, false);
 
         let hist_col = 1;
-        hist_init.update(&bdata, &b.cuts, &g, h.as_deref(), &bdata.index, &col_index, true, false);
+        hist_init.update(
+            0,
+            bdata.index.len(),
+            &bdata,
+            &b.cuts,
+            &g,
+            h.as_deref(),
+            &bdata.index,
+            &col_index,
+            true,
+            false,
+        );
 
         let mut f = bdata.get_col(hist_col).to_owned();
 

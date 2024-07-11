@@ -51,8 +51,8 @@ impl Tree {
         mut index: Vec<usize>,
         col_index: &[usize],
         cuts: &JaggedMatrix<f64>,
-        grad: &[f32],
-        hess: Option<&[f32]>,
+        grad: &mut [f32],
+        mut hess: Option<&mut [f32]>,
         splitter: &T,
         parallel: bool,
         target_loss_decrement: Option<f32>,
@@ -75,7 +75,18 @@ impl Tree {
         }
 
         let root_hist = hist_tree.get_mut(&0).unwrap();
-        root_hist.update(data, cuts, grad, hess, &index, col_index, parallel, false);
+        root_hist.update(
+            0,
+            index.len(),
+            data,
+            cuts,
+            grad,
+            hess.as_deref(),
+            &index,
+            col_index,
+            parallel,
+            false,
+        );
 
         if let Some(c_index) = cat_index {
             let histograms = unsafe { hist_tree.get_many_unchecked_mut([&0, &1, &2]).unwrap() };
@@ -127,7 +138,7 @@ impl Tree {
                 data,
                 cuts,
                 grad,
-                hess,
+                hess.as_deref_mut(),
                 parallel,
                 is_const_hess,
                 &mut hist_tree,
@@ -602,7 +613,7 @@ mod tests {
         let file = fs::read_to_string("resources/performance.csv").expect("Something went wrong reading the file");
         let y: Vec<f64> = file.lines().map(|x| x.parse::<f64>().unwrap()).collect();
         let yhat = vec![0.5; y.len()];
-        let (g, h) = LogLoss::calc_grad_hess(&y, &yhat, None, None);
+        let (mut g, mut h) = LogLoss::calc_grad_hess(&y, &yhat, None, None);
         let loss = LogLoss::calc_loss(&y, &yhat, None, None);
 
         let data = Matrix::new(&data_vec, 891, 5);
@@ -633,8 +644,8 @@ mod tests {
             index,
             &col_index,
             &b.cuts,
-            &g,
-            h.as_deref(),
+            &mut g,
+            h.as_deref_mut(),
             &splitter,
             true,
             Some(f32::MAX),
@@ -658,7 +669,7 @@ mod tests {
         let file = fs::read_to_string("resources/performance.csv").expect("Something went wrong reading the file");
         let y: Vec<f64> = file.lines().map(|x| x.parse::<f64>().unwrap()).collect();
         let yhat = vec![0.5; y.len()];
-        let (g, h) = LogLoss::calc_grad_hess(&y, &yhat, None, None);
+        let (mut g, mut h) = LogLoss::calc_grad_hess(&y, &yhat, None, None);
         let loss = LogLoss::calc_loss(&y, &yhat, None, None);
 
         let data = Matrix::new(&data_vec, 891, 5);
@@ -685,8 +696,8 @@ mod tests {
             data.index.to_owned(),
             &col_index,
             &b.cuts,
-            &g,
-            h.as_deref(),
+            &mut g,
+            h.as_deref_mut(),
             &splitter,
             true,
             Some(f32::MAX),
@@ -745,7 +756,7 @@ mod tests {
         let file = fs::read_to_string("resources/performance.csv").expect("Something went wrong reading the file");
         let y: Vec<f64> = file.lines().map(|x| x.parse::<f64>().unwrap()).collect();
         let yhat = vec![0.5; y.len()];
-        let (g, h) = LogLoss::calc_grad_hess(&y, &yhat, None, None);
+        let (mut g, mut h) = LogLoss::calc_grad_hess(&y, &yhat, None, None);
         let loss = LogLoss::calc_loss(&y, &yhat, None, None);
 
         let data = Matrix::new(&data_vec, 891, 5);
@@ -773,8 +784,8 @@ mod tests {
             data.index.to_owned(),
             &col_index,
             &b.cuts,
-            &g,
-            h.as_deref(),
+            &mut g,
+            h.as_deref_mut(),
             &splitter,
             false,
             Some(f32::MAX),
@@ -803,7 +814,7 @@ mod tests {
         let file = fs::read_to_string("resources/performance.csv").expect("Something went wrong reading the file");
         let y: Vec<f64> = file.lines().map(|x| x.parse::<f64>().unwrap()).collect();
         let yhat = vec![0.5; y.len()];
-        let (g, h) = LogLoss::calc_grad_hess(&y, &yhat, None, None);
+        let (mut g, h) = LogLoss::calc_grad_hess(&y, &yhat, None, None);
         let loss = LogLoss::calc_loss(&y, &yhat, None, None);
         println!("GRADIENT -- {:?}", h);
 
@@ -833,7 +844,7 @@ mod tests {
             data.index.to_owned(),
             &col_index,
             &b.cuts,
-            &g,
+            &mut g,
             None,
             &splitter,
             true,
@@ -892,7 +903,7 @@ mod tests {
         let file = fs::read_to_string("resources/performance.csv").expect("Something went wrong reading the file");
         let y: Vec<f64> = file.lines().map(|x| x.parse::<f64>().unwrap()).collect();
         let yhat = vec![0.5; y.len()];
-        let (g, h) = LogLoss::calc_grad_hess(&y, &yhat, None, None);
+        let (mut g, mut h) = LogLoss::calc_grad_hess(&y, &yhat, None, None);
         let loss = LogLoss::calc_loss(&y, &yhat, None, None);
 
         let data = Matrix::new(&data_vec, 891, 5);
@@ -919,8 +930,8 @@ mod tests {
             data.index.to_owned(),
             &col_index,
             &b.cuts,
-            &g,
-            h.as_deref(),
+            &mut g,
+            h.as_deref_mut(),
             &splitter,
             true,
             Some(f32::MAX),
@@ -1028,7 +1039,7 @@ mod tests {
         );
         let y_test_avg = y_test.iter().sum::<f64>() / y_test.len() as f64;
         let yhat = vec![y_test_avg; y_test.len()];
-        let (grad, hess) = SquaredLoss::calc_grad_hess(&y_test, &yhat, None, None);
+        let (mut g, mut h) = SquaredLoss::calc_grad_hess(&y_test, &yhat, None, None);
         let loss = SquaredLoss::calc_loss(&y_test, &yhat, None, None);
 
         let splitter = MissingImputerSplitter {
@@ -1055,8 +1066,8 @@ mod tests {
             data.index.to_owned(),
             &col_index,
             &b.cuts,
-            &grad,
-            hess.as_deref(),
+            &mut g,
+            h.as_deref_mut(),
             &splitter,
             true,
             Some(f32::MAX),
@@ -1093,7 +1104,7 @@ mod tests {
 
         let y_avg = y.iter().sum::<f64>() / y.len() as f64;
         let yhat = vec![y_avg; y.len()];
-        let (grad, hess) = LogLoss::calc_grad_hess(&y, &yhat, None, None);
+        let (mut grad, mut hess) = LogLoss::calc_grad_hess(&y, &yhat, None, None);
         let loss = LogLoss::calc_loss(&y, &yhat, None, None);
 
         let splitter = MissingImputerSplitter {
@@ -1110,7 +1121,18 @@ mod tests {
         let col_index: Vec<usize> = (0..data.cols).collect();
 
         let mut hist_node = HistogramMatrix::empty(&bdata, &b.cuts, &col_index, false, false);
-        hist_node.update(&bdata, &b.cuts, &grad, hess.as_deref(), &index, &col_index, true, false);
+        hist_node.update(
+            0,
+            index.len(),
+            &bdata,
+            &b.cuts,
+            &grad,
+            hess.as_deref(),
+            &index,
+            &col_index,
+            true,
+            false,
+        );
         let mut hist_tree: BrownHashMap<usize, HistogramMatrix> = BrownHashMap::with_capacity(N_NODES_ALLOCATED);
         for i in 0..N_NODES_ALLOCATED {
             hist_tree.insert(i, hist_node.clone());
@@ -1122,8 +1144,8 @@ mod tests {
             data.index.to_owned(),
             &col_index,
             &b.cuts,
-            &grad,
-            hess.as_deref(),
+            &mut grad,
+            hess.as_deref_mut(),
             &splitter,
             true,
             Some(f32::MAX),

@@ -94,7 +94,7 @@ mod tests {
         let file = fs::read_to_string("resources/performance.csv").expect("Something went wrong reading the file");
         let y: Vec<f64> = file.lines().map(|x| x.parse::<f64>().unwrap()).collect();
         let yhat = vec![0.5; y.len()];
-        let (g, h) = LogLoss::calc_grad_hess(&y, &yhat, None, None);
+        let (mut g, mut h) = LogLoss::calc_grad_hess(&y, &yhat, None, None);
         let loss = LogLoss::calc_loss(&y, &yhat, None, None);
 
         let data = Matrix::new(&data_vec, 891, 5);
@@ -120,8 +120,8 @@ mod tests {
             data.index.to_owned(),
             &col_index,
             &b.cuts,
-            &g,
-            h.as_deref(),
+            &mut g,
+            h.as_deref_mut(),
             &splitter,
             true,
             Some(f32::MAX),

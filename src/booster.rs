@@ -324,7 +324,6 @@ impl PerpetualBooster {
             self.base_score = calc_init_callables(&self.objective)(y, sample_weight, alpha);
             yhat = vec![self.base_score; y.len()];
         } else {
-            // self.lumber(data, y, sample_weight, alpha)?;
             yhat = self.predict(data, self.parallel, None);
         }
 
@@ -385,8 +384,8 @@ impl PerpetualBooster {
                 data.index.to_owned(),
                 &col_index,
                 &binned_data.cuts,
-                &grad,
-                hess.as_deref(),
+                &mut grad,
+                hess.as_deref_mut(),
                 splitter,
                 self.parallel,
                 tld,

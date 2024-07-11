@@ -21,7 +21,7 @@ pub fn tree_benchmarks(c: &mut Criterion) {
         fs::read_to_string("resources/performance_100k_samp_seed0.csv").expect("Something went wrong reading the file");
     let y: Vec<f64> = file.lines().map(|x| x.parse::<f64>().unwrap()).collect();
     let yhat = vec![0.5; y.len()];
-    let (g, h) = LogLoss::calc_grad_hess(&y, &yhat, None, None);
+    let (mut g, mut h) = LogLoss::calc_grad_hess(&y, &yhat, None, None);
     let loss = LogLoss::calc_loss(&y, &yhat, None, None);
 
     let v: Vec<f32> = vec![10.; 300000];
@@ -56,8 +56,8 @@ pub fn tree_benchmarks(c: &mut Criterion) {
         data.index.to_owned(),
         &col_index,
         &bindata.cuts,
-        &g,
-        h.as_deref(),
+        &mut g,
+        h.as_deref_mut(),
         &splitter,
         true,
         Some(f32::MAX),
@@ -82,8 +82,8 @@ pub fn tree_benchmarks(c: &mut Criterion) {
                 black_box(data.index.to_owned()),
                 black_box(&col_index),
                 black_box(&bindata.cuts),
-                black_box(&g),
-                black_box(h.as_deref()),
+                black_box(&mut g),
+                black_box(h.as_deref_mut()),
                 black_box(&splitter),
                 black_box(false),
                 Some(f32::MAX),
@@ -108,8 +108,8 @@ pub fn tree_benchmarks(c: &mut Criterion) {
                 black_box(data.index.to_owned()),
                 black_box(&[1, 3, 4]),
                 black_box(&bindata.cuts),
-                black_box(&g),
-                black_box(h.as_deref()),
+                black_box(&mut g),
+                black_box(h.as_deref_mut()),
                 black_box(&splitter),
                 black_box(false),
                 Some(f32::MAX),
