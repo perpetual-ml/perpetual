@@ -17,17 +17,21 @@ def prepare_data(cal_housing, seed):
         metric_function = log_loss
         metric_name = "log_loss"
         objective = "LogLoss"
-    X_train, X_test, y_train, y_test = train_test_split(data, target, test_size=0.2248, random_state=seed)
+    X_train, X_test, y_train, y_test = train_test_split(
+        data, target, test_size=0.2248, random_state=seed
+    )
     return X_train, X_test, y_train, y_test, metric_function, metric_name, objective
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     budget = 1.5
     cal_housing = True
     cpu_times = []
     metrics = []
     for seed in [0, 1, 2, 3, 4]:
-        X_train, X_test, y_train, y_test, metric_function, metric_name, objective = prepare_data(cal_housing, seed)
+        X_train, X_test, y_train, y_test, metric_function, metric_name, objective = (
+            prepare_data(cal_housing, seed)
+        )
         model = PerpetualBooster(objective=objective)
         start = process_time()
         model.fit(X_train, y_train, budget=budget)
@@ -41,6 +45,10 @@ if __name__ == '__main__':
         metric = metric_function(y_test, y_pred)
         metrics.append(metric)
 
-        print(f"seed: {seed}, cpu time: {stop - start}, {metric_name}: {metric}, n_trees: {model.number_of_trees}")
+        print(
+            f"seed: {seed}, cpu time: {stop - start}, {metric_name}: {metric}, n_trees: {model.number_of_trees}"
+        )
 
-    print(f"average cpu time: {np.mean(cpu_times)}, average {metric_name}: {np.mean(metrics)}")
+    print(
+        f"average cpu time: {np.mean(cpu_times)}, average {metric_name}: {np.mean(metrics)}"
+    )
