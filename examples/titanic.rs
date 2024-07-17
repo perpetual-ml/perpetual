@@ -11,18 +11,22 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let features_and_target = ["survived", "pclass", "age", "sibsp", "parch", "fare"];
 
+    let features_and_target_arc = features_and_target
+        .iter()
+        .map(|s| String::from(s.to_owned()))
+        .collect::<Vec<String>>()
+        .into();
+
     let df = CsvReadOptions::default()
         .with_has_header(true)
-        .with_columns(Some(Arc::new(
-            features_and_target.iter().map(|&s| s.to_string()).collect(),
-        )))
+        .with_columns(Some(features_and_target_arc))
         .try_into_reader_with_file_path(Some("resources/titanic.csv".into()))?
         .finish()
         .unwrap();
 
     // Get data in column major format...
     let id_vars: Vec<&str> = Vec::new();
-    let mdf = df.melt(id_vars, ["pclass", "age", "sibsp", "parch", "fare"])?;
+    let mdf = df.unpivot(["pclass", "age", "sibsp", "parch", "fare"], id_vars)?;
 
     let data = Vec::from_iter(
         mdf.select_at_idx(1)
@@ -49,7 +53,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut model = PerpetualBooster::default().set_objective(Objective::LogLoss);
     model.fit(&matrix, &y, None, None, *budget, None, None)?;
 
-    println!("Model prediction: {:?} ...", &model.predict(&matrix, true, None)[0..10]);
+    println!("Model prediction: {:?} ...", &model.predict(&matrix, true)[0..10]);
 
     Ok(())
 }

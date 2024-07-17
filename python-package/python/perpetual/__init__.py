@@ -7,15 +7,13 @@ from dataclasses import dataclass
 from typing import Any, Dict, Iterable, Optional, Protocol, Union, cast
 
 import numpy as np
-import pandas as pd
 
 from perpetual.perpetual import PerpetualBooster as CratePerpetualBooster  # type: ignore
 from perpetual.serialize import BaseSerializer, ObjectSerializer
 
+
 __all__ = ["PerpetualBooster"]
 
-ArrayLike = Union[pd.Series, np.ndarray]
-FrameLike = Union[pd.DataFrame, np.ndarray]
 
 CONTRIBUTION_METHODS = {
     "weight": "Weight",
@@ -136,8 +134,28 @@ class BoosterType(Protocol):
         """pass"""
 
 
+def type_df(df):
+    if type(df).__name__ == "DataFrame":
+        if type(df).__module__.split(".")[0] == "pandas":
+            return "pandas_df"
+        elif type(df).__module__.split(".")[0] == "polars":
+            return "polars_df"
+    else:
+        return ""
+
+
+def type_series(y):
+    if type(y).__name__ == "Series":
+        if type(y).__module__.split(".")[0] == "pandas":
+            return "pandas_series"
+        elif type(y).__module__.split(".")[0] == "polars":
+            return "polars_series"
+    else:
+        return ""
+
+
 def convert_input_frame(
-    X: FrameLike, categorical_features
+    X, categorical_features
 ) -> tuple[list[str], np.ndarray, int, int, Optional[Iterable[int]], Optional[dict]]:
     """Convert data to format needed by booster.
 
@@ -145,11 +163,25 @@ def convert_input_frame(
         tuple[list[str], np.ndarray, int, int, Optional[Iterable[int]], Optional[dict]]: Return column names, the flat data, number of rows, the number of columns, cat_index, cat_mapping
     """
     categorical_features_ = None
-    if isinstance(X, pd.DataFrame):
+    if type_df(X) == "pandas_df":
         X_ = X.to_numpy()
         features_ = X.columns.to_list()
         if categorical_features == "auto":
             categorical_columns = X.select_dtypes(include=["category"]).columns.tolist()
+            categorical_features_ = [
+                features_.index(c) for c in categorical_columns
+            ] or None
+    elif type_df(X) == "polars_df":
+        import polars.selectors as cs
+
+        try:
+            X_ = X.to_numpy(allow_copy=False)
+        except:
+            X_ = X.to_numpy(allow_copy=True)
+
+        features_ = X.columns
+        if categorical_features == "auto":
+            categorical_columns = X.select(cs.categorical()).columns
             categorical_features_ = [
                 features_.index(c) for c in categorical_columns
             ] or None
@@ -208,17 +240,21 @@ def convert_input_frame(
     return features_, flat_data, rows, cols, categorical_features_, cat_mapping
 
 
-def transform_input_frame(
-    X: FrameLike, cat_mapping
-) -> tuple[list[str], np.ndarray, int, int]:
+def transform_input_frame(X, cat_mapping) -> tuple[list[str], np.ndarray, int, int]:
     """Convert data to format needed by booster.
 
     Returns:
         tuple[list[str], np.ndarray, int, int]: Return column names, the flat data, number of rows, the number of columns
     """
-    if isinstance(X, pd.DataFrame):
+    if type_df(X) == "pandas_df":
         X_ = X.to_numpy()
         features_ = X.columns.to_list()
+    elif type_df(X) == "polars_df":
+        try:
+            X_ = X.to_numpy(allow_copy=False)
+        except:
+            X_ = X.to_numpy(allow_copy=True)
+        features_ = X.columns
     else:
         # Assume it's a numpy array.
         X_ = X
@@ -248,9 +284,11 @@ def transform_input_frame(
     return features_, flat_data, rows, cols
 
 
-def _convert_input_array(x: ArrayLike) -> np.ndarray:
-    if isinstance(x, pd.Series):
+def _convert_input_array(x) -> np.ndarray:
+    if type_series(x) == "pandas_series":
         x_ = x.to_numpy()
+    elif type_series(x) == "polars_series":
+        x_ = x.to_numpy(allow_copy=False)
     else:
         x_ = x
     if not np.issubdtype(x_.dtype, "float64"):
@@ -258,9 +296,11 @@ def _convert_input_array(x: ArrayLike) -> np.ndarray:
     return x_
 
 
-def _convert_input_array_f32(x: ArrayLike) -> np.ndarray:
-    if isinstance(x, pd.Series):
+def _convert_input_array_f32(x) -> np.ndarray:
+    if type_series(x) == "pandas_series":
         x_ = x.to_numpy()
+    elif type_series(x) == "polars_series":
+        x_ = x.to_numpy(allow_copy=False)
     else:
         x_ = x
     if not np.issubdtype(x_.dtype, "float32"):
@@ -413,9 +453,9 @@ class PerpetualBooster:
 
     def fit(
         self,
-        X: FrameLike,
-        y: ArrayLike,
-        sample_weight: Union[ArrayLike, None] = None,
+        X,
+        y,
+        sample_weight=None,
         budget: float = 1.0,
         reset: Union[bool, None] = None,
         categorical_features: Union[Iterable[int], Iterable[str], str, None] = "auto",
@@ -423,8 +463,8 @@ class PerpetualBooster:
         """Fit the gradient booster on a provided dataset.
 
         Args:
-            X (FrameLike): Either a pandas DataFrame, or a 2 dimensional numpy array.
-            y (ArrayLike): Either a pandas Series, or a 1 dimensional numpy array. If "LogLoss"
+            X (FrameLike): Either a Polars or Pandas DataFrame, or a 2 dimensional Numpy array.
+            y (ArrayLike): Either a Polars or Pandas Series, or a 1 dimensional Numpy array. If "LogLoss"
                 was the objective type specified, then this should only contain 1 or 0 values,
                 where 1 is the positive class being predicted. If "SquaredLoss" is the
                 objective type, then any continuous variable can be provided.
@@ -482,7 +522,7 @@ class PerpetualBooster:
                         f"Columns mismatch between data {features} passed, and data {self.feature_names_in_} used at fit."
                     )
 
-    def predict(self, X: FrameLike, parallel: Union[bool, None] = None) -> np.ndarray:
+    def predict(self, X, parallel: Union[bool, None] = None) -> np.ndarray:
         """Predict with the fitted booster on new data.
 
         Args:
@@ -518,7 +558,7 @@ class PerpetualBooster:
             return np.array([vals.get(ft, 0.0) for ft in range(self.n_features_)])
 
     def predict_contributions(
-        self, X: FrameLike, method: str = "Average", parallel: Union[bool, None] = None
+        self, X, method: str = "Average", parallel: Union[bool, None] = None
     ) -> np.ndarray:
         """Predict with the fitted booster on new data, returning the feature
         contribution matrix. The last column is the bias term.
@@ -558,7 +598,7 @@ class PerpetualBooster:
 
     def partial_dependence(
         self,
-        X: FrameLike,
+        X,
         feature: Union[str, int],
         samples: int | None = 100,
         exclude_missing: bool = True,
@@ -629,7 +669,7 @@ class PerpetualBooster:
             <img  height="340" src="https://github.com/jinlow/forust/raw/main/resources/pdp_plot_age_mono.png">
         """
         if isinstance(feature, str):
-            if not isinstance(X, pd.DataFrame):
+            if not (type_df(X) == "pandas_df" or type_df(X) == "polars_df"):
                 raise ValueError(
                     "If `feature` is a string, then the object passed as `X` must be a pandas DataFrame."
                 )
@@ -648,8 +688,10 @@ class PerpetualBooster:
                 [feature_idx] = [i for i, v in enumerate(X.columns) if v == feature]
         elif isinstance(feature, int):
             feature_idx = feature
-            if isinstance(X, pd.DataFrame):
-                values = X.iloc[:, feature].to_numpy()
+            if type_df(X) == "pandas_df":
+                values = X.to_numpy()[:, feature]
+            elif type_df(X) == "polars_df":
+                values = X.to_numpy(allow_copy=False)[:, feature]
             else:
                 values = X[:, feature]
         else:
@@ -788,7 +830,7 @@ class PerpetualBooster:
 
     def _standardize_monotonicity_map(
         self,
-        X: Union[pd.DataFrame, np.ndarray],
+        X,
     ) -> dict[int, Any]:
         if isinstance(X, np.ndarray):
             return self.monotone_constraints
@@ -798,7 +840,7 @@ class PerpetualBooster:
 
     def _standardize_terminate_missing_features(
         self,
-        X: Union[pd.DataFrame, np.ndarray],
+        X,
     ) -> set[int]:
         if isinstance(X, np.ndarray):
             return set(self.terminate_missing_features)
@@ -941,14 +983,14 @@ class PerpetualBooster:
             trees.append(nodes)
         return trees
 
-    def trees_to_dataframe(self) -> pd.DataFrame:
-        """Return the tree structure as a pandas DataFrame object.
+    def trees_to_dataframe(self):
+        """Return the tree structure as a Polars or Pandas DataFrame object.
 
         Returns:
-            pd.DataFrame: Trees in a pandas dataframe.
+            DataFrame: Trees in a Polars or Pandas DataFrame.
 
         Example:
-            This can be used directly to print out the tree structure as a pandas dataframe. The Leaf values will have the "Gain" column replaced with the weight value.
+            This can be used directly to print out the tree structure as a dataframe. The Leaf values will have the "Gain" column replaced with the weight value.
 
             ```python
             model.trees_to_dataframe().head()
@@ -989,6 +1031,15 @@ class PerpetualBooster:
             for n in tree
         ]
 
-        return pd.DataFrame.from_records(vals).sort_values(
-            ["Tree", "Node"], ascending=[True, True]
-        )
+        try:
+            import polars as pl
+
+            return pl.from_records(vals).sort(
+                ["Tree", "Node"], descending=[False, False]
+            )
+        except:
+            import pandas as pd
+
+            return pd.DataFrame.from_records(vals).sort_values(
+                ["Tree", "Node"], ascending=[True, True]
+            )

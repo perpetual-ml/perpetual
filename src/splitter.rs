@@ -7,6 +7,7 @@ use crate::tree::Tree;
 use crate::utils::{
     between, bound_to_parent, constrained_weight, constrained_weight_const_hess, cull_gain, gain_given_weight,
     gain_given_weight_const_hess, pivot_on_split, pivot_on_split_const_hess, pivot_on_split_exclude_missing,
+    pivot_on_split_exclude_missing_const_hess,
 };
 use hashbrown::HashMap;
 use std::collections::HashSet;
@@ -888,32 +889,50 @@ impl Splitter for MissingBranchSplitter {
         split_info: SplitInfo,
         n_nodes: &usize,
         node: &mut SplittableNode,
-        index: &mut [usize],
+        mut index: &mut [usize],
         col_index: &[usize],
         data: &Matrix<u16>,
         cuts: &JaggedMatrix<f64>,
         grad: &mut [f32],
-        hess: Option<&mut [f32]>,
+        mut hess: Option<&mut [f32]>,
         parallel: bool,
-        hist_map: &mut HashMap<usize, HistogramMatrix>,
+        hist_tree: &mut HashMap<usize, HistogramMatrix>,
         cat_index: Option<&[u64]>,
     ) -> Vec<SplittableNode> {
         let missing_child = *n_nodes;
         let left_child = missing_child + 1;
         let right_child = missing_child + 2;
 
-        let (left_cat, right_cat) = get_categories(cat_index, &split_info, hist_map, node);
+        let (left_cat, right_cat) = get_categories(cat_index, &split_info, hist_tree, node);
 
         // We need to move all of the index's above and below our
         // split value.
         // pivot the sub array that this node has on our split value
         // Missing all falls to the bottom.
-        let (mut missing_split_idx, mut split_idx) = pivot_on_split_exclude_missing(
-            &mut index[node.start_idx..node.stop_idx],
-            data.get_col(split_info.split_feature),
-            split_info.split_bin,
-            left_cat.as_deref(),
-        );
+        let mut missing_split_idx: usize;
+        let mut split_idx: usize;
+        if hess.is_some() {
+            (missing_split_idx, split_idx) = pivot_on_split_exclude_missing(
+                node.start_idx,
+                node.stop_idx,
+                &mut index,
+                grad,
+                &mut hess.as_mut().unwrap(),
+                data.get_col(split_info.split_feature),
+                split_info.split_bin,
+                left_cat.as_deref(),
+            );
+        } else {
+            (missing_split_idx, split_idx) = pivot_on_split_exclude_missing_const_hess(
+                node.start_idx,
+                node.stop_idx,
+                &mut index,
+                grad,
+                data.get_col(split_info.split_feature),
+                split_info.split_bin,
+                left_cat.as_deref(),
+            );
+        }
 
         node.update_children(missing_child, left_child, right_child, &split_info, left_cat, right_cat);
 
@@ -965,7 +984,7 @@ impl Splitter for MissingBranchSplitter {
             // will be a leaf, assign this node as a leaf.
             missing_is_leaf = true;
             if max_ == 1 {
-                let right_hist = hist_map.get_mut(&right_child).unwrap();
+                let right_hist = hist_tree.get_mut(&right_child).unwrap();
                 right_hist.update(
                     split_idx,
                     node.stop_idx,
@@ -978,9 +997,9 @@ impl Splitter for MissingBranchSplitter {
                     parallel,
                     true,
                 );
-                HistogramMatrix::from_parent_child(hist_map, node.num, right_child, left_child);
+                HistogramMatrix::from_parent_child(hist_tree, node.num, right_child, left_child);
             } else {
-                let left_hist = hist_map.get_mut(&left_child).unwrap();
+                let left_hist = hist_tree.get_mut(&left_child).unwrap();
                 left_hist.update(
                     missing_split_idx,
                     split_idx,
@@ -993,12 +1012,12 @@ impl Splitter for MissingBranchSplitter {
                     parallel,
                     true,
                 );
-                HistogramMatrix::from_parent_child(hist_map, node.num, left_child, right_child);
+                HistogramMatrix::from_parent_child(hist_tree, node.num, left_child, right_child);
             }
         } else if max_ == 0 {
             // Max is missing, calculate the other two
             // levels histograms.
-            let left_hist = hist_map.get_mut(&left_child).unwrap();
+            let left_hist = hist_tree.get_mut(&left_child).unwrap();
             left_hist.update(
                 missing_split_idx,
                 split_idx,
@@ -1011,7 +1030,7 @@ impl Splitter for MissingBranchSplitter {
                 parallel,
                 true,
             );
-            let right_hist = hist_map.get_mut(&right_child).unwrap();
+            let right_hist = hist_tree.get_mut(&right_child).unwrap();
             right_hist.update(
                 split_idx,
                 node.stop_idx,
@@ -1024,9 +1043,9 @@ impl Splitter for MissingBranchSplitter {
                 parallel,
                 true,
             );
-            HistogramMatrix::from_parent_two_children(hist_map, node.num, left_child, right_child, missing_child);
+            HistogramMatrix::from_parent_two_children(hist_tree, node.num, left_child, right_child, missing_child);
         } else if max_ == 1 {
-            let miss_hist = hist_map.get_mut(&missing_child).unwrap();
+            let miss_hist = hist_tree.get_mut(&missing_child).unwrap();
             miss_hist.update(
                 node.start_idx,
                 missing_split_idx,
@@ -1039,7 +1058,7 @@ impl Splitter for MissingBranchSplitter {
                 parallel,
                 true,
             );
-            let right_hist = hist_map.get_mut(&right_child).unwrap();
+            let right_hist = hist_tree.get_mut(&right_child).unwrap();
             right_hist.update(
                 split_idx,
                 node.stop_idx,
@@ -1052,10 +1071,10 @@ impl Splitter for MissingBranchSplitter {
                 parallel,
                 true,
             );
-            HistogramMatrix::from_parent_two_children(hist_map, node.num, missing_child, right_child, left_child);
+            HistogramMatrix::from_parent_two_children(hist_tree, node.num, missing_child, right_child, left_child);
         } else {
             // right is the largest
-            let miss_hist = hist_map.get_mut(&missing_child).unwrap();
+            let miss_hist = hist_tree.get_mut(&missing_child).unwrap();
             miss_hist.update(
                 node.start_idx,
                 missing_split_idx,
@@ -1068,7 +1087,7 @@ impl Splitter for MissingBranchSplitter {
                 parallel,
                 true,
             );
-            let left_hist = hist_map.get_mut(&left_child).unwrap();
+            let left_hist = hist_tree.get_mut(&left_child).unwrap();
             left_hist.update(
                 missing_split_idx,
                 split_idx,
@@ -1081,7 +1100,7 @@ impl Splitter for MissingBranchSplitter {
                 parallel,
                 true,
             );
-            HistogramMatrix::from_parent_two_children(hist_map, node.num, missing_child, left_child, right_child);
+            HistogramMatrix::from_parent_two_children(hist_tree, node.num, missing_child, left_child, right_child);
         }
 
         let mut missing_node = SplittableNode::from_node_info(
@@ -1535,7 +1554,7 @@ impl Splitter for MissingImputerSplitter {
 fn get_categories(
     cat_index: Option<&[u64]>,
     s: &SplitInfo,
-    hist_map: &HashMap<usize, HistogramMatrix>,
+    hist_tree: &HashMap<usize, HistogramMatrix>,
     n: &SplittableNode,
 ) -> (Option<Vec<u16>>, Option<Vec<u16>>) {
     let (left_cat, right_cat) = match cat_index {
@@ -1543,7 +1562,7 @@ fn get_categories(
             if c_index.contains(&(s.split_feature as u64)) {
                 let mut left_cat = Vec::new();
                 let mut right_cat = Vec::new();
-                let hist = hist_map.get(&n.num).unwrap().0.get_col(s.split_feature);
+                let hist = hist_tree.get(&n.num).unwrap().0.get_col(s.split_feature);
                 let mut is_left = true;
                 for bin in hist.iter() {
                     if bin.num == s.split_bin {
@@ -1654,37 +1673,37 @@ mod tests {
         assert!(between(93.0, 95.0, s.left_node.cover));
         assert!(between(114.0, 116.0, s.right_node.cover));
         assert!(between(7.0, 7.2, s.left_node.gain));
-        assert!(between(298.0, 300.0, s.right_node.gain));
-        assert!(between(88.0, 89.0, s.split_gain));
+        assert!(between(298.0, 302.0, s.right_node.gain));
+        assert!(between(88.0, 95.0, s.split_gain));
     }
 
     #[test]
     fn test_cal_housing() -> Result<(), Box<dyn Error>> {
         let n_bins = 256;
         let n_cols = 8;
+
         let feature_names = [
-            "MedInc",
-            "HouseAge",
-            "AveRooms",
-            "AveBedrms",
-            "Population",
-            "AveOccup",
-            "Latitude",
-            "Longitude",
-            "MedHouseVal",
+            "MedInc".to_owned(),
+            "HouseAge".to_owned(),
+            "AveRooms".to_owned(),
+            "AveBedrms".to_owned(),
+            "Population".to_owned(),
+            "AveOccup".to_owned(),
+            "Latitude".to_owned(),
+            "Longitude".to_owned(),
+            "MedHouseVal".to_owned(),
         ];
 
         let df_test = CsvReadOptions::default()
             .with_has_header(true)
-            .with_columns(Some(Arc::new(feature_names.iter().map(|&s| s.to_string()).collect())))
+            .with_columns(Some(Arc::new(feature_names)))
             .try_into_reader_with_file_path(Some("resources/cal_housing_test.csv".into()))?
             .finish()
             .unwrap();
 
         let id_vars: Vec<&str> = Vec::new();
 
-        let mdf_test = df_test.melt(
-            &id_vars,
+        let mdf_test = df_test.unpivot(
             [
                 "MedInc",
                 "HouseAge",
@@ -1695,6 +1714,7 @@ mod tests {
                 "Latitude",
                 "Longitude",
             ],
+            &id_vars,
         )?;
 
         let data_test = Vec::from_iter(

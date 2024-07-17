@@ -173,7 +173,7 @@ pub fn tree_benchmarks(c: &mut Criterion) {
     let mut booster = PerpetualBooster::default();
     booster.fit(&data, &y, None, None, 0.3, None, None).unwrap();
     booster_train.bench_function("Predict Booster", |b| {
-        b.iter(|| booster.predict(black_box(&data), false, None))
+        b.iter(|| booster.predict(black_box(&data), false))
     });
 }
 

@@ -203,7 +203,7 @@ impl PerpetualBooster {
         let flat_data = flat_data.as_slice()?;
         let data = Matrix::new(flat_data, rows, cols);
         let parallel = parallel.unwrap_or(true);
-        Ok(self.booster.predict(&data, parallel, None).into_pyarray_bound(py))
+        Ok(self.booster.predict(&data, parallel).into_pyarray_bound(py))
     }
 
     pub fn predict_contributions<'py>(

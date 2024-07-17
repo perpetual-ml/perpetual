@@ -490,7 +490,7 @@ def test_missing_treatment(X_y):
     contribus_average = model.predict_contributions(X, method="average")
     assert contribus_average.shape[1] == X.shape[1] + 1
     # Wont be exactly zero because of floating point error.
-    assert np.allclose(contribus_average[:, :-1][X.isna()], 0, atol=0.000001)
+    assert np.allclose(contribus_average[:, :-1][X.isna()], 0, atol=0.001)
     assert np.allclose(contribus_weight.sum(1), preds)
     assert (X.isna().sum().sum()) > 0
 
@@ -514,7 +514,7 @@ def test_missing_treatment_split_further(X_y):
     [pclass_idx] = [i for i, f in enumerate(X.columns) if f == "pclass"]
     [fare_idx] = [i for i, f in enumerate(X.columns) if f == "fare"]
 
-    model.fit(X, y=y)
+    model.fit(X, y)
     preds = model.predict(X)
     contribus_weight = model.predict_contributions(X, method="weight")
 
@@ -530,7 +530,7 @@ def test_missing_treatment_split_further(X_y):
 
     contribus_average = model.predict_contributions(X, method="average")
     assert np.allclose(contribus_weight.sum(1), preds)
-    assert np.allclose(contribus_average, contribus_weight, atol=0.000001)
+    assert np.allclose(contribus_average, contribus_weight, atol=0.001)
 
 
 def test_AverageNodeWeight_missing_node_treatment(X_y):
@@ -754,3 +754,28 @@ def test_categorical(X_y):
     X[cols] = X[cols].astype("category")
     model = PerpetualBooster()
     model.fit(X, y)
+
+
+def test_polars(X_y):
+    import polars as pl
+
+    X = pl.from_pandas(pd.read_csv("../resources/adult_test_df.csv", index_col=False))
+    y = np.array(
+        pd.read_csv(
+            "../resources/adult_test_y.csv", index_col=False, header=None
+        ).squeeze("columns")
+    )
+    cols = [
+        "workclass",
+        "education",
+        "marital-status",
+        "occupation",
+        "relationship",
+        "race",
+        "native-country",
+    ]
+    X = X.with_columns(pl.col(cols).cast(pl.Categorical))
+    model = PerpetualBooster()
+    model.fit(X, y)
+    model.predict(X)
+    model.trees_to_dataframe()

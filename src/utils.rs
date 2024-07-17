@@ -378,7 +378,7 @@ pub fn map_bin<T: FloatData<T>>(x: &[T], v: &T, missing: &T) -> Option<u16> {
 pub fn pivot_on_split(
     start: usize,
     stop: usize,
-    ind: &mut [usize],
+    idx: &mut [usize],
     grad: &mut [f32],
     hess: &mut [f32],
     feature: &[u16],
@@ -386,7 +386,7 @@ pub fn pivot_on_split(
     missing_right: bool,
     left_cat: Option<&[u16]>,
 ) -> usize {
-    let index = &mut ind[start..stop];
+    let index = &mut idx[start..stop];
     let g = &mut grad[start..stop];
     let h = &mut hess[start..stop];
 
@@ -428,14 +428,14 @@ pub fn pivot_on_split(
 pub fn pivot_on_split_const_hess(
     start: usize,
     stop: usize,
-    ind: &mut [usize],
+    idx: &mut [usize],
     grad: &mut [f32],
     feature: &[u16],
     split_value: u16,
     missing_right: bool,
     left_cat: Option<&[u16]>,
 ) -> usize {
-    let index = &mut ind[start..stop];
+    let index = &mut idx[start..stop];
     let g = &mut grad[start..stop];
 
     let length = index.len();
@@ -489,11 +489,18 @@ pub fn pivot_on_split_const_hess(
 /// * `split_value` - the split value to use to pivot on.
 #[inline]
 pub fn pivot_on_split_exclude_missing(
-    index: &mut [usize],
+    start: usize,
+    stop: usize,
+    idx: &mut [usize],
+    grad: &mut [f32],
+    hess: &mut [f32],
     feature: &[u16],
     split_value: u16,
     left_cat: Option<&[u16]>,
 ) -> (usize, usize) {
+    let index = &mut idx[start..stop];
+    let gr = &mut grad[start..stop];
+    let hs = &mut hess[start..stop];
     // I think we can do this in O(n) time...
     let mut low = 0;
     let mut high = index.len() - 1;
@@ -509,6 +516,8 @@ pub fn pivot_on_split_exclude_missing(
             let l = feature[index[low]];
             if l == 0 {
                 index.swap(missing, low);
+                gr.swap(missing, low);
+                hs.swap(missing, low);
                 missing += 1;
             }
             match exclude_missing_compare(&split_value, l, left_cat) {
@@ -523,6 +532,8 @@ pub fn pivot_on_split_exclude_missing(
             // then that value with low.
             if h == 0 {
                 index.swap(missing, high);
+                gr.swap(missing, high);
+                hs.swap(missing, high);
                 missing += 1;
                 // Low must be at least equal to
                 // missing. Otherwise, we would get
@@ -542,6 +553,76 @@ pub fn pivot_on_split_exclude_missing(
         }
         if low < high {
             index.swap(high, low);
+            gr.swap(high, low);
+            hs.swap(high, low);
+        }
+    }
+    (missing, low)
+}
+
+#[inline]
+pub fn pivot_on_split_exclude_missing_const_hess(
+    start: usize,
+    stop: usize,
+    idx: &mut [usize],
+    grad: &mut [f32],
+    feature: &[u16],
+    split_value: u16,
+    left_cat: Option<&[u16]>,
+) -> (usize, usize) {
+    let index = &mut idx[start..stop];
+    let gr = &mut grad[start..stop];
+    // I think we can do this in O(n) time...
+    let mut low = 0;
+    let mut high = index.len() - 1;
+    // The index of the first value, that is not
+    // missing.
+    let mut missing = 0;
+    let max_idx = high;
+    while low < high {
+        // Go until we find a low value that needs to
+        // be swapped, this will be the first value
+        // that our split value is less or equal to.
+        while low < max_idx {
+            let l = feature[index[low]];
+            if l == 0 {
+                index.swap(missing, low);
+                gr.swap(missing, low);
+                missing += 1;
+            }
+            match exclude_missing_compare(&split_value, l, left_cat) {
+                Ordering::Less | Ordering::Equal => break,
+                Ordering::Greater => low += 1,
+            }
+        }
+        while high > low {
+            let h = feature[index[high]];
+            // If this is missing, we need to
+            // swap this value with missing, and
+            // then that value with low.
+            if h == 0 {
+                index.swap(missing, high);
+                gr.swap(missing, high);
+                missing += 1;
+                // Low must be at least equal to
+                // missing. Otherwise, we would get
+                // stuck, because low will be zero
+                // then...
+                if missing > low {
+                    low = missing;
+                }
+            }
+            // Go until we find a high value that needs to be
+            // swapped, this will be the first value that our
+            // split_value is greater than.
+            match exclude_missing_compare(&split_value, h, left_cat) {
+                Ordering::Less | Ordering::Equal => high -= 1,
+                Ordering::Greater => break,
+            }
+        }
+        if low < high {
+            index.swap(high, low);
+            gr.swap(high, low);
         }
     }
     (missing, low)
@@ -903,7 +984,9 @@ mod tests {
         // Using minimum value...
         let mut idx = vec![2, 6, 9, 5, 8, 13, 11, 7];
         let f = vec![15, 10, 10, 0, 3, 0, 0, 9, 3, 5, 2, 6, 13, 19, 14];
-        let split_i = pivot_on_split_exclude_missing(&mut idx, &f, 1, None);
+        let mut grad = idx.iter().map(|i| *i as f32).collect::<Vec<f32>>();
+        let mut hess = grad.clone();
+        let split_i = pivot_on_split_exclude_missing(0, idx.len(), &mut idx, &mut grad, &mut hess, &f, 1, None);
         // let map_ = idx.iter().map(|i| f[*i]).collect::<Vec<u16>>();
         // println!("{:?}, {:?}, {:?}", split_i, idx, map_);
         pivot_missing_assert(1, &idx, &f, &split_i);
@@ -911,14 +994,16 @@ mod tests {
         // Higher value...
         let mut idx = vec![2, 6, 9, 5, 8, 13, 11, 7];
         let f = vec![15, 10, 10, 0, 3, 0, 0, 9, 3, 5, 2, 6, 13, 19, 14];
-        let split_i = pivot_on_split_exclude_missing(&mut idx, &f, 10, None);
+        let mut grad = idx.iter().map(|i| *i as f32).collect::<Vec<f32>>();
+        let mut hess = grad.clone();
+        let split_i = pivot_on_split_exclude_missing(0, idx.len(), &mut idx, &mut grad, &mut hess, &f, 10, None);
         //let split_i = pivot_on_split(&mut idx, &f, 10, false);
         // let map_ = idx.iter().map(|i| f[*i]).collect::<Vec<u16>>();
         // println!("{:?}, {:?}, {:?}", split_i, idx, map_);
         pivot_missing_assert(10, &idx, &f, &split_i);
 
         // Run it again, and ensure it works on an already sorted list...
-        let split_i = pivot_on_split_exclude_missing(&mut idx, &f, 10, None);
+        let split_i = pivot_on_split_exclude_missing(0, idx.len(), &mut idx, &mut grad, &mut hess, &f, 10, None);
         //let split_i = pivot_on_split(&mut idx, &f, 10, false);
         // let map_ = idx.iter().map(|i| f[*i]).collect::<Vec<u16>>();
         // println!("{:?}, {:?}, {:?}", split_i, idx, map_);
@@ -926,7 +1011,7 @@ mod tests {
 
         // Run it again, and ensure it works on reversed list...
         idx.reverse();
-        let split_i = pivot_on_split_exclude_missing(&mut idx, &f, 10, None);
+        let split_i = pivot_on_split_exclude_missing(0, idx.len(), &mut idx, &mut grad, &mut hess, &f, 10, None);
         //let split_i = pivot_on_split(&mut idx, &f, 10, false);
         // let map_ = idx.iter().map(|i| f[*i]).collect::<Vec<u16>>();
         // println!("{:?}, {:?}, {:?}", split_i, idx, map_);
@@ -935,7 +1020,9 @@ mod tests {
         // Small test done with python
         let mut idx = vec![0, 1, 2, 3, 4, 5];
         let f = vec![1, 0, 1, 3, 0, 4];
-        let split_i = pivot_on_split_exclude_missing(&mut idx, &f, 2, None);
+        let mut grad = idx.iter().map(|i| *i as f32).collect::<Vec<f32>>();
+        let mut hess = grad.clone();
+        let split_i = pivot_on_split_exclude_missing(0, idx.len(), &mut idx, &mut grad, &mut hess, &f, 2, None);
         // let map_ = idx.iter().map(|i| f[*i]).collect::<Vec<u16>>();
         // println!("{:?}, {:?}, {:?}", split_i, idx, map_);
         pivot_missing_assert(2, &idx, &f, &split_i);
@@ -952,7 +1039,9 @@ mod tests {
         // TODO: Add more tests for this...
         let mut idx = vec![2, 6, 9, 5, 8, 13, 11, 7];
         let f = vec![15, 10, 10, 2, 3, 5, 7, 9, 3, 5, 2, 6, 13, 19, 14];
-        let split_i = pivot_on_split_exclude_missing(&mut idx, &f, 10, None);
+        let mut grad = idx.iter().map(|i| *i as f32).collect::<Vec<f32>>();
+        let mut hess = grad.clone();
+        let split_i = pivot_on_split_exclude_missing(0, idx.len(), &mut idx, &mut grad, &mut hess, &f, 10, None);
         //let split_i = pivot_on_split(&mut idx, &f, 10, false);
         // println!("{:?}, {:?}, {:?}", split_i, idx, map_);
         // let map_ = idx.iter().map(|i| f[*i]).collect::<Vec<u16>>();
@@ -965,11 +1054,13 @@ mod tests {
         let mut rng = StdRng::seed_from_u64(0);
         let f = (0..100).map(|_| rng.gen_range(0..15)).collect::<Vec<u16>>();
         let mut idx = index.choose_multiple(&mut rng, 73).copied().collect::<Vec<usize>>();
-        let split_i = pivot_on_split_exclude_missing(&mut idx, &f, 10, None);
+        let mut grad = idx.iter().map(|i| *i as f32).collect::<Vec<f32>>();
+        let mut hess = grad.clone();
+        let split_i = pivot_on_split_exclude_missing(0, idx.len(), &mut idx, &mut grad, &mut hess, &f, 10, None);
         pivot_missing_assert(10, &idx, &f, &split_i);
 
         // Already sorted...
-        let split_i = pivot_on_split_exclude_missing(&mut idx, &f, 10, None);
+        let split_i = pivot_on_split_exclude_missing(0, idx.len(), &mut idx, &mut grad, &mut hess, &f, 10, None);
         pivot_missing_assert(10, &idx, &f, &split_i);
 
         // Without missing...
@@ -977,7 +1068,9 @@ mod tests {
         let mut rng = StdRng::seed_from_u64(0);
         let f = (0..100).map(|_| rng.gen_range(1..15)).collect::<Vec<u16>>();
         let mut idx = index.choose_multiple(&mut rng, 73).copied().collect::<Vec<usize>>();
-        let split_i = pivot_on_split_exclude_missing(&mut idx, &f, 5, None);
+        let mut grad = idx.iter().map(|i| *i as f32).collect::<Vec<f32>>();
+        let mut hess = grad.clone();
+        let split_i = pivot_on_split_exclude_missing(0, idx.len(), &mut idx, &mut grad, &mut hess, &f, 5, None);
         // let map_ = idx.iter().map(|i| f[*i]).collect::<Vec<u16>>();
         // println!("{:?}, {:?}, {:?}", split_i, idx, map_);
         pivot_missing_assert(5, &idx, &f, &split_i);
@@ -988,7 +1081,9 @@ mod tests {
         let f = (0..100).map(|_| rng.gen_range(0..15)).collect::<Vec<u16>>();
         let mut idx = index.choose_multiple(&mut rng, 73).copied().collect::<Vec<usize>>();
         let sv = idx.iter().map(|i| f[*i]).max().unwrap();
-        let split_i = pivot_on_split_exclude_missing(&mut idx, &f, sv, None);
+        let mut grad = idx.iter().map(|i| *i as f32).collect::<Vec<f32>>();
+        let mut hess = grad.clone();
+        let split_i = pivot_on_split_exclude_missing(0, idx.len(), &mut idx, &mut grad, &mut hess, &f, sv, None);
         pivot_missing_assert(sv, &idx, &f, &split_i);
 
         // Using non-0 minimum...
@@ -997,7 +1092,9 @@ mod tests {
         let f = (0..100).map(|_| rng.gen_range(0..15)).collect::<Vec<u16>>();
         let mut idx = index.choose_multiple(&mut rng, 73).copied().collect::<Vec<usize>>();
         let sv = idx.iter().filter(|i| f[**i] > 0).map(|i| f[*i]).min().unwrap();
-        let split_i = pivot_on_split_exclude_missing(&mut idx, &f, sv, None);
+        let mut grad = idx.iter().map(|i| *i as f32).collect::<Vec<f32>>();
+        let mut hess = grad.clone();
+        let split_i = pivot_on_split_exclude_missing(0, idx.len(), &mut idx, &mut grad, &mut hess, &f, sv, None);
         pivot_missing_assert(sv, &idx, &f, &split_i);
 
         // Using non-0 minimum with no missing...
@@ -1006,7 +1103,9 @@ mod tests {
         let f = (0..100).map(|_| rng.gen_range(1..15)).collect::<Vec<u16>>();
         let mut idx = index.choose_multiple(&mut rng, 73).copied().collect::<Vec<usize>>();
         let sv = idx.iter().filter(|i| f[**i] > 0).map(|i| f[*i]).min().unwrap();
-        let split_i = pivot_on_split_exclude_missing(&mut idx, &f, sv, None);
+        let mut grad = idx.iter().map(|i| *i as f32).collect::<Vec<f32>>();
+        let mut hess = grad.clone();
+        let split_i = pivot_on_split_exclude_missing(0, idx.len(), &mut idx, &mut grad, &mut hess, &f, sv, None);
         pivot_missing_assert(sv, &idx, &f, &split_i);
     }
 

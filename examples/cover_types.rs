@@ -1,11 +1,11 @@
 //! An example using the `cover types` dataset
 
-// cargo run --release --example cover_types 0.1 0.3
+// cargo run --release --example cover_types 1.0
 
 // cargo build --release --example cover_types
 // hyperfine --runs 3 ./target/release/examples/cover_types
-// hyperfine --runs 3 .\target\release\examples\cover_types 0.1 0.3
-// hyperfine --runs 3 'cargo run --release --example cover_types 0.1 0.3'
+// hyperfine --runs 3 .\target\release\examples\cover_types 1.0
+// hyperfine --runs 3 'cargo run --release --example cover_types 1.0'
 
 // cargo flamegraph --example cover_types
 
@@ -39,7 +39,7 @@ pub fn multiclass_log_loss(y_true: &[f64], y_pred: &[Vec<f64>]) -> f64 {
 
 fn main() -> Result<(), Box<dyn Error>> {
     let args: Vec<String> = env::args().collect();
-    let budget = &args[1].parse::<f32>().unwrap();
+    let budget = &args[1].parse::<f32>().unwrap_or(1.0);
 
     let mut features: Vec<&str> = [
         "Elevation",
@@ -66,29 +66,37 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut features_and_target = features.clone();
     features_and_target.push("Cover_Type");
 
+    let features_and_target_arc1 = features_and_target
+        .iter()
+        .map(|s| String::from(s.to_owned()))
+        .collect::<Vec<String>>()
+        .into();
+
+    let features_and_target_arc2 = features_and_target
+        .iter()
+        .map(|s| String::from(s.to_owned()))
+        .collect::<Vec<String>>()
+        .into();
+
     let df_train = CsvReadOptions::default()
         .with_has_header(true)
-        .with_columns(Some(Arc::new(
-            features_and_target.iter().map(|&s| s.to_string()).collect(),
-        )))
+        .with_columns(Some(features_and_target_arc1))
         .try_into_reader_with_file_path(Some("resources/cover_types_train.csv".into()))?
         .finish()
         .unwrap();
 
     let df_test = CsvReadOptions::default()
         .with_has_header(true)
-        .with_columns(Some(Arc::new(
-            features_and_target.iter().map(|&s| s.to_string()).collect(),
-        )))
+        .with_columns(Some(features_and_target_arc2))
         .try_into_reader_with_file_path(Some("resources/cover_types_train.csv".into()))?
         .finish()
         .unwrap();
 
     // Get data in column major format...
     let id_vars_train: Vec<&str> = Vec::new();
-    let mdf_train = df_train.melt(&id_vars_train, &features)?;
+    let mdf_train = df_train.unpivot(&features, &id_vars_train)?;
     let id_vars_test: Vec<&str> = Vec::new();
-    let mdf_test = df_test.melt(&id_vars_test, &features)?;
+    let mdf_test = df_test.unpivot(&features, &id_vars_test)?;
 
     let data_train = Vec::from_iter(
         mdf_train
@@ -128,14 +136,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     let matrix_train = Matrix::new(&data_train, y_train.len(), 54);
     let matrix_test = Matrix::new(&data_test, y_test.len(), 54);
 
-    // Create booster.
-    // To provide parameters generate a default booster, and then use
-    // the relevant `set_` methods for any parameters you would like to
-    // adjust.
-
     let mut raw_train_array = vec![vec![0.0; 7]; y_train.len()];
     let mut raw_test_array = vec![vec![0.0; 7]; y_test.len()];
-    // let mut raw_test = Vec::new();
     for i in 1..8 {
         println!();
 
@@ -155,8 +157,8 @@ fn main() -> Result<(), Box<dyn Error>> {
         let n_leaves: usize = trees.iter().map(|t| (t.nodes.len() + 1) / 2).sum();
         println!("n_leaves: {:?}", n_leaves);
 
-        let y_pred_train = model.predict(&matrix_train, true, None);
-        let y_pred_test = model.predict(&matrix_test, true, None);
+        let y_pred_train = model.predict(&matrix_train, true);
+        let y_pred_test = model.predict(&matrix_test, true);
 
         raw_train_array
             .iter_mut()
@@ -166,7 +168,6 @@ fn main() -> Result<(), Box<dyn Error>> {
             .iter_mut()
             .enumerate()
             .for_each(|(idx, raw)| raw[(i - 1) as usize] = y_pred_test[idx]);
-        // raw_test.push(Series::new(&i.to_string(), y_pred));
     }
 
     let loss_train = multiclass_log_loss(&y_train, &raw_train_array);
@@ -174,11 +175,6 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     println!("loss_train: {}", loss_train);
     println!("loss_test: {}", loss_test);
-
-    // let mut df_raw_test = DataFrame::new(raw_test).unwrap();
-    // let mut output_file = File::create("./raw_test.csv").expect("Failed to create an output file.");
-    // let mut writer = CsvWriter::new(&mut output_file).include_header(true);
-    // writer.finish(&mut df_raw_test).expect("Failed to write the CSV file.");
 
     Ok(())
 }

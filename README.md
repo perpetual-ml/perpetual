@@ -7,6 +7,7 @@
 [![Python Versions](https://img.shields.io/pypi/pyversions/perpetual.svg?logo=python&logoColor=white)](https://pypi.org/project/perpetual)
 [![PyPI Version](https://img.shields.io/pypi/v/perpetual.svg?logo=pypi&logoColor=white)](https://pypi.org/project/perpetual)
 [![Crates.io Version](https://img.shields.io/crates/v/perpetual?logo=rust&logoColor=white)](https://crates.io/crates/perpetual)
+[![Discord](https://img.shields.io/discord/1247650900214812692?logo=discord&cacheSeconds=10)](https://discord.gg/vADKk9Wr)
 
 </div>
 
@@ -14,21 +15,21 @@
 
 ## _A self-generalizing, hyperparameter-free gradient boosting machine_
 
-PerpetualBooster is a gradient boosting machine (GBM) algorithm which doesn't have hyperparameters to be tuned so that you can use it without hyperparameter optimization packages unlike other GBM algorithms. Similar to AutoML libraries, it has a `budget` parameter. Increasing the `budget` parameter increases the predictive power of the algorithm and gives better results on unseen data. Start with a small budget and increase it once you are confident with your features. If you don't see any improvement with further increasing the `budget`, it means that you are already extracting the most predictive power out of your data.
+PerpetualBooster is a gradient boosting machine (GBM) algorithm which doesn't have hyperparameters to be tuned so that you can use it without hyperparameter optimization packages unlike other GBM algorithms. Similar to AutoML libraries, it has a `budget` parameter. Increasing the `budget` parameter increases the predictive power of the algorithm and gives better results on unseen data. Start with a small budget (e.g. 1.0) and increase it (e.g. 2.0) once you are confident with your features. If you don't see any improvement with further increasing the `budget`, it means that you are already extracting the most predictive power out of your data.
 
 ## Benchmark
 
 Hyperparameter optimization usually takes 100 iterations with plain GBM algorithms. PerpetualBooster achieves the same accuracy in the single run. Thus, it achieves around 100x speed-up at the same accuracy with different `budget` levels and with different datasets. The speed-up might be slightly lower or significantly higher than 100x depending on the dataset.
 
-The following table summarizes the results for the [California Housing](https://scikit-learn.org/stable/modules/generated/sklearn.datasets.fetch_california_housing.html) dataset:
+The following table summarizes the results for the [California Housing](https://scikit-learn.org/stable/modules/generated/sklearn.datasets.fetch_california_housing.html) dataset (regression):
 
 | Perpetual budget | LightGBM n_estimators | Perpetual mse | LightGBM mse | Perpetual cpu time | LightGBM cpu time | Speed-up |
 | ---------------- | --------------------- | ------------- | ------------ | ------------------ | ----------------- | -------- |
-| 1.1              | 100                   | 0.192         | 0.192        | 8.9                | 1003              | 113x     |
-| 1.2              | 200                   | 0.190         | 0.191        | 11.0               | 2030              | 186x     |
-| 1.5              | 300                   | 0.187         | 0.188        | 18.7               | 3272              | 179x     |
+| 1.0              | 100                   | 0.192         | 0.192        | 7.6                | 978               | 129x     |
+| 1.5              | 300                   | 0.188         | 0.188        | 21.8               | 3066              | 141x     |
+| 2.1              | 1000                  | 0.185         | 0.186        | 86.0               | 8720              | 101x     |
 
-You can reproduce the results using the [performance_benchmark.ipynb](./python-package/examples/performance_benchmark.ipynb) notebook in the [examples](./python-package/examples) folder.
+You can reproduce the results using the scripts in the [examples](./python-package/examples) folder.
 
 ## Usage
 
@@ -38,7 +39,7 @@ You can use the algorithm like in the example below. Check examples folders for 
 from perpetual import PerpetualBooster
 
 model = PerpetualBooster(objective="SquaredLoss")
-model.fit(X, y, budget=0.4)
+model.fit(X, y, budget=1.0)
 ```
 
 ## Documentation
@@ -53,10 +54,10 @@ The package can be installed directly from [pypi](https://pypi.org/project/perpe
 pip install perpetual
 ```
 
-To use in a rust project, add the following to your Cargo.toml file to get the package from [crates.io](https://crates.io/crates/perpetual).
+To use in a Rust project, add the following to your Cargo.toml file to get the package from [crates.io](https://crates.io/crates/perpetual).
 
 ```toml
-perpetual = "0.1.0"
+perpetual = "0.2.0"
 ```
 
 ## Paper

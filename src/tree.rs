@@ -715,7 +715,7 @@ mod tests {
         // println!("{}", tree);
         // let preds = tree.predict(&data, false);
         // println!("{:?}", &preds[0..10]);
-        assert_eq!(17, tree.nodes.len());
+        assert_eq!(37, tree.nodes.len());
         // Test contributions prediction...
         let weights = tree.distribute_leaf_weights();
         let mut contribs = vec![0.; (data.cols + 1) * data.rows];
@@ -987,27 +987,26 @@ mod tests {
         let n_bins = 256;
         let n_cols = 8;
         let feature_names = [
-            "MedInc",
-            "HouseAge",
-            "AveRooms",
-            "AveBedrms",
-            "Population",
-            "AveOccup",
-            "Latitude",
-            "Longitude",
-            "MedHouseVal",
+            "MedInc".to_owned(),
+            "HouseAge".to_owned(),
+            "AveRooms".to_owned(),
+            "AveBedrms".to_owned(),
+            "Population".to_owned(),
+            "AveOccup".to_owned(),
+            "Latitude".to_owned(),
+            "Longitude".to_owned(),
+            "MedHouseVal".to_owned(),
         ];
 
         let df_test = CsvReadOptions::default()
             .with_has_header(true)
-            .with_columns(Some(Arc::new(feature_names.iter().map(|&s| s.to_string()).collect())))
+            .with_columns(Some(Arc::new(feature_names)))
             .try_into_reader_with_file_path(Some("resources/cal_housing_test.csv".into()))?
             .finish()
             .unwrap();
         let id_vars: Vec<&str> = Vec::new();
 
-        let mdf_test = df_test.melt(
-            &id_vars,
+        let mdf_test = df_test.unpivot(
             [
                 "MedInc",
                 "HouseAge",
@@ -1018,6 +1017,7 @@ mod tests {
                 "Latitude",
                 "Longitude",
             ],
+            &id_vars,
         )?;
 
         let data_test = Vec::from_iter(

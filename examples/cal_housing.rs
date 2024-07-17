@@ -6,6 +6,7 @@
 // hyperfine --runs 3 ./target/release/examples/cal_housing
 // hyperfine --runs 3 .\target\release\examples\cal_housing
 // hyperfine --runs 11 'cargo run --release --example cal_housing 0.1 0.3 2'
+// hyperfine --runs 11 'cargo run --release --example cal_housing 2.0'
 
 // cargo flamegraph --example cal_housing
 
@@ -27,48 +28,51 @@ fn main() -> Result<(), Box<dyn Error>> {
     let args: Vec<String> = env::args().collect();
     let budget = &args[1].parse::<f32>().unwrap();
 
-    let _all_names = [
-        "MedInc",
-        "HouseAge",
-        "AveRooms",
-        "AveBedrms",
-        "Population",
-        "AveOccup",
-        "Latitude",
-        "Longitude",
-        "MedHouseVal",
+    let all_names = [
+        "MedInc".to_string(),
+        "HouseAge".to_string(),
+        "AveRooms".to_string(),
+        "AveBedrms".to_string(),
+        "Population".to_string(),
+        "AveOccup".to_string(),
+        "Latitude".to_string(),
+        "Longitude".to_string(),
+        "MedHouseVal".to_string(),
     ];
 
-    let _feature_names = [
-        "MedInc",
-        "HouseAge",
-        "AveRooms",
-        "AveBedrms",
-        "Population",
-        "AveOccup",
-        "Latitude",
-        "Longitude",
+    let feature_names = [
+        "MedInc".to_string(),
+        "HouseAge".to_string(),
+        "AveRooms".to_string(),
+        "AveBedrms".to_string(),
+        "Population".to_string(),
+        "AveOccup".to_string(),
+        "Latitude".to_string(),
+        "Longitude".to_string(),
     ];
+
+    let column_names_train = Arc::new(all_names.clone());
+    let column_names_test = Arc::new(all_names.clone());
 
     let df_train = CsvReadOptions::default()
         .with_has_header(true)
-        .with_columns(Some(Arc::new(_all_names.iter().map(|&s| s.to_string()).collect())))
+        .with_columns(Some(column_names_train))
         .try_into_reader_with_file_path(Some("resources/cal_housing_train.csv".into()))?
         .finish()
         .unwrap();
 
     let df_test = CsvReadOptions::default()
         .with_has_header(true)
-        .with_columns(Some(Arc::new(_all_names.iter().map(|&s| s.to_string()).collect())))
+        .with_columns(Some(column_names_test))
         .try_into_reader_with_file_path(Some("resources/cal_housing_test.csv".into()))?
         .finish()
         .unwrap();
 
     // Get data in column major format...
     let id_vars_train: Vec<&str> = Vec::new();
-    let mdf_train = df_train.melt(&id_vars_train, _feature_names)?;
+    let mdf_train = df_train.unpivot(feature_names.clone(), &id_vars_train)?;
     let id_vars_test: Vec<&str> = Vec::new();
-    let mdf_test = df_test.melt(&id_vars_test, _feature_names)?;
+    let mdf_test = df_test.unpivot(feature_names, &id_vars_test)?;
 
     let data_train = Vec::from_iter(
         mdf_train
@@ -121,11 +125,11 @@ fn main() -> Result<(), Box<dyn Error>> {
     let n_leaves: usize = trees.iter().map(|t| (t.nodes.len() + 1) / 2).sum();
     println!("n_leaves: {:?}", n_leaves);
 
-    let y_pred = model.predict(&matrix_train, true, None);
+    let y_pred = model.predict(&matrix_train, true);
     let error = mse(&y_train, &y_pred);
     println!("mse_train: {:?}", error);
 
-    let y_pred = model.predict(&matrix_test, true, None);
+    let y_pred = model.predict(&matrix_test, true);
     let error = mse(&y_test, &y_pred);
     println!("mse_test: {:?}", error);
 

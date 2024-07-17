@@ -10,13 +10,12 @@ use crate::splitter::{MissingBranchSplitter, MissingImputerSplitter, Splitter};
 use crate::tree::{Tree, TreeStopper};
 use crate::utils::odds;
 use hashbrown::HashMap as BrownHashMap;
-use log::info;
+use log::{info, warn};
 use rayon::prelude::*;
 use serde::{Deserialize, Deserializer, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::fs;
 
-pub type CalData<'a> = (Matrix<'a, f64>, &'a [f64], &'a [f32]); // (x_flat_data, rows, cols), y, alpha
 type ImportanceFn = fn(&Tree, &mut HashMap<usize, (f32, usize)>);
 
 #[derive(Serialize, Deserialize)]
@@ -324,7 +323,7 @@ impl PerpetualBooster {
             self.base_score = calc_init_callables(&self.objective)(y, sample_weight, alpha);
             yhat = vec![self.base_score; y.len()];
         } else {
-            yhat = self.predict(data, self.parallel, None);
+            yhat = self.predict(data, self.parallel);
         }
 
         let calc_grad_hess = gradient_hessian_callables(&self.objective);
@@ -334,12 +333,13 @@ impl PerpetualBooster {
 
         let loss_base = calc_loss(y, &vec![self.base_score; y.len()], sample_weight, alpha);
         let loss_avg = loss_base.iter().sum::<f32>() / loss_base.len() as f32;
-        let eta = splitter.get_eta();
-        let target_loss_decrement = (budget / 10.0) * eta * loss_avg;
 
-        // let eta = splitter.get_eta();
-        // let grad_avg = grad.iter().map(|g| g.abs()).sum::<f32>() / grad.len() as f32;
-        // let target_loss_decrement = eta * eta * grad_avg;
+        let base = 10.0_f32;
+        let n = base / budget;
+        let reciprocals_of_powers = n / (n - 1.0);
+        let truncated_series_sum = reciprocals_of_powers - (1.0 + 1.0 / n);
+        let theta = 1.0 / n - truncated_series_sum;
+        let target_loss_decrement = theta * base.powf(-budget) * loss_avg;
 
         let is_const_hess = match sample_weight {
             Some(_sample_weight) => false,
@@ -404,21 +404,25 @@ impl PerpetualBooster {
 
             if tree.nodes.len() < 5 && tree.nodes.values().last().unwrap().generalization < Some(1.0) {
                 es += 1;
-                println!(
-                    "round {0}, tree.nodes: {1}, tree.depth: {2}, early stopping: {3}",
-                    i,
-                    tree.nodes.len(),
-                    tree.depth,
-                    es
-                );
+                if verbose {
+                    println!(
+                        "round {0}, tree.nodes: {1}, tree.depth: {2}, early stopping: {3}",
+                        i,
+                        tree.nodes.len(),
+                        tree.depth,
+                        es
+                    );
+                }
             } else {
                 // es = 0;
-                println!(
-                    "round {0}, tree.nodes: {1}, tree.depth: {2}",
-                    i,
-                    tree.nodes.len(),
-                    tree.depth,
-                );
+                if verbose {
+                    println!(
+                        "round {0}, tree.nodes: {1}, tree.depth: {2}",
+                        i,
+                        tree.nodes.len(),
+                        tree.depth,
+                    );
+                }
             }
 
             if tree.stopper != TreeStopper::LossDecr {
@@ -436,13 +440,13 @@ impl PerpetualBooster {
             (grad, hess) = calc_grad_hess(y, &yhat, sample_weight, alpha);
             loss = calc_loss(y, &yhat, sample_weight, alpha);
 
-            if verbose {
-                info!("Completed iteration {}", i);
+            if i == ITERATIONS_LIMIT - 1 {
+                warn!("Reached iteration limit before early stopping. Try to decrease the budget for the best performance.");
             }
         }
 
         if self.log_iterations > 0 {
-            info!("Finished training booster with {} iterations.", self.trees.len());
+            info!("Finished training booster with {} trees.", self.trees.len());
         }
         Ok(())
     }
@@ -455,19 +459,28 @@ impl PerpetualBooster {
     /// Generate predictions on data using the gradient booster.
     ///
     /// * `data` -  Either a pandas DataFrame, or a 2 dimensional numpy array.
-    /// * `score` -  Optional unceartinity score.
-    pub fn predict(&self, data: &Matrix<f64>, parallel: bool, score: Option<f64>) -> Vec<f64> {
-        let init_pred = match score {
-            None => self.base_score,
-            Some(score) => self.base_score + score,
-        };
-        let mut init_preds = vec![init_pred; data.rows];
+    /// * `parallel` -  Predict in parallel.
+    pub fn predict(&self, data: &Matrix<f64>, parallel: bool) -> Vec<f64> {
+        let mut init_preds = vec![self.base_score; data.rows];
         self.get_prediction_trees().iter().for_each(|tree| {
             for (p_, val) in init_preds.iter_mut().zip(tree.predict(data, parallel, &self.missing)) {
                 *p_ += val;
             }
         });
         init_preds
+    }
+
+    /// Generate probabilities on data using the gradient booster.
+    ///
+    /// * `data` -  Either a pandas DataFrame, or a 2 dimensional numpy array.
+    /// * `parallel` -  Predict in parallel.
+    pub fn predict_proba(&self, data: &Matrix<f64>, parallel: bool) -> Vec<f64> {
+        let preds = self.predict(data, parallel);
+        if parallel {
+            preds.par_iter().map(|p| 1.0 / (1.0 + (-p).exp())).collect()
+        } else {
+            preds.iter().map(|p| 1.0 / (1.0 + (-p).exp())).collect()
+        }
     }
 
     /// Predict the contributions matrix for the provided dataset.
@@ -887,7 +900,7 @@ mod tests {
             .set_base_score(0.5)
             .set_initialize_base_score(false);
         booster.fit(&data, &y, None, None, 0.3, None, None).unwrap();
-        let preds = booster.predict(&data, false, None);
+        let preds = booster.predict(&data, false);
         let contribs = booster.predict_contributions(&data, ContributionsMethod::Average, false);
         assert_eq!(contribs.len(), (data.cols + 1) * data.rows);
         println!("{}", booster.trees[0]);
@@ -905,14 +918,14 @@ mod tests {
         let y: Vec<f64> = file.lines().map(|x| x.parse::<f64>().unwrap()).collect();
 
         let data = Matrix::new(&data_vec, 891, 5);
-        //let data = Matrix::new(data.get_col(1), 891, 1);
+
         let mut booster = PerpetualBooster::default()
             .set_nbins(300)
             .set_base_score(0.5)
             .set_initialize_base_score(false);
 
         booster.fit(&data, &y, None, None, 0.3, None, None).unwrap();
-        let preds = booster.predict(&data, false, None);
+        let preds = booster.predict(&data, false);
         let contribs = booster.predict_contributions(&data, ContributionsMethod::Average, false);
         assert_eq!(contribs.len(), (data.cols + 1) * data.rows);
         println!("{}", booster.trees[0]);
@@ -938,7 +951,7 @@ mod tests {
 
         booster.fit(&data, &y, None, None, 0.3, None, None).unwrap();
         booster.fit(&data, &y, None, None, 0.9, Some(false), None).unwrap();
-        let preds = booster.predict(&data, false, None);
+        let preds = booster.predict(&data, false);
         let contribs = booster.predict_contributions(&data, ContributionsMethod::Average, false);
         assert_eq!(contribs.len(), (data.cols + 1) * data.rows);
         println!("{}", booster.trees[0]);
@@ -963,7 +976,7 @@ mod tests {
             .set_initialize_base_score(true);
 
         booster.fit(&data, &y, None, None, 0.3, None, None).unwrap();
-        let preds = booster.predict(&data, false, None);
+        let preds = booster.predict(&data, false);
         let contribs = booster.predict_contributions(&data, ContributionsMethod::Average, false);
         assert_eq!(contribs.len(), (data.cols + 1) * data.rows);
         println!("{}", booster.trees[0]);
@@ -989,11 +1002,11 @@ mod tests {
             .set_initialize_base_score(false);
 
         booster.fit(&data, &y, None, None, 0.3, None, None).unwrap();
-        let preds = booster.predict(&data, true, None);
+        let preds = booster.predict(&data, true);
 
         booster.save_booster("resources/model64.json").unwrap();
         let booster2 = PerpetualBooster::load_booster("resources/model64.json").unwrap();
-        assert_eq!(booster2.predict(&data, true, None)[0..10], preds[0..10]);
+        assert_eq!(booster2.predict(&data, true)[0..10], preds[0..10]);
 
         // Test with non-NAN missing.
         booster.missing = 0.0;
@@ -1024,7 +1037,7 @@ mod tests {
             .set_initialize_base_score(false);
 
         booster.fit(&data, &y, None, None, 0.3, None, Some(&cat_index)).unwrap();
-        let preds = booster.predict(&data, true, None);
+        let preds = booster.predict(&data, true);
 
         println!("{:?}", &preds[..10]);
         Ok(())

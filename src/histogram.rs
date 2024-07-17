@@ -277,13 +277,13 @@ impl HistogramMatrix {
     /// matrix, and the other child histogram matrix. This should be used
     /// when the node has only two possible splits, left and right.
     pub fn from_parent_child(
-        hist_map: &mut HashMap<usize, HistogramMatrix>,
+        hist_tree: &mut HashMap<usize, HistogramMatrix>,
         root_num: usize,
         child_num: usize,
         update_num: usize,
     ) {
         unsafe {
-            let mut histograms = hist_map
+            let mut histograms = hist_tree
                 .get_many_unchecked_mut([&root_num, &child_num, &update_num])
                 .unwrap();
 
@@ -309,14 +309,14 @@ impl HistogramMatrix {
     /// and two other child histograms. This should be used with the node has
     /// three possible split paths, right, left, and missing.
     pub fn from_parent_two_children(
-        hist_map: &mut HashMap<usize, HistogramMatrix>,
+        hist_tree: &mut HashMap<usize, HistogramMatrix>,
         root_num: usize,
         first_num: usize,
         second_num: usize,
         update_num: usize,
     ) {
         unsafe {
-            let mut histograms = hist_map
+            let mut histograms = hist_tree
                 .get_many_unchecked_mut([&root_num, &first_num, &second_num, &update_num])
                 .unwrap();
 
