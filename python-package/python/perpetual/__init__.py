@@ -176,7 +176,7 @@ def convert_input_frame(
 
         try:
             X_ = X.to_numpy(allow_copy=False)
-        except:
+        except RuntimeError:
             X_ = X.to_numpy(allow_copy=True)
 
         features_ = X.columns
@@ -252,7 +252,7 @@ def transform_input_frame(X, cat_mapping) -> tuple[list[str], np.ndarray, int, i
     elif type_df(X) == "polars_df":
         try:
             X_ = X.to_numpy(allow_copy=False)
-        except:
+        except RuntimeError:
             X_ = X.to_numpy(allow_copy=True)
         features_ = X.columns
     else:
@@ -1037,7 +1037,7 @@ class PerpetualBooster:
             return pl.from_records(vals).sort(
                 ["Tree", "Node"], descending=[False, False]
             )
-        except:
+        except ImportError:
             import pandas as pd
 
             return pd.DataFrame.from_records(vals).sort_values(
