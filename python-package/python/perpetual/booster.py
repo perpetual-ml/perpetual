@@ -542,7 +542,7 @@ class PerpetualBooster:
 
     def calculate_feature_importance(
         self, method: str = "Gain", normalize: bool = True
-    ) -> Union[Dict[int, float], dict[str, float]]:
+    ) -> Union[Dict[int, float], Dict[str, float]]:
         """Feature importance values can be calculated with the `calculate_feature_importance` method. This function will return a dictionary of the features and their importance values. It should be noted that if a feature was never used for splitting it will not be returned in importance dictionary.
 
         Args:
@@ -719,7 +719,7 @@ class PerpetualBooster:
         return self.booster.number_of_trees
 
     # Make picklable with getstate and setstate
-    def __getstate__(self) -> dict[Any, Any]:
+    def __getstate__(self) -> Dict[Any, Any]:
         booster_json = self.json_dump()
         # Delete booster
         # Doing it like this, so it doesn't delete it globally.
@@ -727,7 +727,7 @@ class PerpetualBooster:
         res["__booster_json_file__"] = booster_json
         return res
 
-    def __setstate__(self, d: dict[Any, Any]) -> None:
+    def __setstate__(self, d: Dict[Any, Any]) -> None:
         # Load the booster object the pickled JSon string.
         booster_object = CratePerpetualBooster.from_json(d["__booster_json_file__"])
         d["booster"] = booster_object
@@ -750,7 +750,7 @@ class PerpetualBooster:
             deep (bool, optional): This argument does nothing, and is simply here for scikit-learn compatibility.. Defaults to True.
 
         Returns:
-            dict[str, Any]: The parameters of the booster.
+            Dict[str, Any]: The parameters of the booster.
         """
         args = inspect.getfullargspec(PerpetualBooster).kwonlyargs
         return {param: getattr(self, param) for param in args}
