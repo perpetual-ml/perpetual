@@ -1,6 +1,6 @@
 import optuna
 import numpy as np
-from time import process_time
+from time import process_time, time
 from functools import partial
 from lightgbm import LGBMRegressor, LGBMClassifier
 from sklearn.metrics import mean_squared_error, log_loss
@@ -80,12 +80,14 @@ def objective_function(
 
 if __name__ == "__main__":
     optuna.logging.set_verbosity(optuna.logging.WARNING)
-    cal_housing = True
-    n_estimators = 300
+    cal_housing = False  # True -> California Housing, False -> Cover Types
+    n_estimators = 100
     n_trials = 100
     cpu_times = []
+    wall_times = []
     metrics = []
-    for seed in [0, 1]:
+
+    for seed in range(5):
         (
             X_train,
             X_test,
@@ -96,8 +98,10 @@ if __name__ == "__main__":
             metric_name,
             LGBMBooster,
         ) = prepare_data(cal_housing, seed)
+
         sampler = optuna.samplers.TPESampler(seed=seed)
         study = optuna.create_study(direction="minimize", sampler=sampler)
+
         obj = partial(
             objective_function,
             seed=seed,
@@ -107,10 +111,13 @@ if __name__ == "__main__":
             y_train=y_train,
             scoring=scoring,
         )
+
         start = process_time()
+        tick = time()
         study.optimize(obj, n_trials=n_trials, callbacks=[save_best_cv_results])
         stop = process_time()
         cpu_times.append(stop - start)
+        wall_times.append(time() - tick)
 
         models = best_cv_results["estimator"]
         if metric_name == "log_loss":
@@ -122,6 +129,6 @@ if __name__ == "__main__":
 
         print(f"seed: {seed}, cpu time: {stop - start}, {metric_name}: {metric}")
 
-    print(
-        f"average cpu time: {np.mean(cpu_times)}, average {metric_name}: {np.mean(metrics)}"
-    )
+    print(f"avg cpu time: {np.mean(cpu_times)}, avg {metric_name}: {np.mean(metrics)}")
+    print(f"avg wall time: {np.mean(wall_times)}")
+    print(f"cpu time / wall time: {(np.mean(cpu_times)/np.mean(wall_times)):.1f}")

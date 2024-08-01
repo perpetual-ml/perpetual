@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 
 use crate::data::{FloatData, JaggedMatrix, Matrix};
-use crate::errors::ForustError;
+use crate::errors::PerpetualError;
 use crate::utils::{is_missing, map_bin, percentiles};
 
 /// If there are fewer unique values than their are
@@ -70,7 +70,13 @@ fn bin_matrix_from_cuts<T: FloatData<T>>(data: &Matrix<T>, cuts: &JaggedMatrix<T
 /// * `sample_weight` - Instance weights for each row of the data.
 /// * `nbins` - The number of bins each column should be binned into.
 /// * `missing` - Float value to consider as missing.
-pub fn bin_matrix(data: &Matrix<f64>, sample_weight: Option<&[f64]>, nbins: u16, missing: f64, cat_index: Option<&[u64]>) -> Result<BinnedData<f64>, ForustError> {
+pub fn bin_matrix(
+    data: &Matrix<f64>,
+    sample_weight: Option<&[f64]>,
+    nbins: u16,
+    missing: f64,
+    cat_index: Option<&[u64]>,
+) -> Result<BinnedData<f64>, PerpetualError> {
     let mut pcts = Vec::new();
     let nbins_ = f64::from_u16(nbins);
     for i in 0..nbins {
@@ -112,7 +118,7 @@ pub fn bin_matrix(data: &Matrix<f64>, sample_weight: Option<&[f64]>, nbins: u16,
             col_cuts.push(f64::MAX);
             col_cuts.dedup();
             // if col_cuts.len() < 2 {
-            //     return Err(ForustError::NoVariance(i));
+            //     return Err(PerpetualError::NoVariance(i));
             // }
             // There will be one less bins, then there are cuts.
             // The first value will be for missing.
@@ -146,7 +152,11 @@ pub fn bin_matrix(data: &Matrix<f64>, sample_weight: Option<&[f64]>, nbins: u16,
 
     let binned_data = bin_matrix_from_cuts(data, &cuts, &missing);
 
-    Ok(BinnedData { binned_data, cuts, nunique })
+    Ok(BinnedData {
+        binned_data,
+        cuts,
+        nunique,
+    })
 }
 
 #[cfg(test)]
@@ -155,7 +165,8 @@ mod tests {
     use std::fs;
     #[test]
     fn test_bin_data() {
-        let file = fs::read_to_string("resources/contiguous_no_missing.csv").expect("Something went wrong reading the file");
+        let file =
+            fs::read_to_string("resources/contiguous_no_missing.csv").expect("Something went wrong reading the file");
         let data_vec: Vec<f64> = file.lines().map(|x| x.parse::<f64>().unwrap()).collect();
         let data = Matrix::new(&data_vec, 891, 5);
         let b = bin_matrix(&data, None, 10, f64::NAN, None).unwrap();
@@ -187,7 +198,11 @@ mod tests {
         let n_rows = 39073;
         let n_columns = 2;
         let n_lines = n_columns * 39073;
-        let data_vec: Vec<f64> = file.lines().take(n_lines).map(|x| x.trim().parse::<f64>().unwrap_or(f64::NAN)).collect();
+        let data_vec: Vec<f64> = file
+            .lines()
+            .take(n_lines)
+            .map(|x| x.trim().parse::<f64>().unwrap_or(f64::NAN))
+            .collect();
         let data = Matrix::new(&data_vec, n_rows, n_columns);
         let b = bin_matrix(&data, None, 256, f64::NAN, Some(&vec![1])).unwrap();
         let bdata = Matrix::new(&b.binned_data, data.rows, data.cols);

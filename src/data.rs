@@ -265,7 +265,12 @@ where
         }
         let cols = vecs.len();
 
-        JaggedMatrix { data, ends, cols, n_records }
+        JaggedMatrix {
+            data,
+            ends,
+            cols,
+            n_records,
+        }
     }
 }
 
@@ -282,14 +287,22 @@ impl<T> JaggedMatrix<T> {
     /// Get the column of a jagged array.
     pub fn get_col(&self, col: usize) -> &[T] {
         assert!(col < self.ends.len());
-        let (i, j) = if col == 0 { (0, self.ends[col]) } else { (self.ends[col - 1], self.ends[col]) };
+        let (i, j) = if col == 0 {
+            (0, self.ends[col])
+        } else {
+            (self.ends[col - 1], self.ends[col])
+        };
         &self.data[i..j]
     }
 
     /// Get a mutable reference to a column of the array.
     pub fn get_col_mut(&mut self, col: usize) -> &mut [T] {
         assert!(col < self.ends.len());
-        let (i, j) = if col == 0 { (0, self.ends[col]) } else { (self.ends[col - 1], self.ends[col]) };
+        let (i, j) = if col == 0 {
+            (0, self.ends[col])
+        } else {
+            (self.ends[col - 1], self.ends[col])
+        };
         &mut self.data[i..j]
     }
 }

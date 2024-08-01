@@ -1,7 +1,7 @@
 use thiserror::Error;
 
 #[derive(Debug, Error)]
-pub enum ForustError {
+pub enum PerpetualError {
     #[error("Feature number {0} has no variance, when missing values are excluded.")]
     NoVariance(usize),
     #[error("Unable to write model to file: {0}")]

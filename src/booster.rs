@@ -1,14 +1,15 @@
 use crate::binning::bin_matrix;
-use crate::constants::{ITERATIONS_LIMIT, N_NODES_ALLOCATED, STOPPING_ROUNDS};
+use crate::constants::{GENERALIZATION_THRESHOLD, ITERATION_LIMIT, N_NODES_ALLOCATED, STOPPING_ROUNDS};
 use crate::constraints::ConstraintMap;
 use crate::data::Matrix;
-use crate::errors::ForustError;
+use crate::errors::PerpetualError;
 use crate::histogram::HistogramMatrix;
 use crate::objective::{calc_init_callables, gradient_hessian_callables, loss_callables, Objective};
 use crate::shapley::predict_contributions_row_shapley;
 use crate::splitter::{MissingBranchSplitter, MissingImputerSplitter, Splitter};
 use crate::tree::{Tree, TreeStopper};
 use crate::utils::odds;
+use core::{f32, f64};
 use hashbrown::HashMap as BrownHashMap;
 use log::{info, warn};
 use rayon::prelude::*;
@@ -64,36 +65,36 @@ pub enum MissingNodeTreatment {
 }
 
 /// Perpetual Booster object
-#[derive(Deserialize, Serialize)]
+#[derive(Deserialize, Serialize, Clone)]
 pub struct PerpetualBooster {
     /// The name of objective function used to optimize.
     /// Valid options include "LogLoss" to use logistic loss as the objective function,
     /// or "SquaredLoss" to use Squared Error as the objective function.
     pub objective: Objective,
-    /// The initial prediction value of the model.
+    /// The initial prediction value of the model. Calculated from y and sample_weight if nan.
     pub base_score: f64,
     /// Number of bins to calculate to partition the data. Setting this to
     /// a smaller number, will result in faster training time, while potentially sacrificing
     /// accuracy. If there are more bins, than unique values in a column, all unique values
     /// will be used.
-    pub nbins: u16,
+    pub max_bin: u16,
     /// Whether to use parallelism during training.
     pub parallel: bool,
+    /// Constraints that are used to enforce a specific relationship
+    /// between the training features and the target variable.
+    pub monotone_constraints: Option<ConstraintMap>,
+    /// Should the children nodes contain the parent node in their bounds, setting this to true, will result in no children being created that result in the higher and lower child values both being greater than, or less than the parent weight.
+    #[serde(default = "default_force_children_to_bound_parent")]
+    pub force_children_to_bound_parent: bool,
+    /// Value to consider missing.
+    #[serde(deserialize_with = "parse_missing")]
+    pub missing: f64,
     /// Should the algorithm allow splits that completed seperate out missing
     /// and non-missing values, in the case where `create_missing_branch` is false. When `create_missing_branch`
     /// is true, setting this to true will result in the missin branch being further split.
     pub allow_missing_splits: bool,
-    /// Constraints that are used to enforce a specific relationship
-    /// between the training features and the target variable.
-    pub monotone_constraints: Option<ConstraintMap>,
-    /// Value to consider missing.
-    #[serde(deserialize_with = "parse_missing")]
-    pub missing: f64,
     /// Should missing be split out it's own separate branch?
     pub create_missing_branch: bool,
-    /// If this is specified, the base_score will be calculated using the sample_weight and y data in accordance with the requested objective_type.
-    #[serde(default = "default_initialize_base_score")]
-    pub initialize_base_score: bool,
     /// A set of features for which the missing node will always be terminated, even
     /// if `allow_missing_splits` is set to true. This value is only valid if
     /// `create_missing_branch` is also True.
@@ -105,9 +106,6 @@ pub struct PerpetualBooster {
     /// Should the model be trained showing output.
     #[serde(default = "default_log_iterations")]
     pub log_iterations: usize,
-    /// Should the children nodes contain the parent node in their bounds, setting this to true, will result in no children being created that result in the higher and lower child values both being greater than, or less than the parent weight.
-    #[serde(default = "default_force_children_to_bound_parent")]
-    pub force_children_to_bound_parent: bool,
     // Members internal to the booster object, and not parameters set by the user.
     // Trees is public, just to interact with it directly in the python wrapper.
     pub trees: Vec<Tree>,
@@ -119,25 +117,18 @@ pub struct PerpetualBooster {
     eta: f32,
 }
 
-fn default_initialize_base_score() -> bool {
-    false
-}
-
 fn default_terminate_missing_features() -> HashSet<usize> {
     HashSet::new()
 }
-
 fn default_missing_node_treatment() -> MissingNodeTreatment {
     MissingNodeTreatment::AssignToParent
 }
-
 fn default_log_iterations() -> usize {
     0
 }
 fn default_force_children_to_bound_parent() -> bool {
     false
 }
-
 fn parse_missing<'de, D>(d: D) -> Result<f64, D::Error>
 where
     D: Deserializer<'de>,
@@ -149,19 +140,18 @@ impl Default for PerpetualBooster {
     fn default() -> Self {
         Self::new(
             Objective::LogLoss,
-            0.5,
+            f64::NAN,
             256,
             true,
-            true,
             None,
-            f64::NAN,
             false,
+            f64::NAN,
             true,
+            false,
             HashSet::new(),
             MissingNodeTreatment::AssignToParent,
             0,
-            false,
-            0.1,
+            f32::NAN,
         )
         .unwrap()
     }
@@ -171,59 +161,56 @@ impl PerpetualBooster {
     /// Perpetual Booster object
     ///
     /// * `objective` - The name of objective function used to optimize.
-    ///   Valid options include "LogLoss" to use logistic loss as the objective function,
-    ///   or "SquaredLoss" to use Squared Error as the objective function.
-    /// * `base_score` - The initial prediction value of the model. If set to None the parameter `initialize_base_score` will automatically be set to `true`, in which case the base score will be chosen based on the objective function at fit time.
-    /// * `nbins` - Number of bins to calculate to partition the data. Setting this to
-    ///   a smaller number, will result in faster training time, while potentially sacrificing
-    ///   accuracy. If there are more bins, than unique values in a column, all unique values
-    ///   will be used.
-    /// * `parallel` - Should the algorithm be run in parallel?
-    /// * `allow_missing_splits` - Should the algorithm allow splits that completed seperate out missing
-    /// and non-missing values, in the case where `create_missing_branch` is false. When `create_missing_branch`
-    /// is true, setting this to true will result in the missin branch being further split.
+    ///     Valid options include "LogLoss" to use logistic loss as the objective function,
+    ///     or "SquaredLoss" to use Squared Error as the objective function.
+    /// * `base_score` - The initial prediction value of the model. If set to None, it will be calculated based on the objective function at fit time.
+    /// * `max_bin` - Number of bins to calculate to partition the data. Setting this to
+    ///     a smaller number, will result in faster training time, while potentially sacrificing
+    ///     accuracy. If there are more bins, than unique values in a column, all unique values
+    ///     will be used.
+    /// * `parallel` - Whether to run the algorithm in parallel
     /// * `monotone_constraints` - Constraints that are used to enforce a specific relationship
-    ///   between the training features and the target variable.
+    ///     between the training features and the target variable.
+    /// * `force_children_to_bound_parent` - force_children_to_bound_parent.
     /// * `missing` - Value to consider missing.
-    /// * `create_missing_branch` - Should missing be split out it's own separate branch?
-    /// * `initialize_base_score` - If this is specified, the base_score will be calculated using the sample_weight and y data in accordance with the requested objective_type.
+    /// * `allow_missing_splits` - Should the algorithm allow splits that completed seperate out missing
+    ///     and non-missing values, in the case where `create_missing_branch` is false. When `create_missing_branch`
+    ///     is true, setting this to true will result in the missing branch being further split.
+    /// * `create_missing_branch` - Should missing be split out its own separate branch?
     /// * `missing_node_treatment` - specify how missing nodes should be handled during training.
     /// * `log_iterations` - Setting to a value (N) other than zero will result in information being logged about ever N iterations.
-    /// * `force_children_to_bound_parent` - force_children_to_bound_parent.
     /// * `eta` - Step size to use at each iteration. Each
-    ///   leaf weight is multiplied by this number. The smaller the value, the more
-    ///   conservative the weights will be.
+    ///     leaf weight is multiplied by this number. The smaller the value, the more
+    ///     conservative the weights will be.
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         objective: Objective,
         base_score: f64,
-        nbins: u16,
+        max_bin: u16,
         parallel: bool,
-        allow_missing_splits: bool,
         monotone_constraints: Option<ConstraintMap>,
+        force_children_to_bound_parent: bool,
         missing: f64,
+        allow_missing_splits: bool,
         create_missing_branch: bool,
-        initialize_base_score: bool,
         terminate_missing_features: HashSet<usize>,
         missing_node_treatment: MissingNodeTreatment,
         log_iterations: usize,
-        force_children_to_bound_parent: bool,
         eta: f32,
-    ) -> Result<Self, ForustError> {
+    ) -> Result<Self, PerpetualError> {
         let booster = PerpetualBooster {
             objective,
             base_score,
-            nbins,
+            max_bin,
             parallel,
-            allow_missing_splits,
             monotone_constraints,
+            force_children_to_bound_parent,
             missing,
+            allow_missing_splits,
             create_missing_branch,
-            initialize_base_score,
             terminate_missing_features,
             missing_node_treatment,
             log_iterations,
-            force_children_to_bound_parent,
             trees: Vec::new(),
             metadata: HashMap::new(),
             eta,
@@ -232,7 +219,7 @@ impl PerpetualBooster {
         Ok(booster)
     }
 
-    pub fn validate_parameters(&self) -> Result<(), ForustError> {
+    pub fn validate_parameters(&self) -> Result<(), PerpetualError> {
         Ok(())
     }
 
@@ -242,8 +229,8 @@ impl PerpetualBooster {
 
     /// Fit the gradient booster on a provided dataset.
     ///
-    /// * `data` -  Either a pandas DataFrame, or a 2 dimensional numpy array.
-    /// * `y` - Either a pandas Series, or a 1 dimensional numpy array.
+    /// * `data` -  Either a Polars or Pandas DataFrame, or a 2 dimensional Numpy array.
+    /// * `y` - Either a Polars or Pandas Series, or a 1 dimensional Numpy array.
     /// * `sample_weight` - Instance weights to use when training the model.
     pub fn fit(
         &mut self,
@@ -254,7 +241,7 @@ impl PerpetualBooster {
         budget: f32,
         reset: Option<bool>,
         categorical_features: Option<&[u64]>,
-    ) -> Result<(), ForustError> {
+    ) -> Result<(), PerpetualError> {
         let constraints_map = self
             .monotone_constraints
             .as_ref()
@@ -313,14 +300,16 @@ impl PerpetualBooster {
         budget: f32,
         reset: Option<bool>,
         categorical_features: Option<&[u64]>,
-    ) -> Result<(), ForustError> {
+    ) -> Result<(), PerpetualError> {
         let calc_loss = loss_callables(&self.objective);
 
         // If reset, reset the trees. Otherwise continue training.
         let mut yhat;
         if reset.unwrap_or(true) || self.trees.len() == 0 {
             self.reset();
-            self.base_score = calc_init_callables(&self.objective)(y, sample_weight, alpha);
+            if self.base_score.is_nan() {
+                self.base_score = calc_init_callables(&self.objective)(y, sample_weight, alpha);
+            }
             yhat = vec![self.base_score; y.len()];
         } else {
             yhat = self.predict(data, self.parallel);
@@ -338,8 +327,8 @@ impl PerpetualBooster {
         let n = base / budget;
         let reciprocals_of_powers = n / (n - 1.0);
         let truncated_series_sum = reciprocals_of_powers - (1.0 + 1.0 / n);
-        let theta = 1.0 / n - truncated_series_sum;
-        let target_loss_decrement = theta * base.powf(-budget) * loss_avg;
+        let c = 1.0 / n - truncated_series_sum;
+        let target_loss_decrement = c * base.powf(-budget) * loss_avg;
 
         let is_const_hess = match sample_weight {
             Some(_sample_weight) => false,
@@ -353,7 +342,7 @@ impl PerpetualBooster {
         //
         // In scikit-learn, they sample 200_000 records for generating the bins.
         // we could consider that, especially if this proved to be a large bottleneck...
-        let binned_data = bin_matrix(data, sample_weight, self.nbins, self.missing, categorical_features)?;
+        let binned_data = bin_matrix(data, sample_weight, self.max_bin, self.missing, categorical_features)?;
         let bdata = Matrix::new(&binned_data.binned_data, data.rows, data.cols);
 
         let col_index: Vec<usize> = (0..data.cols).collect();
@@ -366,7 +355,7 @@ impl PerpetualBooster {
             hist_tree.insert(i, hist_node.clone());
         }
 
-        for i in 0..ITERATIONS_LIMIT {
+        for i in 0..ITERATION_LIMIT {
             let verbose = if self.log_iterations == 0 {
                 false
             } else {
@@ -383,7 +372,6 @@ impl PerpetualBooster {
                 &bdata,
                 data.index.to_owned(),
                 &col_index,
-                &binned_data.cuts,
                 &mut grad,
                 hess.as_deref_mut(),
                 splitter,
@@ -402,7 +390,9 @@ impl PerpetualBooster {
 
             self.update_predictions_inplace(&mut yhat, &tree, data);
 
-            if tree.nodes.len() < 5 && tree.nodes.values().last().unwrap().generalization < Some(1.0) {
+            if tree.nodes.len() < 5
+                && tree.nodes.values().last().unwrap().generalization < Some(GENERALIZATION_THRESHOLD)
+            {
                 es += 1;
                 if verbose {
                     println!(
@@ -413,8 +403,11 @@ impl PerpetualBooster {
                         es
                     );
                 }
+                // If root node cannot be split due to no positive split gain, stop boosting.
+                if tree.nodes.len() == 1 {
+                    break;
+                }
             } else {
-                // es = 0;
                 if verbose {
                     println!(
                         "round {0}, tree.nodes: {1}, tree.depth: {2}",
@@ -440,7 +433,7 @@ impl PerpetualBooster {
             (grad, hess) = calc_grad_hess(y, &yhat, sample_weight, alpha);
             loss = calc_loss(y, &yhat, sample_weight, alpha);
 
-            if i == ITERATIONS_LIMIT - 1 {
+            if i == ITERATION_LIMIT - 1 {
                 warn!("Reached iteration limit before early stopping. Try to decrease the budget for the best performance.");
             }
         }
@@ -456,9 +449,18 @@ impl PerpetualBooster {
         yhat.iter_mut().zip(preds).for_each(|(i, j)| *i += j);
     }
 
+    /// Set model fitting budget.
+    /// * `budget` - A positive number for fitting budget.
+    pub fn set_budget(&mut self, budget: f32) {
+        let budget = f32::max(0.0, budget);
+        let power = budget * -1.0;
+        let base = 10_f32;
+        self.eta = base.powf(power);
+    }
+
     /// Generate predictions on data using the gradient booster.
     ///
-    /// * `data` -  Either a pandas DataFrame, or a 2 dimensional numpy array.
+    /// * `data` -  Either a Polars or Pandas DataFrame, or a 2 dimensional Numpy array.
     /// * `parallel` -  Predict in parallel.
     pub fn predict(&self, data: &Matrix<f64>, parallel: bool) -> Vec<f64> {
         let mut init_preds = vec![self.base_score; data.rows];
@@ -472,7 +474,7 @@ impl PerpetualBooster {
 
     /// Generate probabilities on data using the gradient booster.
     ///
-    /// * `data` -  Either a pandas DataFrame, or a 2 dimensional numpy array.
+    /// * `data` -  Either a Polars or Pandas DataFrame, or a 2 dimensional Numpy array.
     /// * `parallel` -  Predict in parallel.
     pub fn predict_proba(&self, data: &Matrix<f64>, parallel: bool) -> Vec<f64> {
         let preds = self.predict(data, parallel);
@@ -481,6 +483,11 @@ impl PerpetualBooster {
         } else {
             preds.iter().map(|p| 1.0 / (1.0 + (-p).exp())).collect()
         }
+    }
+
+    /// Get reference to the trees
+    pub fn get_prediction_trees(&self) -> &[Tree] {
+        &self.trees
     }
 
     /// Predict the contributions matrix for the provided dataset.
@@ -554,15 +561,9 @@ impl PerpetualBooster {
         contribs
     }
 
-    /// Get the a reference to the trees for predicting, ensureing that the right number of
-    /// trees are used.
-    pub fn get_prediction_trees(&self) -> &[Tree] {
-        &self.trees
-    }
-
     /// Generate predictions on data using the gradient booster.
     ///
-    /// * `data` -  Either a pandas DataFrame, or a 2 dimensional numpy array.
+    /// * `data` -  Either a Polars or Pandas DataFrame, or a 2 dimensional Numpy array.
     fn predict_contributions_average(&self, data: &Matrix<f64>, parallel: bool) -> Vec<f64> {
         let weights: Vec<HashMap<usize, f64>> = if parallel {
             self.get_prediction_trees()
@@ -712,82 +713,50 @@ impl PerpetualBooster {
     /// Save a booster as a json object to a file.
     ///
     /// * `path` - Path to save booster.
-    pub fn save_booster(&self, path: &str) -> Result<(), ForustError> {
+    pub fn save_booster(&self, path: &str) -> Result<(), PerpetualError> {
         let model = self.json_dump()?;
         match fs::write(path, model) {
-            Err(e) => Err(ForustError::UnableToWrite(e.to_string())),
+            Err(e) => Err(PerpetualError::UnableToWrite(e.to_string())),
             Ok(_) => Ok(()),
         }
     }
 
     /// Dump a booster as a json object
-    pub fn json_dump(&self) -> Result<String, ForustError> {
+    pub fn json_dump(&self) -> Result<String, PerpetualError> {
         match serde_json::to_string(self) {
             Ok(s) => Ok(s),
-            Err(e) => Err(ForustError::UnableToWrite(e.to_string())),
+            Err(e) => Err(PerpetualError::UnableToWrite(e.to_string())),
         }
     }
 
     /// Load a booster from Json string
     ///
     /// * `json_str` - String object, which can be serialized to json.
-    pub fn from_json(json_str: &str) -> Result<Self, ForustError> {
+    pub fn from_json(json_str: &str) -> Result<Self, PerpetualError> {
         let model = serde_json::from_str::<PerpetualBooster>(json_str);
         match model {
             Ok(m) => Ok(m),
-            Err(e) => Err(ForustError::UnableToRead(e.to_string())),
+            Err(e) => Err(PerpetualError::UnableToRead(e.to_string())),
         }
     }
 
     /// Load a booster from a path to a json booster object.
     ///
     /// * `path` - Path to load booster from.
-    pub fn load_booster(path: &str) -> Result<Self, ForustError> {
+    pub fn load_booster(path: &str) -> Result<Self, PerpetualError> {
         let json_str = match fs::read_to_string(path) {
             Ok(s) => Ok(s),
-            Err(e) => Err(ForustError::UnableToRead(e.to_string())),
+            Err(e) => Err(PerpetualError::UnableToRead(e.to_string())),
         }?;
         Self::from_json(&json_str)
     }
 
     // Set methods for paramters
-    /// Set the objective_type on the booster.
-    /// * `objective_type` - The objective type of the booster.
+
+    /// Set the objective on the booster.
+    /// * `objective` - The objective type of the booster.
     pub fn set_objective(mut self, objective: Objective) -> Self {
         self.objective = objective;
-        self
-    }
-
-    /// Set model fitting budget.
-    /// * `budget` - A fractional number for fitting.
-    pub fn set_budget(&mut self, budget: f32) {
-        let budget = f32::max(0.0, budget);
-        let power = budget * -1.0;
-        let base = 10_f32;
-        self.eta = base.powf(power);
-    }
-
-    /// Set the log iterations on the booster.
-    /// * `log_iterations` - The number of log iterations of the booster.
-    pub fn set_log_iterations(mut self, log_iterations: usize) -> Self {
-        self.log_iterations = log_iterations;
-        self
-    }
-
-    /// Set the eta on the booster.
-    /// * `eta` - The step size of the booster.
-    pub fn set_eta(mut self, eta: f32) -> Self {
-        self.eta = eta;
-        self
-    }
-
-    /// Set the number of nbins on the booster.
-    /// * `max_leaves` - Number of bins to calculate to partition the data. Setting this to
-    ///   a smaller number, will result in faster training time, while potentially sacrificing
-    ///   accuracy. If there are more bins, than unique values in a column, all unique values
-    ///   will be used.
-    pub fn set_nbins(mut self, nbins: u16) -> Self {
-        self.nbins = nbins;
         self
     }
 
@@ -798,31 +767,20 @@ impl PerpetualBooster {
         self
     }
 
-    /// Set the base_score on the booster.
-    /// * `base_score` - The base score of the booster.
-    pub fn set_initialize_base_score(mut self, initialize_base_score: bool) -> Self {
-        self.initialize_base_score = initialize_base_score;
+    /// Set the number of bins on the booster.
+    /// * `max_bin` - Number of bins to calculate to partition the data. Setting this to
+    ///   a smaller number, will result in faster training time, while potentially sacrificing
+    ///   accuracy. If there are more bins, than unique values in a column, all unique values
+    ///   will be used.
+    pub fn set_max_bin(mut self, max_bin: u16) -> Self {
+        self.max_bin = max_bin;
         self
     }
 
     /// Set the parallel on the booster.
-    /// * `parallel` - Set if the booster should be trained in parallels.
+    /// * `parallel` - Set if the booster should be trained in parallel.
     pub fn set_parallel(mut self, parallel: bool) -> Self {
         self.parallel = parallel;
-        self
-    }
-
-    /// Set the force_children_to_bound_parent on the booster.
-    /// * `force_children_to_bound_parent` - Set force children to bound parent.
-    pub fn set_force_children_to_bound_parent(mut self, force_children_to_bound_parent: bool) -> Self {
-        self.force_children_to_bound_parent = force_children_to_bound_parent;
-        self
-    }
-
-    /// Set the allow_missing_splits on the booster.
-    /// * `allow_missing_splits` - Set if missing splits are allowed for the booster.
-    pub fn set_allow_missing_splits(mut self, allow_missing_splits: bool) -> Self {
-        self.allow_missing_splits = allow_missing_splits;
         self
     }
 
@@ -833,10 +791,10 @@ impl PerpetualBooster {
         self
     }
 
-    /// Set the missing_node_treatment on the booster.
-    /// * `missing_node_treatment` - The missing node treatment of the booster.
-    pub fn set_missing_node_treatment(mut self, missing_node_treatment: MissingNodeTreatment) -> Self {
-        self.missing_node_treatment = missing_node_treatment;
+    /// Set the force_children_to_bound_parent on the booster.
+    /// * `force_children_to_bound_parent` - Set force children to bound parent.
+    pub fn set_force_children_to_bound_parent(mut self, force_children_to_bound_parent: bool) -> Self {
+        self.force_children_to_bound_parent = force_children_to_bound_parent;
         self
     }
 
@@ -844,6 +802,13 @@ impl PerpetualBooster {
     /// * `missing` - Float value to consider as missing.
     pub fn set_missing(mut self, missing: f64) -> Self {
         self.missing = missing;
+        self
+    }
+
+    /// Set the allow_missing_splits on the booster.
+    /// * `allow_missing_splits` - Set if missing splits are allowed for the booster.
+    pub fn set_allow_missing_splits(mut self, allow_missing_splits: bool) -> Self {
+        self.allow_missing_splits = allow_missing_splits;
         self
     }
 
@@ -862,6 +827,20 @@ impl PerpetualBooster {
     /// is true.
     pub fn set_terminate_missing_features(mut self, terminate_missing_features: HashSet<usize>) -> Self {
         self.terminate_missing_features = terminate_missing_features;
+        self
+    }
+
+    /// Set the missing_node_treatment on the booster.
+    /// * `missing_node_treatment` - The missing node treatment of the booster.
+    pub fn set_missing_node_treatment(mut self, missing_node_treatment: MissingNodeTreatment) -> Self {
+        self.missing_node_treatment = missing_node_treatment;
+        self
+    }
+
+    /// Set the log iterations on the booster.
+    /// * `log_iterations` - The number of log iterations of the booster.
+    pub fn set_log_iterations(mut self, log_iterations: usize) -> Self {
+        self.log_iterations = log_iterations;
         self
     }
 
@@ -894,11 +873,7 @@ mod tests {
         let y: Vec<f64> = file.lines().map(|x| x.parse::<f64>().unwrap()).collect();
 
         let data = Matrix::new(&data_vec, 891, 5);
-        // let data = Matrix::new(data.get_col(1), 891, 1);
-        let mut booster = PerpetualBooster::default()
-            .set_nbins(300)
-            .set_base_score(0.5)
-            .set_initialize_base_score(false);
+        let mut booster = PerpetualBooster::default().set_max_bin(300).set_base_score(0.5);
         booster.fit(&data, &y, None, None, 0.3, None, None).unwrap();
         let preds = booster.predict(&data, false);
         let contribs = booster.predict_contributions(&data, ContributionsMethod::Average, false);
@@ -919,10 +894,7 @@ mod tests {
 
         let data = Matrix::new(&data_vec, 891, 5);
 
-        let mut booster = PerpetualBooster::default()
-            .set_nbins(300)
-            .set_base_score(0.5)
-            .set_initialize_base_score(false);
+        let mut booster = PerpetualBooster::default();
 
         booster.fit(&data, &y, None, None, 0.3, None, None).unwrap();
         let preds = booster.predict(&data, false);
@@ -943,11 +915,8 @@ mod tests {
         let y: Vec<f64> = file.lines().map(|x| x.parse::<f64>().unwrap()).collect();
 
         let data = Matrix::new(&data_vec, 891, 5);
-        //let data = Matrix::new(data.get_col(1), 891, 1);
-        let mut booster = PerpetualBooster::default()
-            .set_nbins(300)
-            .set_base_score(0.5)
-            .set_initialize_base_score(false);
+
+        let mut booster = PerpetualBooster::default().set_max_bin(300).set_base_score(0.5);
 
         booster.fit(&data, &y, None, None, 0.3, None, None).unwrap();
         booster.fit(&data, &y, None, None, 0.9, Some(false), None).unwrap();
@@ -969,11 +938,10 @@ mod tests {
         let y: Vec<f64> = file.lines().map(|x| x.parse::<f64>().unwrap()).collect();
 
         let data = Matrix::new(&data_vec, 891, 5);
-        //let data = Matrix::new(data.get_col(1), 891, 1);
+
         let mut booster = PerpetualBooster::default()
             .set_objective(Objective::SquaredLoss)
-            .set_nbins(300)
-            .set_initialize_base_score(true);
+            .set_max_bin(300);
 
         booster.fit(&data, &y, None, None, 0.3, None, None).unwrap();
         let preds = booster.predict(&data, false);
@@ -996,10 +964,7 @@ mod tests {
         let y: Vec<f64> = file.lines().map(|x| x.parse::<f64>().unwrap()).collect();
 
         //let data = Matrix::new(data.get_col(1), 891, 1);
-        let mut booster = PerpetualBooster::default()
-            .set_nbins(300)
-            .set_base_score(0.5)
-            .set_initialize_base_score(false);
+        let mut booster = PerpetualBooster::default().set_max_bin(300).set_base_score(0.5);
 
         booster.fit(&data, &y, None, None, 0.3, None, None).unwrap();
         let preds = booster.predict(&data, true);
@@ -1018,23 +983,18 @@ mod tests {
 
     #[test]
     fn test_gbm_categorical() -> Result<(), Box<dyn Error>> {
-        let n_bins = 256;
-        let n_rows = 39073;
         let n_columns = 14;
 
-        let file = fs::read_to_string("resources/adult_train_flat.csv").expect("Something went wrong reading the file");
-        let data_vec: Vec<f64> = file.lines().map(|x| x.parse::<f64>().unwrap_or(f64::NAN)).collect();
-        let data = Matrix::new(&data_vec, n_rows, n_columns);
-
-        let file = fs::read_to_string("resources/adult_train_y.csv").expect("Something went wrong reading the file");
+        let file = fs::read_to_string("resources/adult_test_y.csv").expect("Something went wrong reading the file");
         let y: Vec<f64> = file.lines().map(|x| x.parse::<f64>().unwrap()).collect();
+
+        let file = fs::read_to_string("resources/adult_test_flat.csv").expect("Something went wrong reading the file");
+        let data_vec: Vec<f64> = file.lines().map(|x| x.parse::<f64>().unwrap_or(f64::NAN)).collect();
+        let data = Matrix::new(&data_vec, y.len(), n_columns);
 
         let cat_index = vec![1, 3, 5, 6, 7, 8, 13];
 
-        let mut booster = PerpetualBooster::default()
-            .set_nbins(n_bins)
-            .set_base_score(0.5)
-            .set_initialize_base_score(false);
+        let mut booster = PerpetualBooster::default().set_max_bin(10);
 
         booster.fit(&data, &y, None, None, 0.3, None, Some(&cat_index)).unwrap();
         let preds = booster.predict(&data, true);

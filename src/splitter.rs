@@ -1,7 +1,8 @@
 use crate::booster::MissingNodeTreatment;
+use crate::constants::GENERALIZATION_THRESHOLD;
 use crate::constraints::{Constraint, ConstraintMap};
-use crate::data::{FloatData, JaggedMatrix, Matrix};
-use crate::histogram::{reorder_cat_bins, sort_cat_bins, BinF32, HistogramMatrix};
+use crate::data::{FloatData, Matrix};
+use crate::histogram::{reorder_cat_bins, sort_cat_bins, update_histogram, Bin, HistogramMatrix};
 use crate::node::{NodeType, SplittableNode};
 use crate::tree::Tree;
 use crate::utils::{
@@ -92,27 +93,68 @@ pub trait Splitter {
         col_index: &[usize],
         is_const_hess: bool,
         hist_tree: &HashMap<usize, HistogramMatrix>,
+        parallel: bool,
     ) -> Option<SplitInfo> {
-        let mut best_split_info = None;
-        let mut best_gain = 0.0;
-        for (idx, feature) in col_index.iter().enumerate() {
-            let split_info = if is_const_hess {
-                self.best_feature_split_const_hess(node, *feature, idx, hist_tree)
+        if parallel {
+            if is_const_hess {
+                col_index
+                    .iter()
+                    .enumerate()
+                    .map(|(idx, feature)| self.best_feature_split_const_hess(node, *feature, idx, hist_tree))
+                    .reduce(|a, b| match (a, b) {
+                        (Some(a), Some(b)) => {
+                            if a.split_gain > b.split_gain {
+                                Some(a)
+                            } else {
+                                Some(b)
+                            }
+                        }
+                        (Some(a), None) => Some(a),
+                        (None, Some(b)) => Some(b),
+                        _ => None,
+                    })
+                    .unwrap()
             } else {
-                self.best_feature_split(node, *feature, idx, hist_tree)
-            };
-
-            match split_info {
-                Some(info) => {
-                    if info.split_gain > best_gain {
-                        best_gain = info.split_gain;
-                        best_split_info = Some(info);
-                    }
-                }
-                None => continue,
+                col_index
+                    .iter()
+                    .enumerate()
+                    .map(|(idx, feature)| self.best_feature_split(node, *feature, idx, hist_tree))
+                    .reduce(|a, b| match (a, b) {
+                        (Some(a), Some(b)) => {
+                            if a.split_gain > b.split_gain {
+                                Some(a)
+                            } else {
+                                Some(b)
+                            }
+                        }
+                        (Some(a), None) => Some(a),
+                        (None, Some(b)) => Some(b),
+                        _ => None,
+                    })
+                    .unwrap()
             }
+        } else {
+            let mut best_split_info = None;
+            let mut best_gain = 0.0;
+            for (idx, feature) in col_index.iter().enumerate() {
+                let split_info = if is_const_hess {
+                    self.best_feature_split_const_hess(node, *feature, idx, hist_tree)
+                } else {
+                    self.best_feature_split(node, *feature, idx, hist_tree)
+                };
+
+                match split_info {
+                    Some(info) => {
+                        if info.split_gain > best_gain {
+                            best_gain = info.split_gain;
+                            best_split_info = Some(info);
+                        }
+                    }
+                    None => continue,
+                }
+            }
+            best_split_info
         }
-        best_split_info
     }
 
     /// Evaluate a split, returning the node info for the left, and right splits,
@@ -164,7 +206,7 @@ pub trait Splitter {
         let mut generalization: Option<f32>;
 
         let histogram = hist_tree.get(&node.num).unwrap().0.get_col(idx);
-        let hist: Vec<BinF32> = histogram[1..]
+        let hist: Vec<Bin> = histogram[1..]
             .iter()
             .cloned()
             .filter(|b| b.counts.iter().sum::<usize>() > 0)
@@ -279,7 +321,7 @@ pub trait Splitter {
                 let delta_score_valid = parent_score - valid_score;
                 generalization = Some(delta_score_train / delta_score_valid);
 
-                if generalization < Some(1.0) && node.num != 0 {
+                if generalization < Some(GENERALIZATION_THRESHOLD) && node.num != 0 {
                     continue;
                 }
             } else {
@@ -543,7 +585,6 @@ pub trait Splitter {
         index: &mut [usize],
         col_index: &[usize],
         data: &Matrix<u16>,
-        cuts: &JaggedMatrix<f64>,
         grad: &mut [f32],
         hess: Option<&mut [f32]>,
         parallel: bool,
@@ -561,7 +602,6 @@ pub trait Splitter {
         index: &mut [usize],
         col_index: &[usize],
         data: &Matrix<u16>,
-        cuts: &JaggedMatrix<f64>,
         grad: &mut [f32],
         hess: Option<&mut [f32]>,
         parallel: bool,
@@ -569,9 +609,9 @@ pub trait Splitter {
         hist_tree: &mut HashMap<usize, HistogramMatrix>,
         cat_index: Option<&[u64]>,
     ) -> Vec<SplittableNode> {
-        match self.best_split(node, col_index, is_const_hess, hist_tree) {
+        match self.best_split(node, col_index, is_const_hess, hist_tree, parallel) {
             Some(split_info) => self.handle_split_info(
-                split_info, n_nodes, node, index, col_index, data, cuts, grad, hess, parallel, hist_tree, cat_index,
+                split_info, n_nodes, node, index, col_index, data, grad, hess, parallel, hist_tree, cat_index,
             ),
             None => Vec::new(),
         }
@@ -892,7 +932,6 @@ impl Splitter for MissingBranchSplitter {
         mut index: &mut [usize],
         col_index: &[usize],
         data: &Matrix<u16>,
-        cuts: &JaggedMatrix<f64>,
         grad: &mut [f32],
         mut hess: Option<&mut [f32]>,
         parallel: bool,
@@ -985,11 +1024,11 @@ impl Splitter for MissingBranchSplitter {
             missing_is_leaf = true;
             if max_ == 1 {
                 let right_hist = hist_tree.get_mut(&right_child).unwrap();
-                right_hist.update(
+                update_histogram(
+                    right_hist,
                     split_idx,
                     node.stop_idx,
                     data,
-                    cuts,
                     grad,
                     hess.as_deref(),
                     &index,
@@ -1000,11 +1039,11 @@ impl Splitter for MissingBranchSplitter {
                 HistogramMatrix::from_parent_child(hist_tree, node.num, right_child, left_child);
             } else {
                 let left_hist = hist_tree.get_mut(&left_child).unwrap();
-                left_hist.update(
+                update_histogram(
+                    left_hist,
                     missing_split_idx,
                     split_idx,
                     data,
-                    cuts,
                     grad,
                     hess.as_deref(),
                     &index,
@@ -1018,11 +1057,11 @@ impl Splitter for MissingBranchSplitter {
             // Max is missing, calculate the other two
             // levels histograms.
             let left_hist = hist_tree.get_mut(&left_child).unwrap();
-            left_hist.update(
+            update_histogram(
+                left_hist,
                 missing_split_idx,
                 split_idx,
                 data,
-                cuts,
                 grad,
                 hess.as_deref(),
                 &index,
@@ -1031,11 +1070,11 @@ impl Splitter for MissingBranchSplitter {
                 true,
             );
             let right_hist = hist_tree.get_mut(&right_child).unwrap();
-            right_hist.update(
+            update_histogram(
+                right_hist,
                 split_idx,
                 node.stop_idx,
                 data,
-                cuts,
                 grad,
                 hess.as_deref(),
                 &index,
@@ -1046,11 +1085,11 @@ impl Splitter for MissingBranchSplitter {
             HistogramMatrix::from_parent_two_children(hist_tree, node.num, left_child, right_child, missing_child);
         } else if max_ == 1 {
             let miss_hist = hist_tree.get_mut(&missing_child).unwrap();
-            miss_hist.update(
+            update_histogram(
+                miss_hist,
                 node.start_idx,
                 missing_split_idx,
                 data,
-                cuts,
                 grad,
                 hess.as_deref(),
                 &index,
@@ -1059,11 +1098,11 @@ impl Splitter for MissingBranchSplitter {
                 true,
             );
             let right_hist = hist_tree.get_mut(&right_child).unwrap();
-            right_hist.update(
+            update_histogram(
+                right_hist,
                 split_idx,
                 node.stop_idx,
                 data,
-                cuts,
                 grad,
                 hess.as_deref(),
                 &index,
@@ -1075,11 +1114,11 @@ impl Splitter for MissingBranchSplitter {
         } else {
             // right is the largest
             let miss_hist = hist_tree.get_mut(&missing_child).unwrap();
-            miss_hist.update(
+            update_histogram(
+                miss_hist,
                 node.start_idx,
                 missing_split_idx,
                 data,
-                cuts,
                 grad,
                 hess.as_deref(),
                 &index,
@@ -1088,11 +1127,11 @@ impl Splitter for MissingBranchSplitter {
                 true,
             );
             let left_hist = hist_tree.get_mut(&left_child).unwrap();
-            left_hist.update(
+            update_histogram(
+                left_hist,
                 missing_split_idx,
                 split_idx,
                 data,
-                cuts,
                 grad,
                 hess.as_deref(),
                 &index,
@@ -1412,7 +1451,6 @@ impl Splitter for MissingImputerSplitter {
         index: &mut [usize],
         col_index: &[usize],
         data: &Matrix<u16>,
-        cuts: &JaggedMatrix<f64>,
         grad: &mut [f32],
         mut hess: Option<&mut [f32]>,
         parallel: bool,
@@ -1485,11 +1523,11 @@ impl Splitter for MissingImputerSplitter {
         // Update the histograms inplace for the smaller node. Then for larger node.
         if n_left < n_right {
             let left_hist = hist_map.get_mut(&left_child).unwrap();
-            left_hist.update(
+            update_histogram(
+                left_hist,
                 node.start_idx,
                 split_idx,
                 data,
-                cuts,
                 grad,
                 hess.as_deref(),
                 index,
@@ -1500,11 +1538,11 @@ impl Splitter for MissingImputerSplitter {
             HistogramMatrix::from_parent_child(hist_map, node.num, left_child, right_child);
         } else {
             let right_hist = hist_map.get_mut(&right_child).unwrap();
-            right_hist.update(
+            update_histogram(
+                right_hist,
                 split_idx,
                 node.stop_idx,
                 data,
-                cuts,
                 grad,
                 hess.as_deref(),
                 index,
@@ -1631,11 +1669,11 @@ mod tests {
         let col_index: Vec<usize> = (0..data.cols).collect();
 
         let mut hist_init = HistogramMatrix::empty(&bdata, &b.cuts, &col_index, true, false);
-        hist_init.update(
+        update_histogram(
+            &mut hist_init,
             0,
             index.len(),
             &bdata,
-            &b.cuts,
             &grad,
             hess.as_deref(),
             &index,
@@ -1665,7 +1703,9 @@ mod tests {
             None,
             None,
         );
-        let s = splitter.best_split(&mut n, &col_index, false, &mut hist_map).unwrap();
+        let s = splitter
+            .best_split(&mut n, &col_index, false, &mut hist_map, false)
+            .unwrap();
         println!("{:?}", s);
         n.update_children(2, 1, 2, &s, None, None);
         assert_eq!(0, s.split_feature);
@@ -1759,11 +1799,11 @@ mod tests {
         let col_index: Vec<usize> = (0..data.cols).collect();
 
         let mut hist_init = HistogramMatrix::empty(&bdata, &b.cuts, &col_index, hess.is_some(), false);
-        hist_init.update(
+        update_histogram(
+            &mut hist_init,
             0,
             index.len(),
             &bdata,
-            &b.cuts,
             &grad,
             hess.as_deref(),
             &index,
@@ -1793,7 +1833,9 @@ mod tests {
             None,
             None,
         );
-        let s = splitter.best_split(&mut n, &col_index, true, &mut hist_map).unwrap();
+        let s = splitter
+            .best_split(&mut n, &col_index, true, &mut hist_map, false)
+            .unwrap();
         println!("{:?}", s);
         n.update_children(2, 1, 2, &s, None, None);
         assert_eq!(0, s.split_feature);
@@ -1840,11 +1882,11 @@ mod tests {
         let col_index: Vec<usize> = (0..data.cols).collect();
 
         let mut hist_init = HistogramMatrix::empty(&bdata, &b.cuts, &col_index, false, false);
-        hist_init.update(
+        update_histogram(
+            &mut hist_init,
             0,
             index.len(),
             &bdata,
-            &b.cuts,
             &grad,
             hess.as_deref(),
             &index,
@@ -1878,7 +1920,9 @@ mod tests {
             None,
         );
 
-        let s = splitter.best_split(&mut n, &col_index, false, &mut hist_map).unwrap();
+        let s = splitter
+            .best_split(&mut n, &col_index, false, &mut hist_map, false)
+            .unwrap();
         println!("split info:");
         println!("{:?}", s);
 

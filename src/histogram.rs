@@ -7,26 +7,28 @@ use serde::{Deserialize, Serialize};
 
 /// Struct to hold the information of a given bin.
 #[derive(Debug, Deserialize, Serialize, Clone)]
-pub struct BinF32 {
+pub struct Bin {
     pub g_folded: [f32; 5],
     pub h_folded: Option<[f32; 5]>,
     pub cut_value: f64,
     pub counts: [usize; 5],
     pub num: u16,
+    pub col: usize,
 }
 
-impl BinF32 {
-    pub fn new(h_folded: Option<[f32; 5]>, cut_value: f64, num: u16) -> Self {
-        BinF32 {
+impl Bin {
+    pub fn new(h_folded: Option<[f32; 5]>, cut_value: f64, num: u16, col: usize) -> Self {
+        Bin {
             g_folded: [f32::ZERO; 5],
             h_folded,
             cut_value,
             counts: [0; 5],
             num,
+            col,
         }
     }
 
-    pub fn from_parent_child(root_bin: &BinF32, child_bin: &BinF32, update_bin: &mut BinF32) {
+    pub fn from_parent_child(root_bin: &Bin, child_bin: &Bin, update_bin: &mut Bin) {
         for ((z, a), b) in update_bin
             .g_folded
             .iter_mut()
@@ -60,12 +62,7 @@ impl BinF32 {
         };
     }
 
-    pub fn from_parent_two_children(
-        root_bin: &BinF32,
-        first_bin: &BinF32,
-        second_bin: &BinF32,
-        update_bin: &mut BinF32,
-    ) {
+    pub fn from_parent_two_children(root_bin: &Bin, first_bin: &Bin, second_bin: &Bin, update_bin: &mut Bin) {
         for (((z, a), b), c) in update_bin
             .g_folded
             .iter_mut()
@@ -103,13 +100,34 @@ impl BinF32 {
     }
 }
 
+pub fn create_empty_histogram(cuts: &[f64], is_const_hess: bool, col: usize) -> Vec<Bin> {
+    let mut histogram: Vec<Bin> = Vec::with_capacity(cuts.len());
+    if is_const_hess {
+        histogram.push(Bin::new(None, f64::NAN, 0, col));
+        histogram.extend(
+            cuts[..(cuts.len() - 1)]
+                .iter()
+                .enumerate()
+                .map(|(it, c)| Bin::new(None, *c, it as u16 + 1, col)),
+        );
+    } else {
+        histogram.push(Bin::new(Some([f32::ZERO; 5]), f64::NAN, 0, col));
+        histogram.extend(
+            cuts[..(cuts.len() - 1)]
+                .iter()
+                .enumerate()
+                .map(|(it, c)| Bin::new(Some([f32::ZERO; 5]), *c, it as u16 + 1, col)),
+        );
+    }
+    histogram
+}
+
 pub fn update_feature_histogram(
-    histogram: &mut [BinF32],
+    histogram: &mut [Bin],
     feature: &[u16], // an array which shows the bin index for each element of the feature, length = whole length of data
-    _cuts: &[f64],
-    sorted_grad: &[f32],         // grad with length of data that falls into this node
+    sorted_grad: &[f32], // grad with length of data that falls into this node
     sorted_hess: Option<&[f32]>, // hess with length of data that falls into this split
-    index: &[usize],             // indices with length of data that falls into this node
+    index: &[usize], // indices with length of data that falls into this node
 ) {
     match sorted_hess {
         Some(sorted_hess) => {
@@ -144,31 +162,68 @@ pub fn update_feature_histogram(
     }
 }
 
-pub fn create_empty_histogram(cuts: &[f64], is_const_hess: bool) -> Vec<BinF32> {
-    let mut histogram: Vec<BinF32> = Vec::with_capacity(cuts.len());
-    if is_const_hess {
-        histogram.push(BinF32::new(None, f64::NAN, 0));
-        histogram.extend(
-            cuts[..(cuts.len() - 1)]
-                .iter()
-                .enumerate()
-                .map(|(it, c)| BinF32::new(None, *c, it as u16 + 1)),
-        );
+#[allow(clippy::too_many_arguments)]
+pub fn update_histogram(
+    hist: &mut HistogramMatrix,
+    start: usize,
+    stop: usize,
+    data: &Matrix<u16>,
+    grad: &[f32],
+    hess: Option<&[f32]>,
+    index: &[usize],
+    col_index: &[usize],
+    parallel: bool,
+    sort: bool,
+) {
+    let (sorted_grad, sorted_hess) = match hess {
+        Some(hess) => {
+            if !sort {
+                (grad, Some(hess))
+            } else {
+                let g = &grad[start..stop];
+                let h = &hess[start..stop];
+                (g, Some(h))
+            }
+        }
+        None => {
+            if !sort {
+                (grad, None)
+            } else {
+                let g = &grad[start..stop];
+                (g, None)
+            }
+        }
+    };
+
+    if parallel {
+        let feature_histograms = hist.0.data.par_chunk_by_mut(|a, b| a.num < b.num);
+
+        feature_histograms.for_each(|h| {
+            let feature_col = data.get_col(h[0].col);
+            update_feature_histogram(
+                h,
+                feature_col,
+                &sorted_grad,
+                sorted_hess.as_deref(),
+                &index[start..stop],
+            );
+        });
     } else {
-        histogram.push(BinF32::new(Some([f32::ZERO; 5]), f64::NAN, 0));
-        histogram.extend(
-            cuts[..(cuts.len() - 1)]
-                .iter()
-                .enumerate()
-                .map(|(it, c)| BinF32::new(Some([f32::ZERO; 5]), *c, it as u16 + 1)),
-        );
+        col_index.iter().for_each(|col| {
+            update_feature_histogram(
+                hist.0.get_col_mut(*col),
+                data.get_col(*col),
+                &sorted_grad,
+                sorted_hess.as_deref(),
+                &index[start..stop],
+            );
+        });
     }
-    histogram
 }
 
 /// Histograms implemented as as jagged matrix.
 #[derive(Debug, Deserialize, Serialize, Clone)]
-pub struct HistogramMatrix(pub JaggedMatrix<BinF32>);
+pub struct HistogramMatrix(pub JaggedMatrix<Bin>);
 
 impl HistogramMatrix {
     /// Create an empty histogram matrix.
@@ -203,13 +258,13 @@ impl HistogramMatrix {
         let histograms = if parallel {
             col_index
                 .par_iter()
-                .flat_map(|col| create_empty_histogram(cuts.get_col(*col), is_const_hess))
-                .collect::<Vec<BinF32>>()
+                .flat_map(|col| create_empty_histogram(cuts.get_col(*col), is_const_hess, *col))
+                .collect::<Vec<Bin>>()
         } else {
             col_index
                 .iter()
-                .flat_map(|col| create_empty_histogram(cuts.get_col(*col), is_const_hess))
-                .collect::<Vec<BinF32>>()
+                .flat_map(|col| create_empty_histogram(cuts.get_col(*col), is_const_hess, *col))
+                .collect::<Vec<Bin>>()
         };
 
         HistogramMatrix(JaggedMatrix {
@@ -218,59 +273,6 @@ impl HistogramMatrix {
             cols: col_index.len(),
             n_records,
         })
-    }
-
-    #[allow(clippy::too_many_arguments)]
-    pub fn update(
-        &mut self,
-        start: usize,
-        stop: usize,
-        data: &Matrix<u16>,
-        cuts: &JaggedMatrix<f64>,
-        grad: &[f32],
-        hess: Option<&[f32]>,
-        index: &[usize],
-        col_index: &[usize],
-        _parallel: bool,
-        sort: bool,
-    ) {
-        // Sort gradients and hessians to improve cache hits.
-        // This made a really sizeable difference on larger datasets
-        // Bringing training time down from nearly 6 minutes to 2 minutes.
-
-        // TODO: calculate g_sum_folded and h_sum_folded
-        // let mut sorted_grad: Vec<f32>;
-        // let mut sorted_hess: Option<Vec<f32>>;
-        let (sorted_grad, sorted_hess) = match hess {
-            Some(hess) => {
-                if !sort {
-                    (grad, Some(hess))
-                } else {
-                    let g = &grad[start..stop];
-                    let h = &hess[start..stop];
-                    (g, Some(h))
-                }
-            }
-            None => {
-                if !sort {
-                    (grad, None)
-                } else {
-                    let g = &grad[start..stop];
-                    (g, None)
-                }
-            }
-        };
-
-        col_index.iter().for_each(|col| {
-            update_feature_histogram(
-                self.0.get_col_mut(*col),
-                data.get_col(*col),
-                cuts.get_col(*col),
-                &sorted_grad,
-                sorted_hess.as_deref(),
-                &index[start..stop],
-            );
-        });
     }
 
     /// Calculate the histogram matrix, for a child, given the parent histogram
@@ -300,7 +302,7 @@ impl HistogramMatrix {
                 .zip(child_hist.data.iter_mut())
                 .zip(update_hist.data.iter_mut())
                 .for_each(|((root_bin, child_bin), update_bin)| {
-                    BinF32::from_parent_child(root_bin, child_bin, update_bin)
+                    Bin::from_parent_child(root_bin, child_bin, update_bin)
                 });
         }
     }
@@ -334,7 +336,7 @@ impl HistogramMatrix {
                 .zip(second_hist.iter())
                 .zip(update_hist.iter_mut())
                 .for_each(|(((root_bin, first_bin), second_bin), update_bin)| {
-                    BinF32::from_parent_two_children(root_bin, first_bin, second_bin, update_bin)
+                    Bin::from_parent_two_children(root_bin, first_bin, second_bin, update_bin)
                 });
         }
     }
@@ -402,7 +404,6 @@ mod tests {
         update_feature_histogram(
             &mut hist_init.0.get_col_mut(1),
             &bdata.get_col(1),
-            &b.cuts.get_col(1),
             &g,
             h.as_deref(),
             &bdata.index,
@@ -451,11 +452,11 @@ mod tests {
         let mut hist_init = HistogramMatrix::empty(&bdata, &b.cuts, &col_index, false, false);
 
         let hist_col = 1;
-        hist_init.update(
+        update_histogram(
+            &mut hist_init,
             0,
             bdata.index.len(),
             &bdata,
-            &b.cuts,
             &g,
             h.as_deref(),
             &bdata.index,

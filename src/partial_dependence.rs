@@ -119,7 +119,6 @@ mod tests {
             &bdata,
             data.index.to_owned(),
             &col_index,
-            &b.cuts,
             &mut g,
             h.as_deref_mut(),
             &splitter,

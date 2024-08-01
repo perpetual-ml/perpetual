@@ -33,7 +33,7 @@ pub struct SplittableNode {
     pub right_categories: Option<Vec<u16>>,
 }
 
-#[derive(Deserialize, Serialize)]
+#[derive(Deserialize, Serialize, Clone)]
 pub struct Node {
     pub num: usize,
     pub weight_value: f32,

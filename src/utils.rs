@@ -1,6 +1,6 @@
 use crate::constraints::Constraint;
 use crate::data::FloatData;
-use crate::errors::ForustError;
+use crate::errors::PerpetualError;
 use std::cmp::Ordering;
 use std::collections::VecDeque;
 use std::convert::TryInto;
@@ -31,15 +31,20 @@ pub fn fmt_vec_output<T: FloatData<T>>(v: &[T]) -> String {
 }
 
 // Validation
-pub fn validate_positive_float_parameter<T: FloatData<T>>(value: T, parameter: &str) -> Result<(), ForustError> {
+pub fn validate_positive_float_parameter<T: FloatData<T>>(value: T, parameter: &str) -> Result<(), PerpetualError> {
     validate_float_parameter(value, T::ZERO, T::INFINITY, parameter)
 }
-pub fn validate_float_parameter<T: FloatData<T>>(value: T, min: T, max: T, parameter: &str) -> Result<(), ForustError> {
+pub fn validate_float_parameter<T: FloatData<T>>(
+    value: T,
+    min: T,
+    max: T,
+    parameter: &str,
+) -> Result<(), PerpetualError> {
     let mut msg = String::new();
     if value.is_nan() || value < min || max < value {
         msg.push_str(&value.to_string());
         let ex_msg = format!("real value within rang {} and {}", min, max);
-        Err(ForustError::InvalidParameter(
+        Err(PerpetualError::InvalidParameter(
             parameter.to_string(),
             ex_msg,
             value.to_string(),
@@ -104,12 +109,12 @@ pub fn constrained_weight(
 #[inline]
 pub fn constrained_weight_const_hess(
     gradient_sum: f32,
-    counts: usize,
+    count_sum: usize,
     lower_bound: f32,
     upper_bound: f32,
     constraint: Option<&Constraint>,
 ) -> f32 {
-    let weight = -1.0 * gradient_sum / counts as f32;
+    let weight = weight_const_hess(gradient_sum, count_sum);
     match constraint {
         None | Some(Constraint::Unconstrained) => weight,
         _ => {
@@ -178,10 +183,25 @@ pub fn odds(v: f64) -> f64 {
     1. / (1. + (-v).exp())
 }
 
+/// Calculate the weight of a given node, given the sum
+/// of the gradients, and the hessians in a node.
+#[inline]
+pub fn weight(gradient_sum: f32, hessian_sum: f32) -> f32 {
+    -gradient_sum / (hessian_sum + 1.0)
+}
+#[inline]
+pub fn weight_const_hess(gradient_sum: f32, count_sum: usize) -> f32 {
+    -gradient_sum / (count_sum as f32)
+}
+
 /// Calculate the gain given the gradient and hessian of the node.
 #[inline]
 pub fn gain(gradient_sum: f32, hessian_sum: f32) -> f32 {
-    (gradient_sum * gradient_sum) / hessian_sum // no -0.5 multiplier term!
+    (gradient_sum * gradient_sum) / (hessian_sum + 1.0) // no -0.5 multiplier term!
+}
+#[inline]
+pub fn gain_const_hess(gradient_sum: f32, count_sum: usize) -> f32 {
+    (gradient_sum * gradient_sum) / (count_sum as f32) // no -0.5 multiplier term!
 }
 
 /// Calculate the gain of a split given a specific weight value.
@@ -189,9 +209,8 @@ pub fn gain(gradient_sum: f32, hessian_sum: f32) -> f32 {
 /// monotonicity constraints.
 #[inline]
 pub fn gain_given_weight(gradient_sum: f32, hessian_sum: f32, weight: f32) -> f32 {
-    -(2.0 * gradient_sum * weight + hessian_sum * (weight * weight))
+    -(2.0 * gradient_sum * weight + (hessian_sum + 1.0) * (weight * weight))
 }
-
 #[inline]
 pub fn gain_given_weight_const_hess(gradient_sum: f32, counts: usize, weight: f32) -> f32 {
     -(2.0 * gradient_sum * weight + (counts as f32) * (weight * weight))
@@ -217,14 +236,6 @@ pub fn cull_gain(gain: f32, left_weight: f32, right_weight: f32, constraint: Opt
             }
         }
     }
-}
-
-/// Calculate the weight of a given node, given the sum
-/// of the gradients, and the hessians in a node.
-#[inline]
-pub fn weight(gradient_sum: f32, hessian_sum: f32) -> f32 {
-    let w = -(&gradient_sum / hessian_sum);
-    w
 }
 
 const LANES: usize = 16;

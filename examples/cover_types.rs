@@ -88,7 +88,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let df_test = CsvReadOptions::default()
         .with_has_header(true)
         .with_columns(Some(features_and_target_arc2))
-        .try_into_reader_with_file_path(Some("resources/cover_types_train.csv".into()))?
+        .try_into_reader_with_file_path(Some("resources/cover_types_test.csv".into()))?
         .finish()
         .unwrap();
 

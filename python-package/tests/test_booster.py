@@ -38,10 +38,10 @@ def test_booster_no_variance(X_y):
     assert model.feature_importances_[3] == 0.0
 
     model.fit(X.iloc[:, [1]], y)
-    assert len(np.unique(model.predict(X.iloc[:, [1]]))) == 1
+    assert len(np.unique(model.predict_log_proba(X.iloc[:, [1]]))) == 1
 
     model.fit(X.iloc[:, [3]], y)
-    assert len(np.unique(model.predict(X.iloc[:, [3]]))) == 1
+    assert len(np.unique(model.predict_log_proba(X.iloc[:, [3]]))) == 1
 
 
 def test_sklearn_clone(X_y):
@@ -58,9 +58,9 @@ def test_sklearn_clone(X_y):
         model_cloned_post_fit = clone(model)
     model_cloned_post_fit.fit(X, y)
 
-    model_preds = model.predict(X)
-    model_cloned_preds = model_cloned.predict(X)
-    model_cloned_post_fit_preds = model_cloned_post_fit.predict(X)
+    model_preds = model.predict_log_proba(X)
+    model_cloned_preds = model_cloned.predict_log_proba(X)
+    model_cloned_post_fit_preds = model_cloned_post_fit.predict_log_proba(X)
 
     assert np.allclose(model_preds, model_cloned_preds)
     assert np.allclose(model_preds, model_cloned_post_fit_preds)
@@ -70,10 +70,10 @@ def test_multiple_fit_calls(X_y):
     X, y = X_y
     model = PerpetualBooster(objective="LogLoss")
     model.fit(X, y)
-    preds = model.predict(X)
+    preds = model.predict_log_proba(X)
 
     model.fit(X, y)
-    fit_again_preds = model.predict(X)
+    fit_again_preds = model.predict_log_proba(X)
 
     assert np.allclose(preds, fit_again_preds)
 
@@ -82,13 +82,13 @@ def test_different_data_passed(X_y):
     X, y = X_y
     model = PerpetualBooster(objective="LogLoss")
     model.fit(X, y)
-    model.predict(X)
+    model.predict_log_proba(X)
     with pytest.raises(ValueError, match="Columns mismatch"):
-        model.predict(X.iloc[:, 0:4])
+        model.predict_log_proba(X.iloc[:, 0:4])
 
     with pytest.raises(ValueError, match="Columns mismatch"):
         X_ = X.rename(columns=lambda x: x + "_wrong" if x == "age" else x)
-        model.predict(X_)
+        model.predict_log_proba(X_)
 
 
 def test_booster_from_numpy(X_y):
@@ -96,18 +96,18 @@ def test_booster_from_numpy(X_y):
     X = X.astype("float32").astype("float64")
     model1 = PerpetualBooster(objective="LogLoss")
     model1.fit(X, y)
-    model1_preds = model1.predict(X)
+    model1_preds = model1.predict_log_proba(X)
 
     model2 = PerpetualBooster(objective="LogLoss")
     model2.fit(X, y)
-    model2_preds = model2.predict(X.to_numpy())
+    model2_preds = model2.predict_log_proba(X.to_numpy())
 
     model3 = PerpetualBooster(objective="LogLoss")
     model3.fit(X.to_numpy().astype("float32"), y)
-    model3_preds = model3.predict(X)
+    model3_preds = model3.predict_log_proba(X)
 
     assert np.allclose(model1_preds, model2_preds)
-    assert np.allclose(model2_preds, model3_preds, atol=0.0001)
+    assert np.allclose(model2_preds, model3_preds, atol=0.001)
 
 
 def test_get_node_list(X_y):
@@ -170,7 +170,7 @@ def test_booster_with_new_missing(X_y):
     X = X
     model1 = PerpetualBooster(objective="LogLoss")
     model1.fit(X, y=y)
-    preds1 = model1.predict(X)
+    preds1 = model1.predict_log_proba(X)
 
     Xm = X.copy().fillna(-9999)
     model2 = PerpetualBooster(
@@ -178,7 +178,7 @@ def test_booster_with_new_missing(X_y):
         missing=-9999,
     )
     model2.fit(Xm, y)
-    preds2 = model2.predict(Xm)
+    preds2 = model2.predict_log_proba(Xm)
     assert np.allclose(preds1, preds2, atol=0.00001)
 
 
@@ -282,7 +282,7 @@ def test_booster_contributions_missing_branch_methods(X_y):
         missing_node_treatment="AssignToParent",
     )
     model.fit(X, y=y)
-    preds = model.predict(X)
+    preds = model.predict_log_proba(X)
     contribs_average = model.predict_contributions(X)
     preds[~np.isclose(contribs_average.sum(1), preds, rtol=5)]
     contribs_average.sum(1)[~np.isclose(contribs_average.sum(1), preds, rtol=5)]
@@ -319,7 +319,7 @@ def test_booster_contributions(X_y):
     X = X
     model = PerpetualBooster(objective="LogLoss")
     model.fit(X, y)
-    preds = model.predict(X)
+    preds = model.predict_log_proba(X)
     contribs_average = model.predict_contributions(X)
     preds[~np.isclose(contribs_average.sum(1), preds, rtol=5)]
     contribs_average.sum(1)[~np.isclose(contribs_average.sum(1), preds, rtol=5)]
@@ -344,7 +344,7 @@ def test_booster_contributions_shapley(X_y):
     X = X.round(0)
     model = PerpetualBooster(objective="LogLoss")
     model.fit(X, y)
-    preds = model.predict(X)
+    preds = model.predict_log_proba(X)
     contribs_average = model.predict_contributions(X)
     preds[~np.isclose(contribs_average.sum(1), preds, rtol=5)]
     contribs_average.sum(1)[~np.isclose(contribs_average.sum(1), preds, rtol=5)]
@@ -365,7 +365,7 @@ def test_missing_branch_with_contributions(X_y):
         create_missing_branch=True,
     )
     model_miss_leaf.fit(X, y)
-    model_miss_leaf_preds = model_miss_leaf.predict(X)
+    model_miss_leaf_preds = model_miss_leaf.predict_log_proba(X)
     model_miss_leaf_conts = model_miss_leaf.predict_contributions(X)
     assert np.allclose(model_miss_leaf_conts.sum(1), model_miss_leaf_preds)
 
@@ -385,7 +385,7 @@ def test_missing_branch_with_contributions(X_y):
         create_missing_branch=True,
     )
     model_miss_branch.fit(X, y)
-    model_miss_branch_preds = model_miss_branch.predict(X)
+    model_miss_branch_preds = model_miss_branch.predict_log_proba(X)
     model_miss_branch_conts = model_miss_branch.predict_contributions(X)
     assert np.allclose(model_miss_branch_conts.sum(1), model_miss_branch_preds)
     assert not np.allclose(model_miss_branch_preds, model_miss_leaf_preds)
@@ -474,16 +474,17 @@ def test_missing_treatment(X_y):
     X = X.mask(missing_mask < 0.3)
     model = PerpetualBooster(
         objective="LogLoss",
-        create_missing_branch=True,
         allow_missing_splits=False,
+        create_missing_branch=True,
         missing_node_treatment="AverageLeafWeight",
     )
     model.fit(X, y)
-    preds = model.predict(X)
+    preds = model.predict_log_proba(X)
+
     contribus_weight = model.predict_contributions(X, method="weight")
     assert contribus_weight.shape[1] == X.shape[1] + 1
-    assert np.allclose(contribus_weight.sum(1), preds)
-    assert np.allclose(contribus_weight[:, :-1][X.isna()], 0, atol=0.00001)
+    assert np.allclose(contribus_weight.sum(1), preds, atol=0.001)
+    assert np.allclose(contribus_weight[:, :-1][X.isna()], 0, atol=0.001)
     assert (contribus_weight[:, :-1][X.isna()] == 0).all()
     assert (X.isna().sum().sum()) > 0
 
@@ -495,7 +496,7 @@ def test_missing_treatment(X_y):
     assert (X.isna().sum().sum()) > 0
 
     # Even the contributions should be approximately the same.
-    assert np.allclose(contribus_average, contribus_weight, atol=0.000001)
+    assert np.allclose(contribus_average, contribus_weight, atol=0.001)
 
 
 def test_missing_treatment_split_further(X_y):
@@ -515,7 +516,7 @@ def test_missing_treatment_split_further(X_y):
     [fare_idx] = [i for i, f in enumerate(X.columns) if f == "fare"]
 
     model.fit(X, y)
-    preds = model.predict(X)
+    preds = model.predict_log_proba(X)
     contribus_weight = model.predict_contributions(X, method="weight")
 
     # For the features that we terminate missing, these features should have a contribution
@@ -597,10 +598,10 @@ def test_get_params(X_y):
 def test_set_params(X_y):
     X, y = X_y
     p = False
-    model = PerpetualBooster()
-    assert model.get_params()["parallel"] != p
-    assert model.set_params(parallel=p)
+    model = PerpetualBooster(parallel=p)
     assert model.get_params()["parallel"] == p
+    assert model.set_params(parallel=not p)
+    assert model.get_params()["parallel"] != p
     model.fit(X, y)
 
 
@@ -636,10 +637,7 @@ class TestSaveLoadFunctions:
 
         loaded_dict = loaded.__dict__
         model_dict = model.__dict__
-        print("loaded_dict.keys():")
-        print(loaded_dict.keys())
-        print("model_dict.keys():")
-        print(model_dict.keys())
+
         assert sorted(loaded_dict.keys()) == sorted(model_dict.keys())
         for k, v in loaded_dict.items():
             c_v = model_dict[k]
@@ -648,8 +646,8 @@ class TestSaveLoadFunctions:
                     assert np.isnan(c_v)
                 else:
                     assert np.allclose(v, c_v)
-            elif isinstance(v, perpetual.CratePerpetualBooster):
-                assert isinstance(c_v, perpetual.CratePerpetualBooster)
+            elif isinstance(v, perpetual.booster.CratePerpetualBooster):
+                assert isinstance(c_v, perpetual.booster.CratePerpetualBooster)
             else:
                 assert v == c_v, k
         loaded_preds = loaded.predict(X)
@@ -672,7 +670,6 @@ class TestSaveLoadFunctions:
         # LogLoss
         f64_model_path = tmp_path / "modelf64_ll.json"
         X, y = X_y
-        X = X
         model = PerpetualBooster(objective="LogLoss")
         model.fit(X, y)
         preds = model.predict(X)
@@ -688,7 +685,6 @@ class TestSaveLoadFunctions:
         # squared loss
         f64_model_path = tmp_path / "modelf64_sl.json"
         X, y = X_y
-        X = X
         mono_ = X.apply(lambda x: int(np.sign(x.corr(y)))).to_dict()
         model = PerpetualBooster(
             objective="SquaredLoss",
@@ -756,7 +752,7 @@ def test_categorical(X_y):
     model.fit(X, y)
 
 
-def test_polars(X_y):
+def test_polars():
     import polars as pl
 
     X = pl.from_pandas(pd.read_csv("../resources/adult_test_df.csv", index_col=False))

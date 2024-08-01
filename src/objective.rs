@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 type ObjFn = fn(&[f64], &[f64], Option<&[f64]>, Option<f32>) -> (Vec<f32>, Option<Vec<f32>>);
 type LossFn = fn(&[f64], &[f64], Option<&[f64]>, Option<f32>) -> Vec<f32>;
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub enum Objective {
     LogLoss,
     SquaredLoss,

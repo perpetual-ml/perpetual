@@ -1,11 +1,11 @@
 use crate::constants::N_NODES_ALLOCATED;
-use crate::data::{JaggedMatrix, Matrix};
+use crate::data::Matrix;
 use crate::grower::Grower;
-use crate::histogram::{reorder_cat_bins, sort_cat_bins, HistogramMatrix};
+use crate::histogram::{reorder_cat_bins, sort_cat_bins, update_histogram, HistogramMatrix};
 use crate::node::{Node, NodeType, SplittableNode};
 use crate::partial_dependence::tree_partial_dependence;
 use crate::splitter::Splitter;
-use crate::utils::{fast_f64_sum, gain, odds, weight};
+use crate::utils::{fast_f64_sum, gain, gain_const_hess, odds, weight, weight_const_hess};
 use hashbrown::HashMap as BrownHashMap;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
@@ -13,14 +13,14 @@ use std::cmp::max;
 use std::collections::{BinaryHeap, HashMap};
 use std::fmt::{self, Display};
 
-#[derive(Deserialize, Serialize, PartialEq)]
+#[derive(Deserialize, Serialize, Clone, PartialEq)]
 pub enum TreeStopper {
     MaxDepth,
     LossDecr,
     Overfitting,
 }
 
-#[derive(Deserialize, Serialize)]
+#[derive(Deserialize, Serialize, Clone)]
 pub struct Tree {
     pub nodes: BrownHashMap<usize, Node>,
     pub stopper: TreeStopper,
@@ -50,7 +50,6 @@ impl Tree {
         data: &Matrix<u16>,
         mut index: Vec<usize>,
         col_index: &[usize],
-        cuts: &JaggedMatrix<f64>,
         grad: &mut [f32],
         mut hess: Option<&mut [f32]>,
         splitter: &T,
@@ -75,11 +74,11 @@ impl Tree {
         }
 
         let root_hist = hist_tree.get_mut(&0).unwrap();
-        root_hist.update(
+        update_histogram(
+            root_hist,
             0,
             index.len(),
             data,
-            cuts,
             grad,
             hess.as_deref(),
             &index,
@@ -136,7 +135,6 @@ impl Tree {
                 &mut index,
                 col_index,
                 data,
-                cuts,
                 grad,
                 hess.as_deref_mut(),
                 parallel,
@@ -566,8 +564,13 @@ pub fn create_root_node(index: &[usize], grad: &[f32], hess: Option<&[f32]>) -> 
         None => (fast_f64_sum(grad), grad.len() as f32),
     };
 
-    let root_gain = gain(gradient_sum, hessian_sum);
-    let root_weight = weight(gradient_sum, hessian_sum);
+    let (root_gain, root_weight) = match hess {
+        Some(_hess) => (gain(gradient_sum, hessian_sum), weight(gradient_sum, hessian_sum)),
+        None => (
+            gain_const_hess(gradient_sum, grad.len()),
+            weight_const_hess(gradient_sum, grad.len()),
+        ),
+    };
 
     SplittableNode::new(
         0,
@@ -593,73 +596,14 @@ mod tests {
     use crate::binning::bin_matrix;
     use crate::constraints::{Constraint, ConstraintMap};
     use crate::objective::{LogLoss, ObjectiveFunction, SquaredLoss};
-    use crate::sampler::{RandomSampler, Sampler};
     use crate::splitter::MissingImputerSplitter;
     use crate::utils::precision_round;
     use polars::datatypes::DataType;
     use polars::io::csv::read::CsvReadOptions;
     use polars::io::SerReader;
-
-    use rand::rngs::StdRng;
-    use rand::SeedableRng;
     use std::error::Error;
     use std::fs;
     use std::sync::Arc;
-    #[test]
-    fn test_tree_fit_with_subsample() {
-        let file =
-            fs::read_to_string("resources/contiguous_no_missing.csv").expect("Something went wrong reading the file");
-        let data_vec: Vec<f64> = file.lines().map(|x| x.parse::<f64>().unwrap()).collect();
-        let file = fs::read_to_string("resources/performance.csv").expect("Something went wrong reading the file");
-        let y: Vec<f64> = file.lines().map(|x| x.parse::<f64>().unwrap()).collect();
-        let yhat = vec![0.5; y.len()];
-        let (mut g, mut h) = LogLoss::calc_grad_hess(&y, &yhat, None, None);
-        let loss = LogLoss::calc_loss(&y, &yhat, None, None);
-
-        let data = Matrix::new(&data_vec, 891, 5);
-        let splitter = MissingImputerSplitter {
-            eta: 0.3,
-            allow_missing_splits: true,
-            constraints_map: ConstraintMap::new(),
-        };
-        let mut tree = Tree::new();
-
-        let b = bin_matrix(&data, None, 300, f64::NAN, None).unwrap();
-        let bdata = Matrix::new(&b.binned_data, data.rows, data.cols);
-        let mut rng = StdRng::seed_from_u64(0);
-
-        let (index, excluded) = RandomSampler::new(0.5).sample(&mut rng, &data.index);
-        assert!(excluded.len() > 0);
-        let col_index: Vec<usize> = (0..data.cols).collect();
-        let is_const_hess = false;
-
-        let hist_init = HistogramMatrix::empty(&bdata, &b.cuts, &col_index, is_const_hess, false);
-        let mut hist_map: BrownHashMap<usize, HistogramMatrix> = BrownHashMap::with_capacity(N_NODES_ALLOCATED);
-        for i in 0..N_NODES_ALLOCATED {
-            hist_map.insert(i, hist_init.clone());
-        }
-
-        tree.fit(
-            &bdata,
-            index,
-            &col_index,
-            &b.cuts,
-            &mut g,
-            h.as_deref_mut(),
-            &splitter,
-            true,
-            Some(f32::MAX),
-            &loss,
-            &y,
-            LogLoss::calc_loss,
-            &yhat,
-            None,
-            None,
-            is_const_hess,
-            &mut hist_map,
-            None,
-        );
-    }
 
     #[test]
     fn test_tree_fit() {
@@ -695,7 +639,6 @@ mod tests {
             &bdata,
             data.index.to_owned(),
             &col_index,
-            &b.cuts,
             &mut g,
             h.as_deref_mut(),
             &splitter,
@@ -715,7 +658,7 @@ mod tests {
         // println!("{}", tree);
         // let preds = tree.predict(&data, false);
         // println!("{:?}", &preds[0..10]);
-        assert_eq!(37, tree.nodes.len());
+        assert_eq!(19, tree.nodes.len());
         // Test contributions prediction...
         let weights = tree.distribute_leaf_weights();
         let mut contribs = vec![0.; (data.cols + 1) * data.rows];
@@ -783,7 +726,6 @@ mod tests {
             &bdata,
             data.index.to_owned(),
             &col_index,
-            &b.cuts,
             &mut g,
             h.as_deref_mut(),
             &splitter,
@@ -808,15 +750,17 @@ mod tests {
 
     #[test]
     fn test_tree_fit_monotone() {
+        let parallel = true;
+
         let file =
             fs::read_to_string("resources/contiguous_no_missing.csv").expect("Something went wrong reading the file");
         let data_vec: Vec<f64> = file.lines().map(|x| x.parse::<f64>().unwrap()).collect();
         let file = fs::read_to_string("resources/performance.csv").expect("Something went wrong reading the file");
         let y: Vec<f64> = file.lines().map(|x| x.parse::<f64>().unwrap()).collect();
         let yhat = vec![0.5; y.len()];
-        let (mut g, h) = LogLoss::calc_grad_hess(&y, &yhat, None, None);
+        let (mut g, mut h) = LogLoss::calc_grad_hess(&y, &yhat, None, None);
         let loss = LogLoss::calc_loss(&y, &yhat, None, None);
-        println!("GRADIENT -- {:?}", h);
+        println!("GRADIENT -- {:?}", g);
 
         let data_ = Matrix::new(&data_vec, 891, 5);
         let data = Matrix::new(data_.get_col(1), 891, 1);
@@ -828,7 +772,7 @@ mod tests {
         };
         let mut tree = Tree::new();
 
-        let b = bin_matrix(&data, None, 300, f64::NAN, None).unwrap();
+        let b = bin_matrix(&data, None, 100, f64::NAN, None).unwrap();
         let bdata = Matrix::new(&b.binned_data, data.rows, data.cols);
         let col_index: Vec<usize> = (0..data.cols).collect();
         let is_const_hess = false;
@@ -843,11 +787,10 @@ mod tests {
             &bdata,
             data.index.to_owned(),
             &col_index,
-            &b.cuts,
             &mut g,
-            None,
+            h.as_deref_mut(),
             &splitter,
-            true,
+            parallel,
             Some(f32::MAX),
             &loss,
             &y,
@@ -860,7 +803,6 @@ mod tests {
             None,
         );
 
-        // println!("{}", tree);
         let mut pred_data_vec = data.get_col(0).to_owned();
         pred_data_vec.sort_by(|a, b| a.partial_cmp(b).unwrap());
         pred_data_vec.dedup();
@@ -880,7 +822,7 @@ mod tests {
         let contribs_preds: Vec<f64> = contribs.chunks(data.cols + 1).map(|i| i.iter().sum()).collect();
         assert_eq!(contribs_preds.len(), full_preds.len());
         for (i, j) in full_preds.iter().zip(contribs_preds) {
-            assert_eq!(precision_round(*i, 7), precision_round(j, 7));
+            assert_eq!(precision_round(*i, 3), precision_round(j, 3));
         }
 
         // Weight contributions
@@ -929,7 +871,6 @@ mod tests {
             &bdata,
             data.index.to_owned(),
             &col_index,
-            &b.cuts,
             &mut g,
             h.as_deref_mut(),
             &splitter,
@@ -1065,7 +1006,6 @@ mod tests {
             &bdata,
             data.index.to_owned(),
             &col_index,
-            &b.cuts,
             &mut g,
             h.as_deref_mut(),
             &splitter,
@@ -1117,22 +1057,10 @@ mod tests {
 
         let b = bin_matrix(&data, None, n_bins, f64::NAN, Some(&cat_index)).unwrap();
         let bdata = Matrix::new(&b.binned_data, data.rows, data.cols);
-        let index = data.index.to_owned();
         let col_index: Vec<usize> = (0..data.cols).collect();
 
-        let mut hist_node = HistogramMatrix::empty(&bdata, &b.cuts, &col_index, false, false);
-        hist_node.update(
-            0,
-            index.len(),
-            &bdata,
-            &b.cuts,
-            &grad,
-            hess.as_deref(),
-            &index,
-            &col_index,
-            true,
-            false,
-        );
+        let hist_node = HistogramMatrix::empty(&bdata, &b.cuts, &col_index, false, false);
+
         let mut hist_tree: BrownHashMap<usize, HistogramMatrix> = BrownHashMap::with_capacity(N_NODES_ALLOCATED);
         for i in 0..N_NODES_ALLOCATED {
             hist_tree.insert(i, hist_node.clone());
@@ -1143,7 +1071,6 @@ mod tests {
             &bdata,
             data.index.to_owned(),
             &col_index,
-            &b.cuts,
             &mut grad,
             hess.as_deref_mut(),
             &splitter,

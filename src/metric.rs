@@ -1,5 +1,5 @@
 use crate::data::FloatData;
-use crate::errors::ForustError;
+use crate::errors::PerpetualError;
 use crate::utils::items_to_strings;
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
@@ -41,7 +41,7 @@ pub enum Metric {
 }
 
 impl FromStr for Metric {
-    type Err = ForustError;
+    type Err = PerpetualError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
@@ -50,10 +50,15 @@ impl FromStr for Metric {
             "RootMeanSquaredLogError" => Ok(Metric::RootMeanSquaredLogError),
             "RootMeanSquaredError" => Ok(Metric::RootMeanSquaredError),
 
-            _ => Err(ForustError::ParseString(
+            _ => Err(PerpetualError::ParseString(
                 s.to_string(),
                 "Metric".to_string(),
-                items_to_strings(vec!["AUC", "LogLoss", "RootMeanSquaredLogError", "RootMeanSquaredError"]),
+                items_to_strings(vec![
+                    "AUC",
+                    "LogLoss",
+                    "RootMeanSquaredLogError",
+                    "RootMeanSquaredError",
+                ]),
             )),
         }
     }
@@ -63,8 +68,14 @@ pub fn metric_callables(metric_type: &Metric) -> (MetricFn, bool) {
     match metric_type {
         Metric::AUC => (AUCMetric::calculate_metric, AUCMetric::maximize()),
         Metric::LogLoss => (LogLossMetric::calculate_metric, LogLossMetric::maximize()),
-        Metric::RootMeanSquaredLogError => (RootMeanSquaredLogErrorMetric::calculate_metric, RootMeanSquaredLogErrorMetric::maximize()),
-        Metric::RootMeanSquaredError => (RootMeanSquaredErrorMetric::calculate_metric, RootMeanSquaredErrorMetric::maximize()),
+        Metric::RootMeanSquaredLogError => (
+            RootMeanSquaredLogErrorMetric::calculate_metric,
+            RootMeanSquaredLogErrorMetric::maximize(),
+        ),
+        Metric::RootMeanSquaredError => (
+            RootMeanSquaredErrorMetric::calculate_metric,
+            RootMeanSquaredErrorMetric::maximize(),
+        ),
         Metric::QuantileLoss => (QuantileLossMetric::calculate_metric, QuantileLossMetric::maximize()),
     }
 }

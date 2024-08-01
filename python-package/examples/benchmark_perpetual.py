@@ -1,5 +1,5 @@
 import numpy as np
-from time import process_time
+from time import process_time, time
 from perpetual import PerpetualBooster
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_squared_error, log_loss
@@ -24,19 +24,26 @@ def prepare_data(cal_housing, seed):
 
 
 if __name__ == "__main__":
-    budget = 1.5
-    cal_housing = True
+    budget = 1.1
+    parallel = False
+    cal_housing = False  # True -> California Housing, False -> Cover Types
     cpu_times = []
+    wall_times = []
     metrics = []
-    for seed in [0, 1, 2, 3, 4]:
+
+    for seed in range(5):
         X_train, X_test, y_train, y_test, metric_function, metric_name, objective = (
             prepare_data(cal_housing, seed)
         )
-        model = PerpetualBooster(objective=objective)
+
+        model = PerpetualBooster(objective=objective, parallel=parallel)
+
         start = process_time()
+        tick = time()
         model.fit(X_train, y_train, budget=budget)
         stop = process_time()
         cpu_times.append(stop - start)
+        wall_times.append(time() - tick)
 
         if metric_name == "log_loss":
             y_pred = model.predict_proba(X_test)
@@ -45,10 +52,8 @@ if __name__ == "__main__":
         metric = metric_function(y_test, y_pred)
         metrics.append(metric)
 
-        print(
-            f"seed: {seed}, cpu time: {stop - start}, {metric_name}: {metric}, n_trees: {model.number_of_trees}"
-        )
+        print(f"seed: {seed}, cpu time: {stop - start}, {metric_name}: {metric}")
 
-    print(
-        f"average cpu time: {np.mean(cpu_times)}, average {metric_name}: {np.mean(metrics)}"
-    )
+    print(f"avg cpu time: {np.mean(cpu_times)}, avg {metric_name}: {np.mean(metrics)}")
+    print(f"avg wall time: {np.mean(wall_times)}")
+    print(f"cpu time / wall time: {(np.mean(cpu_times)/np.mean(wall_times)):.1f}")
