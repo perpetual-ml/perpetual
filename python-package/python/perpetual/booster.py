@@ -1,14 +1,14 @@
-import inspect
 import json
-from typing import Any, Dict, Iterable, List, Optional, Tuple, Union, cast
-from typing_extensions import Self
+import inspect
 import warnings
+from typing_extensions import Self
+from typing import Any, Dict, Iterable, List, Optional, Tuple, Union, cast
+
+import numpy as np
 
 from perpetual.perpetual import PerpetualBooster as CratePerpetualBooster  # type: ignore
 from perpetual.perpetual import MultiOutputBooster as CrateMultiOutputBooster  # type: ignore
 from perpetual.serialize import BaseSerializer, ObjectSerializer
-import numpy as np
-
 from perpetual.types import BoosterType, MultiOutputBoosterType
 from perpetual.data import Node
 from perpetual.utils import (
@@ -244,7 +244,7 @@ class PerpetualBooster:
 
         return self
 
-    def _validate_features(self, features: list[str]):
+    def _validate_features(self, features: List[str]):
         if len(features) > 0 and hasattr(self, "feature_names_in_"):
             if features[0] != "0" and self.feature_names_in_[0] != "0":
                 if features != self.feature_names_in_:
