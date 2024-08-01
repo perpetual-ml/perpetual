@@ -3,7 +3,7 @@ import seaborn as sns
 from ucimlrepo import fetch_ucirepo
 from sklearn.model_selection import train_test_split
 from sklearn.datasets import fetch_california_housing, fetch_covtype
-from perpetual import convert_input_frame, transform_input_frame
+from perpetual.utils import convert_input_frame, transform_input_frame
 
 
 if __name__ == "__main__":
