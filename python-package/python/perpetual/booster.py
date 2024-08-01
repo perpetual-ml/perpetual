@@ -2,7 +2,7 @@ import json
 import inspect
 import warnings
 from typing_extensions import Self
-from typing import Any, Dict, Iterable, List, Optional, Tuple, Union, cast
+from typing import Any, Dict, Iterable, List, Optional, Set, Tuple, Union, cast
 
 import numpy as np
 
@@ -664,7 +664,7 @@ class PerpetualBooster:
     def _standardize_terminate_missing_features(
         self,
         X,
-    ) -> set[int]:
+    ) -> Set[int]:
         if isinstance(X, np.ndarray):
             return set(self.terminate_missing_features)
         else:
