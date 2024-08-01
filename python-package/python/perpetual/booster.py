@@ -1,6 +1,6 @@
 import inspect
 import json
-from typing import Any, Dict, Iterable, Union, cast
+from typing import Any, Dict, Iterable, List, Tuple, Union, cast
 from typing_extensions import Self
 import warnings
 
@@ -26,7 +26,7 @@ class PerpetualBooster:
     # this is useful for parameters that should be
     # attempted to be loaded in and set
     # as attributes on the booster after it is loaded.
-    meta_data_attributes: dict[str, BaseSerializer] = {
+    meta_data_attributes: Dict[str, BaseSerializer] = {
         "feature_names_in_": ObjectSerializer(),
         "n_features_": ObjectSerializer(),
         "feature_importance_method": ObjectSerializer(),
@@ -39,7 +39,7 @@ class PerpetualBooster:
         *,
         objective: str = "LogLoss",
         parallel: bool = False,
-        monotone_constraints: Union[dict[Any, int], None] = None,
+        monotone_constraints: Union[Dict[Any, int], None] = None,
         force_children_to_bound_parent: bool = False,
         missing: float = np.nan,
         allow_missing_splits: bool = True,
@@ -58,7 +58,7 @@ class PerpetualBooster:
                 function (regression). Defaults to "LogLoss".
             parallel (bool, optional): Should multiple cores be used when training and predicting
                 with this model? Defaults to `True`.
-            monotone_constraints (dict[Any, int], optional): Constraints that are used to enforce a
+            monotone_constraints (Dict[Any, int], optional): Constraints that are used to enforce a
                 specific relationship between the training features and the target variable. A dictionary
                 should be provided where the keys are the feature index value if the model will be fit on
                 a numpy array, or a feature name if it will be fit on a Dataframe. The values of
@@ -82,7 +82,7 @@ class PerpetualBooster:
                 create a separate branch for missing, creating a ternary tree, the missing node will be given the same
                 weight value as the parent node. If this parameter is `False`, missing will be sent
                 down either the left or right branch, creating a binary tree. Defaults to `False`.
-            terminate_missing_features (set[Any], optional): An optional iterable of features
+            terminate_missing_features (Set[Any], optional): An optional iterable of features
                 (either strings, or integer values specifying the feature indices if numpy arrays are used for fitting),
                 for which the missing node will always be terminated, even if `allow_missing_splits` is set to true.
                 This value is only valid if `create_missing_branch` is also True.
@@ -425,7 +425,7 @@ class PerpetualBooster:
         feature: Union[str, int],
         samples: int | None = 100,
         exclude_missing: bool = True,
-        percentile_bounds: tuple[float, float] = (0.2, 0.98),
+        percentile_bounds: Tuple[float, float] = (0.2, 0.98),
     ) -> np.ndarray:
         """Calculate the partial dependence values of a feature. For each unique
         value of the feature, this gives the estimate of the predicted value for that
@@ -442,7 +442,7 @@ class PerpetualBooster:
             samples (int | None, optional): Number of evenly spaced samples to select. If None
                 is passed all unique values will be used. Defaults to 100.
             exclude_missing (bool, optional): Should missing excluded from the features? Defaults to True.
-            percentile_bounds (tuple[float, float], optional): Upper and lower percentiles to start at
+            percentile_bounds (Tuple[float, float], optional): Upper and lower percentiles to start at
                 when calculating the samples. Defaults to (0.2, 0.98) to cap the samples selected
                 at the 5th and 95th percentiles respectively.
 
@@ -474,7 +474,7 @@ class PerpetualBooster:
             We can see how this is impacted if a model is created, where a specific constraint is applied to the feature using the `monotone_constraint` parameter.
 
             ```python
-            model = GradientBooster(
+            model = PerpetualBooster(
                 objective="LogLoss",
                 monotone_constraints={"age": -1},
             )
@@ -542,7 +542,7 @@ class PerpetualBooster:
 
     def calculate_feature_importance(
         self, method: str = "Gain", normalize: bool = True
-    ) -> dict[int, float] | dict[str, float]:
+    ) -> Dict[int, float] | dict[str, float]:
         """Feature importance values can be calculated with the `calculate_feature_importance` method. This function will return a dictionary of the features and their importance values. It should be noted that if a feature was never used for splitting it will not be returned in importance dictionary.
 
         Args:
@@ -556,7 +556,7 @@ class PerpetualBooster:
             normalize (bool, optional): Should the importance be normalized to sum to 1? Defaults to `True`.
 
         Returns:
-            dict[str, float]: Variable importance values, for features present in the model.
+            Dict[str, float]: Variable importance values, for features present in the model.
 
         Example:
             ```python
@@ -570,22 +570,22 @@ class PerpetualBooster:
             # }
             ```
         """
-        importance_: dict[int, float] = self.booster.calculate_feature_importance(
+        importance_: Dict[int, float] = self.booster.calculate_feature_importance(
             method=method,
             normalize=normalize,
         )
         if hasattr(self, "feature_names_in_"):
-            feature_map: dict[int, str] = {
+            feature_map: Dict[int, str] = {
                 i: f for i, f in enumerate(self.feature_names_in_)
             }
             return {feature_map[i]: v for i, v in importance_.items()}
         return importance_
 
-    def text_dump(self) -> list[str]:
+    def text_dump(self) -> List[str]:
         """Return all of the trees of the model in text form.
 
         Returns:
-            list[str]: A list of strings, where each string is a text representation
+            List[str]: A list of strings, where each string is a text representation
                 of the tree.
         Example:
             ```python
@@ -654,7 +654,7 @@ class PerpetualBooster:
     def _standardize_monotonicity_map(
         self,
         X,
-    ) -> dict[int, Any]:
+    ) -> Dict[int, Any]:
         if isinstance(X, np.ndarray):
             return self.monotone_constraints
         else:
@@ -743,7 +743,7 @@ class PerpetualBooster:
 
     # Functions for scikit-learn compatibility, will feel out adding these manually,
     # and then if that feels too unwieldy will add scikit-learn as a dependency.
-    def get_params(self, deep=True) -> dict[str, Any]:
+    def get_params(self, deep=True) -> Dict[str, Any]:
         """Get all of the parameters for the booster.
 
         Args:
@@ -766,23 +766,23 @@ class PerpetualBooster:
         PerpetualBooster.__init__(self, **old_params)
         return self
 
-    def get_node_lists(self, map_features_names: bool = True) -> list[list[Node]]:
+    def get_node_lists(self, map_features_names: bool = True) -> List[List[Node]]:
         """Return the tree structures representation as a list of python objects.
 
         Args:
             map_features_names (bool, optional): Should the feature names tried to be mapped to a string, if a pandas dataframe was used. Defaults to True.
 
         Returns:
-            list[list[Node]]: A list of lists where each sub list is a tree, with all of it's respective nodes.
+            List[List[Node]]: A list of lists where each sub list is a tree, with all of it's respective nodes.
 
         Example:
             This can be run directly to get the tree structure as python objects.
 
             ```python
-            fmod = GradientBooster(max_depth=2)
-            fmod.fit(X, y=y)
+            model = PerpetualBooster()
+            model.fit(X, y)
 
-            fmod.get_node_lists()[0]
+            model.get_node_lists()[0]
 
             # [Node(num=0, weight_value...,
             # Node(num=1, weight_value...,
@@ -794,7 +794,7 @@ class PerpetualBooster:
             ```
         """
         model = json.loads(self.json_dump())["trees"]
-        feature_map: dict[int, str] | dict[int, int]
+        feature_map: Dict[int, str] | Dict[int, int]
         leaf_split_feature: str | int
         if map_features_names and hasattr(self, "feature_names_in_"):
             feature_map = {i: ft for i, ft in enumerate(self.feature_names_in_)}
@@ -837,7 +837,7 @@ class PerpetualBooster:
         def node_to_row(
             n: Node,
             tree_n: int,
-        ) -> dict[str, Any]:
+        ) -> Dict[str, Any]:
             def _id(i: int) -> str:
                 return f"{tree_n}-{i}"
 

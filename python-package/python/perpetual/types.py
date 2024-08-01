@@ -1,11 +1,11 @@
-from typing_extensions import Self
-from typing import Any, Dict, Iterable, Protocol
 import numpy as np
+from typing_extensions import Self
+from typing import Any, Dict, Iterable, Protocol, Set
 
 
 class BoosterType(Protocol):
-    monotone_constraints: dict[int, int]
-    terminate_missing_features: set[int]
+    monotone_constraints: Dict[int, int]
+    terminate_missing_features: Set[int]
     number_of_trees: int
     base_score: float
 
@@ -17,7 +17,7 @@ class BoosterType(Protocol):
         y: np.ndarray,
         budget: float,
         sample_weight: np.ndarray,
-        parallel: bool = True,
+        parallel: bool = False,
     ):
         """Fit method"""
 
@@ -60,10 +60,10 @@ class BoosterType(Protocol):
         self,
         method: str,
         normalize: bool,
-    ) -> dict[int, float]:
+    ) -> Dict[int, float]:
         """pass"""
 
-    def text_dump(self) -> list[str]:
+    def text_dump(self) -> Iterable[str]:
         """pass"""
 
     @classmethod
@@ -80,7 +80,7 @@ class BoosterType(Protocol):
     def json_dump(self) -> str:
         """pass"""
 
-    def get_params(self) -> dict[str, Any]:
+    def get_params(self) -> Dict[str, Any]:
         """pass"""
 
     def insert_metadata(self, key: str, value: str) -> None:
@@ -91,8 +91,8 @@ class BoosterType(Protocol):
 
 
 class MultiOutputBoosterType(Protocol):
-    monotone_constraints: dict[int, int]
-    terminate_missing_features: set[int]
+    monotone_constraints: Dict[int, int]
+    terminate_missing_features: Set[int]
     number_of_trees: Iterable[int]
     base_score: Iterable[float]
 
@@ -104,7 +104,7 @@ class MultiOutputBoosterType(Protocol):
         y: np.ndarray,
         budget: float,
         sample_weight: np.ndarray,
-        parallel: bool = True,
+        parallel: bool = False,
     ):
         """Fit method"""
 
