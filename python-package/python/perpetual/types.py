@@ -140,7 +140,7 @@ class MultiOutputBoosterType(Protocol):
     def json_dump(self) -> str:
         """pass"""
 
-    def get_params(self) -> dict[str, Any]:
+    def get_params(self) -> Dict[str, Any]:
         """pass"""
 
     def insert_metadata(self, key: str, value: str) -> None:
