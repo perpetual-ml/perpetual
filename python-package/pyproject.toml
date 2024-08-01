@@ -4,7 +4,7 @@ build-backend = "maturin"
 
 [project]
 name = "perpetual"
-version = "0.3.5"
+version = "0.3.6"
 description = "A self-generalizing gradient boosting machine which doesn't need hyperparameter optimization"
 license = { file = "LICENSE" }
 keywords = [

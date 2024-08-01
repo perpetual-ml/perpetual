@@ -4,7 +4,7 @@ import json
 from abc import ABC, abstractmethod
 from ast import literal_eval
 from dataclasses import dataclass
-from typing import Dict, Generic, List, TypeVar, Union
+from typing import Dict, Generic, List, Tuple, TypeVar, Union
 
 import numpy as np
 import numpy.typing as npt
@@ -54,9 +54,9 @@ class ObjectSerializer(BaseSerializer[ObjectItem]):
 
 @dataclass
 class NumpyData:
-    array: list[float] | list[int]
+    array: Union[List[float], List[int]]
     dtype: str
-    shape: tuple[int, ...]
+    shape: Tuple[int, ...]
 
 
 class NumpySerializer(BaseSerializer[npt.NDArray]):

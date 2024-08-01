@@ -1,6 +1,6 @@
 import inspect
 import json
-from typing import Any, Dict, Iterable, List, Tuple, Union, cast
+from typing import Any, Dict, Iterable, List, Optional, Tuple, Union, cast
 from typing_extensions import Self
 import warnings
 
@@ -44,7 +44,7 @@ class PerpetualBooster:
         missing: float = np.nan,
         allow_missing_splits: bool = True,
         create_missing_branch: bool = False,
-        terminate_missing_features: Iterable[Any] | None = None,
+        terminate_missing_features: Optional[Iterable[Any]] = None,
         missing_node_treatment: str = "None",
         log_iterations: int = 0,
         feature_importance_method: str = "Gain",
@@ -423,7 +423,7 @@ class PerpetualBooster:
         self,
         X,
         feature: Union[str, int],
-        samples: int | None = 100,
+        samples: Optional[int] = 100,
         exclude_missing: bool = True,
         percentile_bounds: Tuple[float, float] = (0.2, 0.98),
     ) -> np.ndarray:
@@ -439,7 +439,7 @@ class PerpetualBooster:
             feature (Union[str, int]): The feature for which to calculate the partial
                 dependence values. This can be the name of a column, if the provided
                 X is a pandas DataFrame, or the index of the feature.
-            samples (int | None, optional): Number of evenly spaced samples to select. If None
+            samples (Optional[int]): Number of evenly spaced samples to select. If None
                 is passed all unique values will be used. Defaults to 100.
             exclude_missing (bool, optional): Should missing excluded from the features? Defaults to True.
             percentile_bounds (Tuple[float, float], optional): Upper and lower percentiles to start at
@@ -542,7 +542,7 @@ class PerpetualBooster:
 
     def calculate_feature_importance(
         self, method: str = "Gain", normalize: bool = True
-    ) -> Dict[int, float] | dict[str, float]:
+    ) -> Union[Dict[int, float], dict[str, float]]:
         """Feature importance values can be calculated with the `calculate_feature_importance` method. This function will return a dictionary of the features and their importance values. It should be noted that if a feature was never used for splitting it will not be returned in importance dictionary.
 
         Args:
@@ -794,8 +794,8 @@ class PerpetualBooster:
             ```
         """
         model = json.loads(self.json_dump())["trees"]
-        feature_map: Dict[int, str] | Dict[int, int]
-        leaf_split_feature: str | int
+        feature_map: Union[Dict[int, str], Dict[int, int]]
+        leaf_split_feature: Union[str, int]
         if map_features_names and hasattr(self, "feature_names_in_"):
             feature_map = {i: ft for i, ft in enumerate(self.feature_names_in_)}
             leaf_split_feature = ""
