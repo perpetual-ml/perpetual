@@ -1,6 +1,5 @@
-from typing import Iterable, Optional
-
 import numpy as np
+from typing import Dict, Iterable, List, Optional, Tuple
 
 
 def type_df(df):
@@ -63,11 +62,11 @@ def convert_input_array(x, objective) -> np.ndarray:
 
 def convert_input_frame(
     X, categorical_features
-) -> tuple[list[str], np.ndarray, int, int, Optional[Iterable[int]], Optional[dict]]:
+) -> Tuple[List[str], np.ndarray, int, int, Optional[Iterable[int]], Optional[Dict]]:
     """Convert data to format needed by booster.
 
     Returns:
-        tuple[list[str], np.ndarray, int, int, Optional[Iterable[int]], Optional[dict]]: Return column names, the flat data, number of rows, the number of columns, cat_index, cat_mapping
+        Tuple[List[str], np.ndarray, int, int, Optional[Iterable[int]], Optional[Dict]]: Return column names, the flat data, number of rows, the number of columns, cat_index, cat_mapping
     """
     categorical_features_ = None
     if type_df(X) == "pandas_df":
@@ -147,11 +146,11 @@ def convert_input_frame(
     return features_, flat_data, rows, cols, categorical_features_, cat_mapping
 
 
-def transform_input_frame(X, cat_mapping) -> tuple[list[str], np.ndarray, int, int]:
+def transform_input_frame(X, cat_mapping) -> Tuple[List[str], np.ndarray, int, int]:
     """Convert data to format needed by booster.
 
     Returns:
-        tuple[list[str], np.ndarray, int, int]: Return column names, the flat data, number of rows, the number of columns
+        Tuple[List[str], np.ndarray, int, int]: Return column names, the flat data, number of rows, the number of columns
     """
     if type_df(X) == "pandas_df":
         X_ = X.to_numpy()
