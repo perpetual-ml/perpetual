@@ -54,7 +54,7 @@ jobs:
     strategy:
       matrix:
         pyversion: ["3.11", "3.12"]
-        image: ["macos-latest", "macos-latest-large"]
+        image: [macos-latest, macos-14-large]
     runs-on: ${{ matrix.image }}
     steps:
       - uses: actions/checkout@v4
