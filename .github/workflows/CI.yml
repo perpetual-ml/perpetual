@@ -45,17 +45,17 @@ jobs:
           pytest --cov-fail-under=90 tests
           cd ..
       - name: Save Artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
-          name: release-dists
+          name: dist-windows-${{ matrix.pyversion }}
           path: dist
 
   macos-build-test:
     strategy:
       matrix:
         pyversion: ["3.11", "3.12"]
-        platform: [x64, arm64]
-    runs-on: "macos-latest"
+        os: [macos-latest, macos-latest-large]
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
       - name: Install latest stable Rust
@@ -92,9 +92,9 @@ jobs:
           pytest --cov-fail-under=90 tests
           cd ..
       - name: Save Artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
-          name: release-dists
+          name: dist-${{ matrix.os }}-${{ matrix.pyversion }}
           path: dist
 
   linux-build-test:
@@ -141,9 +141,9 @@ jobs:
           pytest --cov-fail-under=90 tests
           cd ..
       - name: Save Artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
-          name: release-dists
+          name: dist-linux-${{ matrix.pyversion }}
           path: dist
 
   cargo-build-test:
@@ -186,9 +186,10 @@ jobs:
       id-token: write
     steps:
       - name: Retrieve release distributions
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
-          name: release-dists
-          path: dist/
+          pattern: dist-*
+          merge-multiple: true
+          path: dist
       - name: Publish release distributions to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
