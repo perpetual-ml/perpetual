@@ -54,8 +54,8 @@ jobs:
     strategy:
       matrix:
         pyversion: ["3.11", "3.12"]
-        platform: [x64, arm64]
-    runs-on: "macos-latest"
+        image: ["macos-latest", "macos-latest-large"]
+    runs-on: ${{ matrix.image }}
     steps:
       - uses: actions/checkout@v4
       - name: Install latest stable Rust
