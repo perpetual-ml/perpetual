@@ -1,6 +1,6 @@
 [package]
 name = "perpetual"
-version = "0.4.0"
+version = "0.4.2"
 edition = "2021"
 authors = ["Mutlu Simsek <msimsek@perpetual-ml.com>"]
 homepage = "https://perpetual-ml.com"
