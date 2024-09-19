@@ -20,5 +20,5 @@ class Node:
     node_type: str
     parent_node: int
     generalization: Optional[float]
-    left_categories: Optional[Iterable]
-    right_categories: Optional[Iterable]
+    left_cats: Optional[Iterable]
+    right_cats: Optional[Iterable]

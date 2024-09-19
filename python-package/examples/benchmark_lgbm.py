@@ -80,7 +80,7 @@ def objective_function(
 
 if __name__ == "__main__":
     optuna.logging.set_verbosity(optuna.logging.WARNING)
-    cal_housing = False  # True -> California Housing, False -> Cover Types
+    cal_housing = True  # True -> California Housing, False -> Cover Types
     n_estimators = 100
     n_trials = 100
     cpu_times = []

@@ -141,7 +141,7 @@ def convert_input_frame(
     rows, cols = X_.shape
 
     if isinstance(categorical_features_, list):
-        categorical_features_ = np.array(categorical_features_, dtype=np.uint64)
+        categorical_features_ = set(categorical_features_)
 
     return features_, flat_data, rows, cols, categorical_features_, cat_mapping
 

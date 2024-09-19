@@ -38,7 +38,7 @@ class PerpetualBooster:
         self,
         *,
         objective: str = "LogLoss",
-        parallel: bool = False,
+        num_threads: Optional[int] = None,
         monotone_constraints: Union[Dict[Any, int], None] = None,
         force_children_to_bound_parent: bool = False,
         missing: float = np.nan,
@@ -52,12 +52,12 @@ class PerpetualBooster:
         """PerpetualBooster Class, used to generate gradient boosted decision tree ensembles.
 
         Args:
-            objective (str, optional): The name of objective function used to optimize.
-                Valid options include "LogLoss" to use logistic loss as the objective function
-                (classification), or "SquaredLoss" to use Squared Error as the objective
-                function (regression). Defaults to "LogLoss".
-            parallel (bool, optional): Should multiple cores be used when training and predicting
-                with this model? Defaults to `True`.
+            objective (str, optional): Learning objective function to be used for optimization.
+                Valid options include "LogLoss" to use logistic loss (classification),
+                "SquaredLoss" to use squared error (regression),
+                "QuantileLoss" to use quantile error (regression).
+                Defaults to "LogLoss".
+            num_threads (int, optional): Number of threads to be used during training.
             monotone_constraints (Dict[Any, int], optional): Constraints that are used to enforce a
                 specific relationship between the training features and the target variable. A dictionary
                 should be provided where the keys are the feature index value if the model will be fit on
@@ -91,7 +91,7 @@ class PerpetualBooster:
                 - "AssignToParent": Assign the weight of the missing node to that of the parent.
                 - "AverageLeafWeight": After training each tree, starting from the bottom of the tree, assign the missing node weight to the weighted average of the left and right child nodes. Next assign the parent to the weighted average of the children nodes. This is performed recursively up through the entire tree. This is performed as a post processing step on each tree after it is built, and prior to updating the predictions for which to train the next tree.
                 - "AverageNodeWeight": Set the missing node to be equal to the weighted average weight of the left and the right nodes.
-            log_iterations (bool, optional): Setting to a value (N) other than zero will result in information being logged about ever N iterations, info can be interacted with directly with the python [`logging`](https://docs.python.org/3/howto/logging.html) module. For an example of how to utilize the logging information see the example [here](/#logging-output).
+            log_iterations (int, optional): Setting to a value (N) other than zero will result in information being logged about ever N iterations, info can be interacted with directly with the python [`logging`](https://docs.python.org/3/howto/logging.html) module. For an example of how to utilize the logging information see the example [here](/#logging-output).
             feature_importance_method (str, optional): The feature importance method type that will be used to calculate the `feature_importances_` attribute on the booster.
 
         Raises:
@@ -136,7 +136,7 @@ class PerpetualBooster:
         )
 
         self.objective = objective
-        self.parallel = parallel
+        self.num_threads = num_threads
         self.monotone_constraints = monotone_constraints_
         self.force_children_to_bound_parent = force_children_to_bound_parent
         self.allow_missing_splits = allow_missing_splits
@@ -153,6 +153,7 @@ class PerpetualBooster:
         y,
         sample_weight=None,
         budget: float = 1.0,
+        alpha: Union[float, None] = None,
         reset: Union[bool, None] = None,
         categorical_features: Union[Iterable[int], Iterable[str], str, None] = "auto",
     ) -> Self:
@@ -162,11 +163,13 @@ class PerpetualBooster:
             X (FrameLike): Either a Polars or Pandas DataFrame, or a 2 dimensional Numpy array.
             y (Union[FrameLike, ArrayLike]): Either a Polars or Pandas DataFrame or Series,
                 or a 1 or 2 dimensional Numpy array.
-            budget: a positive number for fitting budget. Increasing this number will more
-                likely result in increased accuracy.
             sample_weight (Union[ArrayLike, None], optional): Instance weights to use when
                 training the model. If None is passed, a weight of 1 will be used for every record.
                 Defaults to None.
+            budget: a positive number for fitting budget. Increasing this number will more
+                likely result in increased accuracy.
+            alpha: only used in quantile regression.
+            reset: whether to reset the model or continue training.
             categorical_features: The names or indices for categorical features.
                 `auto` for Polars or Pandas categorical data type.
         """
@@ -196,7 +199,7 @@ class PerpetualBooster:
         ):
             booster = CratePerpetualBooster(
                 objective=self.objective,
-                parallel=self.parallel,
+                num_threads=self.num_threads,
                 monotone_constraints=crate_mc,
                 force_children_to_bound_parent=self.force_children_to_bound_parent,
                 missing=self.missing,
@@ -211,7 +214,7 @@ class PerpetualBooster:
             booster = CrateMultiOutputBooster(
                 n_boosters=len(classes_),
                 objective=self.objective,
-                parallel=self.parallel,
+                num_threads=self.num_threads,
                 monotone_constraints=crate_mc,
                 force_children_to_bound_parent=self.force_children_to_bound_parent,
                 missing=self.missing,
@@ -238,6 +241,7 @@ class PerpetualBooster:
             y=y_,
             budget=budget,
             sample_weight=sample_weight_,  # type: ignore
+            alpha=alpha,
             reset=reset,
             categorical_features=categorical_features_,  # type: ignore
         )
@@ -267,14 +271,13 @@ class PerpetualBooster:
         """
         features_, flat_data, rows, cols = transform_input_frame(X, self.cat_mapping)
         self._validate_features(features_)
-        parallel_ = self.parallel if parallel is None else parallel
 
         if len(self.classes_) == 0:
             return self.booster.predict(
                 flat_data=flat_data,
                 rows=rows,
                 cols=cols,
-                parallel=parallel_,
+                parallel=parallel,
             )
         elif len(self.classes_) == 2:
             return np.rint(
@@ -282,7 +285,7 @@ class PerpetualBooster:
                     flat_data=flat_data,
                     rows=rows,
                     cols=cols,
-                    parallel=parallel_,
+                    parallel=parallel,
                 )
             )
         else:
@@ -290,7 +293,7 @@ class PerpetualBooster:
                 flat_data=flat_data,
                 rows=rows,
                 cols=cols,
-                parallel=parallel_,
+                parallel=parallel,
             )
             preds_matrix = preds.reshape((-1, len(self.classes_)), order="F")
             indices = np.argmax(preds_matrix, axis=1)
@@ -311,14 +314,13 @@ class PerpetualBooster:
         """
         features_, flat_data, rows, cols = transform_input_frame(X, self.cat_mapping)
         self._validate_features(features_)
-        parallel_ = self.parallel if parallel is None else parallel
 
         if len(self.classes_) > 2:
             probabilities = self.booster.predict_proba(
                 flat_data=flat_data,
                 rows=rows,
                 cols=cols,
-                parallel=parallel_,
+                parallel=parallel,
             )
             return probabilities.reshape((-1, len(self.classes_)), order="C")
         elif len(self.classes_) == 2:
@@ -326,7 +328,7 @@ class PerpetualBooster:
                 flat_data=flat_data,
                 rows=rows,
                 cols=cols,
-                parallel=parallel_,
+                parallel=parallel,
             )
         else:
             raise NotImplementedError("predict_proba not implemented for regression.")
@@ -346,14 +348,13 @@ class PerpetualBooster:
         """
         features_, flat_data, rows, cols = transform_input_frame(X, self.cat_mapping)
         self._validate_features(features_)
-        parallel_ = self.parallel if parallel is None else parallel
 
         if len(self.classes_) > 2:
             preds = self.booster.predict(
                 flat_data=flat_data,
                 rows=rows,
                 cols=cols,
-                parallel=parallel_,
+                parallel=parallel,
             )
             return preds.reshape((-1, len(self.classes_)), order="F")
         elif len(self.classes_) == 2:
@@ -361,7 +362,7 @@ class PerpetualBooster:
                 flat_data=flat_data,
                 rows=rows,
                 cols=cols,
-                parallel=parallel_,
+                parallel=parallel,
             )
         else:
             raise NotImplementedError(
@@ -408,14 +409,13 @@ class PerpetualBooster:
         """
         features_, flat_data, rows, cols = transform_input_frame(X, self.cat_mapping)
         self._validate_features(features_)
-        parallel_ = self.parallel if parallel is None else parallel
 
         contributions = self.booster.predict_contributions(
             flat_data=flat_data,
             rows=rows,
             cols=cols,
             method=CONTRIBUTION_METHODS.get(method, method),
-            parallel=parallel_,
+            parallel=parallel,
         )
         return np.reshape(contributions, (rows, cols + 1))
 
@@ -852,8 +852,8 @@ class PerpetualBooster:
                 Missing=None if n.is_leaf else _id(n.missing_node),
                 Gain=n.weight_value if n.is_leaf else n.split_gain,
                 Cover=n.hessian_sum,
-                Left_Categories=n.left_categories,
-                Right_Categories=n.right_categories,
+                Left_Cats=n.left_cats,
+                Right_Cats=n.right_cats,
             )
 
         # Flatten list of lists using list comprehension

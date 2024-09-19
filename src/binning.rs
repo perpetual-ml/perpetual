@@ -75,7 +75,7 @@ pub fn bin_matrix(
     sample_weight: Option<&[f64]>,
     nbins: u16,
     missing: f64,
-    cat_index: Option<&[u64]>,
+    cat_index: Option<&HashSet<usize>>,
 ) -> Result<BinnedData<f64>, PerpetualError> {
     let mut pcts = Vec::new();
     let nbins_ = f64::from_u16(nbins);
@@ -95,7 +95,7 @@ pub fn bin_matrix(
         None => HashSet::new(),
     };
     let mut num_index: Vec<usize> = (0..data.cols).collect();
-    num_index.retain(|e| !to_remove.contains(&(*e as u64)));
+    num_index.retain(|e| !to_remove.contains(&(*e)));
     let num_index_set: HashSet<usize> = HashSet::from_iter(num_index);
 
     // First we need to generate the bins for each of the columns.
@@ -204,7 +204,9 @@ mod tests {
             .map(|x| x.trim().parse::<f64>().unwrap_or(f64::NAN))
             .collect();
         let data = Matrix::new(&data_vec, n_rows, n_columns);
-        let b = bin_matrix(&data, None, 256, f64::NAN, Some(&vec![1])).unwrap();
+        let cat_index = HashSet::from([1]);
+
+        let b = bin_matrix(&data, None, 256, f64::NAN, Some(&cat_index)).unwrap();
         let bdata = Matrix::new(&b.binned_data, data.rows, data.cols);
 
         println!("{:?}", b.cuts);

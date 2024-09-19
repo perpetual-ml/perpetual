@@ -1,170 +1,207 @@
-use std::cmp::Ordering;
+use crate::bin::Bin;
+use crate::data::{FloatData, JaggedMatrix};
+use crate::Matrix;
+use rayon::{prelude::*, ThreadPool};
+use std::cell::UnsafeCell;
 
-use crate::data::{FloatData, JaggedMatrix, Matrix};
-use hashbrown::HashMap;
-use rayon::prelude::*;
-use serde::{Deserialize, Serialize};
-
-/// Struct to hold the information of a given bin.
-#[derive(Debug, Deserialize, Serialize, Clone)]
-pub struct Bin {
-    pub g_folded: [f32; 5],
-    pub h_folded: Option<[f32; 5]>,
-    pub cut_value: f64,
-    pub counts: [usize; 5],
-    pub num: u16,
-    pub col: usize,
+#[derive(Debug)]
+pub struct FeatureHistogramOwned {
+    pub data: Vec<Bin>,
 }
 
-impl Bin {
-    pub fn new(h_folded: Option<[f32; 5]>, cut_value: f64, num: u16, col: usize) -> Self {
-        Bin {
-            g_folded: [f32::ZERO; 5],
-            h_folded,
-            cut_value,
-            counts: [0; 5],
-            num,
-            col,
-        }
-    }
-
-    pub fn from_parent_child(root_bin: &Bin, child_bin: &Bin, update_bin: &mut Bin) {
-        for ((z, a), b) in update_bin
-            .g_folded
-            .iter_mut()
-            .zip(&root_bin.g_folded)
-            .zip(&child_bin.g_folded)
-        {
-            *z = a - b;
-        }
-        for ((z, a), b) in update_bin
-            .counts
-            .iter_mut()
-            .zip(&root_bin.counts)
-            .zip(&child_bin.counts)
-        {
-            *z = a - b;
+impl FeatureHistogramOwned {
+    pub fn empty(cuts: &[f64], is_const_hess: bool) -> Self {
+        let mut histogram: Vec<Bin> = Vec::with_capacity(cuts.len());
+        if is_const_hess {
+            histogram.push(Bin::empty_const_hess(0, f64::NAN));
+            histogram.extend(
+                cuts[..(cuts.len() - 1)]
+                    .iter()
+                    .enumerate()
+                    .map(|(it, c)| Bin::empty_const_hess(it as u16 + 1, *c)),
+            );
+        } else {
+            histogram.push(Bin::empty(0, f64::NAN));
+            histogram.extend(
+                cuts[..(cuts.len() - 1)]
+                    .iter()
+                    .enumerate()
+                    .map(|(it, c)| Bin::empty(it as u16 + 1, *c)),
+            );
         }
 
-        match root_bin.h_folded {
-            Some(_h_folded) => {
-                let h_f_iter = update_bin.h_folded.as_mut().unwrap().iter_mut();
-                for ((zval, aval), bval) in h_f_iter
-                    .zip(&root_bin.h_folded.unwrap())
-                    .zip(&child_bin.h_folded.unwrap())
-                {
-                    *zval = aval - bval;
-                }
-            }
-            None => {
-                update_bin.h_folded = None;
-            }
-        };
-    }
-
-    pub fn from_parent_two_children(root_bin: &Bin, first_bin: &Bin, second_bin: &Bin, update_bin: &mut Bin) {
-        for (((z, a), b), c) in update_bin
-            .g_folded
-            .iter_mut()
-            .zip(&root_bin.g_folded)
-            .zip(&first_bin.g_folded)
-            .zip(&second_bin.g_folded)
-        {
-            *z = a - b - c;
-        }
-        for (((z, a), b), c) in update_bin
-            .counts
-            .iter_mut()
-            .zip(&root_bin.counts)
-            .zip(&first_bin.counts)
-            .zip(&second_bin.counts)
-        {
-            *z = a - b - c;
-        }
-
-        match root_bin.h_folded {
-            Some(_h_folded) => {
-                let h_f_iter = update_bin.h_folded.as_mut().unwrap().iter_mut();
-                for (((z, a), b), c) in h_f_iter
-                    .zip(&root_bin.h_folded.unwrap())
-                    .zip(&first_bin.h_folded.unwrap())
-                    .zip(&second_bin.h_folded.unwrap())
-                {
-                    *z = a - b - c;
-                }
-            }
-            None => {
-                update_bin.h_folded = None;
-            }
-        };
+        FeatureHistogramOwned { data: histogram }
     }
 }
 
-pub fn create_empty_histogram(cuts: &[f64], is_const_hess: bool, col: usize) -> Vec<Bin> {
-    let mut histogram: Vec<Bin> = Vec::with_capacity(cuts.len());
-    if is_const_hess {
-        histogram.push(Bin::new(None, f64::NAN, 0, col));
-        histogram.extend(
-            cuts[..(cuts.len() - 1)]
-                .iter()
-                .enumerate()
-                .map(|(it, c)| Bin::new(None, *c, it as u16 + 1, col)),
-        );
-    } else {
-        histogram.push(Bin::new(Some([f32::ZERO; 5]), f64::NAN, 0, col));
-        histogram.extend(
-            cuts[..(cuts.len() - 1)]
-                .iter()
-                .enumerate()
-                .map(|(it, c)| Bin::new(Some([f32::ZERO; 5]), *c, it as u16 + 1, col)),
-        );
-    }
-    histogram
+#[derive(Copy, Clone, Debug)]
+pub struct FeatureHistogram<'a> {
+    pub data: &'a [UnsafeCell<Bin>],
 }
 
-pub fn update_feature_histogram(
-    histogram: &mut [Bin],
-    feature: &[u16], // an array which shows the bin index for each element of the feature, length = whole length of data
-    sorted_grad: &[f32], // grad with length of data that falls into this node
-    sorted_hess: Option<&[f32]>, // hess with length of data that falls into this split
-    index: &[usize], // indices with length of data that falls into this node
-) {
-    match sorted_hess {
-        Some(sorted_hess) => {
-            histogram.iter_mut().for_each(|hist| {
-                hist.g_folded = [f32::ZERO; 5];
-                hist.h_folded = Some([f32::ZERO; 5]);
-                hist.counts = [0; 5];
-            });
-            index.iter().zip(sorted_grad).zip(sorted_hess).for_each(|((i, g), h)| {
-                if let Some(v) = histogram.get_mut(feature[*i] as usize) {
+unsafe impl<'a> Send for FeatureHistogram<'a> {}
+unsafe impl<'a> Sync for FeatureHistogram<'a> {}
+
+impl<'a> FeatureHistogram<'a> {
+    pub fn new(hist: &'a mut [Bin]) -> Self {
+        let ptr = hist as *mut [Bin] as *const [UnsafeCell<Bin>];
+        Self { data: unsafe { &*ptr } }
+    }
+
+    pub unsafe fn update(
+        &self,
+        feature: &[u16], // an array which shows the bin index for each element of the feature, length = whole length of data
+        sorted_grad: &[f32], // grad with length of data that falls into this node
+        sorted_hess: Option<&[f32]>, // hess with length of data that falls into this split
+        index: &[usize], // indices with length of data that falls into this node
+    ) {
+        match sorted_hess {
+            Some(sorted_hess) => {
+                self.data.iter().for_each(|b| {
+                    let bin = b.get().as_mut().unwrap();
+                    bin.g_folded = [f32::ZERO; 5];
+                    bin.h_folded = Some([f32::ZERO; 5]);
+                    bin.counts = [0; 5];
+                });
+                index.iter().zip(sorted_grad).zip(sorted_hess).for_each(|((i, g), h)| {
+                    let b = self.data.get_unchecked(feature[*i] as usize).get();
+                    let bin = b.as_mut().unwrap_unchecked();
                     let fold = i % 5;
-                    v.g_folded[fold] += *g;
-                    let k = v.h_folded.as_mut().unwrap();
+                    bin.g_folded[fold] += *g;
+                    let k = bin.h_folded.as_mut().unwrap();
                     k[fold] += *h;
-                    v.counts[fold] += 1;
-                }
-            });
-        }
-        None => {
-            histogram.iter_mut().for_each(|hist| {
-                hist.g_folded = [f32::ZERO; 5];
-                hist.counts = [0; 5];
-            });
-            index.iter().zip(sorted_grad).for_each(|(i, g)| {
-                if let Some(v) = histogram.get_mut(feature[*i] as usize) {
+                    bin.counts[fold] += 1;
+                });
+            }
+            None => {
+                self.data.iter().for_each(|b| {
+                    let bin = b.get().as_mut().unwrap();
+                    bin.g_folded = [f32::ZERO; 5];
+                    bin.counts = [0; 5];
+                });
+                index.iter().zip(sorted_grad).for_each(|(i, g)| {
+                    let b = self.data.get_unchecked(feature[*i] as usize).get();
+                    let bin = b.as_mut().unwrap_unchecked();
                     let fold = i % 5;
-                    v.g_folded[fold] += *g;
-                    v.counts[fold] += 1;
-                }
-            });
+                    bin.g_folded[fold] += *g;
+                    bin.counts[fold] += 1;
+                });
+            }
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct NodeHistogramOwned {
+    pub data: Vec<FeatureHistogramOwned>,
+}
+
+impl NodeHistogramOwned {
+    /// Create an empty histogram matrix.
+    pub fn empty(cuts: &JaggedMatrix<f64>, col_index: &[usize], is_const_hess: bool, parallel: bool) -> Self {
+        let histograms: Vec<FeatureHistogramOwned> = if parallel {
+            col_index
+                .par_iter()
+                .map(|col| FeatureHistogramOwned::empty(cuts.get_col(*col), is_const_hess))
+                .collect()
+        } else {
+            col_index
+                .iter()
+                .map(|col| FeatureHistogramOwned::empty(cuts.get_col(*col), is_const_hess))
+                .collect()
+        };
+
+        NodeHistogramOwned { data: histograms }
+    }
+}
+
+#[derive(Debug)]
+pub struct NodeHistogram<'a> {
+    pub data: Vec<FeatureHistogram<'a>>,
+}
+
+impl NodeHistogram<'_> {
+    pub fn from_owned(hist: &mut NodeHistogramOwned) -> NodeHistogram {
+        let histograms = hist
+            .data
+            .iter_mut()
+            .map(|f| FeatureHistogram::new(&mut f.data))
+            .collect();
+        NodeHistogram { data: histograms }
+    }
+
+    /// Calculate the histogram matrix, for a child, given the parent histogram
+    /// matrix, and the other child histogram matrix. This should be used
+    /// when the node has only two possible splits, left and right.
+    pub fn from_parent_child(hist_tree: &[NodeHistogram], root_num: usize, child_num: usize, update_num: usize) {
+        unsafe {
+            let root_hist = &hist_tree.get_unchecked(root_num).data;
+            let child_hist = &hist_tree.get_unchecked(child_num).data;
+            let update_hist = &hist_tree.get_unchecked(update_num).data;
+
+            root_hist
+                .iter()
+                .zip(child_hist.iter())
+                .zip(update_hist.iter())
+                .for_each(|((root_feat_hist, child_feat_hist), update_feat_hist)| {
+                    root_feat_hist
+                        .data
+                        .iter()
+                        .zip(child_feat_hist.data.iter())
+                        .zip(update_feat_hist.data.iter())
+                        .for_each(|((root_bin, child_bin), update_bin)| {
+                            Bin::from_parent_child(root_bin.get(), child_bin.get(), update_bin.get())
+                        })
+                });
+        }
+    }
+
+    /// Calculate the histogram matrix for a child, given the parent histogram
+    /// and two other child histograms. This should be used with the node has
+    /// three possible split paths, right, left, and missing.
+    pub fn from_parent_two_children(
+        hist_tree: &[NodeHistogram],
+        root_num: usize,
+        first_num: usize,
+        second_num: usize,
+        update_num: usize,
+    ) {
+        unsafe {
+            let root_hist = &hist_tree.get_unchecked(root_num).data;
+            let first_hist = &hist_tree.get_unchecked(first_num).data;
+            let second_hist = &hist_tree.get_unchecked(second_num).data;
+            let update_hist = &hist_tree.get_unchecked(update_num).data;
+
+            root_hist
+                .iter()
+                .zip(first_hist.iter())
+                .zip(second_hist.iter())
+                .zip(update_hist.iter())
+                .for_each(
+                    |(((root_feat_hist, first_feat_hist), second_feat_hist), update_feat_hist)| {
+                        root_feat_hist
+                            .data
+                            .iter()
+                            .zip(first_feat_hist.data.iter())
+                            .zip(second_feat_hist.data.iter())
+                            .zip(update_feat_hist.data.iter())
+                            .for_each(|(((root_bin, first_bin), second_bin), update_bin)| {
+                                Bin::from_parent_two_children(
+                                    root_bin.get(),
+                                    first_bin.get(),
+                                    second_bin.get(),
+                                    update_bin.get(),
+                                )
+                            })
+                    },
+                );
         }
     }
 }
 
 #[allow(clippy::too_many_arguments)]
 pub fn update_histogram(
-    hist: &mut HistogramMatrix,
+    hist: &NodeHistogram,
     start: usize,
     stop: usize,
     data: &Matrix<u16>,
@@ -172,7 +209,7 @@ pub fn update_histogram(
     hess: Option<&[f32]>,
     index: &[usize],
     col_index: &[usize],
-    parallel: bool,
+    pool: &ThreadPool,
     sort: bool,
 ) {
     let (sorted_grad, sorted_hess) = match hess {
@@ -195,198 +232,82 @@ pub fn update_histogram(
         }
     };
 
-    if parallel {
-        let feature_histograms = hist.0.data.par_chunk_by_mut(|a, b| a.num < b.num);
-
-        feature_histograms.for_each(|h| {
-            let feature_col = data.get_col(h[0].col);
-            update_feature_histogram(
-                h,
-                feature_col,
-                &sorted_grad,
-                sorted_hess.as_deref(),
-                &index[start..stop],
-            );
-        });
-    } else {
-        col_index.iter().for_each(|col| {
-            update_feature_histogram(
-                hist.0.get_col_mut(*col),
-                data.get_col(*col),
-                &sorted_grad,
-                sorted_hess.as_deref(),
-                &index[start..stop],
-            );
-        });
-    }
-}
-
-/// Histograms implemented as as jagged matrix.
-#[derive(Debug, Deserialize, Serialize, Clone)]
-pub struct HistogramMatrix(pub JaggedMatrix<Bin>);
-
-impl HistogramMatrix {
-    /// Create an empty histogram matrix.
-    pub fn empty(
-        data: &Matrix<u16>,
-        cuts: &JaggedMatrix<f64>,
-        col_index: &[usize],
-        is_const_hess: bool,
-        parallel: bool,
-    ) -> Self {
-        // If we have sampled down the columns, we need to recalculate the ends.
-        // we can do this by iterating over the cut's, as this will be the size
-        // of the histograms.
-        let ends: Vec<usize> = if col_index.len() == data.cols {
-            cuts.ends.to_owned()
+    unsafe {
+        if pool.current_num_threads() > 1 {
+            pool.scope(|s| {
+                for i in 0..hist.data.len() {
+                    let h = hist.data.get_unchecked(i);
+                    let feature = data.get_col(i);
+                    s.spawn(|_| {
+                        h.update(feature, &sorted_grad, sorted_hess.as_deref(), &index[start..stop]);
+                    });
+                }
+            });
         } else {
-            col_index
-                .iter()
-                .scan(0_usize, |state, i| {
-                    *state += cuts.get_col(*i).len();
-                    Some(*state)
-                })
-                .collect()
-        };
-
-        let n_records = if col_index.len() == data.cols {
-            cuts.n_records
-        } else {
-            ends.iter().sum()
-        };
-
-        let histograms = if parallel {
-            col_index
-                .par_iter()
-                .flat_map(|col| create_empty_histogram(cuts.get_col(*col), is_const_hess, *col))
-                .collect::<Vec<Bin>>()
-        } else {
-            col_index
-                .iter()
-                .flat_map(|col| create_empty_histogram(cuts.get_col(*col), is_const_hess, *col))
-                .collect::<Vec<Bin>>()
-        };
-
-        HistogramMatrix(JaggedMatrix {
-            data: histograms,
-            ends,
-            cols: col_index.len(),
-            n_records,
-        })
-    }
-
-    /// Calculate the histogram matrix, for a child, given the parent histogram
-    /// matrix, and the other child histogram matrix. This should be used
-    /// when the node has only two possible splits, left and right.
-    pub fn from_parent_child(
-        hist_tree: &mut HashMap<usize, HistogramMatrix>,
-        root_num: usize,
-        child_num: usize,
-        update_num: usize,
-    ) {
-        unsafe {
-            let mut histograms = hist_tree
-                .get_many_unchecked_mut([&root_num, &child_num, &update_num])
-                .unwrap();
-
-            let (last, rest) = histograms.split_last_mut().unwrap();
-            let (child, root) = rest.split_last_mut().unwrap();
-
-            let root_hist = &mut root[0].0;
-            let child_hist = &mut child.0;
-            let update_hist = &mut last.0;
-
-            root_hist
-                .data
-                .iter()
-                .zip(child_hist.data.iter_mut())
-                .zip(update_hist.data.iter_mut())
-                .for_each(|((root_bin, child_bin), update_bin)| {
-                    Bin::from_parent_child(root_bin, child_bin, update_bin)
-                });
+            col_index.iter().for_each(|col| {
+                hist.data.get_unchecked(*col).update(
+                    data.get_col(*col),
+                    &sorted_grad,
+                    sorted_hess.as_deref(),
+                    &index[start..stop],
+                );
+            });
         }
     }
-
-    /// Calculate the histogram matrix for a child, given the parent histogram
-    /// and two other child histograms. This should be used with the node has
-    /// three possible split paths, right, left, and missing.
-    pub fn from_parent_two_children(
-        hist_tree: &mut HashMap<usize, HistogramMatrix>,
-        root_num: usize,
-        first_num: usize,
-        second_num: usize,
-        update_num: usize,
-    ) {
-        unsafe {
-            let mut histograms = hist_tree
-                .get_many_unchecked_mut([&root_num, &first_num, &second_num, &update_num])
-                .unwrap();
-
-            // Switch to get_many_unchecked_mut when it is stable
-            // https://doc.rust-lang.org/std/primitive.slice.html#method.get_many_unchecked_mut
-            let (last, rest) = histograms.split_last_mut().unwrap();
-            let root_hist = &rest[0].0.data;
-            let first_hist = &rest[1].0.data;
-            let second_hist = &rest[2].0.data;
-            let update_hist = &mut last.0.data;
-
-            root_hist
-                .iter()
-                .zip(first_hist.iter())
-                .zip(second_hist.iter())
-                .zip(update_hist.iter_mut())
-                .for_each(|(((root_bin, first_bin), second_bin), update_bin)| {
-                    Bin::from_parent_two_children(root_bin, first_bin, second_bin, update_bin)
-                });
-        }
-    }
-}
-
-pub fn sort_cat_bins(mut histograms: [&mut HistogramMatrix; 3], cat_index: &[u64]) {
-    for hist in histograms.iter_mut() {
-        for c in cat_index {
-            let feature_hist = hist.0.get_col_mut((*c) as usize);
-            feature_hist.sort_unstable_by_key(|bin| bin.num);
-        }
-    }
-}
-
-pub fn reorder_cat_bins(mut histograms: [&mut HistogramMatrix; 3], cat_index: &[u64], is_const_hess: bool) {
-    cat_index.iter().for_each(|col| {
-        for hist in histograms.iter_mut() {
-            if is_const_hess {
-                hist.0.get_col_mut((*col) as usize).sort_unstable_by(|bin1, bin2| {
-                    if bin1.num == 0 {
-                        return Ordering::Less;
-                    } else if bin2.num == 0 {
-                        return Ordering::Greater;
-                    }
-                    let div1: f32 = bin1.g_folded.iter().sum::<f32>() / bin1.h_folded.unwrap().iter().sum::<f32>();
-                    let div2: f32 = bin2.g_folded.iter().sum::<f32>() / bin2.h_folded.unwrap().iter().sum::<f32>();
-                    div2.partial_cmp(&div1).unwrap_or(Ordering::Less)
-                });
-            } else {
-                hist.0.get_col_mut((*col) as usize).sort_unstable_by(|bin1, bin2| {
-                    if bin1.num == 0 {
-                        return Ordering::Less;
-                    } else if bin2.num == 0 {
-                        return Ordering::Greater;
-                    }
-                    let div1: f32 = bin1.g_folded.iter().sum::<f32>() / bin1.counts.iter().sum::<usize>() as f32;
-                    let div2: f32 = bin2.g_folded.iter().sum::<f32>() / bin2.counts.iter().sum::<usize>() as f32;
-                    div2.partial_cmp(&div1).unwrap_or(Ordering::Less)
-                });
-            }
-        }
-    });
 }
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use crate::binning::bin_matrix;
+    use crate::histogram::{
+        update_histogram, FeatureHistogram, FeatureHistogramOwned, NodeHistogram, NodeHistogramOwned,
+    };
     use crate::objective::{LogLoss, ObjectiveFunction};
+    use crate::Matrix;
+    use approx::assert_relative_eq;
+    use std::collections::HashSet;
     use std::fs;
+
+    #[test]
+    fn test_simple_histogram() {
+        let data_vec: Vec<f64> = (0..100).map(|i| i as f64).collect();
+        let y: Vec<f64> = (0..100).map(|i| i as f64).collect();
+
+        let data = Matrix::new(&data_vec, data_vec.len(), 1);
+
+        let b = bin_matrix(&data, None, 5, f64::NAN, None).unwrap();
+        let bdata = Matrix::new(&b.binned_data, data.rows, data.cols);
+
+        let y_avg = y.iter().sum::<f64>() / y.len() as f64;
+        let yhat = vec![y_avg; y.len()];
+        let (g, h) = LogLoss::calc_grad_hess(&y, &yhat, None, None);
+
+        let col = 0;
+        let mut hist_feat_owned = FeatureHistogramOwned::empty(&b.cuts.get_col(col), false);
+        let hist_feat = FeatureHistogram::new(&mut hist_feat_owned.data);
+        unsafe { hist_feat.update(&bdata.get_col(col), &g, h.as_deref(), &bdata.index) };
+
+        let mut f = bdata.get_col(col).to_owned();
+
+        println!("histogram:");
+        println!("{:?}", hist_feat);
+        println!("feature_data:");
+        println!("{:?}", &data.get_col(col));
+        println!("feature_data_bin_indices:");
+        println!("{:?}", &bdata.get_col(col));
+        println!("data_indices:");
+        println!("{:?}", &bdata.index);
+        println!("cuts:");
+        println!("{:?}", &b.cuts.get_col(col));
+        f.sort();
+        f.dedup();
+        println!("f:");
+        println!("{:?}", &f);
+        println!("{:?}", &f.len());
+        println!("{:?}", &hist_feat.data.len());
+        assert_eq!(f.len() + 1, hist_feat.data.len());
+    }
+
     #[test]
     fn test_single_histogram() {
         let file =
@@ -400,38 +321,42 @@ mod tests {
         let (g, h) = LogLoss::calc_grad_hess(&y, &yhat, None, None);
 
         let col_index: Vec<usize> = (0..data.cols).collect();
-        let mut hist_init = HistogramMatrix::empty(&bdata, &b.cuts, &col_index, true, false);
-        update_feature_histogram(
-            &mut hist_init.0.get_col_mut(1),
-            &bdata.get_col(1),
-            &g,
-            h.as_deref(),
-            &bdata.index,
-        );
+        let mut hist_init_owned = NodeHistogramOwned::empty(&b.cuts, &col_index, true, false);
+        let mut hist_init = NodeHistogram::from_owned(&mut hist_init_owned);
 
-        let mut f = bdata.get_col(1).to_owned();
+        let col = 1;
+
+        unsafe {
+            hist_init
+                .data
+                .get_mut(col)
+                .unwrap()
+                .update(&bdata.get_col(col), &g, h.as_deref(), &bdata.index)
+        };
+
+        let mut f = bdata.get_col(col).to_owned();
 
         println!("histogram:");
-        println!("{:?}", hist_init.0.get_col(1));
+        println!("{:?}", hist_init.data.get(col).unwrap());
         println!("feature_data:");
-        println!("{:?}", &data.get_col(1));
+        println!("{:?}", &data.get_col(col));
         println!("feature_data_bin_indices:");
-        println!("{:?}", &bdata.get_col(1));
+        println!("{:?}", &bdata.get_col(col));
         println!("data_indices:");
         println!("{:?}", &bdata.index);
         println!("cuts:");
-        println!("{:?}", &b.cuts.get_col(1));
+        println!("{:?}", &b.cuts.get_col(col));
         f.sort();
         f.dedup();
         println!("f:");
         println!("{:?}", &f);
         println!("{:?}", &f.len());
-        println!("{:?}", &hist_init.0.get_col(1).len());
-        assert_eq!(f.len() + 1, hist_init.0.get_col(1).len());
+        println!("{:?}", &hist_init.data.get(col).unwrap().data.len());
+        assert_eq!(f.len() + 1, hist_init.data.get(col).unwrap().data.len());
     }
 
     #[test]
-    fn test_single_histogram_categorical() {
+    fn test_histogram_categorical() {
         let file = fs::read_to_string("resources/adult_train_flat.csv").expect("Something went wrong reading the file");
         let n_rows = 39073;
         let n_columns = 14;
@@ -442,16 +367,20 @@ mod tests {
             .map(|x| x.trim().parse::<f64>().unwrap_or(f64::NAN))
             .collect();
         let data = Matrix::new(&data_vec, n_rows, n_columns);
-        let b = bin_matrix(&data, None, 256, f64::NAN, Some(&vec![1])).unwrap();
+        let b = bin_matrix(&data, None, 256, f64::NAN, Some(&HashSet::from([1]))).unwrap();
         let bdata = Matrix::new(&b.binned_data, data.rows, data.cols);
         let y: Vec<f64> = file.lines().map(|x| x.parse::<f64>().unwrap_or(f64::NAN)).collect();
         let yhat = vec![0.5; y.len()];
         let (g, h) = LogLoss::calc_grad_hess(&y, &yhat, None, None);
 
         let col_index: Vec<usize> = (0..data.cols).collect();
-        let mut hist_init = HistogramMatrix::empty(&bdata, &b.cuts, &col_index, false, false);
+        let mut hist_init_owned = NodeHistogramOwned::empty(&b.cuts, &col_index, false, false);
+        let mut hist_init = NodeHistogram::from_owned(&mut hist_init_owned);
 
-        let hist_col = 1;
+        let col = 1;
+
+        let pool = rayon::ThreadPoolBuilder::new().num_threads(2).build().unwrap();
+
         update_histogram(
             &mut hist_init,
             0,
@@ -461,22 +390,98 @@ mod tests {
             h.as_deref(),
             &bdata.index,
             &col_index,
-            true,
+            &pool,
             false,
         );
 
-        let mut f = bdata.get_col(hist_col).to_owned();
+        let mut f = bdata.get_col(col).to_owned();
 
         println!("histogram:");
-        println!("{:?}", hist_init.0.get_col(hist_col));
+        println!("{:?}", unsafe { hist_init.data.get_unchecked(col) });
         println!("cuts:");
-        println!("{:?}", &b.cuts.get_col(hist_col));
+        println!("{:?}", &b.cuts.get_col(col));
         f.sort();
         f.dedup();
         println!("f:");
         println!("{:?}", &f);
         println!("{:?}", &f.len());
-        println!("{:?}", &hist_init.0.get_col(hist_col).len());
-        assert_eq!(f.len(), hist_init.0.get_col(hist_col).len());
+        println!("{:?}", unsafe { hist_init.data.get_unchecked(col) }.data.len());
+        assert_eq!(f.len(), unsafe { hist_init.data.get_unchecked(col) }.data.len());
+    }
+
+    #[test]
+    fn test_histogram_parallel() {
+        let file = fs::read_to_string("resources/adult_train_flat.csv").expect("Something went wrong reading the file");
+        let n_rows = 39073;
+        let n_columns = 14;
+        let n_lines = n_columns * 39073;
+        let data_vec: Vec<f64> = file
+            .lines()
+            .take(n_lines)
+            .map(|x| x.trim().parse::<f64>().unwrap_or(f64::NAN))
+            .collect();
+        let data = Matrix::new(&data_vec, n_rows, n_columns);
+        let b = bin_matrix(&data, None, 256, f64::NAN, Some(&HashSet::from([1]))).unwrap();
+        let bdata = Matrix::new(&b.binned_data, data.rows, data.cols);
+        let y: Vec<f64> = file.lines().map(|x| x.parse::<f64>().unwrap_or(f64::NAN)).collect();
+        let yhat = vec![0.5; y.len()];
+        let (g, h) = LogLoss::calc_grad_hess(&y, &yhat, None, None);
+
+        let col_index: Vec<usize> = (0..data.cols).collect();
+
+        let mut hist_init_owned1 = NodeHistogramOwned::empty(&b.cuts, &col_index, false, false);
+        let mut hist_init1 = NodeHistogram::from_owned(&mut hist_init_owned1);
+
+        let mut hist_init_owned2 = NodeHistogramOwned::empty(&b.cuts, &col_index, false, false);
+        let mut hist_init2 = NodeHistogram::from_owned(&mut hist_init_owned2);
+
+        let col = 1;
+
+        let pool1 = rayon::ThreadPoolBuilder::new().num_threads(1).build().unwrap();
+        let pool2 = rayon::ThreadPoolBuilder::new().num_threads(2).build().unwrap();
+
+        update_histogram(
+            &mut hist_init1,
+            0,
+            bdata.index.len(),
+            &bdata,
+            &g,
+            h.as_deref(),
+            &bdata.index,
+            &col_index,
+            &pool1,
+            false,
+        );
+        update_histogram(
+            &mut hist_init2,
+            0,
+            bdata.index.len(),
+            &bdata,
+            &g,
+            h.as_deref(),
+            &bdata.index,
+            &col_index,
+            &pool2,
+            false,
+        );
+
+        let bins1 = unsafe { &hist_init_owned1.data.get_unchecked(col).data };
+        let bins2 = unsafe { &hist_init_owned2.data.get_unchecked(col).data };
+
+        println!("{:?}", bins1[0].g_folded);
+        println!("{:?}", bins2[0].g_folded);
+
+        bins1.iter().zip(bins2.iter()).for_each(|(b1, b2)| {
+            b1.g_folded.iter().zip(b2.g_folded.iter()).for_each(|(g1, g2)| {
+                assert_relative_eq!(g1, g2);
+            });
+            b1.h_folded
+                .unwrap()
+                .iter()
+                .zip(b2.h_folded.unwrap().iter())
+                .for_each(|(h1, h2)| {
+                    assert_relative_eq!(h1, h2);
+                });
+        });
     }
 }

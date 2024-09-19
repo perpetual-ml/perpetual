@@ -3,6 +3,7 @@ use crate::splitter::{MissingInfo, NodeInfo, SplitInfo};
 use crate::utils::is_missing;
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
+use std::collections::HashSet;
 use std::fmt::{self, Debug};
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -29,8 +30,8 @@ pub struct SplittableNode {
     pub generalization: Option<f32>,
     pub node_type: NodeType,
     pub parent_node: usize,
-    pub left_categories: Option<Vec<u16>>,
-    pub right_categories: Option<Vec<u16>>,
+    pub left_cats: HashSet<usize>,
+    pub right_cats: HashSet<usize>,
 }
 
 #[derive(Deserialize, Serialize, Clone)]
@@ -49,8 +50,8 @@ pub struct Node {
     pub generalization: Option<f32>,
     pub node_type: NodeType,
     pub parent_node: usize,
-    pub left_categories: Option<Vec<u16>>,
-    pub right_categories: Option<Vec<u16>>,
+    pub left_cats: HashSet<usize>,
+    pub right_cats: HashSet<usize>,
 }
 
 impl Ord for SplittableNode {
@@ -85,15 +86,15 @@ impl Node {
         self.left_child = split_node.left_child;
         self.right_child = split_node.right_child;
         self.parent_node = split_node.parent_node;
-        self.left_categories = split_node.left_categories;
-        self.right_categories = split_node.right_categories;
+        self.left_cats = split_node.left_cats;
+        self.right_cats = split_node.right_cats;
     }
     /// Get the path that should be traveled down, given a value.
     pub fn get_child_idx(&self, v: &f64, missing: &f64) -> usize {
-        if self.left_categories.is_some() {
-            if self.left_categories.as_ref().unwrap().contains(&(*v as u16)) {
+        if !self.left_cats.is_empty() || !self.right_cats.is_empty() {
+            if self.left_cats.contains(&(*v as usize)) {
                 return self.left_child;
-            } else if self.right_categories.as_ref().unwrap().contains(&(*v as u16)) {
+            } else if self.right_cats.contains(&(*v as usize)) {
                 return self.right_child;
             } else {
                 return self.missing_node;
@@ -128,7 +129,7 @@ impl SplittableNode {
         depth: usize,
         start_idx: usize,
         stop_idx: usize,
-        node_info: NodeInfo,
+        node_info: &NodeInfo,
         generalization: Option<f32>,
         node_type: NodeType,
         parent_node: usize,
@@ -156,8 +157,8 @@ impl SplittableNode {
             generalization,
             node_type,
             parent_node,
-            left_categories: None,
-            right_categories: None,
+            left_cats: HashSet::new(),
+            right_cats: HashSet::new(),
         }
     }
 
@@ -177,8 +178,8 @@ impl SplittableNode {
         lower_bound: f32,
         upper_bound: f32,
         node_type: NodeType,
-        left_categories: Option<Vec<u16>>,
-        right_categories: Option<Vec<u16>>,
+        left_cats: HashSet<usize>,
+        right_cats: HashSet<usize>,
     ) -> Self {
         SplittableNode {
             num,
@@ -203,8 +204,8 @@ impl SplittableNode {
             generalization: None,
             node_type,
             parent_node: 0,
-            left_categories,
-            right_categories,
+            left_cats,
+            right_cats,
         }
     }
 
@@ -214,8 +215,6 @@ impl SplittableNode {
         left_child: usize,
         right_child: usize,
         split_info: &SplitInfo,
-        left_categories: Option<Vec<u16>>,
-        right_categories: Option<Vec<u16>>,
     ) {
         self.left_child = left_child;
         self.right_child = right_child;
@@ -224,8 +223,8 @@ impl SplittableNode {
         self.split_value = split_info.split_value;
         self.missing_node = missing_child;
         self.is_leaf = false;
-        self.left_categories = left_categories;
-        self.right_categories = right_categories;
+        self.left_cats = split_info.left_cats.clone();
+        self.right_cats = split_info.right_cats.clone();
     }
 
     pub fn get_split_gain(
@@ -257,8 +256,8 @@ impl SplittableNode {
             generalization: self.generalization,
             node_type: self.node_type,
             parent_node: self.parent_node,
-            left_categories: self.left_categories.clone(),
-            right_categories: self.right_categories.clone(),
+            left_cats: self.left_cats.clone(),
+            right_cats: self.right_cats.clone(),
         }
     }
 }

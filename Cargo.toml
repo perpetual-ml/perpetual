@@ -1,6 +1,6 @@
 [package]
 name = "perpetual"
-version = "0.3.8"
+version = "0.4.0"
 edition = "2021"
 authors = ["Mutlu Simsek <msimsek@perpetual-ml.com>"]
 homepage = "https://perpetual-ml.com"
@@ -22,11 +22,11 @@ codegen-units = 1
 [dependencies]
 rayon = "1.8"
 thiserror = "1.0"
-serde_json = { version = "1.0", features = ["float_roundtrip"] }
-serde = { version = "1.0", features = ["derive"] }
-rand = "0.8"
+serde_json = { version = "1.0.127", features = ["float_roundtrip"] }
+serde = { version = "1.0.209", features = ["derive"] }
+approx = "0.5"
 log = "0.4"
-hashbrown = { version = "0.14", features = ["serde", "rayon"] }
+rand = "0.8.5"
 
 [dev-dependencies]
 criterion = "0.5"

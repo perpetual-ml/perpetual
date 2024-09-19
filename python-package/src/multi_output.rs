@@ -24,7 +24,7 @@ impl MultiOutputBooster {
     #[pyo3(signature=(
         n_boosters,
         objective,
-        parallel,
+        num_threads,
         monotone_constraints,
         force_children_to_bound_parent,
         missing,
@@ -37,7 +37,7 @@ impl MultiOutputBooster {
     pub fn new(
         n_boosters: usize,
         objective: &str,
-        parallel: bool,
+        num_threads: Option<usize>,
         monotone_constraints: HashMap<usize, i8>,
         force_children_to_bound_parent: bool,
         missing: f64,
@@ -53,7 +53,7 @@ impl MultiOutputBooster {
 
         let booster = CrateMultiOutputBooster::default()
             .set_objective(objective_)
-            .set_parallel(parallel)
+            .set_num_threads(num_threads)
             .set_monotone_constraints(Some(monotone_constraints_))
             .set_force_children_to_bound_parent(force_children_to_bound_parent)
             .set_missing(missing)
@@ -79,8 +79,8 @@ impl MultiOutputBooster {
         Ok(())
     }
     #[setter]
-    fn set_parallel(&mut self, value: bool) -> PyResult<()> {
-        self.booster = self.booster.clone().set_parallel(value);
+    fn set_num_threads(&mut self, value: Option<usize>) -> PyResult<()> {
+        self.booster = self.booster.clone().set_num_threads(value);
         Ok(())
     }
     #[setter]
@@ -156,8 +156,9 @@ impl MultiOutputBooster {
         y: PyReadonlyArray1<f64>,
         budget: f32,
         sample_weight: Option<PyReadonlyArray1<f64>>,
+        alpha: Option<f32>,
         reset: Option<bool>,
-        categorical_features: Option<PyReadonlyArray1<u64>>,
+        categorical_features: Option<HashSet<usize>>,
     ) -> PyResult<()> {
         let flat_data = flat_data.as_slice()?;
         let data = Matrix::new(flat_data, rows, cols);
@@ -172,22 +173,15 @@ impl MultiOutputBooster {
             }
             None => None,
         };
-        let categorical_features_ = match categorical_features.as_ref() {
-            Some(x) => {
-                let x_slice = x.as_slice()?;
-                Some(x_slice)
-            }
-            None => None,
-        };
 
         match self.booster.fit(
             &data,
             &y_data,
             sample_weight_,
-            None,
+            alpha,
             budget,
             reset,
-            categorical_features_,
+            categorical_features,
         ) {
             Ok(m) => Ok(m),
             Err(e) => Err(PyValueError::new_err(e.to_string())),
@@ -294,7 +288,7 @@ impl MultiOutputBooster {
 
         let key_vals: Vec<(&str, PyObject)> = vec![
             ("objective", objective_.to_object(py)),
-            ("parallel", self.booster.parallel.to_object(py)),
+            ("num_threads", self.booster.num_threads.to_object(py)),
             ("allow_missing_splits", self.booster.allow_missing_splits.to_object(py)),
             ("monotone_constraints", monotone_constraints_.to_object(py)),
             ("missing", self.booster.missing.to_object(py)),
