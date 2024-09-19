@@ -61,7 +61,7 @@ pip install perpetual
 To use in a Rust project, add the following to your Cargo.toml file to get the package from [crates.io](https://crates.io/crates/perpetual).
 
 ```toml
-perpetual = "0.4.0"
+perpetual = "0.4.4"
 ```
 
 ## Paper
