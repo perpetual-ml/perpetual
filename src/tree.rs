@@ -1,16 +1,15 @@
 use crate::constants::N_NODES_ALLOCATED;
 use crate::data::Matrix;
 use crate::grower::Grower;
-use crate::histogram::{reorder_cat_bins, sort_cat_bins, update_histogram, HistogramMatrix};
+use crate::histogram::{update_histogram, NodeHistogram};
 use crate::node::{Node, NodeType, SplittableNode};
 use crate::partial_dependence::tree_partial_dependence;
-use crate::splitter::Splitter;
+use crate::splitter::{SplitInfoSlice, Splitter};
 use crate::utils::{fast_f64_sum, gain, gain_const_hess, odds, weight, weight_const_hess};
-use hashbrown::HashMap as BrownHashMap;
-use rayon::prelude::*;
+use rayon::{prelude::*, ThreadPool};
 use serde::{Deserialize, Serialize};
 use std::cmp::max;
-use std::collections::{BinaryHeap, HashMap};
+use std::collections::{BinaryHeap, HashMap, HashSet};
 use std::fmt::{self, Display};
 
 #[derive(Deserialize, Serialize, Clone, PartialEq)]
@@ -22,7 +21,7 @@ pub enum TreeStopper {
 
 #[derive(Deserialize, Serialize, Clone)]
 pub struct Tree {
-    pub nodes: BrownHashMap<usize, Node>,
+    pub nodes: HashMap<usize, Node>,
     pub stopper: TreeStopper,
     pub depth: usize,
     pub n_leaves: usize,
@@ -37,7 +36,7 @@ impl Default for Tree {
 impl Tree {
     pub fn new() -> Self {
         Tree {
-            nodes: BrownHashMap::new(),
+            nodes: HashMap::new(),
             stopper: TreeStopper::Overfitting,
             depth: 0,
             n_leaves: 0,
@@ -53,7 +52,7 @@ impl Tree {
         grad: &mut [f32],
         mut hess: Option<&mut [f32]>,
         splitter: &T,
-        parallel: bool,
+        pool: &ThreadPool,
         target_loss_decrement: Option<f32>,
         loss: &[f32],
         y: &[f64],
@@ -62,18 +61,14 @@ impl Tree {
         sample_weight: Option<&[f64]>,
         alpha: Option<f32>,
         is_const_hess: bool,
-        mut hist_tree: &mut BrownHashMap<usize, HistogramMatrix>,
-        cat_index: Option<&[u64]>,
+        mut hist_tree: &mut [NodeHistogram],
+        cat_index: Option<&HashSet<usize>>,
+        split_info_slice: &SplitInfoSlice,
     ) {
         let mut n_nodes = 1;
         self.n_leaves = 1;
 
-        if let Some(c_index) = cat_index {
-            let histograms = unsafe { hist_tree.get_many_unchecked_mut([&0, &1, &2]).unwrap() };
-            sort_cat_bins(histograms, c_index);
-        }
-
-        let root_hist = hist_tree.get_mut(&0).unwrap();
+        let root_hist = unsafe { hist_tree.get_unchecked_mut(0) };
         update_histogram(
             root_hist,
             0,
@@ -83,14 +78,9 @@ impl Tree {
             hess.as_deref(),
             &index,
             col_index,
-            parallel,
+            pool,
             false,
         );
-
-        if let Some(c_index) = cat_index {
-            let histograms = unsafe { hist_tree.get_many_unchecked_mut([&0, &1, &2]).unwrap() };
-            reorder_cat_bins(histograms, c_index, is_const_hess);
-        }
 
         let root_node = create_root_node(&index, grad, hess.as_deref());
         self.nodes.insert(root_node.num, root_node.as_node(splitter.get_eta()));
@@ -137,10 +127,11 @@ impl Tree {
                 data,
                 grad,
                 hess.as_deref_mut(),
-                parallel,
+                pool,
                 is_const_hess,
                 &mut hist_tree,
                 cat_index,
+                split_info_slice,
             );
 
             let n_new_nodes = new_nodes.len();
@@ -585,8 +576,8 @@ pub fn create_root_node(index: &[usize], grad: &[f32], hess: Option<&[f32]>) -> 
         f32::NEG_INFINITY,
         f32::INFINITY,
         NodeType::Root,
-        None,
-        None,
+        HashSet::new(),
+        HashSet::new(),
     )
 }
 
@@ -595,8 +586,9 @@ mod tests {
     use super::*;
     use crate::binning::bin_matrix;
     use crate::constraints::{Constraint, ConstraintMap};
+    use crate::histogram::NodeHistogramOwned;
     use crate::objective::{LogLoss, ObjectiveFunction, SquaredLoss};
-    use crate::splitter::MissingImputerSplitter;
+    use crate::splitter::{MissingImputerSplitter, SplitInfo};
     use crate::utils::precision_round;
     use polars::datatypes::DataType;
     use polars::io::csv::read::CsvReadOptions;
@@ -617,11 +609,7 @@ mod tests {
         let loss = LogLoss::calc_loss(&y, &yhat, None, None);
 
         let data = Matrix::new(&data_vec, 891, 5);
-        let splitter = MissingImputerSplitter {
-            eta: 0.3,
-            allow_missing_splits: true,
-            constraints_map: ConstraintMap::new(),
-        };
+        let splitter = MissingImputerSplitter::new(0.3, true, ConstraintMap::new());
         let mut tree = Tree::new();
 
         let b = bin_matrix(&data, None, 300, f64::NAN, None).unwrap();
@@ -629,11 +617,19 @@ mod tests {
         let col_index: Vec<usize> = (0..data.cols).collect();
         let is_const_hess = false;
 
-        let hist_node = HistogramMatrix::empty(&bdata, &b.cuts, &col_index, is_const_hess, false);
-        let mut hist_tree: BrownHashMap<usize, HistogramMatrix> = BrownHashMap::with_capacity(N_NODES_ALLOCATED);
-        for i in 0..N_NODES_ALLOCATED {
-            hist_tree.insert(i, hist_node.clone());
-        }
+        let mut hist_tree_owned: Vec<NodeHistogramOwned> = (0..N_NODES_ALLOCATED)
+            .map(|_| NodeHistogramOwned::empty(&b.cuts, &col_index, is_const_hess, true))
+            .collect();
+
+        let mut hist_tree: Vec<NodeHistogram> = hist_tree_owned
+            .iter_mut()
+            .map(|node_hist| NodeHistogram::from_owned(node_hist))
+            .collect();
+
+        let pool = rayon::ThreadPoolBuilder::new().num_threads(2).build().unwrap();
+
+        let mut split_info_vec: Vec<SplitInfo> = (0..col_index.len()).map(|_| SplitInfo::default()).collect();
+        let split_info_slice = SplitInfoSlice::new(&mut split_info_vec);
 
         tree.fit(
             &bdata,
@@ -642,7 +638,7 @@ mod tests {
             &mut g,
             h.as_deref_mut(),
             &splitter,
-            true,
+            &pool,
             Some(f32::MAX),
             &loss,
             &y,
@@ -653,11 +649,12 @@ mod tests {
             is_const_hess,
             &mut hist_tree,
             None,
+            &split_info_slice,
         );
 
-        // println!("{}", tree);
-        // let preds = tree.predict(&data, false);
-        // println!("{:?}", &preds[0..10]);
+        println!("{}", tree);
+        let preds = tree.predict(&data, false, &f64::NAN);
+        println!("{:?}", &preds[0..10]);
         assert_eq!(19, tree.nodes.len());
         // Test contributions prediction...
         let weights = tree.distribute_leaf_weights();
@@ -692,66 +689,7 @@ mod tests {
     }
 
     #[test]
-    fn test_tree_colsample() {
-        let file =
-            fs::read_to_string("resources/contiguous_no_missing.csv").expect("Something went wrong reading the file");
-        let data_vec: Vec<f64> = file.lines().map(|x| x.parse::<f64>().unwrap()).collect();
-        let file = fs::read_to_string("resources/performance.csv").expect("Something went wrong reading the file");
-        let y: Vec<f64> = file.lines().map(|x| x.parse::<f64>().unwrap()).collect();
-        let yhat = vec![0.5; y.len()];
-        let (mut g, mut h) = LogLoss::calc_grad_hess(&y, &yhat, None, None);
-        let loss = LogLoss::calc_loss(&y, &yhat, None, None);
-
-        let data = Matrix::new(&data_vec, 891, 5);
-        let splitter = MissingImputerSplitter {
-            eta: 0.3,
-            allow_missing_splits: true,
-            constraints_map: ConstraintMap::new(),
-        };
-        let mut tree = Tree::new();
-
-        let b = bin_matrix(&data, None, 300, f64::NAN, None).unwrap();
-        let bdata = Matrix::new(&b.binned_data, data.rows, data.cols);
-        let col_index: Vec<usize> = vec![1, 3];
-        let is_const_hess = false;
-
-        let c_index: Vec<usize> = (0..data.cols).collect();
-        let hist_node = HistogramMatrix::empty(&bdata, &b.cuts, &c_index, is_const_hess, false);
-        let mut hist_tree: BrownHashMap<usize, HistogramMatrix> = BrownHashMap::with_capacity(N_NODES_ALLOCATED);
-        for i in 0..N_NODES_ALLOCATED {
-            hist_tree.insert(i, hist_node.clone());
-        }
-
-        tree.fit(
-            &bdata,
-            data.index.to_owned(),
-            &col_index,
-            &mut g,
-            h.as_deref_mut(),
-            &splitter,
-            false,
-            Some(f32::MAX),
-            &loss,
-            &y,
-            LogLoss::calc_loss,
-            &yhat,
-            None,
-            None,
-            is_const_hess,
-            &mut hist_tree,
-            None,
-        );
-        for n in tree.nodes.values() {
-            if !n.is_leaf {
-                assert!((n.split_feature == 1) || (n.split_feature == 3))
-            }
-        }
-    }
-
-    #[test]
     fn test_tree_fit_monotone() {
-        let parallel = true;
-
         let file =
             fs::read_to_string("resources/contiguous_no_missing.csv").expect("Something went wrong reading the file");
         let data_vec: Vec<f64> = file.lines().map(|x| x.parse::<f64>().unwrap()).collect();
@@ -765,11 +703,7 @@ mod tests {
         let data_ = Matrix::new(&data_vec, 891, 5);
         let data = Matrix::new(data_.get_col(1), 891, 1);
         let map = ConstraintMap::from([(0, Constraint::Negative)]);
-        let splitter = MissingImputerSplitter {
-            eta: 0.3,
-            allow_missing_splits: true,
-            constraints_map: map,
-        };
+        let splitter = MissingImputerSplitter::new(0.3, true, map);
         let mut tree = Tree::new();
 
         let b = bin_matrix(&data, None, 100, f64::NAN, None).unwrap();
@@ -777,11 +711,19 @@ mod tests {
         let col_index: Vec<usize> = (0..data.cols).collect();
         let is_const_hess = false;
 
-        let hist_node = HistogramMatrix::empty(&bdata, &b.cuts, &col_index, is_const_hess, false);
-        let mut hist_tree: BrownHashMap<usize, HistogramMatrix> = BrownHashMap::with_capacity(N_NODES_ALLOCATED);
-        for i in 0..N_NODES_ALLOCATED {
-            hist_tree.insert(i, hist_node.clone());
-        }
+        let mut hist_tree_owned: Vec<NodeHistogramOwned> = (0..N_NODES_ALLOCATED)
+            .map(|_| NodeHistogramOwned::empty(&b.cuts, &col_index, is_const_hess, true))
+            .collect();
+
+        let mut hist_tree: Vec<NodeHistogram> = hist_tree_owned
+            .iter_mut()
+            .map(|node_hist| NodeHistogram::from_owned(node_hist))
+            .collect();
+
+        let pool = rayon::ThreadPoolBuilder::new().num_threads(2).build().unwrap();
+
+        let mut split_info_vec: Vec<SplitInfo> = (0..col_index.len()).map(|_| SplitInfo::default()).collect();
+        let split_info_slice = SplitInfoSlice::new(&mut split_info_vec);
 
         tree.fit(
             &bdata,
@@ -790,7 +732,7 @@ mod tests {
             &mut g,
             h.as_deref_mut(),
             &splitter,
-            parallel,
+            &pool,
             Some(f32::MAX),
             &loss,
             &y,
@@ -801,6 +743,7 @@ mod tests {
             is_const_hess,
             &mut hist_tree,
             None,
+            &split_info_slice,
         );
 
         let mut pred_data_vec = data.get_col(0).to_owned();
@@ -849,11 +792,7 @@ mod tests {
         let loss = LogLoss::calc_loss(&y, &yhat, None, None);
 
         let data = Matrix::new(&data_vec, 891, 5);
-        let splitter = MissingImputerSplitter {
-            eta: 0.3,
-            allow_missing_splits: false,
-            constraints_map: ConstraintMap::new(),
-        };
+        let splitter = MissingImputerSplitter::new(0.3, true, ConstraintMap::new());
         let mut tree = Tree::new();
 
         let b = bin_matrix(&data, None, 300, f64::NAN, None).unwrap();
@@ -861,11 +800,19 @@ mod tests {
         let col_index: Vec<usize> = (0..data.cols).collect();
         let is_const_hess = false;
 
-        let hist_node = HistogramMatrix::empty(&bdata, &b.cuts, &col_index, is_const_hess, false);
-        let mut hist_tree: BrownHashMap<usize, HistogramMatrix> = BrownHashMap::with_capacity(N_NODES_ALLOCATED);
-        for i in 0..N_NODES_ALLOCATED {
-            hist_tree.insert(i, hist_node.clone());
-        }
+        let mut hist_tree_owned: Vec<NodeHistogramOwned> = (0..N_NODES_ALLOCATED)
+            .map(|_| NodeHistogramOwned::empty(&b.cuts, &col_index, is_const_hess, true))
+            .collect();
+
+        let mut hist_tree: Vec<NodeHistogram> = hist_tree_owned
+            .iter_mut()
+            .map(|node_hist| NodeHistogram::from_owned(node_hist))
+            .collect();
+
+        let pool = rayon::ThreadPoolBuilder::new().num_threads(2).build().unwrap();
+
+        let mut split_info_vec: Vec<SplitInfo> = (0..col_index.len()).map(|_| SplitInfo::default()).collect();
+        let split_info_slice = SplitInfoSlice::new(&mut split_info_vec);
 
         tree.fit(
             &bdata,
@@ -874,7 +821,7 @@ mod tests {
             &mut g,
             h.as_deref_mut(),
             &splitter,
-            true,
+            &pool,
             Some(f32::MAX),
             &loss,
             &y,
@@ -885,6 +832,7 @@ mod tests {
             is_const_hess,
             &mut hist_tree,
             None,
+            &split_info_slice,
         );
 
         println!("{}", tree);
@@ -983,11 +931,7 @@ mod tests {
         let (mut g, mut h) = SquaredLoss::calc_grad_hess(&y_test, &yhat, None, None);
         let loss = SquaredLoss::calc_loss(&y_test, &yhat, None, None);
 
-        let splitter = MissingImputerSplitter {
-            eta: 0.1,
-            allow_missing_splits: false,
-            constraints_map: ConstraintMap::new(),
-        };
+        let splitter = MissingImputerSplitter::new(0.3, true, ConstraintMap::new());
 
         let data = Matrix::new(&data_test, y_test.len(), n_cols);
         let b = bin_matrix(&data, None, n_bins, f64::NAN, None).unwrap();
@@ -995,11 +939,19 @@ mod tests {
         let col_index: Vec<usize> = (0..data.cols).collect();
         let is_const_hess = true;
 
-        let hist_node = HistogramMatrix::empty(&bdata, &b.cuts, &col_index, is_const_hess, false);
-        let mut hist_tree: BrownHashMap<usize, HistogramMatrix> = BrownHashMap::with_capacity(N_NODES_ALLOCATED);
-        for i in 0..N_NODES_ALLOCATED {
-            hist_tree.insert(i, hist_node.clone());
-        }
+        let mut hist_tree_owned: Vec<NodeHistogramOwned> = (0..N_NODES_ALLOCATED)
+            .map(|_| NodeHistogramOwned::empty(&b.cuts, &col_index, is_const_hess, true))
+            .collect();
+
+        let mut hist_tree: Vec<NodeHistogram> = hist_tree_owned
+            .iter_mut()
+            .map(|node_hist| NodeHistogram::from_owned(node_hist))
+            .collect();
+
+        let pool = rayon::ThreadPoolBuilder::new().num_threads(2).build().unwrap();
+
+        let mut split_info_vec: Vec<SplitInfo> = (0..col_index.len()).map(|_| SplitInfo::default()).collect();
+        let split_info_slice = SplitInfoSlice::new(&mut split_info_vec);
 
         let mut tree = Tree::new();
         tree.fit(
@@ -1009,7 +961,7 @@ mod tests {
             &mut g,
             h.as_deref_mut(),
             &splitter,
-            true,
+            &pool,
             Some(f32::MAX),
             &loss,
             &y_test,
@@ -1020,8 +972,9 @@ mod tests {
             is_const_hess,
             &mut hist_tree,
             None,
+            &split_info_slice,
         );
-        // println!("{}", tree);
+        println!("{}", tree);
         println!("tree.nodes.len: {}", tree.nodes.len());
         println!("data.first: {:?}", data.get_row(10));
         println!("tree.predict: {}", tree.predict(&data, true, &0.0)[10]);
@@ -1047,24 +1000,28 @@ mod tests {
         let (mut grad, mut hess) = LogLoss::calc_grad_hess(&y, &yhat, None, None);
         let loss = LogLoss::calc_loss(&y, &yhat, None, None);
 
-        let splitter = MissingImputerSplitter {
-            eta: 0.3,
-            allow_missing_splits: false,
-            constraints_map: ConstraintMap::new(),
-        };
+        let splitter = MissingImputerSplitter::new(0.3, true, ConstraintMap::new());
 
-        let cat_index = vec![1, 3, 5, 6, 7, 8, 13];
+        let cat_index = HashSet::from([1, 3, 5, 6, 7, 8, 13]);
 
         let b = bin_matrix(&data, None, n_bins, f64::NAN, Some(&cat_index)).unwrap();
         let bdata = Matrix::new(&b.binned_data, data.rows, data.cols);
         let col_index: Vec<usize> = (0..data.cols).collect();
+        let is_const_hess = false;
 
-        let hist_node = HistogramMatrix::empty(&bdata, &b.cuts, &col_index, false, false);
+        let mut hist_tree_owned: Vec<NodeHistogramOwned> = (0..N_NODES_ALLOCATED)
+            .map(|_| NodeHistogramOwned::empty(&b.cuts, &col_index, is_const_hess, true))
+            .collect();
 
-        let mut hist_tree: BrownHashMap<usize, HistogramMatrix> = BrownHashMap::with_capacity(N_NODES_ALLOCATED);
-        for i in 0..N_NODES_ALLOCATED {
-            hist_tree.insert(i, hist_node.clone());
-        }
+        let mut hist_tree: Vec<NodeHistogram> = hist_tree_owned
+            .iter_mut()
+            .map(|node_hist| NodeHistogram::from_owned(node_hist))
+            .collect();
+
+        let pool = rayon::ThreadPoolBuilder::new().num_threads(2).build().unwrap();
+
+        let mut split_info_vec: Vec<SplitInfo> = (0..col_index.len()).map(|_| SplitInfo::default()).collect();
+        let split_info_slice = SplitInfoSlice::new(&mut split_info_vec);
 
         let mut tree = Tree::new();
         tree.fit(
@@ -1074,7 +1031,7 @@ mod tests {
             &mut grad,
             hess.as_deref_mut(),
             &splitter,
-            true,
+            &pool,
             Some(f32::MAX),
             &loss,
             &y,
@@ -1085,13 +1042,14 @@ mod tests {
             false,
             &mut hist_tree,
             Some(&cat_index),
+            &split_info_slice,
         );
         println!("{}", tree);
         println!("tree.nodes.len: {}", tree.nodes.len());
         println!("data.first: {:?}", data.get_row(10));
         println!("tree.predict: {}", tree.predict(&data, true, &f64::NAN)[10]);
         println!("hist_tree[0]:");
-        for (i, item) in hist_tree[&156].0.get_col(3).iter().enumerate() {
+        for (i, item) in hist_tree[156].data.get(3).iter().enumerate() {
             println!("The {}th item is {:?}", i, item);
         }
 

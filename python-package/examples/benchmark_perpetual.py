@@ -24,9 +24,9 @@ def prepare_data(cal_housing, seed):
 
 
 if __name__ == "__main__":
-    budget = 1.1
-    parallel = False
-    cal_housing = False  # True -> California Housing, False -> Cover Types
+    budget = 1.0
+    num_threads = 2
+    cal_housing = True  # True -> California Housing, False -> Cover Types
     cpu_times = []
     wall_times = []
     metrics = []
@@ -36,7 +36,9 @@ if __name__ == "__main__":
             prepare_data(cal_housing, seed)
         )
 
-        model = PerpetualBooster(objective=objective, parallel=parallel)
+        model = PerpetualBooster(
+            objective=objective, num_threads=num_threads, log_iterations=0
+        )
 
         start = process_time()
         tick = time()

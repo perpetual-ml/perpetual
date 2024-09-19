@@ -1,8 +1,12 @@
+#![feature(get_many_mut)]
+#![feature(array_ptr_get)]
+
 mod node;
 mod partial_dependence;
 mod shapley;
 
 // Modules
+pub mod bin;
 pub mod binning;
 pub mod booster;
 pub mod constants;

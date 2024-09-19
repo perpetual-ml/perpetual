@@ -23,8 +23,8 @@ pub struct MultiOutputBooster {
     /// accuracy. If there are more bins, than unique values in a column, all unique values
     /// will be used.
     pub max_bin: u16,
-    /// Whether to use parallelism during training.
-    pub parallel: bool,
+    /// Number of threads to be used during training.
+    pub num_threads: Option<usize>,
     /// Constraints that are used to enforce a specific relationship
     /// between the training features and the target variable.
     pub monotone_constraints: Option<ConstraintMap>,
@@ -84,7 +84,7 @@ impl Default for MultiOutputBooster {
             Objective::LogLoss,
             f64::NAN,
             256,
-            true,
+            None,
             None,
             false,
             f64::NAN,
@@ -109,7 +109,7 @@ impl MultiOutputBooster {
     ///     a smaller number, will result in faster training time, while potentially sacrificing
     ///     accuracy. If there are more bins, than unique values in a column, all unique values
     ///     will be used.
-    /// * `parallel` - Whether to run the algorithm in parallel
+    /// * `num_threads` - Number of threads to be used during training
     /// * `monotone_constraints` - Constraints that are used to enforce a specific relationship
     ///     between the training features and the target variable.
     /// * `force_children_to_bound_parent` - force_children_to_bound_parent.
@@ -126,7 +126,7 @@ impl MultiOutputBooster {
         objective: Objective,
         base_score: f64,
         max_bin: u16,
-        parallel: bool,
+        num_threads: Option<usize>,
         monotone_constraints: Option<ConstraintMap>,
         force_children_to_bound_parent: bool,
         missing: f64,
@@ -145,7 +145,7 @@ impl MultiOutputBooster {
             objective,
             base_score,
             max_bin,
-            parallel,
+            num_threads,
             monotone_constraints,
             force_children_to_bound_parent,
             missing,
@@ -162,7 +162,7 @@ impl MultiOutputBooster {
             .set_objective(booster_objective)
             .set_base_score(base_score)
             .set_max_bin(max_bin)
-            .set_parallel(parallel)
+            .set_num_threads(num_threads)
             .set_monotone_constraints(booster_monotone_constraints)
             .set_force_children_to_bound_parent(force_children_to_bound_parent)
             .set_missing(missing)
@@ -193,7 +193,7 @@ impl MultiOutputBooster {
         quantile: Option<f32>,
         budget: f32,
         reset: Option<bool>,
-        categorical_features: Option<&[u64]>,
+        categorical_features: Option<HashSet<usize>>,
     ) -> Result<(), PerpetualError> {
         for i in 0..self.n_boosters {
             let _ = self.boosters[i].fit(
@@ -203,7 +203,7 @@ impl MultiOutputBooster {
                 quantile,
                 budget,
                 reset,
-                categorical_features,
+                categorical_features.clone(),
             );
         }
         Ok(())
@@ -327,10 +327,14 @@ impl MultiOutputBooster {
         self
     }
 
-    /// Set the parallel on the booster.
-    /// * `parallel` - Set if the booster should be trained in parallel.
-    pub fn set_parallel(mut self, parallel: bool) -> Self {
-        self.boosters = self.boosters.iter().map(|b| b.clone().set_parallel(parallel)).collect();
+    /// Set the number of threads on the booster.
+    /// * `num_threads` - Set the number of threads to be used during training.
+    pub fn set_num_threads(mut self, num_threads: Option<usize>) -> Self {
+        self.boosters = self
+            .boosters
+            .iter()
+            .map(|b| b.clone().set_num_threads(num_threads))
+            .collect();
         self
     }
 
@@ -457,9 +461,7 @@ mod tests {
         let n_classes = 7;
         let n_columns = 54;
         let n_rows = 1000;
-        let parallel = true;
         let max_bin = 10;
-        let base_score = 0.5;
 
         let mut features: Vec<&str> = [
             "Elevation",
@@ -540,8 +542,6 @@ mod tests {
         let mut booster = MultiOutputBooster::default()
             .set_objective(Objective::LogLoss)
             .set_max_bin(max_bin)
-            .set_parallel(parallel)
-            .set_base_score(base_score)
             .set_n_boosters(n_classes);
 
         println!("The number of boosters: {:?}", booster.get_boosters().len());

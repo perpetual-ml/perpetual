@@ -46,7 +46,7 @@ def test_booster_no_variance(X_y):
 
 def test_sklearn_clone(X_y):
     X, y = X_y
-    model = PerpetualBooster(objective="LogLoss")
+    model = PerpetualBooster(objective="LogLoss", num_threads=1)
     model_cloned = clone(model)
     model_cloned.fit(X, y)
 
@@ -68,7 +68,7 @@ def test_sklearn_clone(X_y):
 
 def test_multiple_fit_calls(X_y):
     X, y = X_y
-    model = PerpetualBooster(objective="LogLoss")
+    model = PerpetualBooster(objective="LogLoss", num_threads=1)
     model.fit(X, y)
     preds = model.predict_log_proba(X)
 
@@ -80,7 +80,7 @@ def test_multiple_fit_calls(X_y):
 
 def test_different_data_passed(X_y):
     X, y = X_y
-    model = PerpetualBooster(objective="LogLoss")
+    model = PerpetualBooster(objective="LogLoss", num_threads=1)
     model.fit(X, y)
     model.predict_log_proba(X)
     with pytest.raises(ValueError, match="Columns mismatch"):
@@ -107,7 +107,7 @@ def test_booster_from_numpy(X_y):
     model3_preds = model3.predict_log_proba(X)
 
     assert np.allclose(model1_preds, model2_preds)
-    assert np.allclose(model2_preds, model3_preds, atol=0.001)
+    assert np.allclose(model2_preds, model3_preds)
 
 
 def test_get_node_list(X_y):
@@ -168,18 +168,15 @@ def test_feature_importance_method_init(
 def test_booster_with_new_missing(X_y):
     X, y = X_y
     X = X
-    model1 = PerpetualBooster(objective="LogLoss")
+    model1 = PerpetualBooster(objective="LogLoss", num_threads=1)
     model1.fit(X, y=y)
     preds1 = model1.predict_log_proba(X)
 
     Xm = X.copy().fillna(-9999)
-    model2 = PerpetualBooster(
-        objective="LogLoss",
-        missing=-9999,
-    )
+    model2 = PerpetualBooster(objective="LogLoss", missing=-9999, num_threads=1)
     model2.fit(Xm, y)
     preds2 = model2.predict_log_proba(Xm)
-    assert np.allclose(preds1, preds2, atol=0.00001)
+    assert np.allclose(preds1, preds2)
 
 
 def pickle_booster(model: PerpetualBooster, path: str) -> None:
@@ -228,12 +225,12 @@ def test_monotone_constraints(X_y):
 
 def test_partial_dependence_errors(X_y):
     X, y = X_y
-    model = PerpetualBooster()
+    model = PerpetualBooster(num_threads=1)
     model.fit(X, y)
     with pytest.raises(ValueError, match="If `feature` is a string, then"):
         model.partial_dependence(X.to_numpy(), "pclass")
 
-    model = PerpetualBooster()
+    model = PerpetualBooster(num_threads=1)
     model.fit(X.to_numpy(), y)
     with pytest.warns(
         expected_warning=UserWarning, match="No feature names were provided at fit"
@@ -241,11 +238,11 @@ def test_partial_dependence_errors(X_y):
         res = model.partial_dependence(X, "pclass")
 
     # This is the same as if we used a dataframe at fit.
-    model = PerpetualBooster()
+    model = PerpetualBooster(num_threads=1)
     model.fit(X, y)
     assert np.allclose(model.partial_dependence(X, "pclass"), res)
 
-    model = PerpetualBooster()
+    model = PerpetualBooster(num_threads=1)
     model.fit(X, y)
     pclass_n = next(i for i, ft in enumerate(X.columns) if ft == "pclass")
     assert np.allclose(
@@ -281,7 +278,7 @@ def test_booster_contributions_missing_branch_methods(X_y):
         allow_missing_splits=True,
         missing_node_treatment="AssignToParent",
     )
-    model.fit(X, y=y)
+    model.fit(X, y)
     preds = model.predict_log_proba(X)
     contribs_average = model.predict_contributions(X)
     preds[~np.isclose(contribs_average.sum(1), preds, rtol=5)]
@@ -541,7 +538,6 @@ def test_AverageNodeWeight_missing_node_treatment(X_y):
     X = X.mask(missing_mask < 0.3)
     model = PerpetualBooster(
         objective="LogLoss",
-        parallel=True,
         allow_missing_splits=True,
         create_missing_branch=True,
         terminate_missing_features=["pclass", "fare"],
@@ -574,7 +570,6 @@ def test_AverageNodeWeight_missing_node_treatment(X_y):
 
     model = PerpetualBooster(
         objective="SquaredLoss",
-        parallel=True,
         allow_missing_splits=True,
         create_missing_branch=True,
         # terminate_missing_features=["pclass"]
@@ -588,20 +583,19 @@ def test_AverageNodeWeight_missing_node_treatment(X_y):
 
 def test_get_params(X_y):
     X, y = X_y
-    p = False
-    model = PerpetualBooster(parallel=p)
-    assert model.get_params()["parallel"] == p
+    nt = 2
+    model = PerpetualBooster(num_threads=nt)
+    assert model.get_params()["num_threads"] == nt
     model.fit(X, y)
-    assert model.get_params()["parallel"] == p
+    assert model.get_params()["num_threads"] == nt
 
 
 def test_set_params(X_y):
     X, y = X_y
-    p = False
-    model = PerpetualBooster(parallel=p)
-    assert model.get_params()["parallel"] == p
-    assert model.set_params(parallel=not p)
-    assert model.get_params()["parallel"] != p
+    model = PerpetualBooster(num_threads=2)
+    assert model.get_params()["num_threads"] == 2
+    assert model.set_params(num_threads=1)
+    assert model.get_params()["num_threads"] == 1
     model.fit(X, y)
 
 

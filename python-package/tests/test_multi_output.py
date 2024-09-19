@@ -9,7 +9,7 @@ def test_multi_output():
     y = np.array(X.pop("Cover_Type"))
     X_test = pd.read_csv("../resources/cover_types_test.csv", index_col=False)
     y_test = np.array(X_test.pop("Cover_Type"))
-    model = PerpetualBooster()
+    model = PerpetualBooster(num_threads=1)
     model.fit(X, y)
     pred_test = model.predict(X_test)
     proba_test = model.predict_proba(X_test)

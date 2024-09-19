@@ -3,14 +3,13 @@ use crate::constants::{GENERALIZATION_THRESHOLD, ITERATION_LIMIT, N_NODES_ALLOCA
 use crate::constraints::ConstraintMap;
 use crate::data::Matrix;
 use crate::errors::PerpetualError;
-use crate::histogram::HistogramMatrix;
+use crate::histogram::{NodeHistogram, NodeHistogramOwned};
 use crate::objective::{calc_init_callables, gradient_hessian_callables, loss_callables, Objective};
 use crate::shapley::predict_contributions_row_shapley;
-use crate::splitter::{MissingBranchSplitter, MissingImputerSplitter, Splitter};
+use crate::splitter::{MissingBranchSplitter, MissingImputerSplitter, SplitInfo, SplitInfoSlice, Splitter};
 use crate::tree::{Tree, TreeStopper};
 use crate::utils::odds;
 use core::{f32, f64};
-use hashbrown::HashMap as BrownHashMap;
 use log::{info, warn};
 use rayon::prelude::*;
 use serde::{Deserialize, Deserializer, Serialize};
@@ -78,8 +77,8 @@ pub struct PerpetualBooster {
     /// accuracy. If there are more bins, than unique values in a column, all unique values
     /// will be used.
     pub max_bin: u16,
-    /// Whether to use parallelism during training.
-    pub parallel: bool,
+    /// Number of threads to use during training.
+    pub num_threads: Option<usize>,
     /// Constraints that are used to enforce a specific relationship
     /// between the training features and the target variable.
     pub monotone_constraints: Option<ConstraintMap>,
@@ -142,7 +141,7 @@ impl Default for PerpetualBooster {
             Objective::LogLoss,
             f64::NAN,
             256,
-            true,
+            None,
             None,
             false,
             f64::NAN,
@@ -168,7 +167,7 @@ impl PerpetualBooster {
     ///     a smaller number, will result in faster training time, while potentially sacrificing
     ///     accuracy. If there are more bins, than unique values in a column, all unique values
     ///     will be used.
-    /// * `parallel` - Whether to run the algorithm in parallel
+    /// * `num_threads` - Number of threads to use during training
     /// * `monotone_constraints` - Constraints that are used to enforce a specific relationship
     ///     between the training features and the target variable.
     /// * `force_children_to_bound_parent` - force_children_to_bound_parent.
@@ -187,7 +186,7 @@ impl PerpetualBooster {
         objective: Objective,
         base_score: f64,
         max_bin: u16,
-        parallel: bool,
+        num_threads: Option<usize>,
         monotone_constraints: Option<ConstraintMap>,
         force_children_to_bound_parent: bool,
         missing: f64,
@@ -202,7 +201,7 @@ impl PerpetualBooster {
             objective,
             base_score,
             max_bin,
-            parallel,
+            num_threads,
             monotone_constraints,
             force_children_to_bound_parent,
             missing,
@@ -232,15 +231,19 @@ impl PerpetualBooster {
     /// * `data` -  Either a Polars or Pandas DataFrame, or a 2 dimensional Numpy array.
     /// * `y` - Either a Polars or Pandas Series, or a 1 dimensional Numpy array.
     /// * `sample_weight` - Instance weights to use when training the model.
+    /// * `alpha` - used only in quantile regression.
+    /// * `budget` - budget to fit the model.
+    /// * `reset` - Reset the model or continue training.
+    /// * `categorical_features` - categorical features.
     pub fn fit(
         &mut self,
         data: &Matrix<f64>,
         y: &[f64],
         sample_weight: Option<&[f64]>,
-        quantile: Option<f32>,
+        alpha: Option<f32>,
         budget: f32,
         reset: Option<bool>,
-        categorical_features: Option<&[u64]>,
+        categorical_features: Option<HashSet<usize>>,
     ) -> Result<(), PerpetualError> {
         let constraints_map = self
             .monotone_constraints
@@ -251,36 +254,32 @@ impl PerpetualBooster {
         self.set_budget(budget);
 
         if self.create_missing_branch {
-            let splitter = MissingBranchSplitter {
-                eta: self.eta,
-                allow_missing_splits: self.allow_missing_splits,
+            let splitter = MissingBranchSplitter::new(
+                self.eta,
+                self.allow_missing_splits,
                 constraints_map,
-                terminate_missing_features: self.terminate_missing_features.clone(),
-                missing_node_treatment: self.missing_node_treatment,
-                force_children_to_bound_parent: self.force_children_to_bound_parent,
-            };
+                self.terminate_missing_features.clone(),
+                self.missing_node_treatment,
+                self.force_children_to_bound_parent,
+            );
             self.fit_trees(
                 y,
                 sample_weight,
                 data,
                 &splitter,
-                quantile,
+                alpha,
                 budget,
                 reset,
                 categorical_features,
             )?;
         } else {
-            let splitter = MissingImputerSplitter {
-                eta: self.eta,
-                allow_missing_splits: self.allow_missing_splits,
-                constraints_map,
-            };
+            let splitter = MissingImputerSplitter::new(self.eta, self.allow_missing_splits, constraints_map);
             self.fit_trees(
                 y,
                 sample_weight,
                 data,
                 &splitter,
-                quantile,
+                alpha,
                 budget,
                 reset,
                 categorical_features,
@@ -299,8 +298,18 @@ impl PerpetualBooster {
         alpha: Option<f32>,
         budget: f32,
         reset: Option<bool>,
-        categorical_features: Option<&[u64]>,
+        categorical_features: Option<HashSet<usize>>,
     ) -> Result<(), PerpetualError> {
+        let n_threads_available = std::thread::available_parallelism().unwrap().get();
+        let num_threads = match self.num_threads {
+            Some(num_threads) => num_threads,
+            None => n_threads_available,
+        };
+        let pool = rayon::ThreadPoolBuilder::new()
+            .num_threads(num_threads)
+            .build()
+            .unwrap();
+
         let calc_loss = loss_callables(&self.objective);
 
         // If reset, reset the trees. Otherwise continue training.
@@ -312,7 +321,7 @@ impl PerpetualBooster {
             }
             yhat = vec![self.base_score; y.len()];
         } else {
-            yhat = self.predict(data, self.parallel);
+            yhat = self.predict(data, true);
         }
 
         let calc_grad_hess = gradient_hessian_callables(&self.objective);
@@ -342,18 +351,30 @@ impl PerpetualBooster {
         //
         // In scikit-learn, they sample 200_000 records for generating the bins.
         // we could consider that, especially if this proved to be a large bottleneck...
-        let binned_data = bin_matrix(data, sample_weight, self.max_bin, self.missing, categorical_features)?;
+        let binned_data = bin_matrix(
+            data,
+            sample_weight,
+            self.max_bin,
+            self.missing,
+            categorical_features.as_ref(),
+        )?;
         let bdata = Matrix::new(&binned_data.binned_data, data.rows, data.cols);
 
         let col_index: Vec<usize> = (0..data.cols).collect();
-        let mut es = 0 as usize;
+        let mut stopping = 0 as usize;
         let mut n_low_loss_rounds = 0;
 
-        let hist_node = HistogramMatrix::empty(&bdata, &binned_data.cuts, &col_index, is_const_hess, self.parallel);
-        let mut hist_tree: BrownHashMap<usize, HistogramMatrix> = BrownHashMap::with_capacity(N_NODES_ALLOCATED);
-        for i in 0..N_NODES_ALLOCATED {
-            hist_tree.insert(i, hist_node.clone());
-        }
+        let mut hist_tree_owned: Vec<NodeHistogramOwned> = (0..N_NODES_ALLOCATED)
+            .map(|_| NodeHistogramOwned::empty(&binned_data.cuts, &col_index, is_const_hess, false))
+            .collect();
+
+        let mut hist_tree: Vec<NodeHistogram> = hist_tree_owned
+            .iter_mut()
+            .map(|node_hist| NodeHistogram::from_owned(node_hist))
+            .collect();
+
+        let mut split_info_vec: Vec<SplitInfo> = (0..col_index.len()).map(|_| SplitInfo::default()).collect();
+        let split_info_slice = SplitInfoSlice::new(&mut split_info_vec);
 
         for i in 0..ITERATION_LIMIT {
             let verbose = if self.log_iterations == 0 {
@@ -361,6 +382,7 @@ impl PerpetualBooster {
             } else {
                 i % self.log_iterations == 0
             };
+
             let tld = if n_low_loss_rounds > (STOPPING_ROUNDS + 1) {
                 None
             } else {
@@ -375,7 +397,7 @@ impl PerpetualBooster {
                 &mut grad,
                 hess.as_deref_mut(),
                 splitter,
-                self.parallel,
+                &pool,
                 tld,
                 &loss,
                 y,
@@ -385,27 +407,34 @@ impl PerpetualBooster {
                 alpha,
                 is_const_hess,
                 &mut hist_tree,
-                categorical_features,
+                categorical_features.as_ref(),
+                &split_info_slice,
             );
 
             self.update_predictions_inplace(&mut yhat, &tree, data);
 
-            if tree.nodes.len() < 5
-                && tree.nodes.values().last().unwrap().generalization < Some(GENERALIZATION_THRESHOLD)
-            {
-                es += 1;
-                if verbose {
-                    println!(
-                        "round {0}, tree.nodes: {1}, tree.depth: {2}, early stopping: {3}",
-                        i,
-                        tree.nodes.len(),
-                        tree.depth,
-                        es
-                    );
-                }
-                // If root node cannot be split due to no positive split gain, stop boosting.
-                if tree.nodes.len() == 1 {
-                    break;
+            if tree.nodes.len() < 5 {
+                let generalization = tree
+                    .nodes
+                    .values()
+                    .map(|n| n.generalization.unwrap_or(0.0))
+                    .max_by(|a, b| a.total_cmp(b))
+                    .unwrap_or(0.0);
+                if generalization < GENERALIZATION_THRESHOLD {
+                    stopping += 1;
+                    if verbose {
+                        println!(
+                            "round {0}, tree.nodes: {1}, tree.depth: {2}, stopping: {3}",
+                            i,
+                            tree.nodes.len(),
+                            tree.depth,
+                            stopping,
+                        );
+                    }
+                    // If root node cannot be split due to no positive split gain, stop boosting.
+                    if tree.nodes.len() == 1 {
+                        break;
+                    }
                 }
             } else {
                 if verbose {
@@ -426,7 +455,7 @@ impl PerpetualBooster {
 
             self.trees.push(tree);
 
-            if es >= STOPPING_ROUNDS {
+            if stopping >= STOPPING_ROUNDS {
                 break;
             }
 
@@ -434,18 +463,19 @@ impl PerpetualBooster {
             loss = calc_loss(y, &yhat, sample_weight, alpha);
 
             if i == ITERATION_LIMIT - 1 {
-                warn!("Reached iteration limit before early stopping. Try to decrease the budget for the best performance.");
+                warn!("Reached iteration limit before auto stopping. Try to decrease the budget for the best performance.");
             }
         }
 
         if self.log_iterations > 0 {
             info!("Finished training booster with {} trees.", self.trees.len());
         }
+
         Ok(())
     }
 
     fn update_predictions_inplace(&self, yhat: &mut [f64], tree: &Tree, data: &Matrix<f64>) {
-        let preds = tree.predict(data, self.parallel, &self.missing);
+        let preds = tree.predict(data, true, &self.missing);
         yhat.iter_mut().zip(preds).for_each(|(i, j)| *i += j);
     }
 
@@ -660,7 +690,7 @@ impl PerpetualBooster {
     /// * `feature` - The index of the feature.
     /// * `value` - The value for which to calculate the partial dependence.
     pub fn value_partial_dependence(&self, feature: usize, value: f64) -> f64 {
-        let pd: f64 = if self.parallel {
+        let pd: f64 = if true {
             self.get_prediction_trees()
                 .par_iter()
                 .map(|t| t.value_partial_dependence(feature, value, &self.missing))
@@ -777,10 +807,10 @@ impl PerpetualBooster {
         self
     }
 
-    /// Set the parallel on the booster.
-    /// * `parallel` - Set if the booster should be trained in parallel.
-    pub fn set_parallel(mut self, parallel: bool) -> Self {
-        self.parallel = parallel;
+    /// Set the number of threads on the booster.
+    /// * `num_threads` - Set the number of threads to be used during training.
+    pub fn set_num_threads(mut self, num_threads: Option<usize>) -> Self {
+        self.num_threads = num_threads;
         self
     }
 
@@ -860,9 +890,14 @@ impl PerpetualBooster {
 
 #[cfg(test)]
 mod tests {
+    use approx::assert_relative_eq;
+    use polars::io::SerReader;
+    use polars::prelude::{CsvReadOptions, DataType};
+
     use super::*;
     use std::error::Error;
     use std::fs;
+    use std::sync::Arc;
 
     #[test]
     fn test_booster_fit_subsample() {
@@ -897,29 +932,6 @@ mod tests {
         let mut booster = PerpetualBooster::default();
 
         booster.fit(&data, &y, None, None, 0.3, None, None).unwrap();
-        let preds = booster.predict(&data, false);
-        let contribs = booster.predict_contributions(&data, ContributionsMethod::Average, false);
-        assert_eq!(contribs.len(), (data.cols + 1) * data.rows);
-        println!("{}", booster.trees[0]);
-        println!("{}", booster.trees[0].nodes.len());
-        println!("{}", booster.trees.last().unwrap().nodes.len());
-        println!("{:?}", &preds[0..10]);
-    }
-
-    #[test]
-    fn test_booster_fit_continual() {
-        let file =
-            fs::read_to_string("resources/contiguous_with_missing.csv").expect("Something went wrong reading the file");
-        let data_vec: Vec<f64> = file.lines().map(|x| x.parse::<f64>().unwrap_or(f64::NAN)).collect();
-        let file = fs::read_to_string("resources/performance.csv").expect("Something went wrong reading the file");
-        let y: Vec<f64> = file.lines().map(|x| x.parse::<f64>().unwrap()).collect();
-
-        let data = Matrix::new(&data_vec, 891, 5);
-
-        let mut booster = PerpetualBooster::default().set_max_bin(300).set_base_score(0.5);
-
-        booster.fit(&data, &y, None, None, 0.3, None, None).unwrap();
-        booster.fit(&data, &y, None, None, 0.9, Some(false), None).unwrap();
         let preds = booster.predict(&data, false);
         let contribs = booster.predict_contributions(&data, ContributionsMethod::Average, false);
         assert_eq!(contribs.len(), (data.cols + 1) * data.rows);
@@ -992,14 +1004,147 @@ mod tests {
         let data_vec: Vec<f64> = file.lines().map(|x| x.parse::<f64>().unwrap_or(f64::NAN)).collect();
         let data = Matrix::new(&data_vec, y.len(), n_columns);
 
-        let cat_index = vec![1, 3, 5, 6, 7, 8, 13];
+        let cat_index = HashSet::from([1, 3, 5, 6, 7, 8, 13]);
 
         let mut booster = PerpetualBooster::default().set_max_bin(10);
 
-        booster.fit(&data, &y, None, None, 0.3, None, Some(&cat_index)).unwrap();
+        booster.fit(&data, &y, None, None, 0.3, None, Some(cat_index)).unwrap();
         let preds = booster.predict(&data, true);
 
         println!("{:?}", &preds[..10]);
+        Ok(())
+    }
+
+    #[test]
+    fn test_gbm_parallel() -> Result<(), Box<dyn Error>> {
+        let all_names = [
+            "MedInc".to_string(),
+            "HouseAge".to_string(),
+            "AveRooms".to_string(),
+            "AveBedrms".to_string(),
+            "Population".to_string(),
+            "AveOccup".to_string(),
+            "Latitude".to_string(),
+            "Longitude".to_string(),
+            "MedHouseVal".to_string(),
+        ];
+
+        let feature_names = [
+            "MedInc".to_string(),
+            "HouseAge".to_string(),
+            "AveRooms".to_string(),
+            "AveBedrms".to_string(),
+            "Population".to_string(),
+            "AveOccup".to_string(),
+            "Latitude".to_string(),
+            "Longitude".to_string(),
+        ];
+
+        let column_names_train = Arc::new(all_names.clone());
+        let column_names_test = Arc::new(all_names.clone());
+
+        let df_train = CsvReadOptions::default()
+            .with_has_header(true)
+            .with_columns(Some(column_names_train))
+            .try_into_reader_with_file_path(Some("resources/cal_housing_train.csv".into()))?
+            .finish()
+            .unwrap();
+
+        let df_test = CsvReadOptions::default()
+            .with_has_header(true)
+            .with_columns(Some(column_names_test))
+            .try_into_reader_with_file_path(Some("resources/cal_housing_test.csv".into()))?
+            .finish()
+            .unwrap();
+
+        // Get data in column major format...
+        let id_vars_train: Vec<&str> = Vec::new();
+        let mdf_train = df_train.unpivot(feature_names.clone(), &id_vars_train)?;
+        let id_vars_test: Vec<&str> = Vec::new();
+        let mdf_test = df_test.unpivot(feature_names, &id_vars_test)?;
+
+        let data_train = Vec::from_iter(
+            mdf_train
+                .select_at_idx(1)
+                .expect("Invalid column")
+                .f64()?
+                .into_iter()
+                .map(|v| v.unwrap_or(f64::NAN)),
+        );
+        let data_test = Vec::from_iter(
+            mdf_test
+                .select_at_idx(1)
+                .expect("Invalid column")
+                .f64()?
+                .into_iter()
+                .map(|v| v.unwrap_or(f64::NAN)),
+        );
+
+        let y_train = Vec::from_iter(
+            df_train
+                .column("MedHouseVal")?
+                .cast(&DataType::Float64)?
+                .f64()?
+                .into_iter()
+                .map(|v| v.unwrap_or(f64::NAN)),
+        );
+        let y_test = Vec::from_iter(
+            df_test
+                .column("MedHouseVal")?
+                .cast(&DataType::Float64)?
+                .f64()?
+                .into_iter()
+                .map(|v| v.unwrap_or(f64::NAN)),
+        );
+
+        // Create Matrix from ndarray.
+        let matrix_train = Matrix::new(&data_train, y_train.len(), 8);
+        let matrix_test = Matrix::new(&data_test, y_test.len(), 8);
+
+        // Create booster.
+        // To provide parameters generate a default booster, and then use
+        // the relevant `set_` methods for any parameters you would like to
+        // adjust.
+        let mut model1 = PerpetualBooster::default()
+            .set_objective(Objective::SquaredLoss)
+            .set_max_bin(10)
+            .set_num_threads(Some(1));
+        let mut model2 = PerpetualBooster::default()
+            .set_objective(Objective::SquaredLoss)
+            .set_max_bin(10)
+            .set_num_threads(Some(2));
+
+        model1.fit(&matrix_test, &y_test, None, None, 0.1, None, None)?;
+        model2.fit(&matrix_test, &y_test, None, None, 0.1, None, None)?;
+
+        let trees1 = model1.get_prediction_trees();
+        let trees2 = model2.get_prediction_trees();
+        assert_eq!(trees1.len(), trees2.len());
+
+        let n_leaves1: usize = trees1.iter().map(|t| (t.nodes.len() + 1) / 2).sum();
+        let n_leaves2: usize = trees2.iter().map(|t| (t.nodes.len() + 1) / 2).sum();
+        assert_eq!(n_leaves1, n_leaves2);
+
+        println!("{}", trees1.last().unwrap());
+        println!("{}", trees2.last().unwrap());
+
+        let y_pred1 = model1.predict(&matrix_train, true);
+        let y_pred2 = model2.predict(&matrix_train, true);
+
+        let mse1 = y_pred1
+            .iter()
+            .zip(y_train.iter())
+            .map(|(y1, y2)| (y1 - y2) * (y1 - y2))
+            .sum::<f64>()
+            / y_train.len() as f64;
+        let mse2 = y_pred2
+            .iter()
+            .zip(y_train.iter())
+            .map(|(y1, y2)| (y1 - y2) * (y1 - y2))
+            .sum::<f64>()
+            / y_train.len() as f64;
+        assert_relative_eq!(mse1, mse2, max_relative = 0.99);
+
         Ok(())
     }
 }

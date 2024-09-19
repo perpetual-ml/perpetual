@@ -1,6 +1,6 @@
 //! An example using the `california housing` dataset
 
-// cargo run --release --example cal_housing 0.1 0.3 2
+// cargo run --release --example cal_housing 1.0 1
 
 // cargo build --release --example cal_housing
 // hyperfine --runs 3 ./target/release/examples/cal_housing
@@ -14,6 +14,7 @@ use perpetual::{objective::Objective, Matrix, PerpetualBooster};
 use polars::prelude::*;
 use std::env;
 use std::error::Error;
+use std::time::SystemTime;
 
 pub fn mse(y_test: &[f64], y_pred: &[f64]) -> f32 {
     let mut error = 0.0;
@@ -26,7 +27,8 @@ pub fn mse(y_test: &[f64], y_pred: &[f64]) -> f32 {
 
 fn main() -> Result<(), Box<dyn Error>> {
     let args: Vec<String> = env::args().collect();
-    let budget = &args[1].parse::<f32>().unwrap();
+    let budget = &args[1].parse::<f32>().unwrap_or(1.0);
+    let num_threads = &args[2].parse::<usize>().unwrap_or(1);
 
     let all_names = [
         "MedInc".to_string(),
@@ -116,8 +118,13 @@ fn main() -> Result<(), Box<dyn Error>> {
     // To provide parameters generate a default booster, and then use
     // the relevant `set_` methods for any parameters you would like to
     // adjust.
-    let mut model = PerpetualBooster::default().set_objective(Objective::SquaredLoss);
+    let mut model = PerpetualBooster::default()
+        .set_objective(Objective::SquaredLoss)
+        .set_num_threads(Some(*num_threads));
+
+    let now = SystemTime::now();
     model.fit(&matrix_train, &y_train, None, None, *budget, None, None)?;
+    println!("now.elapsed: {:?}", now.elapsed().unwrap().as_secs_f32());
 
     let trees = model.get_prediction_trees();
     println!("n_rounds: {:?}", trees.len());
@@ -134,7 +141,9 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("mse_test: {:?}", error);
 
     println!("tree:");
-    println!("{}", trees[0]);
+    for t in trees {
+        println!("{}", t);
+    }
 
     Ok(())
 }

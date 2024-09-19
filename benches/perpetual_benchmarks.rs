@@ -1,13 +1,12 @@
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
-use hashbrown::HashMap;
 use perpetual::binning::bin_matrix;
 use perpetual::booster::PerpetualBooster;
 use perpetual::constants::N_NODES_ALLOCATED;
 use perpetual::constraints::ConstraintMap;
 use perpetual::data::Matrix;
-use perpetual::histogram::HistogramMatrix;
+use perpetual::histogram::{NodeHistogram, NodeHistogramOwned};
 use perpetual::objective::{LogLoss, ObjectiveFunction};
-use perpetual::splitter::MissingImputerSplitter;
+use perpetual::splitter::{MissingImputerSplitter, SplitInfo, SplitInfoSlice};
 use perpetual::tree::Tree;
 use perpetual::utils::{fast_f64_sum, fast_sum, naive_sum};
 use std::fs;
@@ -34,22 +33,26 @@ pub fn tree_benchmarks(c: &mut Criterion) {
     });
 
     let data = Matrix::new(&data_vec, y.len(), 5);
-    let splitter = MissingImputerSplitter {
-        eta: 0.3,
-        allow_missing_splits: true,
-        constraints_map: ConstraintMap::new(),
-    };
+    let splitter = MissingImputerSplitter::new(0.3, true, ConstraintMap::new());
     let mut tree = Tree::new();
 
     let bindata = bin_matrix(&data, None, 300, f64::NAN, None).unwrap();
     let bdata = Matrix::new(&bindata.binned_data, data.rows, data.cols);
     let col_index: Vec<usize> = (0..data.cols).collect();
 
-    let hist_init = HistogramMatrix::empty(&bdata, &bindata.cuts, &col_index, true, false);
-    let mut hist_map: HashMap<usize, HistogramMatrix> = HashMap::with_capacity(N_NODES_ALLOCATED);
-    for i in 0..N_NODES_ALLOCATED {
-        hist_map.insert(i, hist_init.clone());
-    }
+    let mut hist_tree_owned: Vec<NodeHistogramOwned> = (0..N_NODES_ALLOCATED)
+        .map(|_| NodeHistogramOwned::empty(&bindata.cuts, &col_index, false, true))
+        .collect();
+
+    let mut hist_tree: Vec<NodeHistogram> = hist_tree_owned
+        .iter_mut()
+        .map(|node_hist| NodeHistogram::from_owned(node_hist))
+        .collect();
+
+    let pool = rayon::ThreadPoolBuilder::new().num_threads(2).build().unwrap();
+
+    let mut split_info_vec: Vec<SplitInfo> = (0..col_index.len()).map(|_| SplitInfo::default()).collect();
+    let split_info_slice = SplitInfoSlice::new(&mut split_info_vec);
 
     tree.fit(
         &bdata,
@@ -58,7 +61,7 @@ pub fn tree_benchmarks(c: &mut Criterion) {
         &mut g,
         h.as_deref_mut(),
         &splitter,
-        true,
+        &pool,
         Some(f32::MAX),
         &loss,
         &y,
@@ -67,8 +70,9 @@ pub fn tree_benchmarks(c: &mut Criterion) {
         None,
         None,
         false,
-        &mut hist_map,
+        &mut hist_tree,
         None,
+        &split_info_slice,
     );
 
     println!("{}", tree.nodes.len());
@@ -83,7 +87,7 @@ pub fn tree_benchmarks(c: &mut Criterion) {
                 black_box(&mut g),
                 black_box(h.as_deref_mut()),
                 black_box(&splitter),
-                black_box(false),
+                black_box(&pool),
                 Some(f32::MAX),
                 black_box(&loss),
                 black_box(&y),
@@ -92,8 +96,9 @@ pub fn tree_benchmarks(c: &mut Criterion) {
                 None,
                 None,
                 false,
-                black_box(&mut hist_map),
+                black_box(&mut hist_tree),
                 None,
+                black_box(&split_info_slice),
             );
         })
     });
@@ -108,7 +113,7 @@ pub fn tree_benchmarks(c: &mut Criterion) {
                 black_box(&mut g),
                 black_box(h.as_deref_mut()),
                 black_box(&splitter),
-                black_box(false),
+                black_box(&pool),
                 Some(f32::MAX),
                 black_box(&loss),
                 black_box(&y),
@@ -117,8 +122,9 @@ pub fn tree_benchmarks(c: &mut Criterion) {
                 None,
                 None,
                 false,
-                black_box(&mut hist_map),
+                black_box(&mut hist_tree),
                 None,
+                black_box(&split_info_slice),
             );
         })
     });
@@ -137,7 +143,7 @@ pub fn tree_benchmarks(c: &mut Criterion) {
     // booster_train.sampling_mode(SamplingMode::Linear);
     booster_train.bench_function("train_booster_default", |b| {
         b.iter(|| {
-            let mut booster = PerpetualBooster::default().set_parallel(false);
+            let mut booster = PerpetualBooster::default();
             booster
                 .fit(
                     black_box(&data),
@@ -153,7 +159,7 @@ pub fn tree_benchmarks(c: &mut Criterion) {
     });
     booster_train.bench_function("train_booster_with_column_sampling", |b| {
         b.iter(|| {
-            let mut booster = PerpetualBooster::default().set_parallel(false);
+            let mut booster = PerpetualBooster::default();
             booster
                 .fit(
                     black_box(&data),

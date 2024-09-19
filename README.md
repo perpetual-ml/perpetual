@@ -7,33 +7,31 @@
 [![Python Versions](https://img.shields.io/pypi/pyversions/perpetual.svg?logo=python&logoColor=white)](https://pypi.org/project/perpetual)
 [![PyPI Version](https://img.shields.io/pypi/v/perpetual.svg?logo=pypi&logoColor=white)](https://pypi.org/project/perpetual)
 [![Crates.io Version](https://img.shields.io/crates/v/perpetual?logo=rust&logoColor=white)](https://crates.io/crates/perpetual)
-[![Discord](https://img.shields.io/discord/1247650900214812692?logo=discord&cacheSeconds=10)](https://discord.gg/vADKk9Wr)
+[![Static Badge](https://img.shields.io/badge/join-discord-blue?logo=discord)](https://discord.gg/aQmKKUuJ)
 
 </div>
 
 # Perpetual
 
-## _A self-generalizing gradient boosting machine which doesn't need hyperparameter optimization_
-
 PerpetualBooster is a gradient boosting machine (GBM) algorithm which doesn't need hyperparameter optimization unlike other GBM algorithms. Similar to AutoML libraries, it has a `budget` parameter. Increasing the `budget` parameter increases the predictive power of the algorithm and gives better results on unseen data. Start with a small budget (e.g. 1.0) and increase it (e.g. 2.0) once you are confident with your features. If you don't see any improvement with further increasing the `budget`, it means that you are already extracting the most predictive power out of your data.
 
 ## Benchmark
 
-Hyperparameter optimization usually takes 100 iterations with plain GBM algorithms. PerpetualBooster achieves the same accuracy in a single run. Thus, it achieves around 100x speed-up at the same accuracy with different `budget` levels and with different datasets. The speed-up might be slightly lower or significantly higher than 100x depending on the dataset.
+Hyperparameter optimization usually takes 100 iterations with plain GBM algorithms. PerpetualBooster achieves the same accuracy in a single run. Thus, it achieves up to 100x speed-up at the same accuracy with different `budget` levels and with different datasets.
 
 The following table summarizes the results for the [California Housing](https://scikit-learn.org/stable/modules/generated/sklearn.datasets.fetch_california_housing.html) dataset (regression):
 
-| Perpetual budget | LightGBM n_estimators | Perpetual mse | LightGBM mse | Perpetual cpu time | LightGBM cpu time | Speed-up |
-| ---------------- | --------------------- | ------------- | ------------ | ------------------ | ----------------- | -------- |
-| 1.0              | 100                   | 0.192         | 0.192        | 7.6                | 978               | 129x     |
-| 1.5              | 300                   | 0.188         | 0.188        | 21.8               | 3066              | 141x     |
-| 2.1              | 1000                  | 0.185         | 0.186        | 86.0               | 8720              | 101x     |
+| Perpetual budget | LightGBM n_estimators | Perpetual mse | LightGBM mse | Speed-up wall time | Speed-up cpu time |
+| ---------------- | --------------------- | ------------- | ------------ | ------------------ | ----------------- |
+| 1.0              | 100                   | 0.192         | 0.192        | 54x                | 56x               |
+| 1.5              | 300                   | 0.188         | 0.188        | 59x                | 58x               |
+| 2.1              | 1000                  | 0.185         | 0.186        | 42x                | 41x               |
 
 The following table summarizes the results for the [Cover Types](https://scikit-learn.org/stable/modules/generated/sklearn.datasets.fetch_covtype.html) dataset (classification):
 
-| Perpetual budget | LightGBM n_estimators | Perpetual log loss | LightGBM log loss | Perpetual cpu time | LightGBM cpu time | Speed-up |
-| ---------------- | --------------------- | ------------------ | ----------------- | ------------------ | ----------------- | -------- |
-| 1.0              | 100                   | 0.089              | 0.084             | 1653               | 124958            | 76x      |
+| Perpetual budget | LightGBM n_estimators | Perpetual log loss | LightGBM log loss | Speed-up wall time | Speed-up cpu time |
+| ---------------- | --------------------- | ------------------ | ----------------- | ------------------ | ----------------- |
+| 0.9              | 100                   | 0.091              | 0.084             | 72x                | 78x               |
 
 You can reproduce the results using the scripts in the [examples](./python-package/examples) folder.
 
@@ -63,7 +61,7 @@ pip install perpetual
 To use in a Rust project, add the following to your Cargo.toml file to get the package from [crates.io](https://crates.io/crates/perpetual).
 
 ```toml
-perpetual = "0.3.8"
+perpetual = "0.4.0"
 ```
 
 ## Paper
