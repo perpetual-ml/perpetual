@@ -4,7 +4,7 @@ build-backend = "maturin"
 
 [project]
 name = "perpetual"
-version = "0.4.7"
+version = "0.4.9"
 description = "A self-generalizing gradient boosting machine which doesn't need hyperparameter optimization"
 license = { file = "LICENSE" }
 keywords = [
@@ -18,7 +18,7 @@ keywords = [
 ]
 authors = [{ name = "Mutlu Simsek" }]
 readme = "README.md"
-dependencies = ["numpy"]
+dependencies = ["numpy", "typing-extensions"]
 requires-python = ">=3.8"
 classifiers = [
   "Programming Language :: Rust",

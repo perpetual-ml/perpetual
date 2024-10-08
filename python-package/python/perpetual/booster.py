@@ -324,14 +324,17 @@ class PerpetualBooster:
             )
             return probabilities.reshape((-1, len(self.classes_)), order="C")
         elif len(self.classes_) == 2:
-            return self.booster.predict_proba(
+            probabilities = self.booster.predict_proba(
                 flat_data=flat_data,
                 rows=rows,
                 cols=cols,
                 parallel=parallel,
             )
+            return np.concatenate([probabilities, 1 - probabilities], axis=1)
         else:
-            raise NotImplementedError("predict_proba not implemented for regression.")
+            raise NotImplementedError(
+                f"predict_proba not implemented for regression. n_classes = {len(self.classes_)}"
+            )
 
     def predict_log_proba(self, X, parallel: Union[bool, None] = None) -> np.ndarray:
         """Predict class log-probabilities with the fitted booster on new data.

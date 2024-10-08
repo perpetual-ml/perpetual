@@ -148,6 +148,7 @@ jobs:
 
   cargo-build-test:
     runs-on: ubuntu-latest
+    needs: ["windows-build-test", "macos-build-test", "linux-build-test"]
     steps:
       - uses: actions/checkout@v4
       - name: Install latest stable Rust
@@ -156,7 +157,7 @@ jobs:
           toolchain: stable
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.10"
+          python-version: "3.11"
           architecture: x64
       - name: Install deps
         run: pip install numpy pandas seaborn scikit-learn toml ucimlrepo
