@@ -330,7 +330,10 @@ class PerpetualBooster:
                 cols=cols,
                 parallel=parallel,
             )
-            return np.concatenate([probabilities, 1 - probabilities], axis=1)
+            return np.concatenate(
+                [probabilities.reshape(-1, 1), (1.0 - probabilities).reshape(-1, 1)],
+                axis=1,
+            )
         else:
             raise NotImplementedError(
                 f"predict_proba not implemented for regression. n_classes = {len(self.classes_)}"

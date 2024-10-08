@@ -110,6 +110,16 @@ def test_booster_from_numpy(X_y):
     assert np.allclose(model2_preds, model3_preds)
 
 
+def test_predict_proba(X_y):
+    X, y = X_y
+    model = PerpetualBooster(objective="LogLoss")
+    model.fit(X, y)
+
+    y_proba = model.predict_proba(X)
+
+    assert np.allclose(y_proba.shape, (len(X), 2))
+
+
 def test_get_node_list(X_y):
     X, y = X_y
     X = X
@@ -614,7 +624,6 @@ class TestSaveLoadFunctions:
     ):
         f64_model_path = tmp_path / "modelf64_sl.json"
         X, y = X_y
-        X = X
         model = PerpetualBooster(objective="SquaredLoss")
         model.fit(X, y)
         preds = model.predict(X)
