@@ -331,7 +331,7 @@ class PerpetualBooster:
                 parallel=parallel,
             )
             return np.concatenate(
-                [probabilities.reshape(-1, 1), (1.0 - probabilities).reshape(-1, 1)],
+                [(1.0 - probabilities).reshape(-1, 1), probabilities.reshape(-1, 1)],
                 axis=1,
             )
         else:
