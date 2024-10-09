@@ -310,7 +310,7 @@ class PerpetualBooster:
                 Defaults to `None`.
 
         Returns:
-            np.ndarray: Returns a numpy array of the predictions.
+            np.ndarray, shape (n_samples, n_classes): Returns a numpy array of the class probabilities.
         """
         features_, flat_data, rows, cols = transform_input_frame(X, self.cat_mapping)
         self._validate_features(features_)
@@ -330,7 +330,10 @@ class PerpetualBooster:
                 cols=cols,
                 parallel=parallel,
             )
-            return np.concatenate([probabilities, 1 - probabilities], axis=1)
+            return np.concatenate(
+                [probabilities.reshape(-1, 1), (1.0 - probabilities).reshape(-1, 1)],
+                axis=1,
+            )
         else:
             raise NotImplementedError(
                 f"predict_proba not implemented for regression. n_classes = {len(self.classes_)}"

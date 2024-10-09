@@ -1,6 +1,5 @@
 import pandas as pd
 import seaborn as sns
-from ucimlrepo import fetch_ucirepo
 from sklearn.model_selection import train_test_split
 from sklearn.datasets import fetch_california_housing, fetch_covtype
 from perpetual.utils import convert_input_frame, transform_input_frame
@@ -70,22 +69,26 @@ if __name__ == "__main__":
 
     
 
-    # fetch dataset: https://archive.ics.uci.edu/dataset/2/adult
-    adult = fetch_ucirepo(id=2)
-    data = adult.data.features.copy()
-    data["sex"] = pd.get_dummies(adult.data.features["sex"], drop_first=True, dtype=float).to_numpy()
-    cols = ['workclass', 'education', 'marital-status', 'occupation', 'relationship', 'race', 'native-country']
-    data[cols] = data[cols].astype('category')
-    y = adult.data.targets["income"].str.contains("<").to_numpy().astype(int)
-    
-    data_train, data_test, y_train, y_test = train_test_split(data, y, test_size=0.2, random_state=42)
+  
 
-    features_, adult_train_flat, rows, cols, categorical_features_, cat_mapping = convert_input_frame(data_train, "auto")
-    features_, adult_test_flat, rows, cols = transform_input_frame(data_test, cat_mapping)
+    X = df.drop(columns=["survived"])
+    y = df["survived"]
 
-    data_test.to_csv("resources/adult_test_df.csv", index=False)
+    X["sex"] = pd.get_dummies(X["sex"], drop_first=True, dtype=float).to_numpy()
+    X["adult_male"] = pd.get_dummies(X["adult_male"], drop_first=True, dtype=float).to_numpy()
+    X.drop(columns=["alive"], inplace=True)
+    X["alone"] = pd.get_dummies(X["alone"], drop_first=True, dtype=float).to_numpy()
+    cols = ['pclass', 'sibsp', 'parch', 'embarked', 'class', 'who', 'deck', 'embark_town']
+    X[cols] = X[cols].astype('category')
 
-    pd.Series(adult_train_flat).to_csv("resources/adult_train_flat.csv", index=False, header=False)
-    pd.Series(adult_test_flat).to_csv("resources/adult_test_flat.csv", index=False, header=False)
-    pd.Series(y_train).to_csv("resources/adult_train_y.csv", index=False, header=False)
-    pd.Series(y_test).to_csv("resources/adult_test_y.csv", index=False, header=False)
+    data_train, data_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+    features_, titanic_train_flat, rows, cols, categorical_features_, cat_mapping = convert_input_frame(data_train, "auto")
+    features_, titanic_test_flat, rows, cols = transform_input_frame(data_test, cat_mapping)
+
+    data_test.to_csv("resources/titanic_test_df.csv", index=False)
+
+    pd.Series(titanic_train_flat).to_csv("resources/titanic_train_flat.csv", index=False, header=False)
+    pd.Series(titanic_test_flat).to_csv("resources/titanic_test_flat.csv", index=False, header=False)
+    pd.Series(y_train).to_csv("resources/titanic_train_y.csv", index=False, header=False)
+    pd.Series(y_test).to_csv("resources/titanic_test_y.csv", index=False, header=False)

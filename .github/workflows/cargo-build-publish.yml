@@ -15,7 +15,7 @@ jobs:
           python-version: "3.10"
           architecture: x64
       - name: Install deps
-        run: pip install numpy pandas seaborn scikit-learn toml ucimlrepo
+        run: pip install numpy pandas seaborn scikit-learn toml
       - run: |
           cp README.md python-package/README.md
           cp LICENSE python-package/LICENSE

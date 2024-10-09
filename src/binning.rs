@@ -192,19 +192,21 @@ mod tests {
         }
         println!("{:?}", b);
     }
+
     #[test]
     fn test_bin_data_categorical() {
-        let file = fs::read_to_string("resources/adult_train_flat.csv").expect("Something went wrong reading the file");
-        let n_rows = 39073;
-        let n_columns = 2;
-        let n_lines = n_columns * 39073;
+        let file =
+            fs::read_to_string("resources/titanic_train_flat.csv").expect("Something went wrong reading the file");
+        let n_rows = 712;
+        let n_columns = 13;
+        let n_lines = n_columns * n_rows;
         let data_vec: Vec<f64> = file
             .lines()
             .take(n_lines)
             .map(|x| x.trim().parse::<f64>().unwrap_or(f64::NAN))
             .collect();
         let data = Matrix::new(&data_vec, n_rows, n_columns);
-        let cat_index = HashSet::from([1]);
+        let cat_index = HashSet::from([0, 3, 4, 6, 7, 8, 10, 11]);
 
         let b = bin_matrix(&data, None, 256, f64::NAN, Some(&cat_index)).unwrap();
         let bdata = Matrix::new(&b.binned_data, data.rows, data.cols);

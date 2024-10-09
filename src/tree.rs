@@ -984,15 +984,15 @@ mod tests {
     #[test]
     fn test_tree_categorical() -> Result<(), Box<dyn Error>> {
         let n_bins = 256;
+        let n_rows = 712;
+        let n_columns = 13;
 
-        let n_rows = 39073;
-        let n_columns = 14;
-
-        let file = fs::read_to_string("resources/adult_train_flat.csv").expect("Something went wrong reading the file");
+        let file =
+            fs::read_to_string("resources/titanic_train_flat.csv").expect("Something went wrong reading the file");
         let data_vec: Vec<f64> = file.lines().map(|x| x.parse::<f64>().unwrap_or(f64::NAN)).collect();
         let data = Matrix::new(&data_vec, n_rows, n_columns);
 
-        let file = fs::read_to_string("resources/adult_train_y.csv").expect("Something went wrong reading the file");
+        let file = fs::read_to_string("resources/titanic_train_y.csv").expect("Something went wrong reading the file");
         let y: Vec<f64> = file.lines().map(|x| x.parse::<f64>().unwrap()).collect();
 
         let y_avg = y.iter().sum::<f64>() / y.len() as f64;
@@ -1002,7 +1002,7 @@ mod tests {
 
         let splitter = MissingImputerSplitter::new(0.3, true, ConstraintMap::new());
 
-        let cat_index = HashSet::from([1, 3, 5, 6, 7, 8, 13]);
+        let cat_index = HashSet::from([0, 3, 4, 6, 7, 8, 10, 11]);
 
         let b = bin_matrix(&data, None, n_bins, f64::NAN, Some(&cat_index)).unwrap();
         let bdata = Matrix::new(&b.binned_data, data.rows, data.cols);
