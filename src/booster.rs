@@ -1,3 +1,4 @@
+use crate::bin::Bin;
 use crate::binning::bin_matrix;
 use crate::constants::{GENERALIZATION_THRESHOLD, ITERATION_LIMIT, N_NODES_ALLOCATED, STOPPING_ROUNDS};
 use crate::constraints::ConstraintMap;
@@ -14,7 +15,8 @@ use log::{info, warn};
 use rayon::prelude::*;
 use serde::{Deserialize, Deserializer, Serialize};
 use std::collections::{HashMap, HashSet};
-use std::fs;
+use std::{fs, mem};
+use sysinfo::System;
 
 type ImportanceFn = fn(&Tree, &mut HashMap<usize, (f32, usize)>);
 
@@ -364,7 +366,13 @@ impl PerpetualBooster {
         let mut stopping = 0 as usize;
         let mut n_low_loss_rounds = 0;
 
-        let mut hist_tree_owned: Vec<NodeHistogramOwned> = (0..N_NODES_ALLOCATED)
+        let mem_bin = mem::size_of::<Bin>();
+        let mem_hist = mem_bin * binned_data.nunique.iter().sum::<usize>();
+        let s = System::new_all();
+        let mem_available = s.available_memory() as usize;
+        let n_nodes_alloc = usize::min(N_NODES_ALLOCATED, (0.9 * (mem_available / mem_hist) as f32) as usize);
+
+        let mut hist_tree_owned: Vec<NodeHistogramOwned> = (0..n_nodes_alloc)
             .map(|_| NodeHistogramOwned::empty(&binned_data.cuts, &col_index, is_const_hess, false))
             .collect();
 
