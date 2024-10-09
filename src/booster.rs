@@ -995,16 +995,17 @@ mod tests {
 
     #[test]
     fn test_gbm_categorical() -> Result<(), Box<dyn Error>> {
-        let n_columns = 14;
+        let n_columns = 13;
 
-        let file = fs::read_to_string("resources/adult_test_y.csv").expect("Something went wrong reading the file");
+        let file = fs::read_to_string("resources/titanic_test_y.csv").expect("Something went wrong reading the file");
         let y: Vec<f64> = file.lines().map(|x| x.parse::<f64>().unwrap()).collect();
 
-        let file = fs::read_to_string("resources/adult_test_flat.csv").expect("Something went wrong reading the file");
+        let file =
+            fs::read_to_string("resources/titanic_test_flat.csv").expect("Something went wrong reading the file");
         let data_vec: Vec<f64> = file.lines().map(|x| x.parse::<f64>().unwrap_or(f64::NAN)).collect();
         let data = Matrix::new(&data_vec, y.len(), n_columns);
 
-        let cat_index = HashSet::from([1, 3, 5, 6, 7, 8, 13]);
+        let cat_index = HashSet::from([0, 3, 4, 6, 7, 8, 10, 11]);
 
         let mut booster = PerpetualBooster::default().set_max_bin(10);
 

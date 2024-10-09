@@ -735,20 +735,21 @@ class TestSaveLoadFunctions:
 
 
 def test_categorical(X_y):
-    X = pd.read_csv("../resources/adult_test_df.csv", index_col=False)
+    X = pd.read_csv("../resources/titanic_test_df.csv", index_col=False)
     y = np.array(
         pd.read_csv(
-            "../resources/adult_test_y.csv", index_col=False, header=None
+            "../resources/titanic_test_y.csv", index_col=False, header=None
         ).squeeze("columns")
     )
     cols = [
-        "workclass",
-        "education",
-        "marital-status",
-        "occupation",
-        "relationship",
-        "race",
-        "native-country",
+        "pclass",
+        "sibsp",
+        "parch",
+        "embarked",
+        "class",
+        "who",
+        "deck",
+        "embark_town",
     ]
     X[cols] = X[cols].astype("category")
     model = PerpetualBooster()
@@ -758,22 +759,23 @@ def test_categorical(X_y):
 def test_polars():
     import polars as pl
 
-    X = pl.from_pandas(pd.read_csv("../resources/adult_test_df.csv", index_col=False))
+    X = pl.from_pandas(pd.read_csv("../resources/titanic_test_df.csv", index_col=False))
     y = np.array(
         pd.read_csv(
-            "../resources/adult_test_y.csv", index_col=False, header=None
+            "../resources/titanic_test_y.csv", index_col=False, header=None
         ).squeeze("columns")
     )
     cols = [
-        "workclass",
-        "education",
-        "marital-status",
-        "occupation",
-        "relationship",
-        "race",
-        "native-country",
+        "pclass",
+        "sibsp",
+        "parch",
+        "embarked",
+        "class",
+        "who",
+        "deck",
+        "embark_town",
     ]
-    X = X.with_columns(pl.col(cols).cast(pl.Categorical))
+    X = X.with_columns(pl.col(cols).cast(pl.String).cast(pl.Categorical))
     model = PerpetualBooster()
     model.fit(X, y)
     model.predict(X)

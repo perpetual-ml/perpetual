@@ -357,17 +357,25 @@ mod tests {
 
     #[test]
     fn test_histogram_categorical() {
-        let file = fs::read_to_string("resources/adult_train_flat.csv").expect("Something went wrong reading the file");
-        let n_rows = 39073;
-        let n_columns = 14;
-        let n_lines = n_columns * 39073;
+        let file =
+            fs::read_to_string("resources/titanic_train_flat.csv").expect("Something went wrong reading the file");
+        let n_rows = 712;
+        let n_columns = 13;
+        let n_lines = n_columns * n_rows;
         let data_vec: Vec<f64> = file
             .lines()
             .take(n_lines)
             .map(|x| x.trim().parse::<f64>().unwrap_or(f64::NAN))
             .collect();
         let data = Matrix::new(&data_vec, n_rows, n_columns);
-        let b = bin_matrix(&data, None, 256, f64::NAN, Some(&HashSet::from([1]))).unwrap();
+        let b = bin_matrix(
+            &data,
+            None,
+            256,
+            f64::NAN,
+            Some(&HashSet::from([0, 3, 4, 6, 7, 8, 10, 11])),
+        )
+        .unwrap();
         let bdata = Matrix::new(&b.binned_data, data.rows, data.cols);
         let y: Vec<f64> = file.lines().map(|x| x.parse::<f64>().unwrap_or(f64::NAN)).collect();
         let yhat = vec![0.5; y.len()];
@@ -377,7 +385,7 @@ mod tests {
         let mut hist_init_owned = NodeHistogramOwned::empty(&b.cuts, &col_index, false, false);
         let mut hist_init = NodeHistogram::from_owned(&mut hist_init_owned);
 
-        let col = 1;
+        let col = 0;
 
         let pool = rayon::ThreadPoolBuilder::new().num_threads(2).build().unwrap();
 
@@ -406,15 +414,16 @@ mod tests {
         println!("{:?}", &f);
         println!("{:?}", &f.len());
         println!("{:?}", unsafe { hist_init.data.get_unchecked(col) }.data.len());
-        assert_eq!(f.len(), unsafe { hist_init.data.get_unchecked(col) }.data.len());
+        assert_eq!(f.len() + 1, unsafe { hist_init.data.get_unchecked(col) }.data.len());
     }
 
     #[test]
     fn test_histogram_parallel() {
-        let file = fs::read_to_string("resources/adult_train_flat.csv").expect("Something went wrong reading the file");
-        let n_rows = 39073;
-        let n_columns = 14;
-        let n_lines = n_columns * 39073;
+        let file =
+            fs::read_to_string("resources/titanic_train_flat.csv").expect("Something went wrong reading the file");
+        let n_rows = 712;
+        let n_columns = 13;
+        let n_lines = n_columns * n_rows;
         let data_vec: Vec<f64> = file
             .lines()
             .take(n_lines)

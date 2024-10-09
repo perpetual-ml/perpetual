@@ -14,7 +14,7 @@ cd python-package
 python -m pip install -e .[dev]
 # You can now return to the rood directory and run the tests...
 cd ..
-python -m pip install pandas seaborn ucimlrepo
+python -m pip install pandas seaborn
 python scripts/make_resources.py
 ```
 
