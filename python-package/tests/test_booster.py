@@ -777,6 +777,6 @@ def test_polars():
     ]
     X = X.with_columns(pl.col(cols).cast(pl.String).cast(pl.Categorical))
     model = PerpetualBooster()
-    model.fit(X, y)
+    model.fit(X, y, budget=0.1)
     model.predict(X)
     model.trees_to_dataframe()

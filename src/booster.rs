@@ -1,10 +1,13 @@
 use crate::bin::Bin;
 use crate::binning::bin_matrix;
-use crate::constants::{GENERALIZATION_THRESHOLD, ITERATION_LIMIT, N_NODES_ALLOCATED, STOPPING_ROUNDS};
+use crate::constants::{
+    GENERALIZATION_THRESHOLD, ITERATION_LIMIT, MIN_COL_AMOUNT, N_NODES_ALLOC_LIMIT, ROW_COLUMN_RATIO_LIMIT,
+    STOPPING_ROUNDS,
+};
 use crate::constraints::ConstraintMap;
 use crate::data::Matrix;
 use crate::errors::PerpetualError;
-use crate::histogram::{NodeHistogram, NodeHistogramOwned};
+use crate::histogram::{update_cuts, NodeHistogram, NodeHistogramOwned};
 use crate::objective::{calc_init_callables, gradient_hessian_callables, loss_callables, Objective};
 use crate::shapley::predict_contributions_row_shapley;
 use crate::splitter::{MissingBranchSplitter, MissingImputerSplitter, SplitInfo, SplitInfoSlice, Splitter};
@@ -12,6 +15,9 @@ use crate::tree::{Tree, TreeStopper};
 use crate::utils::odds;
 use core::{f32, f64};
 use log::{info, warn};
+use rand::rngs::StdRng;
+use rand::seq::IteratorRandom;
+use rand::SeedableRng;
 use rayon::prelude::*;
 use serde::{Deserialize, Deserializer, Serialize};
 use std::collections::{HashMap, HashSet};
@@ -116,6 +122,8 @@ pub struct PerpetualBooster {
     /// leaf weight is multiplied by this number. The smaller the value, the more
     /// conservative the weights will be.
     eta: f32,
+    /// Integer value used to seed any randomness used in the algorithm.
+    pub seed: u64,
 }
 
 fn default_terminate_missing_features() -> HashSet<usize> {
@@ -153,6 +161,7 @@ impl Default for PerpetualBooster {
             MissingNodeTreatment::AssignToParent,
             0,
             f32::NAN,
+            0,
         )
         .unwrap()
     }
@@ -183,6 +192,7 @@ impl PerpetualBooster {
     /// * `eta` - Step size to use at each iteration. Each
     ///     leaf weight is multiplied by this number. The smaller the value, the more
     ///     conservative the weights will be.
+    /// * `seed` - Integer value used to seed any randomness used in the algorithm.
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         objective: Objective,
@@ -198,6 +208,7 @@ impl PerpetualBooster {
         missing_node_treatment: MissingNodeTreatment,
         log_iterations: usize,
         eta: f32,
+        seed: u64,
     ) -> Result<Self, PerpetualError> {
         let booster = PerpetualBooster {
             objective,
@@ -215,8 +226,11 @@ impl PerpetualBooster {
             trees: Vec::new(),
             metadata: HashMap::new(),
             eta,
+            seed,
         };
+
         booster.validate_parameters()?;
+
         Ok(booster)
     }
 
@@ -366,22 +380,48 @@ impl PerpetualBooster {
         let mut stopping = 0 as usize;
         let mut n_low_loss_rounds = 0;
 
-        let mem_bin = mem::size_of::<Bin>();
-        let mem_hist = mem_bin * binned_data.nunique.iter().sum::<usize>();
-        let s = System::new_all();
-        let mem_available = s.available_memory() as usize;
-        let n_nodes_alloc = usize::min(N_NODES_ALLOCATED, (0.9 * (mem_available / mem_hist) as f32) as usize);
+        let mut rng = StdRng::seed_from_u64(self.seed);
 
-        let mut hist_tree_owned: Vec<NodeHistogramOwned> = (0..n_nodes_alloc)
-            .map(|_| NodeHistogramOwned::empty(&binned_data.cuts, &col_index, is_const_hess, false))
-            .collect();
+        // Column sampling is only applied when (n_rows / n_columns) < ROW_COLUMN_RATIO_LIMIT.
+        // ROW_COLUMN_RATIO_LIMIT is set to 100 by default.
+        let colsample_bytree = f64::min(
+            1.0,
+            (data.rows as f64 / data.cols as f64) / ROW_COLUMN_RATIO_LIMIT as f64,
+        );
+
+        let col_amount = usize::max(
+            usize::min(MIN_COL_AMOUNT, col_index.len()),
+            ((col_index.len() as f64) * colsample_bytree).floor() as usize,
+        );
+
+        let mem_bin = mem::size_of::<Bin>();
+        let mem_hist: usize;
+        if col_amount == col_index.len() {
+            mem_hist = mem_bin * binned_data.nunique.iter().sum::<usize>();
+        } else {
+            mem_hist = mem_bin * self.max_bin as usize * col_amount;
+        }
+        let system = System::new_all();
+        let mem_available = system.available_memory() as usize;
+        let n_nodes_alloc = usize::min(N_NODES_ALLOC_LIMIT, (0.9 * (mem_available / mem_hist) as f32) as usize);
+
+        let mut hist_tree_owned: Vec<NodeHistogramOwned>;
+        if col_amount == col_index.len() {
+            hist_tree_owned = (0..n_nodes_alloc)
+                .map(|_| NodeHistogramOwned::empty_from_cuts(&binned_data.cuts, &col_index, is_const_hess, false))
+                .collect();
+        } else {
+            hist_tree_owned = (0..n_nodes_alloc)
+                .map(|_| NodeHistogramOwned::empty(self.max_bin, col_amount, is_const_hess, false))
+                .collect();
+        }
 
         let mut hist_tree: Vec<NodeHistogram> = hist_tree_owned
             .iter_mut()
             .map(|node_hist| NodeHistogram::from_owned(node_hist))
             .collect();
 
-        let mut split_info_vec: Vec<SplitInfo> = (0..col_index.len()).map(|_| SplitInfo::default()).collect();
+        let mut split_info_vec: Vec<SplitInfo> = (0..col_amount).map(|_| SplitInfo::default()).collect();
         let split_info_slice = SplitInfoSlice::new(&mut split_info_vec);
 
         for i in 0..ITERATION_LIMIT {
@@ -397,11 +437,36 @@ impl PerpetualBooster {
                 Some(target_loss_decrement)
             };
 
+            let col_index_sample: Vec<usize> = if col_amount == col_index.len() {
+                Vec::new()
+            } else {
+                let mut v: Vec<usize> = col_index
+                    .iter()
+                    .choose_multiple(&mut rng, col_amount)
+                    .iter()
+                    .map(|i| **i)
+                    .collect();
+                v.sort();
+                v
+            };
+
+            let col_index_fit = if col_amount == col_index.len() {
+                &col_index
+            } else {
+                &col_index_sample
+            };
+
+            if col_amount != col_index.len() {
+                hist_tree.iter().for_each(|h| {
+                    update_cuts(h, col_index_fit, &binned_data.cuts, true);
+                })
+            }
+
             let mut tree = Tree::new();
             tree.fit(
                 &bdata,
                 data.index.to_owned(),
-                &col_index,
+                &col_index_fit,
                 &mut grad,
                 hess.as_deref_mut(),
                 splitter,
@@ -417,6 +482,7 @@ impl PerpetualBooster {
                 &mut hist_tree,
                 categorical_features.as_ref(),
                 &split_info_slice,
+                n_nodes_alloc,
             );
 
             self.update_predictions_inplace(&mut yhat, &tree, data);
@@ -428,7 +494,7 @@ impl PerpetualBooster {
                     .map(|n| n.generalization.unwrap_or(0.0))
                     .max_by(|a, b| a.total_cmp(b))
                     .unwrap_or(0.0);
-                if generalization < GENERALIZATION_THRESHOLD {
+                if generalization < GENERALIZATION_THRESHOLD && tree.stopper != TreeStopper::LossDecr {
                     stopping += 1;
                     if verbose {
                         println!(
@@ -882,6 +948,13 @@ impl PerpetualBooster {
         self
     }
 
+    /// Set the seed on the booster.
+    /// * `seed` - Integer value used to see any randomness used in the algorithm.
+    pub fn set_seed(mut self, seed: u64) -> Self {
+        self.seed = seed;
+        self
+    }
+
     /// Insert metadata
     /// * `key` - String value for the metadata key.
     /// * `value` - value to assign to the metadata key.
@@ -898,11 +971,12 @@ impl PerpetualBooster {
 
 #[cfg(test)]
 mod tests {
+    use crate::utils::between;
+
+    use super::*;
     use approx::assert_relative_eq;
     use polars::io::SerReader;
     use polars::prelude::{CsvReadOptions, DataType};
-
-    use super::*;
     use std::error::Error;
     use std::fs;
     use std::sync::Arc;
@@ -1007,7 +1081,6 @@ mod tests {
 
         let file = fs::read_to_string("resources/titanic_test_y.csv").expect("Something went wrong reading the file");
         let y: Vec<f64> = file.lines().map(|x| x.parse::<f64>().unwrap()).collect();
-
         let file =
             fs::read_to_string("resources/titanic_test_flat.csv").expect("Something went wrong reading the file");
         let data_vec: Vec<f64> = file.lines().map(|x| x.parse::<f64>().unwrap_or(f64::NAN)).collect();
@@ -1015,12 +1088,28 @@ mod tests {
 
         let cat_index = HashSet::from([0, 3, 4, 6, 7, 8, 10, 11]);
 
-        let mut booster = PerpetualBooster::default().set_max_bin(10);
+        let mut booster = PerpetualBooster::default();
 
-        booster.fit(&data, &y, None, None, 0.3, None, Some(cat_index)).unwrap();
-        let preds = booster.predict(&data, true);
+        booster.fit(&data, &y, None, None, 0.1, None, Some(cat_index)).unwrap();
 
-        println!("{:?}", &preds[..10]);
+        let file = fs::read_to_string("resources/titanic_train_y.csv").expect("Something went wrong reading the file");
+        let y: Vec<f64> = file.lines().map(|x| x.parse::<f64>().unwrap()).collect();
+        let file =
+            fs::read_to_string("resources/titanic_train_flat.csv").expect("Something went wrong reading the file");
+        let data_vec: Vec<f64> = file.lines().map(|x| x.parse::<f64>().unwrap_or(f64::NAN)).collect();
+        let data = Matrix::new(&data_vec, y.len(), n_columns);
+
+        let probabilities = booster.predict_proba(&data, true);
+
+        let accuracy = probabilities
+            .iter()
+            .zip(y.iter())
+            .map(|(p, y)| if p.round() == *y { 1 } else { 0 })
+            .sum::<usize>() as f32
+            / y.len() as f32;
+
+        assert!(between(0.77, 0.79, accuracy));
+
         Ok(())
     }
 
@@ -1156,4 +1245,31 @@ mod tests {
 
         Ok(())
     }
+
+    /*
+    #[test]
+    fn test_gbm_christine() -> Result<(), Box<dyn Error>> {
+        let n_columns = 1636;
+
+        let file = fs::read_to_string("resources/christine_y.csv").expect("Something went wrong reading the file");
+        let y: Vec<f64> = file.lines().map(|x| x.parse::<f64>().unwrap()).collect();
+        let file = fs::read_to_string("resources/christine_flat.csv").expect("Something went wrong reading the file");
+        let data_vec: Vec<f64> = file.lines().map(|x| x.parse::<f64>().unwrap_or(f64::NAN)).collect();
+        let data = Matrix::new(&data_vec, y.len(), n_columns);
+
+        let cat_index = HashSet::from([
+            72, 155, 213, 238, 244, 256, 261, 477, 495, 545, 565, 574, 583, 587, 646, 684, 687, 740, 779, 832, 856,
+            934, 950, 1004, 1009, 1047, 1186, 1228, 1238, 1239, 1255, 1259, 1300, 1355, 1486, 1585, 1606,
+        ]);
+
+        let mut booster = PerpetualBooster::default()
+            .set_num_threads(Some(1))
+            .set_log_iterations(1)
+            .set_max_bin(300);
+
+        booster.fit(&data, &y, None, None, 1.0, None, Some(cat_index)).unwrap();
+
+        Ok(())
+    }
+    */
 }

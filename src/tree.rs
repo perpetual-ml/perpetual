@@ -1,4 +1,3 @@
-use crate::constants::N_NODES_ALLOCATED;
 use crate::data::Matrix;
 use crate::grower::Grower;
 use crate::histogram::{update_histogram, NodeHistogram};
@@ -64,6 +63,7 @@ impl Tree {
         mut hist_tree: &mut [NodeHistogram],
         cat_index: Option<&HashSet<usize>>,
         split_info_slice: &SplitInfoSlice,
+        n_nodes_alloc: usize,
     ) {
         let mut n_nodes = 1;
         self.n_leaves = 1;
@@ -94,7 +94,7 @@ impl Tree {
         growable.add_node(root_node);
         while !growable.is_empty() {
             // If this will push us over the number of allocated nodes, break.
-            if self.nodes.len() > (N_NODES_ALLOCATED - 5) {
+            if self.nodes.len() > (n_nodes_alloc - 3) {
                 break;
             }
 
@@ -617,8 +617,10 @@ mod tests {
         let col_index: Vec<usize> = (0..data.cols).collect();
         let is_const_hess = false;
 
-        let mut hist_tree_owned: Vec<NodeHistogramOwned> = (0..N_NODES_ALLOCATED)
-            .map(|_| NodeHistogramOwned::empty(&b.cuts, &col_index, is_const_hess, true))
+        let n_nodes_alloc = 100;
+
+        let mut hist_tree_owned: Vec<NodeHistogramOwned> = (0..n_nodes_alloc)
+            .map(|_| NodeHistogramOwned::empty_from_cuts(&b.cuts, &col_index, is_const_hess, true))
             .collect();
 
         let mut hist_tree: Vec<NodeHistogram> = hist_tree_owned
@@ -650,12 +652,13 @@ mod tests {
             &mut hist_tree,
             None,
             &split_info_slice,
+            n_nodes_alloc,
         );
 
         println!("{}", tree);
         let preds = tree.predict(&data, false, &f64::NAN);
         println!("{:?}", &preds[0..10]);
-        assert_eq!(19, tree.nodes.len());
+        assert_eq!(27, tree.nodes.len());
         // Test contributions prediction...
         let weights = tree.distribute_leaf_weights();
         let mut contribs = vec![0.; (data.cols + 1) * data.rows];
@@ -711,8 +714,10 @@ mod tests {
         let col_index: Vec<usize> = (0..data.cols).collect();
         let is_const_hess = false;
 
-        let mut hist_tree_owned: Vec<NodeHistogramOwned> = (0..N_NODES_ALLOCATED)
-            .map(|_| NodeHistogramOwned::empty(&b.cuts, &col_index, is_const_hess, true))
+        let n_nodes_alloc = 100;
+
+        let mut hist_tree_owned: Vec<NodeHistogramOwned> = (0..n_nodes_alloc)
+            .map(|_| NodeHistogramOwned::empty_from_cuts(&b.cuts, &col_index, is_const_hess, true))
             .collect();
 
         let mut hist_tree: Vec<NodeHistogram> = hist_tree_owned
@@ -744,6 +749,7 @@ mod tests {
             &mut hist_tree,
             None,
             &split_info_slice,
+            n_nodes_alloc,
         );
 
         let mut pred_data_vec = data.get_col(0).to_owned();
@@ -800,8 +806,10 @@ mod tests {
         let col_index: Vec<usize> = (0..data.cols).collect();
         let is_const_hess = false;
 
-        let mut hist_tree_owned: Vec<NodeHistogramOwned> = (0..N_NODES_ALLOCATED)
-            .map(|_| NodeHistogramOwned::empty(&b.cuts, &col_index, is_const_hess, true))
+        let n_nodes_alloc = 100;
+
+        let mut hist_tree_owned: Vec<NodeHistogramOwned> = (0..n_nodes_alloc)
+            .map(|_| NodeHistogramOwned::empty_from_cuts(&b.cuts, &col_index, is_const_hess, true))
             .collect();
 
         let mut hist_tree: Vec<NodeHistogram> = hist_tree_owned
@@ -833,6 +841,7 @@ mod tests {
             &mut hist_tree,
             None,
             &split_info_slice,
+            n_nodes_alloc,
         );
 
         println!("{}", tree);
@@ -939,8 +948,10 @@ mod tests {
         let col_index: Vec<usize> = (0..data.cols).collect();
         let is_const_hess = true;
 
-        let mut hist_tree_owned: Vec<NodeHistogramOwned> = (0..N_NODES_ALLOCATED)
-            .map(|_| NodeHistogramOwned::empty(&b.cuts, &col_index, is_const_hess, true))
+        let n_nodes_alloc = 100;
+
+        let mut hist_tree_owned: Vec<NodeHistogramOwned> = (0..n_nodes_alloc)
+            .map(|_| NodeHistogramOwned::empty_from_cuts(&b.cuts, &col_index, is_const_hess, true))
             .collect();
 
         let mut hist_tree: Vec<NodeHistogram> = hist_tree_owned
@@ -973,6 +984,7 @@ mod tests {
             &mut hist_tree,
             None,
             &split_info_slice,
+            n_nodes_alloc,
         );
         println!("{}", tree);
         println!("tree.nodes.len: {}", tree.nodes.len());
@@ -1009,8 +1021,10 @@ mod tests {
         let col_index: Vec<usize> = (0..data.cols).collect();
         let is_const_hess = false;
 
-        let mut hist_tree_owned: Vec<NodeHistogramOwned> = (0..N_NODES_ALLOCATED)
-            .map(|_| NodeHistogramOwned::empty(&b.cuts, &col_index, is_const_hess, true))
+        let n_nodes_alloc = 100;
+
+        let mut hist_tree_owned: Vec<NodeHistogramOwned> = (0..n_nodes_alloc)
+            .map(|_| NodeHistogramOwned::empty_from_cuts(&b.cuts, &col_index, is_const_hess, true))
             .collect();
 
         let mut hist_tree: Vec<NodeHistogram> = hist_tree_owned
@@ -1043,13 +1057,14 @@ mod tests {
             &mut hist_tree,
             Some(&cat_index),
             &split_info_slice,
+            n_nodes_alloc,
         );
         println!("{}", tree);
         println!("tree.nodes.len: {}", tree.nodes.len());
         println!("data.first: {:?}", data.get_row(10));
         println!("tree.predict: {}", tree.predict(&data, true, &f64::NAN)[10]);
         println!("hist_tree[0]:");
-        for (i, item) in hist_tree[156].data.get(3).iter().enumerate() {
+        for (i, item) in hist_tree[10].data.get(3).iter().enumerate() {
             println!("The {}th item is {:?}", i, item);
         }
 
