@@ -547,7 +547,7 @@ mod tests {
         println!("The number of boosters: {:?}", booster.get_boosters().len());
         assert!(booster.get_boosters().len() == n_classes);
 
-        booster.fit(&data, &y, None, None, 0.3, None, None).unwrap();
+        booster.fit(&data, &y, None, None, 0.1, None, None).unwrap();
 
         let probas = booster.predict_proba(&data, true);
 

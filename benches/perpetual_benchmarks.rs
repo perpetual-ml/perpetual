@@ -1,7 +1,6 @@
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use perpetual::binning::bin_matrix;
 use perpetual::booster::PerpetualBooster;
-use perpetual::constants::N_NODES_ALLOCATED;
 use perpetual::constraints::ConstraintMap;
 use perpetual::data::Matrix;
 use perpetual::histogram::{NodeHistogram, NodeHistogramOwned};
@@ -40,8 +39,10 @@ pub fn tree_benchmarks(c: &mut Criterion) {
     let bdata = Matrix::new(&bindata.binned_data, data.rows, data.cols);
     let col_index: Vec<usize> = (0..data.cols).collect();
 
-    let mut hist_tree_owned: Vec<NodeHistogramOwned> = (0..N_NODES_ALLOCATED)
-        .map(|_| NodeHistogramOwned::empty(&bindata.cuts, &col_index, false, true))
+    let n_nodes_alloc = 100;
+
+    let mut hist_tree_owned: Vec<NodeHistogramOwned> = (0..n_nodes_alloc)
+        .map(|_| NodeHistogramOwned::empty_from_cuts(&bindata.cuts, &col_index, false, true))
         .collect();
 
     let mut hist_tree: Vec<NodeHistogram> = hist_tree_owned
@@ -73,6 +74,7 @@ pub fn tree_benchmarks(c: &mut Criterion) {
         &mut hist_tree,
         None,
         &split_info_slice,
+        n_nodes_alloc,
     );
 
     println!("{}", tree.nodes.len());
@@ -99,6 +101,7 @@ pub fn tree_benchmarks(c: &mut Criterion) {
                 black_box(&mut hist_tree),
                 None,
                 black_box(&split_info_slice),
+                n_nodes_alloc,
             );
         })
     });
@@ -125,6 +128,7 @@ pub fn tree_benchmarks(c: &mut Criterion) {
                 black_box(&mut hist_tree),
                 None,
                 black_box(&split_info_slice),
+                n_nodes_alloc,
             );
         })
     });

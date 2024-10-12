@@ -34,7 +34,7 @@ pub struct SplittableNode {
     pub right_cats: HashSet<usize>,
 }
 
-#[derive(Deserialize, Serialize, Clone)]
+#[derive(Deserialize, Serialize, Clone, Debug)]
 pub struct Node {
     pub num: usize,
     pub weight_value: f32,

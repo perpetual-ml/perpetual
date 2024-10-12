@@ -10,7 +10,7 @@ pub struct FeatureHistogramOwned {
 }
 
 impl FeatureHistogramOwned {
-    pub fn empty(cuts: &[f64], is_const_hess: bool) -> Self {
+    pub fn empty_from_cuts(cuts: &[f64], is_const_hess: bool) -> Self {
         let mut histogram: Vec<Bin> = Vec::with_capacity(cuts.len());
         if is_const_hess {
             histogram.push(Bin::empty_const_hess(0, f64::NAN));
@@ -29,7 +29,18 @@ impl FeatureHistogramOwned {
                     .map(|(it, c)| Bin::empty(it as u16 + 1, *c)),
             );
         }
+        FeatureHistogramOwned { data: histogram }
+    }
 
+    pub fn empty(max_bin: u16, is_const_hess: bool) -> Self {
+        let mut histogram: Vec<Bin> = Vec::with_capacity(max_bin.into());
+        if is_const_hess {
+            histogram.push(Bin::empty_const_hess(0, f64::NAN));
+            histogram.extend((0..(max_bin + 1)).map(|i| Bin::empty_const_hess(i + 1, f64::NAN)));
+        } else {
+            histogram.push(Bin::empty(0, f64::NAN));
+            histogram.extend((0..(max_bin + 1)).map(|i| Bin::empty(i + 1, f64::NAN)));
+        }
         FeatureHistogramOwned { data: histogram }
     }
 }
@@ -89,6 +100,18 @@ impl<'a> FeatureHistogram<'a> {
             }
         }
     }
+
+    pub unsafe fn update_cuts(&self, cuts: &[f64]) {
+        let cuts_mod = &cuts[..(cuts.len() - 1)];
+        self.data.iter().enumerate().for_each(|(i, b)| {
+            let bin = b.get().as_mut().unwrap();
+            if i == 0 {
+                bin.cut_value = f64::NAN;
+            } else {
+                bin.cut_value = *cuts_mod.get(i - 1).unwrap_or(&f64::NAN);
+            }
+        });
+    }
 }
 
 #[derive(Debug)]
@@ -98,19 +121,34 @@ pub struct NodeHistogramOwned {
 
 impl NodeHistogramOwned {
     /// Create an empty histogram matrix.
-    pub fn empty(cuts: &JaggedMatrix<f64>, col_index: &[usize], is_const_hess: bool, parallel: bool) -> Self {
+    pub fn empty_from_cuts(cuts: &JaggedMatrix<f64>, col_index: &[usize], is_const_hess: bool, parallel: bool) -> Self {
         let histograms: Vec<FeatureHistogramOwned> = if parallel {
             col_index
                 .par_iter()
-                .map(|col| FeatureHistogramOwned::empty(cuts.get_col(*col), is_const_hess))
+                .map(|col| FeatureHistogramOwned::empty_from_cuts(cuts.get_col(*col), is_const_hess))
                 .collect()
         } else {
             col_index
                 .iter()
-                .map(|col| FeatureHistogramOwned::empty(cuts.get_col(*col), is_const_hess))
+                .map(|col| FeatureHistogramOwned::empty_from_cuts(cuts.get_col(*col), is_const_hess))
                 .collect()
         };
+        NodeHistogramOwned { data: histograms }
+    }
 
+    /// Create an empty histogram matrix.
+    pub fn empty(max_bin: u16, col_amount: usize, is_const_hess: bool, parallel: bool) -> Self {
+        let histograms: Vec<FeatureHistogramOwned> = if parallel {
+            (0..col_amount)
+                .collect::<Vec<_>>()
+                .par_iter()
+                .map(|_col| FeatureHistogramOwned::empty(max_bin, is_const_hess))
+                .collect()
+        } else {
+            (0..col_amount)
+                .map(|_col| FeatureHistogramOwned::empty(max_bin, is_const_hess))
+                .collect()
+        };
         NodeHistogramOwned { data: histograms }
     }
 }
@@ -200,6 +238,21 @@ impl NodeHistogram<'_> {
 }
 
 #[allow(clippy::too_many_arguments)]
+pub fn update_cuts(hist: &NodeHistogram, col_index: &[usize], cuts: &JaggedMatrix<f64>, parallel: bool) {
+    if parallel {
+        hist.data
+            .par_iter()
+            .zip(col_index.par_iter())
+            .for_each(|(h, i)| unsafe { h.update_cuts(cuts.get_col(*i)) })
+    } else {
+        hist.data
+            .iter()
+            .zip(col_index.iter())
+            .for_each(|(h, i)| unsafe { h.update_cuts(cuts.get_col(*i)) })
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
 pub fn update_histogram(
     hist: &NodeHistogram,
     start: usize,
@@ -237,15 +290,16 @@ pub fn update_histogram(
             pool.scope(|s| {
                 for i in 0..hist.data.len() {
                     let h = hist.data.get_unchecked(i);
-                    let feature = data.get_col(i);
+                    let feature = data.get_col(col_index[i]);
                     s.spawn(|_| {
                         h.update(feature, &sorted_grad, sorted_hess.as_deref(), &index[start..stop]);
                     });
                 }
             });
         } else {
-            col_index.iter().for_each(|col| {
-                hist.data.get_unchecked(*col).update(
+            col_index.iter().enumerate().for_each(|(i, col)| {
+                println!("i: {:?}, col: {:?}", i, col);
+                hist.data.get_unchecked(i).update(
                     data.get_col(*col),
                     &sorted_grad,
                     sorted_hess.as_deref(),
@@ -270,12 +324,14 @@ mod tests {
 
     #[test]
     fn test_simple_histogram() {
+        let nbins = 90;
+
         let data_vec: Vec<f64> = (0..100).map(|i| i as f64).collect();
         let y: Vec<f64> = (0..100).map(|i| i as f64).collect();
 
         let data = Matrix::new(&data_vec, data_vec.len(), 1);
 
-        let b = bin_matrix(&data, None, 5, f64::NAN, None).unwrap();
+        let b = bin_matrix(&data, None, nbins, f64::NAN, None).unwrap();
         let bdata = Matrix::new(&b.binned_data, data.rows, data.cols);
 
         let y_avg = y.iter().sum::<f64>() / y.len() as f64;
@@ -283,7 +339,7 @@ mod tests {
         let (g, h) = LogLoss::calc_grad_hess(&y, &yhat, None, None);
 
         let col = 0;
-        let mut hist_feat_owned = FeatureHistogramOwned::empty(&b.cuts.get_col(col), false);
+        let mut hist_feat_owned = FeatureHistogramOwned::empty_from_cuts(&b.cuts.get_col(col), false);
         let hist_feat = FeatureHistogram::new(&mut hist_feat_owned.data);
         unsafe { hist_feat.update(&bdata.get_col(col), &g, h.as_deref(), &bdata.index) };
 
@@ -291,6 +347,15 @@ mod tests {
 
         println!("histogram:");
         println!("{:?}", hist_feat);
+        println!("histogram.cuts:");
+        println!(
+            "{:?}",
+            hist_feat
+                .data
+                .iter()
+                .map(|b| unsafe { b.get().as_ref().unwrap().cut_value })
+                .collect::<Vec<_>>()
+        );
         println!("feature_data:");
         println!("{:?}", &data.get_col(col));
         println!("feature_data_bin_indices:");
@@ -306,22 +371,28 @@ mod tests {
         println!("{:?}", &f.len());
         println!("{:?}", &hist_feat.data.len());
         assert_eq!(f.len() + 1, hist_feat.data.len());
+        println!("b.cuts:");
+        println!("{:?}", &b.cuts);
+        println!("b.nunique:");
+        println!("{:?}", &b.nunique);
     }
 
     #[test]
     fn test_single_histogram() {
+        let nbins = 10;
+
         let file =
             fs::read_to_string("resources/contiguous_no_missing.csv").expect("Something went wrong reading the file");
         let data_vec: Vec<f64> = file.lines().map(|x| x.parse::<f64>().unwrap()).collect();
         let data = Matrix::new(&data_vec, 891, 5);
-        let b = bin_matrix(&data, None, 10, f64::NAN, None).unwrap();
+        let b = bin_matrix(&data, None, nbins, f64::NAN, None).unwrap();
         let bdata = Matrix::new(&b.binned_data, data.rows, data.cols);
         let y: Vec<f64> = file.lines().map(|x| x.parse::<f64>().unwrap()).collect();
         let yhat = vec![0.5; y.len()];
         let (g, h) = LogLoss::calc_grad_hess(&y, &yhat, None, None);
 
         let col_index: Vec<usize> = (0..data.cols).collect();
-        let mut hist_init_owned = NodeHistogramOwned::empty(&b.cuts, &col_index, true, false);
+        let mut hist_init_owned = NodeHistogramOwned::empty_from_cuts(&b.cuts, &col_index, true, false);
         let mut hist_init = NodeHistogram::from_owned(&mut hist_init_owned);
 
         let col = 1;
@@ -382,7 +453,7 @@ mod tests {
         let (g, h) = LogLoss::calc_grad_hess(&y, &yhat, None, None);
 
         let col_index: Vec<usize> = (0..data.cols).collect();
-        let mut hist_init_owned = NodeHistogramOwned::empty(&b.cuts, &col_index, false, false);
+        let mut hist_init_owned = NodeHistogramOwned::empty_from_cuts(&b.cuts, &col_index, false, false);
         let mut hist_init = NodeHistogram::from_owned(&mut hist_init_owned);
 
         let col = 0;
@@ -438,10 +509,10 @@ mod tests {
 
         let col_index: Vec<usize> = (0..data.cols).collect();
 
-        let mut hist_init_owned1 = NodeHistogramOwned::empty(&b.cuts, &col_index, false, false);
+        let mut hist_init_owned1 = NodeHistogramOwned::empty_from_cuts(&b.cuts, &col_index, false, false);
         let mut hist_init1 = NodeHistogram::from_owned(&mut hist_init_owned1);
 
-        let mut hist_init_owned2 = NodeHistogramOwned::empty(&b.cuts, &col_index, false, false);
+        let mut hist_init_owned2 = NodeHistogramOwned::empty_from_cuts(&b.cuts, &col_index, false, false);
         let mut hist_init2 = NodeHistogram::from_owned(&mut hist_init_owned2);
 
         let col = 1;

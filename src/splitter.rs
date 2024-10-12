@@ -179,14 +179,17 @@ pub trait Splitter {
 
         let best_feature_split = best_feature_split_callables(is_const_hess);
 
+        let feature_index = (0..col_index.len()).collect::<Vec<_>>();
+
         if pool.current_num_threads() > 1 {
             pool.scope(|s| {
-                for feature in col_index.iter() {
+                for (feature, feat_idx) in col_index.iter().zip(feature_index.iter()) {
                     s.spawn(|_| {
                         best_feature_split(
                             node,
+                            *feat_idx,
                             *feature,
-                            hist_node.data.get(*feature).unwrap(),
+                            hist_node.data.get(*feat_idx).unwrap(),
                             cat_index,
                             constraint_map.get(feature),
                             force_children_to_bound_parent,
@@ -199,12 +202,13 @@ pub trait Splitter {
                 }
             });
         } else {
-            for feature in col_index.iter() {
+            for (feature, feat_idx) in col_index.iter().zip(feature_index.iter()) {
                 let constraint = self.get_constraint(&feature);
                 best_feature_split(
                     node,
+                    *feat_idx,
                     *feature,
-                    hist_node.data.get(*feature).unwrap(),
+                    hist_node.data.get(*feat_idx).unwrap(),
                     cat_index,
                     constraint,
                     force_children_to_bound_parent,
@@ -823,6 +827,7 @@ impl Splitter for MissingImputerSplitter {
 type BestFeatureSplitFn = fn(
     &SplittableNode,
     usize,
+    usize,
     &FeatureHistogram,
     Option<&HashSet<usize>>,
     Option<&Constraint>,
@@ -841,11 +846,12 @@ pub fn best_feature_split_callables(is_const_hess: bool) -> BestFeatureSplitFn {
     }
 }
 
-/// The idx is the index of the feature in the histogram data, whereas feature
-/// is the index of the actual feature in the data.
+/// The feat_idx is the index of the feature in the histogram data.
+/// The feature is the index of the actual feature in the data.
 #[inline]
 fn best_feature_split_const_hess(
     node: &SplittableNode,
+    feat_idx: usize,
     feature: usize,
     hist_feat: &FeatureHistogram,
     cat_index: Option<&HashSet<usize>>,
@@ -856,7 +862,7 @@ fn best_feature_split_const_hess(
     create_missing_branch: bool,
     split_info_slice: &SplitInfoSlice,
 ) {
-    let split_info = unsafe { split_info_slice.get_mut(feature) };
+    let split_info = unsafe { split_info_slice.get_mut(feat_idx) };
     split_info.split_gain = -1.0;
 
     let mut max_gain: Option<f32> = None;
@@ -869,7 +875,10 @@ fn best_feature_split_const_hess(
 
     let mut hist = hist_feat.data[1..]
         .iter()
-        .filter(|b| unsafe { b.get().as_ref().unwrap().counts.iter().sum::<usize>() } > 0)
+        .filter(|b| {
+            let bin = unsafe { b.get().as_ref().unwrap() };
+            bin.counts.iter().sum::<usize>() > 0 && !bin.cut_value.is_nan()
+        })
         .collect::<Vec<_>>();
 
     if let Some(c_index) = cat_index {
@@ -1061,11 +1070,12 @@ fn best_feature_split_const_hess(
     }
 }
 
-/// The idx is the index of the feature in the histogram data, whereas feature
-/// is the index of the actual feature in the data.
+/// The feat_idx is the index of the feature in the histogram data.
+/// The feature is the index of the actual feature in the data.
 #[inline]
 fn best_feature_split_var_hess(
     node: &SplittableNode,
+    feat_idx: usize,
     feature: usize,
     hist_feat: &FeatureHistogram,
     cat_index: Option<&HashSet<usize>>,
@@ -1076,7 +1086,7 @@ fn best_feature_split_var_hess(
     create_missing_branch: bool,
     split_info_slice: &SplitInfoSlice,
 ) {
-    let split_info = unsafe { split_info_slice.get_mut(feature) };
+    let split_info = unsafe { split_info_slice.get_mut(feat_idx) };
     split_info.split_gain = -1.0;
 
     let mut max_gain: Option<f32> = None;
@@ -1803,7 +1813,6 @@ fn evaluate_branch_split_var_hess(
 mod tests {
     use super::*;
     use crate::binning::bin_matrix;
-    use crate::constants::N_NODES_ALLOCATED;
     use crate::data::Matrix;
     use crate::histogram::NodeHistogramOwned;
     use crate::node::SplittableNode;
@@ -1848,8 +1857,10 @@ mod tests {
             .build()
             .unwrap();
 
-        let mut hist_tree_owned: Vec<NodeHistogramOwned> = (0..N_NODES_ALLOCATED)
-            .map(|_| NodeHistogramOwned::empty(&b.cuts, &col_index, is_const_hess, true))
+        let n_nodes_alloc = 100;
+
+        let mut hist_tree_owned: Vec<NodeHistogramOwned> = (0..n_nodes_alloc)
+            .map(|_| NodeHistogramOwned::empty_from_cuts(&b.cuts, &col_index, is_const_hess, true))
             .collect();
 
         let mut hist_tree: Vec<NodeHistogram> = hist_tree_owned
@@ -1857,7 +1868,7 @@ mod tests {
             .map(|node_hist| NodeHistogram::from_owned(node_hist))
             .collect();
 
-        for i in 0..N_NODES_ALLOCATED {
+        for i in 0..n_nodes_alloc {
             update_histogram(
                 unsafe { &mut hist_tree.get_unchecked(i) },
                 0,
@@ -1995,8 +2006,10 @@ mod tests {
 
         let pool = rayon::ThreadPoolBuilder::new().num_threads(2).build().unwrap();
 
-        let mut hist_tree_owned: Vec<NodeHistogramOwned> = (0..N_NODES_ALLOCATED)
-            .map(|_| NodeHistogramOwned::empty(&b.cuts, &col_index, is_const_hess, true))
+        let n_nodes_alloc = 100;
+
+        let mut hist_tree_owned: Vec<NodeHistogramOwned> = (0..n_nodes_alloc)
+            .map(|_| NodeHistogramOwned::empty_from_cuts(&b.cuts, &col_index, is_const_hess, true))
             .collect();
 
         let mut hist_tree: Vec<NodeHistogram> = hist_tree_owned
@@ -2004,7 +2017,7 @@ mod tests {
             .map(|node_hist| NodeHistogram::from_owned(node_hist))
             .collect();
 
-        for i in 0..N_NODES_ALLOCATED {
+        for i in 0..n_nodes_alloc {
             update_histogram(
                 unsafe { &mut hist_tree.get_unchecked(i) },
                 0,
@@ -2061,13 +2074,14 @@ mod tests {
     fn test_categorical() -> Result<(), Box<dyn Error>> {
         let n_bins = 256;
         let n_rows = 712;
-        let n_cols = 13;
+        let n_cols = 9;
         let is_const_hess = false;
 
         let file =
             fs::read_to_string("resources/titanic_train_flat.csv").expect("Something went wrong reading the file");
         let data_vec: Vec<f64> = file.lines().map(|x| x.parse::<f64>().unwrap_or(f64::NAN)).collect();
-        let data = Matrix::new(&data_vec, n_rows, n_cols);
+        let data_vec_truncated = &data_vec[0..(n_cols * n_rows)];
+        let data = Matrix::new(&data_vec_truncated, n_rows, n_cols);
 
         let file = fs::read_to_string("resources/titanic_train_y.csv").expect("Something went wrong reading the file");
         let y: Vec<f64> = file.lines().map(|x| x.parse::<f64>().unwrap()).collect();
@@ -2076,7 +2090,7 @@ mod tests {
         let yhat = vec![y_avg; y.len()];
         let (grad, hess) = LogLoss::calc_grad_hess(&y, &yhat, None, None);
 
-        let splitter = MissingImputerSplitter::new(0.3, false, ConstraintMap::new());
+        let splitter = MissingImputerSplitter::new(0.1, false, ConstraintMap::new());
 
         let gradient_sum = grad.iter().copied().sum();
         let hessian_sum = match hess {
@@ -2096,7 +2110,7 @@ mod tests {
         let pool = rayon::ThreadPoolBuilder::new().num_threads(2).build().unwrap();
 
         let mut hist_tree_owned: Vec<NodeHistogramOwned> = (0..10)
-            .map(|_| NodeHistogramOwned::empty(&b.cuts, &col_index, is_const_hess, true))
+            .map(|_| NodeHistogramOwned::empty_from_cuts(&b.cuts, &col_index, is_const_hess, true))
             .collect();
 
         let mut hist_tree: Vec<NodeHistogram> = hist_tree_owned

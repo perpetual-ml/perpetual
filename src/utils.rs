@@ -197,7 +197,7 @@ pub fn weight_const_hess(gradient_sum: f32, count_sum: usize) -> f32 {
 /// Calculate the gain given the gradient and hessian of the node.
 #[inline]
 pub fn gain(gradient_sum: f32, hessian_sum: f32) -> f32 {
-    (gradient_sum * gradient_sum) / (hessian_sum + 1.0) // no -0.5 multiplier term!
+    (gradient_sum * gradient_sum) / (hessian_sum + 1e-3) // no -0.5 multiplier term!
 }
 #[inline]
 pub fn gain_const_hess(gradient_sum: f32, count_sum: usize) -> f32 {
@@ -209,7 +209,7 @@ pub fn gain_const_hess(gradient_sum: f32, count_sum: usize) -> f32 {
 /// monotonicity constraints.
 #[inline]
 pub fn gain_given_weight(gradient_sum: f32, hessian_sum: f32, weight: f32) -> f32 {
-    -(2.0 * gradient_sum * weight + (hessian_sum + 1.0) * (weight * weight))
+    -(2.0 * gradient_sum * weight + (hessian_sum + 1e-3) * (weight * weight))
 }
 #[inline]
 pub fn gain_given_weight_const_hess(gradient_sum: f32, counts: usize, weight: f32) -> f32 {

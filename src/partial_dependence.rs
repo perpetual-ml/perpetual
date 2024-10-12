@@ -76,7 +76,6 @@ mod tests {
 
     use super::*;
     use crate::binning::bin_matrix;
-    use crate::constants::N_NODES_ALLOCATED;
     use crate::constraints::ConstraintMap;
     use crate::data::Matrix;
     use crate::histogram::{NodeHistogram, NodeHistogramOwned};
@@ -106,8 +105,10 @@ mod tests {
         let bdata = Matrix::new(&b.binned_data, data.rows, data.cols);
         let col_index: Vec<usize> = (0..data.cols).collect();
 
-        let mut hist_tree_owned: Vec<NodeHistogramOwned> = (0..N_NODES_ALLOCATED)
-            .map(|_| NodeHistogramOwned::empty(&b.cuts, &col_index, is_const_hess, true))
+        let n_nodes_alloc = 100;
+
+        let mut hist_tree_owned: Vec<NodeHistogramOwned> = (0..n_nodes_alloc)
+            .map(|_| NodeHistogramOwned::empty_from_cuts(&b.cuts, &col_index, is_const_hess, true))
             .collect();
 
         let mut hist_tree: Vec<NodeHistogram> = hist_tree_owned
@@ -139,6 +140,7 @@ mod tests {
             &mut hist_tree,
             None,
             &split_info_slice,
+            n_nodes_alloc,
         );
 
         let pdp1 = tree_partial_dependence(&tree, 0, 0, 1.0, 1.0, &f64::NAN);
