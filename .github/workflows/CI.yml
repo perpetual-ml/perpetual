@@ -148,7 +148,7 @@ jobs:
 
   cargo-build-test:
     runs-on: ubuntu-latest
-    needs: ["windows-build-test", "macos-build-test", "linux-build-test"]
+    needs: ["linux-build-test"]
     steps:
       - uses: actions/checkout@v4
       - name: Install latest stable Rust

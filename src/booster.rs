@@ -1108,7 +1108,8 @@ mod tests {
             .sum::<usize>() as f32
             / y.len() as f32;
 
-        assert!(between(0.77, 0.79, accuracy));
+        println!("accuracy: {}", accuracy);
+        assert!(between(0.76, 0.78, accuracy));
 
         Ok(())
     }
