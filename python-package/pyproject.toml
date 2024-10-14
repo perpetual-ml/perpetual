@@ -19,7 +19,7 @@ keywords = [
 authors = [{ name = "Mutlu Simsek" }]
 readme = "README.md"
 dependencies = ["numpy", "typing-extensions"]
-requires-python = ">=3.9"
+requires-python = ">=3.8"
 classifiers = [
   "Programming Language :: Rust",
   "Programming Language :: Python :: 3",
