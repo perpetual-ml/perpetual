@@ -5,7 +5,7 @@ jobs:
   windows-build-test:
     strategy:
       matrix:
-        pyversion: ["3.8", "3.9", "3.10", "3.11", "3.12"]
+        pyversion: ["3.9", "3.10", "3.11", "3.12", "3.13"]
     runs-on: "windows-latest"
     steps:
       - uses: actions/checkout@v4
@@ -53,7 +53,7 @@ jobs:
   macos-build-test:
     strategy:
       matrix:
-        pyversion: ["3.11", "3.12"]
+        pyversion: ["3.11", "3.12", "3.13"]
         os: [macos-latest, macos-latest-large]
     runs-on: ${{ matrix.os }}
     steps:
@@ -101,7 +101,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        pyversion: ["3.8", "3.9", "3.10", "3.11", "3.12"]
+        pyversion: ["3.9", "3.10", "3.11", "3.12", "3.13"]
     steps:
       - uses: actions/checkout@v4
       - name: Install latests stable Rust
@@ -148,7 +148,7 @@ jobs:
 
   cargo-build-test:
     runs-on: ubuntu-latest
-    needs: ["windows-build-test", "macos-build-test", "linux-build-test"]
+    needs: ["linux-build-test"]
     steps:
       - uses: actions/checkout@v4
       - name: Install latest stable Rust
