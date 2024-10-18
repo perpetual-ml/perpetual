@@ -156,6 +156,7 @@ class PerpetualBooster:
         alpha: Union[float, None] = None,
         reset: Union[bool, None] = None,
         categorical_features: Union[Iterable[int], Iterable[str], str, None] = "auto",
+        timeout: Union[float, None] = None,
     ) -> Self:
         """Fit the gradient booster on a provided dataset.
 
@@ -172,6 +173,7 @@ class PerpetualBooster:
             reset: whether to reset the model or continue training.
             categorical_features: The names or indices for categorical features.
                 `auto` for Polars or Pandas categorical data type.
+            timeout: optional fit timeout in seconds
         """
 
         features_, flat_data, rows, cols, categorical_features_, cat_mapping = (
@@ -244,6 +246,7 @@ class PerpetualBooster:
             alpha=alpha,
             reset=reset,
             categorical_features=categorical_features_,  # type: ignore
+            timeout=timeout,
         )
 
         return self

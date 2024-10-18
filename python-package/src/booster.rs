@@ -140,6 +140,7 @@ impl PerpetualBooster {
         alpha: Option<f32>,
         reset: Option<bool>,
         categorical_features: Option<HashSet<usize>>,
+        timeout: Option<f32>,
     ) -> PyResult<()> {
         let flat_data = flat_data.as_slice()?;
         let data = Matrix::new(flat_data, rows, cols);
@@ -152,10 +153,16 @@ impl PerpetualBooster {
             None => None,
         };
 
-        match self
-            .booster
-            .fit(&data, y, sample_weight_, alpha, budget, reset, categorical_features)
-        {
+        match self.booster.fit(
+            &data,
+            y,
+            sample_weight_,
+            alpha,
+            budget,
+            reset,
+            categorical_features,
+            timeout,
+        ) {
             Ok(m) => Ok(m),
             Err(e) => Err(PyValueError::new_err(e.to_string())),
         }?;

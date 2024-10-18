@@ -194,7 +194,13 @@ impl MultiOutputBooster {
         budget: f32,
         reset: Option<bool>,
         categorical_features: Option<HashSet<usize>>,
+        timeout: Option<f32>,
     ) -> Result<(), PerpetualError> {
+        let timeout_booster = match timeout {
+            Some(t) => Some(t / self.n_boosters as f32),
+            None => None,
+        };
+
         for i in 0..self.n_boosters {
             let _ = self.boosters[i].fit(
                 data,
@@ -204,6 +210,7 @@ impl MultiOutputBooster {
                 budget,
                 reset,
                 categorical_features.clone(),
+                timeout_booster,
             );
         }
         Ok(())
@@ -547,7 +554,7 @@ mod tests {
         println!("The number of boosters: {:?}", booster.get_boosters().len());
         assert!(booster.get_boosters().len() == n_classes);
 
-        booster.fit(&data, &y, None, None, 0.1, None, None).unwrap();
+        booster.fit(&data, &y, None, None, 0.1, None, None, Some(59.0)).unwrap();
 
         let probas = booster.predict_proba(&data, true);
 

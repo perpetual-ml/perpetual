@@ -11,11 +11,11 @@ use std::cmp::max;
 use std::collections::{BinaryHeap, HashMap, HashSet};
 use std::fmt::{self, Display};
 
-#[derive(Deserialize, Serialize, Clone, PartialEq)]
+#[derive(Deserialize, Serialize, Clone, PartialEq, Debug)]
 pub enum TreeStopper {
-    MaxDepth,
-    LossDecr,
-    Overfitting,
+    Generalization,
+    LossDecrement,
+    MaxNodes,
 }
 
 #[derive(Deserialize, Serialize, Clone)]
@@ -36,7 +36,7 @@ impl Tree {
     pub fn new() -> Self {
         Tree {
             nodes: HashMap::new(),
-            stopper: TreeStopper::Overfitting,
+            stopper: TreeStopper::Generalization,
             depth: 0,
             n_leaves: 0,
         }
@@ -95,12 +95,13 @@ impl Tree {
         while !growable.is_empty() {
             // If this will push us over the number of allocated nodes, break.
             if self.nodes.len() > (n_nodes_alloc - 3) {
+                self.stopper = TreeStopper::MaxNodes;
                 break;
             }
 
             if let Some(tld) = target_loss_decrement {
                 if loss_decr_avg > tld {
-                    self.stopper = TreeStopper::LossDecr;
+                    self.stopper = TreeStopper::LossDecrement;
                     break;
                 }
             }
