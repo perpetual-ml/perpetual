@@ -157,6 +157,7 @@ pub fn tree_benchmarks(c: &mut Criterion) {
                     black_box(0.3),
                     black_box(None),
                     black_box(None),
+                    black_box(None),
                 )
                 .unwrap();
         })
@@ -173,12 +174,13 @@ pub fn tree_benchmarks(c: &mut Criterion) {
                     black_box(0.3),
                     black_box(None),
                     black_box(None),
+                    black_box(None),
                 )
                 .unwrap();
         })
     });
     let mut booster = PerpetualBooster::default();
-    booster.fit(&data, &y, None, None, 0.3, None, None).unwrap();
+    booster.fit(&data, &y, None, None, 0.1, None, None, None).unwrap();
     booster_train.bench_function("Predict Booster", |b| {
         b.iter(|| booster.predict(black_box(&data), false))
     });

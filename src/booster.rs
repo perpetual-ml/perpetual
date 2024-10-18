@@ -21,6 +21,7 @@ use rand::SeedableRng;
 use rayon::prelude::*;
 use serde::{Deserialize, Deserializer, Serialize};
 use std::collections::{HashMap, HashSet};
+use std::time::Instant;
 use std::{fs, mem};
 use sysinfo::System;
 
@@ -251,6 +252,7 @@ impl PerpetualBooster {
     /// * `budget` - budget to fit the model.
     /// * `reset` - Reset the model or continue training.
     /// * `categorical_features` - categorical features.
+    /// * `timeout` - fit timeout limit in seconds.
     pub fn fit(
         &mut self,
         data: &Matrix<f64>,
@@ -260,6 +262,7 @@ impl PerpetualBooster {
         budget: f32,
         reset: Option<bool>,
         categorical_features: Option<HashSet<usize>>,
+        timeout: Option<f32>,
     ) -> Result<(), PerpetualError> {
         let constraints_map = self
             .monotone_constraints
@@ -287,6 +290,7 @@ impl PerpetualBooster {
                 budget,
                 reset,
                 categorical_features,
+                timeout,
             )?;
         } else {
             let splitter = MissingImputerSplitter::new(self.eta, self.allow_missing_splits, constraints_map);
@@ -299,6 +303,7 @@ impl PerpetualBooster {
                 budget,
                 reset,
                 categorical_features,
+                timeout,
             )?;
         };
 
@@ -315,7 +320,10 @@ impl PerpetualBooster {
         budget: f32,
         reset: Option<bool>,
         categorical_features: Option<HashSet<usize>>,
+        timeout: Option<f32>,
     ) -> Result<(), PerpetualError> {
+        let start = Instant::now();
+
         let n_threads_available = std::thread::available_parallelism().unwrap().get();
         let num_threads = match self.num_threads {
             Some(num_threads) => num_threads,
@@ -494,34 +502,26 @@ impl PerpetualBooster {
                     .map(|n| n.generalization.unwrap_or(0.0))
                     .max_by(|a, b| a.total_cmp(b))
                     .unwrap_or(0.0);
-                if generalization < GENERALIZATION_THRESHOLD && tree.stopper != TreeStopper::LossDecr {
+                if generalization < GENERALIZATION_THRESHOLD && tree.stopper != TreeStopper::LossDecrement {
                     stopping += 1;
-                    if verbose {
-                        println!(
-                            "round {0}, tree.nodes: {1}, tree.depth: {2}, stopping: {3}",
-                            i,
-                            tree.nodes.len(),
-                            tree.depth,
-                            stopping,
-                        );
-                    }
                     // If root node cannot be split due to no positive split gain, stop boosting.
                     if tree.nodes.len() == 1 {
                         break;
                     }
                 }
-            } else {
-                if verbose {
-                    println!(
-                        "round {0}, tree.nodes: {1}, tree.depth: {2}",
-                        i,
-                        tree.nodes.len(),
-                        tree.depth,
-                    );
-                }
             }
 
-            if tree.stopper != TreeStopper::LossDecr {
+            if verbose {
+                info!(
+                    "round {:0?}, tree.nodes: {:1?}, tree.depth: {:2?}, tree.stopper: {:3?}",
+                    i,
+                    tree.nodes.len(),
+                    tree.depth,
+                    tree.stopper,
+                );
+            }
+
+            if tree.stopper != TreeStopper::LossDecrement {
                 n_low_loss_rounds += 1;
             } else {
                 n_low_loss_rounds = 0;
@@ -529,12 +529,20 @@ impl PerpetualBooster {
 
             self.trees.push(tree);
 
+            (grad, hess) = calc_grad_hess(y, &yhat, sample_weight, alpha);
+            loss = calc_loss(y, &yhat, sample_weight, alpha);
+
             if stopping >= STOPPING_ROUNDS {
+                info!("Auto stopping since stopping round limit reached.");
                 break;
             }
 
-            (grad, hess) = calc_grad_hess(y, &yhat, sample_weight, alpha);
-            loss = calc_loss(y, &yhat, sample_weight, alpha);
+            if let Some(t) = timeout {
+                if start.elapsed().as_secs_f32() > t {
+                    warn!("Reached timeout limit before auto stopping. Try to decrease the budget or increase the timeout for the best performance.");
+                    break;
+                }
+            }
 
             if i == ITERATION_LIMIT - 1 {
                 warn!("Reached iteration limit before auto stopping. Try to decrease the budget for the best performance.");
@@ -542,7 +550,11 @@ impl PerpetualBooster {
         }
 
         if self.log_iterations > 0 {
-            info!("Finished training booster with {} trees.", self.trees.len());
+            info!(
+                "Finished training a booster with {0} trees in {1}.",
+                self.trees.len(),
+                start.elapsed().as_secs()
+            );
         }
 
         Ok(())
@@ -991,7 +1003,7 @@ mod tests {
 
         let data = Matrix::new(&data_vec, 891, 5);
         let mut booster = PerpetualBooster::default().set_max_bin(300).set_base_score(0.5);
-        booster.fit(&data, &y, None, None, 0.3, None, None).unwrap();
+        booster.fit(&data, &y, None, None, 0.3, None, None, None).unwrap();
         let preds = booster.predict(&data, false);
         let contribs = booster.predict_contributions(&data, ContributionsMethod::Average, false);
         assert_eq!(contribs.len(), (data.cols + 1) * data.rows);
@@ -1013,7 +1025,7 @@ mod tests {
 
         let mut booster = PerpetualBooster::default();
 
-        booster.fit(&data, &y, None, None, 0.3, None, None).unwrap();
+        booster.fit(&data, &y, None, None, 0.3, None, None, None).unwrap();
         let preds = booster.predict(&data, false);
         let contribs = booster.predict_contributions(&data, ContributionsMethod::Average, false);
         assert_eq!(contribs.len(), (data.cols + 1) * data.rows);
@@ -1037,7 +1049,7 @@ mod tests {
             .set_objective(Objective::SquaredLoss)
             .set_max_bin(300);
 
-        booster.fit(&data, &y, None, None, 0.3, None, None).unwrap();
+        booster.fit(&data, &y, None, None, 0.3, None, None, None).unwrap();
         let preds = booster.predict(&data, false);
         let contribs = booster.predict_contributions(&data, ContributionsMethod::Average, false);
         assert_eq!(contribs.len(), (data.cols + 1) * data.rows);
@@ -1060,7 +1072,7 @@ mod tests {
         //let data = Matrix::new(data.get_col(1), 891, 1);
         let mut booster = PerpetualBooster::default().set_max_bin(300).set_base_score(0.5);
 
-        booster.fit(&data, &y, None, None, 0.3, None, None).unwrap();
+        booster.fit(&data, &y, None, None, 0.3, None, None, None).unwrap();
         let preds = booster.predict(&data, true);
 
         booster.save_booster("resources/model64.json").unwrap();
@@ -1090,7 +1102,9 @@ mod tests {
 
         let mut booster = PerpetualBooster::default();
 
-        booster.fit(&data, &y, None, None, 0.1, None, Some(cat_index)).unwrap();
+        booster
+            .fit(&data, &y, None, None, 0.1, None, Some(cat_index), None)
+            .unwrap();
 
         let file = fs::read_to_string("resources/titanic_train_y.csv").expect("Something went wrong reading the file");
         let y: Vec<f64> = file.lines().map(|x| x.parse::<f64>().unwrap()).collect();
@@ -1213,8 +1227,8 @@ mod tests {
             .set_max_bin(10)
             .set_num_threads(Some(2));
 
-        model1.fit(&matrix_test, &y_test, None, None, 0.1, None, None)?;
-        model2.fit(&matrix_test, &y_test, None, None, 0.1, None, None)?;
+        model1.fit(&matrix_test, &y_test, None, None, 0.1, None, None, None)?;
+        model2.fit(&matrix_test, &y_test, None, None, 0.1, None, None, None)?;
 
         let trees1 = model1.get_prediction_trees();
         let trees2 = model2.get_prediction_trees();

@@ -123,7 +123,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         .set_num_threads(Some(*num_threads));
 
     let now = SystemTime::now();
-    model.fit(&matrix_train, &y_train, None, None, *budget, None, None)?;
+    model.fit(&matrix_train, &y_train, None, None, *budget, None, None, None)?;
     println!("now.elapsed: {:?}", now.elapsed().unwrap().as_secs_f32());
 
     let trees = model.get_prediction_trees();
