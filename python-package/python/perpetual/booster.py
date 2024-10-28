@@ -157,6 +157,8 @@ class PerpetualBooster:
         reset: Union[bool, None] = None,
         categorical_features: Union[Iterable[int], Iterable[str], str, None] = "auto",
         timeout: Union[float, None] = None,
+        iteration_limit: Union[int, None] = None,
+        memory_limit: Union[float, None] = None,
     ) -> Self:
         """Fit the gradient booster on a provided dataset.
 
@@ -168,12 +170,17 @@ class PerpetualBooster:
                 training the model. If None is passed, a weight of 1 will be used for every record.
                 Defaults to None.
             budget: a positive number for fitting budget. Increasing this number will more
-                likely result in increased accuracy.
+                likely result in more boosting rounds and more increased predictive power.
             alpha: only used in quantile regression.
             reset: whether to reset the model or continue training.
             categorical_features: The names or indices for categorical features.
                 `auto` for Polars or Pandas categorical data type.
             timeout: optional fit timeout in seconds
+            iteration_limit: optional limit for the number of boosting rounds. The default value is 1000 boosting rounds.
+                The algorithm automatically stops for most of the cases before hitting this limit.
+                If you want to experiment with very high budget (>2.0), you can also increase this limit.
+            memory_limit: optional limit for memory allocation in GB. If not set, the memory will be allocated based on
+                available memory and the algorithm requirements.
         """
 
         features_, flat_data, rows, cols, categorical_features_, cat_mapping = (
@@ -247,6 +254,8 @@ class PerpetualBooster:
             reset=reset,
             categorical_features=categorical_features_,  # type: ignore
             timeout=timeout,
+            iteration_limit=iteration_limit,
+            memory_limit=memory_limit,
         )
 
         return self

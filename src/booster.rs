@@ -1,8 +1,8 @@
 use crate::bin::Bin;
 use crate::binning::bin_matrix;
 use crate::constants::{
-    GENERALIZATION_THRESHOLD, ITERATION_LIMIT, MIN_COL_AMOUNT, N_NODES_ALLOC_LIMIT, ROW_COLUMN_RATIO_LIMIT,
-    STOPPING_ROUNDS,
+    FREE_MEM_ALLOC_FACTOR, GENERALIZATION_THRESHOLD, ITER_LIMIT, MIN_COL_AMOUNT, N_NODES_ALLOC_LIMIT,
+    ROW_COLUMN_RATIO_LIMIT, STOPPING_ROUNDS, TIMEOUT_FACTOR,
 };
 use crate::constraints::ConstraintMap;
 use crate::data::Matrix;
@@ -247,22 +247,26 @@ impl PerpetualBooster {
     ///
     /// * `data` -  Either a Polars or Pandas DataFrame, or a 2 dimensional Numpy array.
     /// * `y` - Either a Polars or Pandas Series, or a 1 dimensional Numpy array.
+    /// * `budget` - budget to fit the model.
     /// * `sample_weight` - Instance weights to use when training the model.
     /// * `alpha` - used only in quantile regression.
-    /// * `budget` - budget to fit the model.
     /// * `reset` - Reset the model or continue training.
     /// * `categorical_features` - categorical features.
     /// * `timeout` - fit timeout limit in seconds.
+    /// * `iteration_limit` - optional limit for the number of boosting rounds.
+    /// * `memory_limit` - optional limit for memory allocation. 
     pub fn fit(
         &mut self,
         data: &Matrix<f64>,
         y: &[f64],
+        budget: f32,
         sample_weight: Option<&[f64]>,
         alpha: Option<f32>,
-        budget: f32,
         reset: Option<bool>,
         categorical_features: Option<HashSet<usize>>,
         timeout: Option<f32>,
+        iteration_limit: Option<usize>,
+        memory_limit: Option<f32>,
     ) -> Result<(), PerpetualError> {
         let constraints_map = self
             .monotone_constraints
@@ -282,28 +286,32 @@ impl PerpetualBooster {
                 self.force_children_to_bound_parent,
             );
             self.fit_trees(
-                y,
-                sample_weight,
                 data,
-                &splitter,
-                alpha,
+                y,
                 budget,
+                &splitter,
+                sample_weight,
+                alpha,
                 reset,
                 categorical_features,
                 timeout,
+                iteration_limit,
+                memory_limit,
             )?;
         } else {
             let splitter = MissingImputerSplitter::new(self.eta, self.allow_missing_splits, constraints_map);
             self.fit_trees(
-                y,
-                sample_weight,
                 data,
-                &splitter,
-                alpha,
+                y,
                 budget,
+                &splitter,
+                sample_weight,
+                alpha,
                 reset,
                 categorical_features,
                 timeout,
+                iteration_limit,
+                memory_limit,
             )?;
         };
 
@@ -312,15 +320,17 @@ impl PerpetualBooster {
 
     fn fit_trees<T: Splitter>(
         &mut self,
-        y: &[f64],
-        sample_weight: Option<&[f64]>,
         data: &Matrix<f64>,
-        splitter: &T,
-        alpha: Option<f32>,
+        y: &[f64],
         budget: f32,
+        splitter: &T,
+        sample_weight: Option<&[f64]>,
+        alpha: Option<f32>,
         reset: Option<bool>,
         categorical_features: Option<HashSet<usize>>,
         timeout: Option<f32>,
+        iteration_limit: Option<usize>,
+        memory_limit: Option<f32>,
     ) -> Result<(), PerpetualError> {
         let start = Instant::now();
 
@@ -409,9 +419,18 @@ impl PerpetualBooster {
         } else {
             mem_hist = mem_bin * self.max_bin as usize * col_amount;
         }
-        let system = System::new_all();
-        let mem_available = system.available_memory() as usize;
-        let n_nodes_alloc = usize::min(N_NODES_ALLOC_LIMIT, (0.9 * (mem_available / mem_hist) as f32) as usize);
+        let sys = System::new_all();
+        let mem_available = match memory_limit {
+            Some(mem_limit) => mem_limit * (1e9 as f32),
+            None => match sys.cgroup_limits() {
+                Some(limits) => limits.free_memory as f32,
+                None => sys.available_memory() as f32,
+            },
+        };
+        let n_nodes_alloc = usize::min(
+            N_NODES_ALLOC_LIMIT,
+            (FREE_MEM_ALLOC_FACTOR * (mem_available / (mem_hist as f32))) as usize,
+        );
 
         let mut hist_tree_owned: Vec<NodeHistogramOwned>;
         if col_amount == col_index.len() {
@@ -432,7 +451,7 @@ impl PerpetualBooster {
         let mut split_info_vec: Vec<SplitInfo> = (0..col_amount).map(|_| SplitInfo::default()).collect();
         let split_info_slice = SplitInfoSlice::new(&mut split_info_vec);
 
-        for i in 0..ITERATION_LIMIT {
+        for i in 0..iteration_limit.unwrap_or(ITER_LIMIT) {
             let verbose = if self.log_iterations == 0 {
                 false
             } else {
@@ -538,13 +557,13 @@ impl PerpetualBooster {
             }
 
             if let Some(t) = timeout {
-                if start.elapsed().as_secs_f32() > t {
+                if start.elapsed().as_secs_f32() > t * TIMEOUT_FACTOR {
                     warn!("Reached timeout limit before auto stopping. Try to decrease the budget or increase the timeout for the best performance.");
                     break;
                 }
             }
 
-            if i == ITERATION_LIMIT - 1 {
+            if i == iteration_limit.unwrap_or(ITER_LIMIT) - 1 {
                 warn!("Reached iteration limit before auto stopping. Try to decrease the budget for the best performance.");
             }
         }
@@ -1003,7 +1022,9 @@ mod tests {
 
         let data = Matrix::new(&data_vec, 891, 5);
         let mut booster = PerpetualBooster::default().set_max_bin(300).set_base_score(0.5);
-        booster.fit(&data, &y, None, None, 0.3, None, None, None).unwrap();
+        booster
+            .fit(&data, &y, 0.3, None, None, None, None, None, None, None)
+            .unwrap();
         let preds = booster.predict(&data, false);
         let contribs = booster.predict_contributions(&data, ContributionsMethod::Average, false);
         assert_eq!(contribs.len(), (data.cols + 1) * data.rows);
@@ -1025,7 +1046,9 @@ mod tests {
 
         let mut booster = PerpetualBooster::default();
 
-        booster.fit(&data, &y, None, None, 0.3, None, None, None).unwrap();
+        booster
+            .fit(&data, &y, 0.3, None, None, None, None, None, None, None)
+            .unwrap();
         let preds = booster.predict(&data, false);
         let contribs = booster.predict_contributions(&data, ContributionsMethod::Average, false);
         assert_eq!(contribs.len(), (data.cols + 1) * data.rows);
@@ -1049,7 +1072,9 @@ mod tests {
             .set_objective(Objective::SquaredLoss)
             .set_max_bin(300);
 
-        booster.fit(&data, &y, None, None, 0.3, None, None, None).unwrap();
+        booster
+            .fit(&data, &y, 0.3, None, None, None, None, None, None, None)
+            .unwrap();
         let preds = booster.predict(&data, false);
         let contribs = booster.predict_contributions(&data, ContributionsMethod::Average, false);
         assert_eq!(contribs.len(), (data.cols + 1) * data.rows);
@@ -1072,7 +1097,9 @@ mod tests {
         //let data = Matrix::new(data.get_col(1), 891, 1);
         let mut booster = PerpetualBooster::default().set_max_bin(300).set_base_score(0.5);
 
-        booster.fit(&data, &y, None, None, 0.3, None, None, None).unwrap();
+        booster
+            .fit(&data, &y, 0.3, None, None, None, None, None, None, None)
+            .unwrap();
         let preds = booster.predict(&data, true);
 
         booster.save_booster("resources/model64.json").unwrap();
@@ -1103,7 +1130,7 @@ mod tests {
         let mut booster = PerpetualBooster::default();
 
         booster
-            .fit(&data, &y, None, None, 0.1, None, Some(cat_index), None)
+            .fit(&data, &y, 0.1, None, None, None, Some(cat_index), None, None, None)
             .unwrap();
 
         let file = fs::read_to_string("resources/titanic_train_y.csv").expect("Something went wrong reading the file");
@@ -1227,8 +1254,8 @@ mod tests {
             .set_max_bin(10)
             .set_num_threads(Some(2));
 
-        model1.fit(&matrix_test, &y_test, None, None, 0.1, None, None, None)?;
-        model2.fit(&matrix_test, &y_test, None, None, 0.1, None, None, None)?;
+        model1.fit(&matrix_test, &y_test, 0.1, None, None, None, None, None, None, None)?;
+        model2.fit(&matrix_test, &y_test, 0.1, None, None, None, None, None, None, None)?;
 
         let trees1 = model1.get_prediction_trees();
         let trees2 = model2.get_prediction_trees();
