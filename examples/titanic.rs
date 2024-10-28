@@ -51,7 +51,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     // the relevant `set_` methods for any parameters you would like to
     // adjust.
     let mut model = PerpetualBooster::default().set_objective(Objective::LogLoss);
-    model.fit(&matrix, &y, None, None, *budget, None, None, None)?;
+    model.fit(&matrix, &y, *budget, None, None, None, None, None, None, None)?;
 
     println!("Model prediction: {:?} ...", &model.predict(&matrix, true)[0..10]);
 

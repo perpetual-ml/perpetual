@@ -160,6 +160,8 @@ impl MultiOutputBooster {
         reset: Option<bool>,
         categorical_features: Option<HashSet<usize>>,
         timeout: Option<f32>,
+        iteration_limit: Option<usize>,
+        memory_limit: Option<f32>,
     ) -> PyResult<()> {
         let flat_data = flat_data.as_slice()?;
         let data = Matrix::new(flat_data, rows, cols);
@@ -178,12 +180,14 @@ impl MultiOutputBooster {
         match self.booster.fit(
             &data,
             &y_data,
+            budget,
             sample_weight_,
             alpha,
-            budget,
             reset,
             categorical_features,
             timeout,
+            iteration_limit,
+            memory_limit,
         ) {
             Ok(m) => Ok(m),
             Err(e) => Err(PyValueError::new_err(e.to_string())),
