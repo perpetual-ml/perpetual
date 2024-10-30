@@ -625,6 +625,8 @@ class TestSaveLoadFunctions:
         f64_model_path = tmp_path / "modelf64_sl.json"
         X, y = X_y
         model = PerpetualBooster(objective="SquaredLoss")
+        save_func(model, f64_model_path)
+        model.json_dump()
         model.fit(X, y)
         preds = model.predict(X)
         save_func(model, f64_model_path)

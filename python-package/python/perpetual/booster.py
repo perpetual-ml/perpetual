@@ -147,6 +147,20 @@ class PerpetualBooster:
         self.log_iterations = log_iterations
         self.feature_importance_method = feature_importance_method
 
+        booster = CratePerpetualBooster(
+            objective=self.objective,
+            num_threads=self.num_threads,
+            monotone_constraints=dict(),
+            force_children_to_bound_parent=self.force_children_to_bound_parent,
+            missing=self.missing,
+            allow_missing_splits=self.allow_missing_splits,
+            create_missing_branch=self.create_missing_branch,
+            terminate_missing_features=set(),
+            missing_node_treatment=self.missing_node_treatment,
+            log_iterations=self.log_iterations,
+        )
+        self.booster = cast(BoosterType, booster)
+
     def fit(
         self,
         X,
