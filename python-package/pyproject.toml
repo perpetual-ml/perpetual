@@ -1,10 +1,10 @@
 [build-system]
-requires = ["maturin>=1.0.0,<2.0.0"]
+requires = ["maturin>=1.0.0,<1.7.0"]
 build-backend = "maturin"
 
 [project]
 name = "perpetual"
-version = "0.6.1"
+version = "0.6.2"
 description = "A self-generalizing gradient boosting machine which doesn't need hyperparameter optimization"
 license = { file = "LICENSE" }
 keywords = [
@@ -30,7 +30,7 @@ classifiers = [
 ]
 
 [project.optional-dependencies]
-dev = ["pandas", "polars", "pyarrow", "maturin", "pytest", "seaborn", "scikit-learn", "mkdocs-material", "mkdocstrings[python]", "mkdocs-autorefs", "ruff", "typing-extensions"]
+dev = ["pandas", "polars", "pyarrow", "maturin==1.6.0", "pytest", "seaborn", "scikit-learn", "mkdocs-material", "mkdocstrings[python]", "mkdocs-autorefs", "ruff"]
 
 [tool.maturin]
 sdist-include = ["LICENSE", "README.md"]
