@@ -33,7 +33,7 @@ jobs:
         with:
           target: x86_64
           command: build
-          args: --release --strip --interpreter python --manifest-path python-package/Cargo.toml --out dist
+          args: --release --strip --interpreter python --manifest-path python-package/Cargo.toml --out dist --sdist
       - name: Install wheel
         run: pip install perpetual --no-index --find-links dist --no-deps --force-reinstall
       - name: Run Package Tests
@@ -80,7 +80,7 @@ jobs:
         uses: PyO3/maturin-action@v1
         with:
           command: build
-          args: --release --strip --interpreter python --manifest-path python-package/Cargo.toml --out dist
+          args: --release --strip --interpreter python --manifest-path python-package/Cargo.toml --out dist --sdist
       - name: Install wheel
         run: pip install perpetual --no-index --find-links dist --no-deps --force-reinstall
       - name: Run Package Tests
@@ -129,7 +129,7 @@ jobs:
           target: x86_64
           manylinux: auto
           command: build
-          args: --release --strip --interpreter python${{ matrix.pyversion }} --manifest-path python-package/Cargo.toml --out dist
+          args: --release --strip --interpreter python${{ matrix.pyversion }} --manifest-path python-package/Cargo.toml --out dist --sdist
       - name: Install wheel
         run: pip install perpetual --no-index --find-links dist --no-deps --force-reinstall
       - name: Run Package Tests
