@@ -58,11 +58,21 @@ The package can be installed directly from [pypi](https://pypi.org/project/perpe
 pip install perpetual
 ```
 
+Using [conda-forge](https://anaconda.org/conda-forge/perpetual):
+
+```shell
+conda install conda-forge::perpetual
+```
+
 To use in a Rust project, add the following to your Cargo.toml file to get the package from [crates.io](https://crates.io/crates/perpetual).
 
 ```toml
-perpetual = "0.6.2"
+perpetual = "0.7.0"
 ```
+
+## Contribution
+
+Contributions are welcome. Check CONTRIBUTING.md for the guideline.
 
 ## Paper
 

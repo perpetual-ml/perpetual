@@ -116,8 +116,8 @@ pub fn sort_cat_bins_by_stat(histogram: &mut [&UnsafeCell<Bin>], is_const_hess: 
                 } else if b2.num == 0 {
                     return Ordering::Greater;
                 }
-                let div1: f32 = b1.g_folded.iter().sum::<f32>() / b1.h_folded.unwrap().iter().sum::<f32>();
-                let div2: f32 = b2.g_folded.iter().sum::<f32>() / b2.h_folded.unwrap().iter().sum::<f32>();
+                let div1: f32 = b1.g_folded.iter().sum::<f32>() / b1.counts.iter().sum::<usize>() as f32;
+                let div2: f32 = b2.g_folded.iter().sum::<f32>() / b2.counts.iter().sum::<usize>() as f32;
                 div2.partial_cmp(&div1).unwrap_or(Ordering::Less)
             });
         } else {
@@ -129,8 +129,8 @@ pub fn sort_cat_bins_by_stat(histogram: &mut [&UnsafeCell<Bin>], is_const_hess: 
                 } else if b2.num == 0 {
                     return Ordering::Greater;
                 }
-                let div1: f32 = b1.g_folded.iter().sum::<f32>() / b1.counts.iter().sum::<usize>() as f32;
-                let div2: f32 = b2.g_folded.iter().sum::<f32>() / b2.counts.iter().sum::<usize>() as f32;
+                let div1: f32 = b1.g_folded.iter().sum::<f32>() / b1.h_folded.unwrap().iter().sum::<f32>();
+                let div2: f32 = b2.g_folded.iter().sum::<f32>() / b2.h_folded.unwrap().iter().sum::<f32>();
                 div2.partial_cmp(&div1).unwrap_or(Ordering::Less)
             });
         }

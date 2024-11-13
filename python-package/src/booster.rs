@@ -135,7 +135,7 @@ impl PerpetualBooster {
         rows: usize,
         cols: usize,
         y: PyReadonlyArray1<f64>,
-        budget: f32,
+        budget: Option<f32>,
         sample_weight: Option<PyReadonlyArray1<f64>>,
         alpha: Option<f32>,
         reset: Option<bool>,
@@ -158,7 +158,7 @@ impl PerpetualBooster {
         match self.booster.fit(
             &data,
             y,
-            budget,
+            budget.unwrap_or(1.0),
             sample_weight_,
             alpha,
             reset,
