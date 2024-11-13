@@ -1,8 +1,8 @@
 use crate::bin::Bin;
 use crate::binning::bin_matrix;
 use crate::constants::{
-    FREE_MEM_ALLOC_FACTOR, GENERALIZATION_THRESHOLD, ITER_LIMIT, MIN_COL_AMOUNT, N_NODES_ALLOC_LIMIT,
-    ROW_COLUMN_RATIO_LIMIT, STOPPING_ROUNDS, TIMEOUT_FACTOR,
+    FREE_MEM_ALLOC_FACTOR, GENERALIZATION_THRESHOLD, ITER_LIMIT, MIN_COL_AMOUNT, N_NODES_ALLOC_LIMIT, STOPPING_ROUNDS,
+    TIMEOUT_FACTOR,
 };
 use crate::constraints::ConstraintMap;
 use crate::data::Matrix;
@@ -254,7 +254,7 @@ impl PerpetualBooster {
     /// * `categorical_features` - categorical features.
     /// * `timeout` - fit timeout limit in seconds.
     /// * `iteration_limit` - optional limit for the number of boosting rounds.
-    /// * `memory_limit` - optional limit for memory allocation. 
+    /// * `memory_limit` - optional limit for memory allocation.
     pub fn fit(
         &mut self,
         data: &Matrix<f64>,
@@ -401,16 +401,14 @@ impl PerpetualBooster {
         let mut rng = StdRng::seed_from_u64(self.seed);
 
         // Column sampling is only applied when (n_rows / n_columns) < ROW_COLUMN_RATIO_LIMIT.
-        // ROW_COLUMN_RATIO_LIMIT is set to 100 by default.
-        let colsample_bytree = f64::min(
-            1.0,
-            (data.rows as f64 / data.cols as f64) / ROW_COLUMN_RATIO_LIMIT as f64,
-        );
+        // ROW_COLUMN_RATIO_LIMIT is calculated using budget.
+        // budget = 1.0 -> ROW_COLUMN_RATIO_LIMIT = 100
+        // budget = 2.0 -> ROW_COLUMN_RATIO_LIMIT = 10
+        let row_column_ratio_limit = 10.0_f32.powf(-budget) * 1000.0;
+        let colsample_bytree = (data.rows as f32 / data.cols as f32) / row_column_ratio_limit;
 
-        let col_amount = usize::max(
-            usize::min(MIN_COL_AMOUNT, col_index.len()),
-            ((col_index.len() as f64) * colsample_bytree).floor() as usize,
-        );
+        let col_amount = (((col_index.len() as f32) * colsample_bytree).floor() as usize)
+            .clamp(usize::min(MIN_COL_AMOUNT, col_index.len()), col_index.len());
 
         let mem_bin = mem::size_of::<Bin>();
         let mem_hist: usize;
