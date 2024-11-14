@@ -864,12 +864,12 @@ fn best_feature_split_const_hess(
 ) {
     let split_info = unsafe { split_info_slice.get_mut(feat_idx) };
     split_info.split_gain = -1.0;
+    split_info.left_cats = HashSet::new();
+    split_info.right_cats = HashSet::new();
 
     let mut max_gain: Option<f32> = None;
     let mut generalization: Option<f32>;
-    let mut left_cats: HashSet<usize> = HashSet::new();
-    let mut right_cats: HashSet<usize> = HashSet::new();
-    let mut is_cat = false;
+    let mut all_cats: Vec<usize> = Vec::new();
 
     let evaluate_fn = eval_callables(true, create_missing_branch);
 
@@ -883,12 +883,11 @@ fn best_feature_split_const_hess(
 
     if let Some(c_index) = cat_index {
         if c_index.contains(&feature) {
-            is_cat = true;
             sort_cat_bins_by_stat(&mut hist, true);
-            right_cats = HashSet::from_iter(
-                hist.iter()
-                    .map(|b| unsafe { b.get().as_ref().unwrap().cut_value } as usize),
-            );
+            all_cats = hist
+                .iter()
+                .map(|b| unsafe { b.get().as_ref().unwrap().cut_value } as usize)
+                .collect();
         }
     }
 
@@ -992,7 +991,7 @@ fn best_feature_split_const_hess(
             let delta_score_train = parent_score - train_score;
             let delta_score_valid = parent_score - valid_score;
             generalization = Some(delta_score_train / delta_score_valid);
-            if generalization < Some(1.0) && node.num != 0 {
+            if generalization < Some(GENERALIZATION_THRESHOLD) && node.num != 0 {
                 continue;
             }
         } else {
@@ -1047,14 +1046,19 @@ fn best_feature_split_const_hess(
         // If split gain is NaN, one of the sides is empty, do not allow this split.
         let split_gain = if split_gain.is_nan() { 0.0 } else { split_gain };
 
-        if is_cat {
-            let cat = b.cut_value as usize;
-            left_cats.insert(cat);
-            right_cats.remove(&cat);
-        }
-
         if (max_gain.is_none() || split_gain > max_gain.unwrap()) && (!generalization.is_none() || node.num == 0) {
             max_gain = Some(split_gain);
+
+            let mut left_cats: HashSet<usize> = HashSet::new();
+            let mut right_cats: HashSet<usize> = all_cats.iter().copied().collect();
+
+            for c in all_cats.iter() {
+                if *c == b.cut_value as usize {
+                    break;
+                }
+                left_cats.insert(*c);
+                right_cats.remove(c);
+            }
 
             split_info.split_gain = split_gain;
             split_info.split_feature = feature;
@@ -1064,8 +1068,8 @@ fn best_feature_split_const_hess(
             split_info.right_node = right_node_info;
             split_info.missing_node = missing_info;
             split_info.generalization = generalization;
-            split_info.left_cats = left_cats.clone();
-            split_info.right_cats = right_cats.clone();
+            split_info.left_cats = left_cats;
+            split_info.right_cats = right_cats;
         }
     }
 }
@@ -1817,6 +1821,7 @@ mod tests {
     use crate::histogram::NodeHistogramOwned;
     use crate::node::SplittableNode;
     use crate::objective::{LogLoss, ObjectiveFunction, SquaredLoss};
+    use crate::tree::create_root_node;
     use crate::utils::gain;
     use crate::utils::weight;
     use polars::prelude::*;
@@ -1990,13 +1995,6 @@ mod tests {
 
         let splitter = MissingImputerSplitter::new(0.3, false, ConstraintMap::new());
 
-        let gradient_sum = grad.iter().copied().sum();
-        let hessian_sum = match hess {
-            Some(ref hess) => hess.iter().copied().sum(),
-            None => grad.len() as f32,
-        };
-        let root_weight = weight(gradient_sum, hessian_sum);
-        let root_gain = gain(gradient_sum, hessian_sum);
         let data = Matrix::new(&data_test, y_test.len(), n_cols);
 
         let b = bin_matrix(&data, None, n_bins, f64::NAN, None).unwrap();
@@ -2032,22 +2030,7 @@ mod tests {
             );
         }
 
-        let mut n = SplittableNode::new(
-            0,
-            root_weight,
-            root_gain,
-            gradient_sum,
-            hessian_sum,
-            grad.len() as usize,
-            0,
-            0,
-            grad.len(),
-            f32::NEG_INFINITY,
-            f32::INFINITY,
-            NodeType::Root,
-            HashSet::new(),
-            HashSet::new(),
-        );
+        let mut n = create_root_node(&index, &grad, hess.as_deref());
 
         let mut split_info_vec: Vec<SplitInfo> = (0..col_index.len()).map(|_| SplitInfo::default()).collect();
         let split_info_slice = SplitInfoSlice::new(&mut split_info_vec);
@@ -2076,6 +2059,7 @@ mod tests {
         let n_rows = 712;
         let n_cols = 9;
         let is_const_hess = false;
+        let eta = 0.1;
 
         let file =
             fs::read_to_string("resources/titanic_train_flat.csv").expect("Something went wrong reading the file");
@@ -2090,7 +2074,7 @@ mod tests {
         let yhat = vec![y_avg; y.len()];
         let (grad, hess) = LogLoss::calc_grad_hess(&y, &yhat, None, None);
 
-        let splitter = MissingImputerSplitter::new(0.1, false, ConstraintMap::new());
+        let splitter = MissingImputerSplitter::new(eta, false, ConstraintMap::new());
 
         let gradient_sum = grad.iter().copied().sum();
         let hessian_sum = match hess {
@@ -2176,6 +2160,95 @@ mod tests {
         println!("hist_tree[0]: {:?}", hist_tree_owned[0].data[7]);
 
         assert_eq!(8, s.split_feature);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_gbm_categorical_sensory() -> Result<(), Box<dyn Error>> {
+        let n_bins = 256;
+        let n_cols = 11;
+        let is_const_hess = true;
+        let eta = 0.1;
+
+        let file = fs::read_to_string("resources/sensory_y.csv").expect("Something went wrong reading the file");
+        let y: Vec<f64> = file.lines().map(|x| x.parse::<f64>().unwrap()).collect();
+        let file = fs::read_to_string("resources/sensory_flat.csv").expect("Something went wrong reading the file");
+        let data_vec: Vec<f64> = file.lines().map(|x| x.parse::<f64>().unwrap_or(f64::NAN)).collect();
+        let data = Matrix::new(&data_vec, y.len(), n_cols);
+
+        let cat_index = HashSet::from([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+
+        let y_avg = y.iter().sum::<f64>() / y.len() as f64;
+        let yhat = vec![y_avg; y.len()];
+        let (grad, hess) = SquaredLoss::calc_grad_hess(&y, &yhat, None, None);
+
+        let splitter = MissingImputerSplitter::new(eta, false, ConstraintMap::new());
+
+        let b = bin_matrix(&data, None, n_bins, f64::NAN, Some(&cat_index)).unwrap();
+        let bdata = Matrix::new(&b.binned_data, data.rows, data.cols);
+        let index = data.index.to_owned();
+        let col_index: Vec<usize> = (0..data.cols).collect();
+
+        let pool = rayon::ThreadPoolBuilder::new().num_threads(2).build().unwrap();
+
+        let mut hist_tree_owned: Vec<NodeHistogramOwned> = (0..10)
+            .map(|_| NodeHistogramOwned::empty_from_cuts(&b.cuts, &col_index, is_const_hess, true))
+            .collect();
+
+        let mut hist_tree: Vec<NodeHistogram> = hist_tree_owned
+            .iter_mut()
+            .map(|node_hist| NodeHistogram::from_owned(node_hist))
+            .collect();
+
+        for i in 0..10 {
+            update_histogram(
+                unsafe { &mut hist_tree.get_unchecked(i) },
+                0,
+                index.len(),
+                &bdata,
+                &grad,
+                None,
+                &index,
+                &col_index,
+                &pool,
+                false,
+            );
+        }
+
+        let mut n = create_root_node(&index, &grad, hess.as_deref());
+
+        let mut split_info_vec: Vec<SplitInfo> = (0..col_index.len()).map(|_| SplitInfo::default()).collect();
+        let split_info_slice = SplitInfoSlice::new(&mut split_info_vec);
+        splitter.best_split(
+            &mut n,
+            &col_index,
+            is_const_hess,
+            &mut hist_tree,
+            &pool,
+            Some(&cat_index),
+            &split_info_slice,
+        );
+        let s = unsafe { split_info_slice.best_split_info() };
+
+        n.update_children(1, 1, 2, &s);
+
+        println!("split_info_slice:");
+        for s_data in split_info_slice.data.iter() {
+            println!("{:?}", unsafe { &s_data.get().as_ref().unwrap() });
+        }
+
+        println!("split info:");
+        println!("{:?}", s);
+
+        println!("left_cats:");
+        println!("{:?}", s.left_cats);
+        println!("right_cats:");
+        println!("{:?}", s.right_cats);
+
+        println!("hist_tree.0.6: {:?}", hist_tree_owned[0].data[6]);
+
+        assert_eq!(6, s.split_feature);
 
         Ok(())
     }

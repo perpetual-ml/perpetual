@@ -1286,30 +1286,64 @@ mod tests {
         Ok(())
     }
 
-    /*
     #[test]
-    fn test_gbm_christine() -> Result<(), Box<dyn Error>> {
-        let n_columns = 1636;
+    fn test_gbm_sensory() -> Result<(), Box<dyn Error>> {
+        let n_columns = 11;
+        let iter_limit = 10;
 
-        let file = fs::read_to_string("resources/christine_y.csv").expect("Something went wrong reading the file");
+        let file = fs::read_to_string("resources/sensory_y.csv").expect("Something went wrong reading the file");
         let y: Vec<f64> = file.lines().map(|x| x.parse::<f64>().unwrap()).collect();
-        let file = fs::read_to_string("resources/christine_flat.csv").expect("Something went wrong reading the file");
+        let file = fs::read_to_string("resources/sensory_flat.csv").expect("Something went wrong reading the file");
         let data_vec: Vec<f64> = file.lines().map(|x| x.parse::<f64>().unwrap_or(f64::NAN)).collect();
         let data = Matrix::new(&data_vec, y.len(), n_columns);
 
-        let cat_index = HashSet::from([
-            72, 155, 213, 238, 244, 256, 261, 477, 495, 545, 565, 574, 583, 587, 646, 684, 687, 740, 779, 832, 856,
-            934, 950, 1004, 1009, 1047, 1186, 1228, 1238, 1239, 1255, 1259, 1300, 1355, 1486, 1585, 1606,
-        ]);
+        let cat_index = HashSet::from([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
 
         let mut booster = PerpetualBooster::default()
-            .set_num_threads(Some(1))
             .set_log_iterations(1)
-            .set_max_bin(300);
+            .set_objective(Objective::SquaredLoss);
 
-        booster.fit(&data, &y, None, None, 1.0, None, Some(cat_index)).unwrap();
+        booster
+            .fit(
+                &data,
+                &y,
+                1.0,
+                None,
+                None,
+                None,
+                Some(cat_index),
+                None,
+                Some(iter_limit),
+                Some(0.00003),
+            )
+            .unwrap();
+
+        let split_features_test = vec![6, 6, 6, 1, 6, 1, 6, 9, 1, 6];
+        let split_gains_test = vec![
+            31.172100067138672,
+            25.249399185180664,
+            20.45199966430664,
+            17.50349998474121,
+            16.566099166870117,
+            14.345199584960938,
+            13.418600082397461,
+            12.505200386047363,
+            12.23270034790039,
+            10.869000434875488,
+        ];
+        for (i, tree) in booster.get_prediction_trees().iter().enumerate() {
+            let nodes = &tree.nodes;
+            let root_node = nodes.get(&0).unwrap();
+            println!("i: {}", i);
+            println!("nodes.len: {}", nodes.len());
+            println!("root_node.split_feature: {}", root_node.split_feature);
+            println!("root_node.split_gain: {}", root_node.split_gain);
+            assert_eq!(3, nodes.len());
+            assert_eq!(root_node.split_feature, split_features_test[i]);
+            assert_relative_eq!(root_node.split_gain, split_gains_test[i], max_relative = 0.99);
+        }
+        assert_eq!(iter_limit, booster.get_prediction_trees().len());
 
         Ok(())
     }
-    */
 }
