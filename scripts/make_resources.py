@@ -1,9 +1,8 @@
 import pandas as pd
 import seaborn as sns
 from sklearn.model_selection import train_test_split
-from sklearn.datasets import fetch_california_housing, fetch_covtype
+from sklearn.datasets import fetch_california_housing, fetch_covtype, fetch_openml
 from perpetual.utils import convert_input_frame, transform_input_frame
-
 
 if __name__ == "__main__":
     df = sns.load_dataset("titanic")
@@ -92,3 +91,12 @@ if __name__ == "__main__":
     pd.Series(titanic_test_flat).to_csv("resources/titanic_test_flat.csv", index=False, header=False)
     pd.Series(y_train).to_csv("resources/titanic_train_y.csv", index=False, header=False)
     pd.Series(y_test).to_csv("resources/titanic_test_y.csv", index=False, header=False)
+
+
+    # https://www.openml.org/search?type=data&id=546&sort=runs&status=active
+    df = fetch_openml(data_id=546)
+    X = df.data
+    y = df.target
+    features_, sensory_flat, rows, cols, categorical_features_, cat_mapping = convert_input_frame(X, "auto")
+    pd.Series(sensory_flat).to_csv("resources/sensory_flat.csv", index=False, header=False)
+    pd.Series(y).to_csv("resources/sensory_y.csv", index=False, header=False)
