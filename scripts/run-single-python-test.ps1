@@ -1,4 +1,4 @@
 Set-Location python-package
 maturin develop --release
-pytest tests/test_booster.py::test_polars -s
+pytest tests/test_openml.py::test_sensory -s
 Set-Location ..
