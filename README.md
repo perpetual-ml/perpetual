@@ -67,7 +67,7 @@ conda install conda-forge::perpetual
 To use in a Rust project, add the following to your Cargo.toml file to get the package from [crates.io](https://crates.io/crates/perpetual).
 
 ```toml
-perpetual = "0.7.0"
+perpetual = "0.7.3"
 ```
 
 ## Contribution

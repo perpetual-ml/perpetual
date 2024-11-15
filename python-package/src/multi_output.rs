@@ -24,6 +24,7 @@ impl MultiOutputBooster {
     #[pyo3(signature=(
         n_boosters,
         objective,
+        max_bin,
         num_threads,
         monotone_constraints,
         force_children_to_bound_parent,
@@ -37,6 +38,7 @@ impl MultiOutputBooster {
     pub fn new(
         n_boosters: usize,
         objective: &str,
+        max_bin: u16,
         num_threads: Option<usize>,
         monotone_constraints: HashMap<usize, i8>,
         force_children_to_bound_parent: bool,
@@ -53,6 +55,7 @@ impl MultiOutputBooster {
 
         let booster = CrateMultiOutputBooster::default()
             .set_objective(objective_)
+            .set_max_bin(max_bin)
             .set_num_threads(num_threads)
             .set_monotone_constraints(Some(monotone_constraints_))
             .set_force_children_to_bound_parent(force_children_to_bound_parent)
@@ -76,6 +79,11 @@ impl MultiOutputBooster {
     fn set_objective(&mut self, value: &str) -> PyResult<()> {
         let objective_ = to_value_error(serde_plain::from_str(value))?;
         self.booster = self.booster.clone().set_objective(objective_);
+        Ok(())
+    }
+    #[setter]
+    fn set_max_bin(&mut self, value: u16) -> PyResult<()> {
+        self.booster = self.booster.clone().set_max_bin(value);
         Ok(())
     }
     #[setter]
@@ -162,6 +170,7 @@ impl MultiOutputBooster {
         timeout: Option<f32>,
         iteration_limit: Option<usize>,
         memory_limit: Option<f32>,
+        stopping_rounds: Option<usize>,
     ) -> PyResult<()> {
         let flat_data = flat_data.as_slice()?;
         let data = Matrix::new(flat_data, rows, cols);
@@ -188,6 +197,7 @@ impl MultiOutputBooster {
             timeout,
             iteration_limit,
             memory_limit,
+            stopping_rounds,
         ) {
             Ok(m) => Ok(m),
             Err(e) => Err(PyValueError::new_err(e.to_string())),

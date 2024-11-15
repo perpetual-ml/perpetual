@@ -23,6 +23,7 @@ impl PerpetualBooster {
     #[allow(clippy::too_many_arguments)]
     #[pyo3(signature=(
         objective,
+        max_bin,
         num_threads,
         monotone_constraints,
         force_children_to_bound_parent,
@@ -35,6 +36,7 @@ impl PerpetualBooster {
     ))]
     pub fn new(
         objective: &str,
+        max_bin: u16,
         num_threads: Option<usize>,
         monotone_constraints: HashMap<usize, i8>,
         force_children_to_bound_parent: bool,
@@ -51,6 +53,7 @@ impl PerpetualBooster {
 
         let booster = CratePerpetualBooster::default()
             .set_objective(objective_)
+            .set_max_bin(max_bin)
             .set_num_threads(num_threads)
             .set_monotone_constraints(Some(monotone_constraints_))
             .set_force_children_to_bound_parent(force_children_to_bound_parent)
@@ -70,6 +73,11 @@ impl PerpetualBooster {
     fn set_objective(&mut self, value: &str) -> PyResult<()> {
         let objective_ = to_value_error(serde_plain::from_str(value))?;
         self.booster.objective = objective_;
+        Ok(())
+    }
+    #[setter]
+    fn set_max_bin(&mut self, value: u16) -> PyResult<()> {
+        self.booster.max_bin = value;
         Ok(())
     }
     #[setter]
@@ -143,6 +151,7 @@ impl PerpetualBooster {
         timeout: Option<f32>,
         iteration_limit: Option<usize>,
         memory_limit: Option<f32>,
+        stopping_rounds: Option<usize>,
     ) -> PyResult<()> {
         let flat_data = flat_data.as_slice()?;
         let data = Matrix::new(flat_data, rows, cols);
@@ -166,6 +175,7 @@ impl PerpetualBooster {
             timeout,
             iteration_limit,
             memory_limit,
+            stopping_rounds,
         ) {
             Ok(m) => Ok(m),
             Err(e) => Err(PyValueError::new_err(e.to_string())),

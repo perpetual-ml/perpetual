@@ -197,6 +197,7 @@ impl MultiOutputBooster {
         timeout: Option<f32>,
         iteration_limit: Option<usize>,
         memory_limit: Option<f32>,
+        stopping_rounds: Option<usize>,
     ) -> Result<(), PerpetualError> {
         let timeout_booster = match timeout {
             Some(t) => Some(t / self.n_boosters as f32),
@@ -215,6 +216,7 @@ impl MultiOutputBooster {
                 timeout_booster,
                 iteration_limit,
                 memory_limit,
+                stopping_rounds,
             );
         }
         Ok(())
@@ -559,7 +561,7 @@ mod tests {
         assert!(booster.get_boosters().len() == n_classes);
 
         booster
-            .fit(&data, &y, 0.1, None, None, None, None, Some(60.0), None, None)
+            .fit(&data, &y, 0.1, None, None, None, None, Some(60.0), None, None, None)
             .unwrap();
 
         let probas = booster.predict_proba(&data, true);

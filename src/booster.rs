@@ -255,6 +255,7 @@ impl PerpetualBooster {
     /// * `timeout` - fit timeout limit in seconds.
     /// * `iteration_limit` - optional limit for the number of boosting rounds.
     /// * `memory_limit` - optional limit for memory allocation.
+    /// * `stopping_rounds` - optional limit for auto stopping rounds.
     pub fn fit(
         &mut self,
         data: &Matrix<f64>,
@@ -267,6 +268,7 @@ impl PerpetualBooster {
         timeout: Option<f32>,
         iteration_limit: Option<usize>,
         memory_limit: Option<f32>,
+        stopping_rounds: Option<usize>,
     ) -> Result<(), PerpetualError> {
         let constraints_map = self
             .monotone_constraints
@@ -297,6 +299,7 @@ impl PerpetualBooster {
                 timeout,
                 iteration_limit,
                 memory_limit,
+                stopping_rounds,
             )?;
         } else {
             let splitter = MissingImputerSplitter::new(self.eta, self.allow_missing_splits, constraints_map);
@@ -312,6 +315,7 @@ impl PerpetualBooster {
                 timeout,
                 iteration_limit,
                 memory_limit,
+                stopping_rounds,
             )?;
         };
 
@@ -331,6 +335,7 @@ impl PerpetualBooster {
         timeout: Option<f32>,
         iteration_limit: Option<usize>,
         memory_limit: Option<f32>,
+        stopping_rounds: Option<usize>,
     ) -> Result<(), PerpetualError> {
         let start = Instant::now();
 
@@ -456,7 +461,7 @@ impl PerpetualBooster {
                 i % self.log_iterations == 0
             };
 
-            let tld = if n_low_loss_rounds > (STOPPING_ROUNDS + 1) {
+            let tld = if n_low_loss_rounds > (stopping_rounds.unwrap_or(STOPPING_ROUNDS) + 1) {
                 None
             } else {
                 Some(target_loss_decrement)
@@ -549,7 +554,7 @@ impl PerpetualBooster {
             (grad, hess) = calc_grad_hess(y, &yhat, sample_weight, alpha);
             loss = calc_loss(y, &yhat, sample_weight, alpha);
 
-            if stopping >= STOPPING_ROUNDS {
+            if stopping >= stopping_rounds.unwrap_or(STOPPING_ROUNDS) {
                 info!("Auto stopping since stopping round limit reached.");
                 break;
             }
@@ -1021,7 +1026,7 @@ mod tests {
         let data = Matrix::new(&data_vec, 891, 5);
         let mut booster = PerpetualBooster::default().set_max_bin(300).set_base_score(0.5);
         booster
-            .fit(&data, &y, 0.3, None, None, None, None, None, None, None)
+            .fit(&data, &y, 0.3, None, None, None, None, None, None, None, None)
             .unwrap();
         let preds = booster.predict(&data, false);
         let contribs = booster.predict_contributions(&data, ContributionsMethod::Average, false);
@@ -1045,7 +1050,7 @@ mod tests {
         let mut booster = PerpetualBooster::default();
 
         booster
-            .fit(&data, &y, 0.3, None, None, None, None, None, None, None)
+            .fit(&data, &y, 0.3, None, None, None, None, None, None, None, None)
             .unwrap();
         let preds = booster.predict(&data, false);
         let contribs = booster.predict_contributions(&data, ContributionsMethod::Average, false);
@@ -1071,7 +1076,7 @@ mod tests {
             .set_max_bin(300);
 
         booster
-            .fit(&data, &y, 0.3, None, None, None, None, None, None, None)
+            .fit(&data, &y, 0.3, None, None, None, None, None, None, None, None)
             .unwrap();
         let preds = booster.predict(&data, false);
         let contribs = booster.predict_contributions(&data, ContributionsMethod::Average, false);
@@ -1096,7 +1101,7 @@ mod tests {
         let mut booster = PerpetualBooster::default().set_max_bin(300).set_base_score(0.5);
 
         booster
-            .fit(&data, &y, 0.3, None, None, None, None, None, None, None)
+            .fit(&data, &y, 0.3, None, None, None, None, None, None, None, None)
             .unwrap();
         let preds = booster.predict(&data, true);
 
@@ -1128,7 +1133,19 @@ mod tests {
         let mut booster = PerpetualBooster::default();
 
         booster
-            .fit(&data, &y, 0.1, None, None, None, Some(cat_index), None, None, None)
+            .fit(
+                &data,
+                &y,
+                0.1,
+                None,
+                None,
+                None,
+                Some(cat_index),
+                None,
+                None,
+                None,
+                None,
+            )
             .unwrap();
 
         let file = fs::read_to_string("resources/titanic_train_y.csv").expect("Something went wrong reading the file");
@@ -1252,8 +1269,32 @@ mod tests {
             .set_max_bin(10)
             .set_num_threads(Some(2));
 
-        model1.fit(&matrix_test, &y_test, 0.1, None, None, None, None, None, None, None)?;
-        model2.fit(&matrix_test, &y_test, 0.1, None, None, None, None, None, None, None)?;
+        model1.fit(
+            &matrix_test,
+            &y_test,
+            0.1,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        )?;
+        model2.fit(
+            &matrix_test,
+            &y_test,
+            0.1,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        )?;
 
         let trees1 = model1.get_prediction_trees();
         let trees2 = model2.get_prediction_trees();
@@ -1315,6 +1356,7 @@ mod tests {
                 None,
                 Some(iter_limit),
                 Some(0.00003),
+                None,
             )
             .unwrap();
 

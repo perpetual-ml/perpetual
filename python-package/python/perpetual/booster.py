@@ -55,6 +55,8 @@ class PerpetualBooster:
         timeout: Optional[float] = None,
         iteration_limit: Optional[int] = None,
         memory_limit: Optional[float] = None,
+        stopping_rounds: Optional[int] = None,
+        max_bin: int = 256,
     ):
         """PerpetualBooster class, used to generate gradient boosted decision tree ensembles.
         The following parameters can also be specified in the fit method to override the values in the constructor:
@@ -115,6 +117,8 @@ class PerpetualBooster:
                 If you want to experiment with very high budget (>2.0), you can also increase this limit.
             memory_limit: optional limit for memory allocation in GB. If not set, the memory will be allocated based on
                 available memory and the algorithm requirements.
+            stopping_rounds: optional limit for auto stopping.
+            max_bin: number bins for feature discretization.
 
         Raises:
             TypeError: Raised if an invalid dtype is passed.
@@ -175,9 +179,12 @@ class PerpetualBooster:
         self.timeout = timeout
         self.iteration_limit = iteration_limit
         self.memory_limit = memory_limit
+        self.stopping_rounds = stopping_rounds
+        self.max_bin = max_bin
 
         booster = CratePerpetualBooster(
             objective=self.objective,
+            max_bin=self.max_bin,
             num_threads=self.num_threads,
             monotone_constraints=dict(),
             force_children_to_bound_parent=self.force_children_to_bound_parent,
@@ -202,6 +209,7 @@ class PerpetualBooster:
         timeout: Optional[float] = None,
         iteration_limit: Optional[int] = None,
         memory_limit: Optional[float] = None,
+        stopping_rounds: Optional[int] = None,
     ) -> Self:
         """Fit the gradient booster on a provided dataset.
 
@@ -225,6 +233,7 @@ class PerpetualBooster:
                 If you want to experiment with very high budget (>2.0), you can also increase this limit.
             memory_limit: optional limit for memory allocation in GB. If not set, the memory will be allocated based on
                 available memory and the algorithm requirements.
+            stopping_rounds: optional limit for auto stopping. Defaults to 3.
         """
 
         features_, flat_data, rows, cols, categorical_features_, cat_mapping = (
@@ -252,6 +261,7 @@ class PerpetualBooster:
         ):
             booster = CratePerpetualBooster(
                 objective=self.objective,
+                max_bin=self.max_bin,
                 num_threads=self.num_threads,
                 monotone_constraints=crate_mc,
                 force_children_to_bound_parent=self.force_children_to_bound_parent,
@@ -267,6 +277,7 @@ class PerpetualBooster:
             booster = CrateMultiOutputBooster(
                 n_boosters=len(classes_),
                 objective=self.objective,
+                max_bin=self.max_bin,
                 num_threads=self.num_threads,
                 monotone_constraints=crate_mc,
                 force_children_to_bound_parent=self.force_children_to_bound_parent,
@@ -300,6 +311,7 @@ class PerpetualBooster:
             timeout=timeout or self.timeout,
             iteration_limit=iteration_limit or self.iteration_limit,
             memory_limit=memory_limit or self.memory_limit,
+            stopping_rounds=stopping_rounds or self.stopping_rounds,
         )
 
         return self

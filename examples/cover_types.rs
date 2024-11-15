@@ -148,7 +148,19 @@ fn main() -> Result<(), Box<dyn Error>> {
             .map(|y| if (*y as i32) == i { 1.0 } else { 0.0 })
             .collect();
 
-        model.fit(&matrix_train, &y_tr, *budget, None, None, None, None, None, None, None)?;
+        model.fit(
+            &matrix_train,
+            &y_tr,
+            *budget,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        )?;
         println!("Completed fitting model number: {}", i);
 
         let trees = model.get_prediction_trees();
