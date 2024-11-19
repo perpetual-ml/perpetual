@@ -27,6 +27,20 @@ def X_y() -> Tuple[pd.DataFrame, pd.Series]:
     return X, y
 
 
+def test_booster_max_cat(X_y):
+    df = pd.read_csv("../resources/titanic.csv")
+    X = df.drop(columns="survived").reset_index(drop=True)
+    y = df["survived"]
+
+    num_cols = X.select_dtypes(include=np.number).columns.tolist()
+    all_cols = X.columns.tolist()
+    cat_cols = [x for x in all_cols if x not in num_cols]
+    X[cat_cols] = X[cat_cols].astype("category")
+
+    model = PerpetualBooster(objective="LogLoss", max_cat=4)
+    model.fit(X, y)
+
+
 def test_booster_no_variance(X_y):
     X, y = X_y
     X.iloc[:, 3] = 1

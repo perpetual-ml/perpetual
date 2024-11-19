@@ -123,7 +123,6 @@ def convert_input_frame(
                 logger.warning(
                     f"Feature {features_[i]} will be treated as numerical since the number of categories ({len(categories)}) exceeds max_cat ({max_cat}) threshold."
                 )
-                continue
             categories = [c for c in list(categories) if c != "nan"]
             categories.insert(0, "nan")
             cat_mapping[features_[i]] = categories
