@@ -82,7 +82,7 @@ if __name__ == "__main__":
 
     data_train, data_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
-    features_, titanic_train_flat, rows, cols, categorical_features_, cat_mapping = convert_input_frame(data_train, "auto")
+    features_, titanic_train_flat, rows, cols, categorical_features_, cat_mapping = convert_input_frame(data_train, "auto", 1000)
     features_, titanic_test_flat, rows, cols = transform_input_frame(data_test, cat_mapping)
 
     data_test.to_csv("resources/titanic_test_df.csv", index=False)
@@ -97,6 +97,6 @@ if __name__ == "__main__":
     df = fetch_openml(data_id=546)
     X = df.data
     y = df.target
-    features_, sensory_flat, rows, cols, categorical_features_, cat_mapping = convert_input_frame(X, "auto")
+    features_, sensory_flat, rows, cols, categorical_features_, cat_mapping = convert_input_frame(X, "auto", 1000)
     pd.Series(sensory_flat).to_csv("resources/sensory_flat.csv", index=False, header=False)
     pd.Series(y).to_csv("resources/sensory_y.csv", index=False, header=False)
