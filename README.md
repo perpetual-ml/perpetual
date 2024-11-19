@@ -52,7 +52,7 @@ Documentation for the Python API can be found [here](https://perpetual-ml.github
 
 ## Installation
 
-The package can be installed directly from [pypi](https://pypi.org/project/perpetual).
+The package can be installed directly from [pypi](https://pypi.org/project/perpetual):
 
 ```shell
 pip install perpetual
@@ -64,10 +64,10 @@ Using [conda-forge](https://anaconda.org/conda-forge/perpetual):
 conda install conda-forge::perpetual
 ```
 
-To use in a Rust project, add the following to your Cargo.toml file to get the package from [crates.io](https://crates.io/crates/perpetual).
+To use in a Rust project and to get the package from [crates.io](https://crates.io/crates/perpetual):
 
 ```toml
-perpetual = "0.7.3"
+cargo add perpetual
 ```
 
 ## Contribution

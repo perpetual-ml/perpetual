@@ -57,10 +57,11 @@ class PerpetualBooster:
         memory_limit: Optional[float] = None,
         stopping_rounds: Optional[int] = None,
         max_bin: int = 256,
+        max_cat: int = 1000,
     ):
         """PerpetualBooster class, used to generate gradient boosted decision tree ensembles.
         The following parameters can also be specified in the fit method to override the values in the constructor:
-            budget, alpha, reset, categorical_features, timeout, iteration_limit, and memory_limit.
+            budget, alpha, reset, categorical_features, timeout, iteration_limit, memory_limit, and stopping_rounds.
 
         Args:
             objective (str, optional): Learning objective function to be used for optimization.
@@ -104,21 +105,24 @@ class PerpetualBooster:
                 - "AverageNodeWeight": Set the missing node to be equal to the weighted average weight of the left and the right nodes.
             log_iterations (int, optional): Setting to a value (N) other than zero will result in information being logged about ever N iterations, info can be interacted with directly with the python [`logging`](https://docs.python.org/3/howto/logging.html) module. For an example of how to utilize the logging information see the example [here](/#logging-output).
             feature_importance_method (str, optional): The feature importance method type that will be used to calculate the `feature_importances_` attribute on the booster.
-            budget: a positive number for fitting budget. Increasing this number will more
+            budget (float, optional): a positive number for fitting budget. Increasing this number will more
                 likely result in more boosting rounds and more increased predictive power.
                 Default value is 1.0.
-            alpha: only used in quantile regression.
-            reset: whether to reset the model or continue training.
-            categorical_features: The names or indices for categorical features.
-                `auto` for Polars or Pandas categorical data type.
-            timeout: optional fit timeout in seconds
-            iteration_limit: optional limit for the number of boosting rounds. The default value is 1000 boosting rounds.
+            alpha (float, optional): only used in quantile regression.
+            reset (bool, optional): whether to reset the model or continue training.
+            categorical_features (Union[Iterable[int], Iterable[str], str, None], optional): The names or indices for categorical features.
+                Defaults to `auto` for Polars or Pandas categorical data types.
+            timeout (float, optional): optional fit timeout in seconds
+            iteration_limit (int, optional): optional limit for the number of boosting rounds. The default value is 1000 boosting rounds.
                 The algorithm automatically stops for most of the cases before hitting this limit.
                 If you want to experiment with very high budget (>2.0), you can also increase this limit.
-            memory_limit: optional limit for memory allocation in GB. If not set, the memory will be allocated based on
+            memory_limit (float, optional): optional limit for memory allocation in GB. If not set, the memory will be allocated based on
                 available memory and the algorithm requirements.
-            stopping_rounds: optional limit for auto stopping.
-            max_bin: number bins for feature discretization.
+            stopping_rounds (int, optional): optional limit for auto stopping.
+            max_bin (int, optional): maximum number of bins for feature discretization. Defaults to 256.
+            max_cat (int, optional): Maximum number of unique categories for a categorical feature.
+                Features with more categories will be treated as numerical.
+                Defaults to 1000.
 
         Raises:
             TypeError: Raised if an invalid dtype is passed.
@@ -181,6 +185,7 @@ class PerpetualBooster:
         self.memory_limit = memory_limit
         self.stopping_rounds = stopping_rounds
         self.max_bin = max_bin
+        self.max_cat = max_cat
 
         booster = CratePerpetualBooster(
             objective=self.objective,
@@ -220,24 +225,26 @@ class PerpetualBooster:
             sample_weight (Union[ArrayLike, None], optional): Instance weights to use when
                 training the model. If None is passed, a weight of 1 will be used for every record.
                 Defaults to None.
-            budget: a positive number for fitting budget. Increasing this number will more
+            budget (float, optional): a positive number for fitting budget. Increasing this number will more
                 likely result in more boosting rounds and more increased predictive power.
-                Default value is 1.0.
-            alpha: only used in quantile regression.
-            reset: whether to reset the model or continue training.
-            categorical_features: The names or indices for categorical features.
-                `auto` for Polars or Pandas categorical data type.
-            timeout: optional fit timeout in seconds
-            iteration_limit: optional limit for the number of boosting rounds. The default value is 1000 boosting rounds.
+                Defaults to 1.0.
+            alpha (float, optional): only used in quantile regression.
+            reset (bool, optional): whether to reset the model or continue training.
+            categorical_features (Union[Iterable[int], Iterable[str], str, None], optional): The names or indices for categorical features.
+                Defaults to `auto` for Polars or Pandas categorical data types.
+            timeout (float, optional): optional fit timeout in seconds
+            iteration_limit (int, optional): optional limit for the number of boosting rounds. The default value is 1000 boosting rounds.
                 The algorithm automatically stops for most of the cases before hitting this limit.
                 If you want to experiment with very high budget (>2.0), you can also increase this limit.
-            memory_limit: optional limit for memory allocation in GB. If not set, the memory will be allocated based on
+            memory_limit (float, optional): optional limit for memory allocation in GB. If not set, the memory will be allocated based on
                 available memory and the algorithm requirements.
-            stopping_rounds: optional limit for auto stopping. Defaults to 3.
+            stopping_rounds (int, optional): optional limit for auto stopping. Defaults to 3.
         """
 
         features_, flat_data, rows, cols, categorical_features_, cat_mapping = (
-            convert_input_frame(X, categorical_features or self.categorical_features)
+            convert_input_frame(
+                X, categorical_features or self.categorical_features, self.max_cat
+            )
         )
         self.n_features_ = cols
         self.cat_mapping = cat_mapping
