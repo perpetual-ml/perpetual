@@ -35,7 +35,7 @@ def test_booster_max_cat(X_y):
     num_cols = X.select_dtypes(include=np.number).columns.tolist()
     all_cols = X.columns.tolist()
     cat_cols = [x for x in all_cols if x not in num_cols]
-    X[cat_cols] = X[cat_cols].astype('category')
+    X[cat_cols] = X[cat_cols].astype("category")
 
     model = PerpetualBooster(objective="LogLoss", max_cat=4)
     model.fit(X, y)
