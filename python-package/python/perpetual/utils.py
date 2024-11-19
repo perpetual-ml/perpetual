@@ -1,5 +1,9 @@
+import logging
 import numpy as np
 from typing import Dict, Iterable, List, Optional, Tuple
+
+
+logger = logging.getLogger(__name__)
 
 
 def type_df(df):
@@ -61,7 +65,7 @@ def convert_input_array(x, objective) -> np.ndarray:
 
 
 def convert_input_frame(
-    X, categorical_features
+    X, categorical_features, max_cat
 ) -> Tuple[List[str], np.ndarray, int, int, Optional[Iterable[int]], Optional[Dict]]:
     """Convert data to format needed by booster.
 
@@ -110,18 +114,28 @@ def convert_input_frame(
         categorical_features_ = [features_.index(c) for c in categorical_features]
 
     cat_mapping = {}  # key: feature_name, value: ordered category names
+    cat_to_num = []
     if categorical_features_:
         for i in categorical_features_:
             categories = np.unique(X_[:, i].astype(dtype="str", copy=False))
+            if len(categories) > max_cat:
+                cat_to_num.append(i)
+                logger.warning(
+                    f"Feature {features_[i]} will be treated as numerical since the number of categories ({len(categories)}) exceeds max_cat ({max_cat}) threshold."
+                )
+                continue
             categories = [c for c in list(categories) if c != "nan"]
             categories.insert(0, "nan")
             cat_mapping[features_[i]] = categories
+        categorical_features_ = [
+            x for x in categorical_features_ if x not in cat_to_num
+        ]
 
     if cat_mapping:
-        print(f"Categorical features: {categorical_features_}")
-        print(f"Mapping of categories: {cat_mapping}")
+        logger.info(f"Categorical features: {categorical_features_}")
+        logger.info(f"Mapping of categories: {cat_mapping}")
+
         for feature_name, categories in cat_mapping.items():
-            feature_index = features_.index(feature_name)
 
             def f(x):
                 try:
@@ -133,6 +147,7 @@ def convert_input_frame(
                 except (ValueError, IndexError):
                     return np.nan
 
+            feature_index = features_.index(feature_name)
             X_[:, feature_index] = np.apply_along_axis(f, 1, X_)
 
     if not np.issubdtype(X_.dtype, "float64"):
