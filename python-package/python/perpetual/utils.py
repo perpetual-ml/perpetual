@@ -117,37 +117,32 @@ def convert_input_frame(
     cat_to_num = []
     if categorical_features_:
         for i in categorical_features_:
-            categories = np.unique(X_[:, i].astype(dtype="str", copy=False))
+            categories, inversed = np.unique(X_[:, i].astype(str), return_inverse=True)
+            if categories[-1] == "nan":
+                categories = list(categories)
+            else:
+                categories = list(categories)
+                categories.append("nan")
+            inversed = inversed.astype(np.float32)
+
             if len(categories) > max_cat:
                 cat_to_num.append(i)
                 logger.warning(
                     f"Feature {features_[i]} will be treated as numerical since the number of categories ({len(categories)}) exceeds max_cat ({max_cat}) threshold."
                 )
-            categories = [c for c in list(categories) if c != "nan"]
-            categories.insert(0, "nan")
-            cat_mapping[features_[i]] = categories
+
+            feature_name = features_[i]
+            cat_mapping[feature_name] = categories
+            ind_nan = len(categories) - 1
+            inversed[inversed == ind_nan] = np.nan
+            X_[:, i] = inversed
+
         categorical_features_ = [
             x for x in categorical_features_ if x not in cat_to_num
         ]
 
-    if cat_mapping:
         logger.info(f"Categorical features: {categorical_features_}")
         logger.info(f"Mapping of categories: {cat_mapping}")
-
-        for feature_name, categories in cat_mapping.items():
-
-            def f(x):
-                try:
-                    return (
-                        np.nan
-                        if str(x[feature_index]) == "nan"
-                        else float(categories.index(str(x[feature_index])))
-                    )
-                except (ValueError, IndexError):
-                    return np.nan
-
-            feature_index = features_.index(feature_name)
-            X_[:, feature_index] = np.apply_along_axis(f, 1, X_)
 
     if not np.issubdtype(X_.dtype, "float64"):
         X_ = X_.astype(dtype="float64", copy=False)
@@ -183,18 +178,12 @@ def transform_input_frame(X, cat_mapping) -> Tuple[List[str], np.ndarray, int, i
     if cat_mapping:
         for feature_name, categories in cat_mapping.items():
             feature_index = features_.index(feature_name)
-
-            def f(x):
-                try:
-                    return (
-                        np.nan
-                        if str(x[feature_index]) == "nan"
-                        else float(categories.index(str(x[feature_index])))
-                    )
-                except (ValueError, IndexError):
-                    return np.nan
-
-            X_[:, feature_index] = np.apply_along_axis(f, 1, X_)
+            x_enc = np.searchsorted(
+                categories, X_[:, feature_index].astype(str)
+            ).astype(np.float32)
+            ind_nan = len(categories) - 1
+            x_enc[x_enc == ind_nan] = np.nan
+            X_[:, feature_index] = x_enc
 
     if not np.issubdtype(X_.dtype, "float64"):
         X_ = X_.astype(dtype="float64", copy=False)
