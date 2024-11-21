@@ -37,7 +37,7 @@ def convert_input_array(x, objective) -> np.ndarray:
 
     if type(x).__module__.split(".")[0] == "numpy":
         if len(x.shape) == 2:
-            classes_, x_, *_ = convert_input_frame(x, None)
+            classes_, x_, *_ = convert_input_frame(x, None, 1000)
         else:
             x_ = x
     elif type_series(x) == "pandas_series":
@@ -45,7 +45,7 @@ def convert_input_array(x, objective) -> np.ndarray:
     elif type_series(x) == "polars_series":
         x_ = x.to_numpy(allow_copy=False)
     elif type_df(x) == "polars_df" or type_df(x) == "pandas_df":
-        classes_, x_, *_ = convert_input_frame(x, None)
+        classes_, x_, *_ = convert_input_frame(x, None, 1000)
     else:
         x_ = x.to_numpy()
 
