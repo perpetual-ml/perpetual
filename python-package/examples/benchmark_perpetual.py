@@ -4,6 +4,7 @@ from perpetual import PerpetualBooster
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_squared_error, log_loss
 from sklearn.datasets import fetch_covtype, fetch_california_housing
+from importlib.metadata import version
 
 
 def prepare_data(cal_housing, seed):
@@ -24,6 +25,7 @@ def prepare_data(cal_housing, seed):
 
 
 if __name__ == "__main__":
+    print(f"perpetual: {version('perpetual')}")
     budget = 1.0
     num_threads = 2
     cal_housing = True  # True -> California Housing, False -> Cover Types
