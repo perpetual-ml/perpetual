@@ -1,8 +1,8 @@
 use crate::bin::Bin;
 use crate::binning::bin_matrix;
 use crate::constants::{
-    FREE_MEM_ALLOC_FACTOR, GENERALIZATION_THRESHOLD, ITER_LIMIT, MIN_COL_AMOUNT, N_NODES_ALLOC_LIMIT, STOPPING_ROUNDS,
-    TIMEOUT_FACTOR,
+    FREE_MEM_ALLOC_FACTOR, GENERALIZATION_THRESHOLD_FLEX, ITER_LIMIT, MIN_COL_AMOUNT, N_NODES_ALLOC_LIMIT,
+    STOPPING_ROUNDS, TIMEOUT_FACTOR,
 };
 use crate::constraints::ConstraintMap;
 use crate::data::Matrix;
@@ -524,7 +524,7 @@ impl PerpetualBooster {
                     .map(|n| n.generalization.unwrap_or(0.0))
                     .max_by(|a, b| a.total_cmp(b))
                     .unwrap_or(0.0);
-                if generalization < GENERALIZATION_THRESHOLD && tree.stopper != TreeStopper::LossDecrement {
+                if generalization < GENERALIZATION_THRESHOLD_FLEX && tree.stopper != TreeStopper::LossDecrement {
                     stopping += 1;
                     // If root node cannot be split due to no positive split gain, stop boosting.
                     if tree.nodes.len() == 1 {
