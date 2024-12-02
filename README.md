@@ -8,6 +8,7 @@
 [![PyPI Version](https://img.shields.io/pypi/v/perpetual.svg?logo=pypi&logoColor=white)](https://pypi.org/project/perpetual)
 [![Crates.io Version](https://img.shields.io/crates/v/perpetual?logo=rust&logoColor=white)](https://crates.io/crates/perpetual)
 [![Static Badge](https://img.shields.io/badge/join-discord-blue?logo=discord)](https://discord.gg/AyUK7rr6wy)
+![PyPI - Downloads](https://img.shields.io/pypi/dm/perpetual)
 
 </div>
 
@@ -33,7 +34,25 @@ The following table summarizes the results for the [Cover Types](https://scikit-
 | ---------------- | --------------------- | ------------------ | ----------------- | ------------------ | ----------------- |
 | 0.9              | 100                   | 0.091              | 0.084             | 72x                | 78x               |
 
-You can reproduce the results using the scripts in the [examples](./python-package/examples) folder.
+The results can be reproduced using the scripts in the [examples](./python-package/examples) folder.
+
+PerpetualBooster is a GBM but behaves like AutoML so it is benchmarked also against AutoGluon (v1.2, best quality preset), the current leader in [AutoML benchmark](https://automlbenchmark.streamlit.app/cd_diagram). Top 10 datasets with the most number of rows are selected from [OpenML datasets](https://www.openml.org/). The results are summarized in the following table for regression tasks:
+
+| OpenML Task                                  | Perpetual Training Duration | Perpetual Inference Duration                                      | Perpetual RMSE | AutoGluon Training Duration | AutoGluon Inference Duration                                      | AutoGluon RMSE |
+| -------------------------------------------- | --------------------------- | ----------------------------------------------------------------- | -------------- | --------------------------- | ----------------------------------------------------------------- | -------------- |
+| [Airlines_DepDelay_10M](openml.org/t/359929) | 518                         | 11.3                                                              | 29.0           | 520                         | 30.9 <td style="background-color:green;color:white;"> 28.8 </td>  |
+| [bates_regr_100](openml.org/t/361940)        | 3421                        | 15.1 <td style="background-color:green;color:white;"> 1.084 </td> | OOM            | OOM                         | OOM                                                               |
+| [BNG(libras_move)](openml.org/t/7327)        | 1956                        | 4.2 <td style="background-color:green;color:white;"> 2.51 </td>   | 1922           | 97.6                        | 2.53                                                              |
+| [BNG(satellite_image)](openml.org/t/7326)    | 334                         | 1.6                                                               | 0.731          | 337                         | 10.0 <td style="background-color:green;color:white;"> 0.721 </td> |
+| [COMET_MC](openml.org/t/14949)               | 44                          | 1.0 <td style="background-color:green;color:white;"> 0.0615 </td> | 47             | 5.0                         | 0.0662                                                            |
+| [friedman1](openml.org/t/361939)             | 275                         | 4.2 <td style="background-color:green;color:white;"> 1.047 </td>  | 278            | 5.1                         | 1.487                                                             |
+| [poker](openml.org/t/10102)                  | 38                          | 0.6 <td style="background-color:green;color:white;"> 0.256 </td>  | 41             | 1.2                         | 0.722                                                             |
+| [subset_higgs](openml.org/t/361955)          | 868                         | 10.6 <td style="background-color:green;color:white;"> 0.420 </td> | 870            | 24.5                        | 0.421                                                             |
+| [BNG(autoHorse)](openml.org/t/7319)          | 107                         | 1.1 <td style="background-color:green;color:white;"> 19.0 </td>   | 107            | 3.2                         | 20.5                                                              |
+| [BNG(pbc)](openml.org/t/7318)                | 48                          | 0.6 <td style="background-color:green;color:white;"> 836.5 </td>  | 51             | 0.2                         | 957.1                                                             |
+| average                                      | 465                         | 3.9                                                               | -              | 464                         | 19.7                                                              | -              |
+
+PerpetualBooster outperformed AutoGluon on 8 out of 10 datasets, training equally fast and inferring 5x faster. The results can be reproduced using the automlbenchmark fork [here](https://github.com/deadsoul44/automlbenchmark).
 
 ## Usage
 
