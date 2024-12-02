@@ -533,26 +533,27 @@ impl PerpetualBooster {
                 }
             }
 
-            if verbose {
-                info!(
-                    "round {:0?}, tree.nodes: {:1?}, tree.depth: {:2?}, tree.stopper: {:3?}",
-                    i,
-                    tree.nodes.len(),
-                    tree.depth,
-                    tree.stopper,
-                );
-            }
-
             if tree.stopper != TreeStopper::LossDecrement {
                 n_low_loss_rounds += 1;
             } else {
                 n_low_loss_rounds = 0;
             }
 
-            self.trees.push(tree);
-
             (grad, hess) = calc_grad_hess(y, &yhat, sample_weight, alpha);
             loss = calc_loss(y, &yhat, sample_weight, alpha);
+
+            if verbose {
+                info!(
+                    "round {:0?}, tree.nodes: {:1?}, tree.depth: {:2?}, tree.stopper: {:3?}, loss: {:4?}",
+                    i,
+                    tree.nodes.len(),
+                    tree.depth,
+                    tree.stopper,
+                    loss.iter().sum::<f32>() / loss.len() as f32,
+                );
+            }
+
+            self.trees.push(tree);
 
             if stopping >= stopping_rounds.unwrap_or(STOPPING_ROUNDS) {
                 info!("Auto stopping since stopping round limit reached.");
@@ -573,7 +574,7 @@ impl PerpetualBooster {
 
         if self.log_iterations > 0 {
             info!(
-                "Finished training a booster with {0} trees in {1}.",
+                "Finished training a booster with {0} trees in {1} seconds.",
                 self.trees.len(),
                 start.elapsed().as_secs()
             );

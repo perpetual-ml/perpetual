@@ -1,10 +1,10 @@
 [build-system]
-requires = ["maturin>=1.0.0,<1.7.0"]
+requires = ["maturin>=1.0,<1.7"]
 build-backend = "maturin"
 
 [project]
 name = "perpetual"
-version = "0.7.8"
+version = "0.7.10"
 description = "A self-generalizing gradient boosting machine which doesn't need hyperparameter optimization"
 license = { file = "LICENSE" }
 keywords = [

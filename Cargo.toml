@@ -1,6 +1,6 @@
 [package]
 name = "perpetual"
-version = "0.7.8"
+version = "0.7.10"
 edition = "2021"
 authors = ["Mutlu Simsek <msimsek@perpetual-ml.com>"]
 homepage = "https://perpetual-ml.com"
@@ -27,7 +27,7 @@ serde = { version = "1.0.215", features = ["derive"] }
 approx = "0.5"
 log = "0.4"
 rand = "0.8.5"
-sysinfo = "0.32.0"
+sysinfo = "0.32.1"
 
 [dev-dependencies]
 criterion = "0.5"

@@ -1,6 +1,6 @@
 [package]
 name = "py-perpetual"
-version = "0.7.8"
+version = "0.7.10"
 edition = "2021"
 authors = ["Mutlu Simsek <msimsek@perpetual-ml.com>"]
 homepage = "https://perpetual-ml.com"
@@ -18,10 +18,10 @@ name = "perpetual"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-pyo3 = { version = "0.22.6", features = ["extension-module"] }
-perpetual_rs = {package="perpetual", version = "0.7.8", path = "../" }
-numpy = "0.22.1"
+pyo3 = { version = "0.23.2", features = ["extension-module"] }
+perpetual_rs = {package="perpetual", version = "0.7.10", path = "../" }
+numpy = "0.23.0"
 ndarray = "0.16.1"
 serde_plain = { version = "1.0" }
 serde = { version = "1.0.215" }
-pyo3-log = "0.11"
+pyo3-log = "0.12.0"
