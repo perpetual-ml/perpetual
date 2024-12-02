@@ -1,5 +1,5 @@
 [build-system]
-requires = ["maturin"]
+requires = ["maturin>=1.0,<1.7"]
 build-backend = "maturin"
 
 [project]
@@ -30,7 +30,7 @@ classifiers = [
 ]
 
 [project.optional-dependencies]
-dev = ["pandas", "polars", "pyarrow", "maturin", "pytest", "seaborn", "scikit-learn", "mkdocs-material", "mkdocstrings[python]", "mkdocs-autorefs", "ruff"]
+dev = ["pandas", "polars", "pyarrow", "maturin==1.6.0", "pytest", "seaborn", "scikit-learn", "mkdocs-material", "mkdocstrings[python]", "mkdocs-autorefs", "ruff"]
 
 [tool.maturin]
 sdist-include = ["LICENSE", "README.md"]
