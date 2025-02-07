@@ -52,7 +52,7 @@ PerpetualBooster is a GBM but behaves like AutoML so it is benchmarked also agai
 | [BNG(pbc)](https://www.openml.org/t/7318)                | 48                          | 0.6 <td style="background-color:green;color:white;"> 836.5 </td>  | 51             | 0.2                         | 957.1                                                             |
 | average                                      | 465                         | 3.9                                                               | -              | 464                         | 19.7                                                              | -              |
 
-PerpetualBooster outperformed AutoGluon on 8 out of 10 datasets, training equally fast and inferring 5x faster. The results can be reproduced using the automlbenchmark fork [here](https://github.com/deadsoul44/automlbenchmark).
+PerpetualBooster outperformed AutoGluon on 8 out of 10 datasets, training equally fast and inferring 5x faster. The results can be reproduced using the automlbenchmark fork [here](https://github.com/deadsoul44/automlbenchmark)..
 
 ## Usage
 

@@ -175,7 +175,6 @@ jobs:
       - name: Build wheels with maturin
         uses: PyO3/maturin-action@v1
         with:
-          target: x86_64
           manylinux: auto
           command: build
           args: --release --strip --interpreter python${{ matrix.pyversion }} --manifest-path python-package/Cargo.toml --out dist --sdist
