@@ -85,9 +85,11 @@ The results are summarized in the following table for classification tasks:
 | [sf-police-incidents](https://www.openml.org/t/359994)   | 85.8    | 1.5   | <ins> 0.687 </ins> | 99.4     | 2.8    | 0.659              |
 | [bates_classif_100](https://www.openml.org/t/361941)     | 11152.8 | 50.0  | <ins> 0.864 </ins> | OOM      | OOM    | OOM                |
 | [prostate](https://www.openml.org/t/361945)              | 13699.9 | 79.8  | <ins> 0.987 </ins> | OOM      | OOM    | OOM                |
-| average                                                  | 3747.0  | 34.0  | -                  | 3699.2   | 19.7   | -                  |
+| average                                                  | 3747.0  | 34.0  | -                  | 3699.2   | 39.0   | -                  |
 
 PerpetualBooster outperformed AutoGluon on 10 out of 10 classification tasks, training equally fast and inferring 1.1x faster. 
+
+PerpetualBooster demonstrates greater robustness compared to AutoGluon, successfully training on all 20 tasks, whereas AutoGluon encountered out-of-memory errors on 3 of those tasks.
 
 The results can be reproduced using the automlbenchmark fork [here](https://github.com/deadsoul44/automlbenchmark).
 
