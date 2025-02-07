@@ -4,7 +4,7 @@ build-backend = "maturin"
 
 [project]
 name = "perpetual"
-version = "0.7.10"
+version = "0.7.12"
 description = "A self-generalizing gradient boosting machine which doesn't need hyperparameter optimization"
 license = { file = "LICENSE" }
 keywords = [
@@ -27,6 +27,7 @@ classifiers = [
   "Programming Language :: Python :: 3.10",
   "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
 ]
 
 [project.optional-dependencies]

@@ -1,8 +1,8 @@
 use crate::bin::Bin;
 use crate::binning::bin_matrix;
 use crate::constants::{
-    FREE_MEM_ALLOC_FACTOR, GENERALIZATION_THRESHOLD_FLEX, ITER_LIMIT, MIN_COL_AMOUNT, N_NODES_ALLOC_LIMIT,
-    STOPPING_ROUNDS, TIMEOUT_FACTOR,
+    FREE_MEM_ALLOC_FACTOR, GENERALIZATION_THRESHOLD_FLEX, ITER_LIMIT, MIN_COL_AMOUNT, N_NODES_ALLOC_MAX,
+    N_NODES_ALLOC_MIN, STOPPING_ROUNDS, TIMEOUT_FACTOR,
 };
 use crate::constraints::ConstraintMap;
 use crate::data::Matrix;
@@ -430,10 +430,14 @@ impl PerpetualBooster {
                 None => sys.available_memory() as f32,
             },
         };
-        let n_nodes_alloc = usize::min(
-            N_NODES_ALLOC_LIMIT,
-            (FREE_MEM_ALLOC_FACTOR * (mem_available / (mem_hist as f32))) as usize,
-        );
+
+        let mut n_nodes_alloc: usize;
+        if memory_limit.is_none() {
+            n_nodes_alloc = (FREE_MEM_ALLOC_FACTOR * (mem_available / (mem_hist as f32))) as usize;
+            n_nodes_alloc = n_nodes_alloc.clamp(N_NODES_ALLOC_MIN, N_NODES_ALLOC_MAX);
+        } else {
+            n_nodes_alloc = (FREE_MEM_ALLOC_FACTOR * (mem_available / (mem_hist as f32))) as usize;
+        }
 
         let mut hist_tree_owned: Vec<NodeHistogramOwned>;
         if col_amount == col_index.len() {
