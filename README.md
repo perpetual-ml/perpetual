@@ -69,7 +69,7 @@ The results are summarized in the following table for regression tasks:
 | [BNG(pbc)](https://www.openml.org/t/7318)                | 48    | 0.6   | <ins> 836.5 </ins>  | 51       | 0.2    | 957.1              |
 | average                                                  | 465   | 3.9   | -                   | 464      | 19.7   | -                  |
 
-PerpetualBooster outperformed AutoGluon on 8 out of 10 regression tasks, training equally fast and inferring 5x faster. 
+PerpetualBooster outperformed AutoGluon on 8 out of 10 regression tasks, training equally fast and inferring 5.1x faster. 
 
 The results are summarized in the following table for classification tasks:
 
