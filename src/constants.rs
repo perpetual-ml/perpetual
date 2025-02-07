@@ -1,6 +1,7 @@
 pub const STOPPING_ROUNDS: usize = 3;
 pub const FREE_MEM_ALLOC_FACTOR: f32 = 0.9;
-pub const N_NODES_ALLOC_LIMIT: usize = 3000;
+pub const N_NODES_ALLOC_MIN: usize = 100;
+pub const N_NODES_ALLOC_MAX: usize = 10000;
 pub const ITER_LIMIT: usize = 1000;
 pub const GENERALIZATION_THRESHOLD: f32 = 1.0;
 pub const GENERALIZATION_THRESHOLD_FLEX: f32 = 0.99;
