@@ -160,7 +160,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.pyversion }}
-          architecture: x64
+          architecture: arm64
       - name: Install deps
         run: pip install numpy pandas seaborn scikit-learn toml
       - run: |
