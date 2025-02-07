@@ -191,7 +191,7 @@ jobs:
       - name: Save Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: dist-linux-${{ matrix.pyversion }}
+          name: dist-linux-arm-${{ matrix.pyversion }}
           path: dist
 
   cargo-build-test:
