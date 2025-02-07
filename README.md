@@ -16,6 +16,21 @@
 
 PerpetualBooster is a gradient boosting machine (GBM) algorithm which doesn't need hyperparameter optimization unlike other GBM algorithms. Similar to AutoML libraries, it has a `budget` parameter. Increasing the `budget` parameter increases the predictive power of the algorithm and gives better results on unseen data. Start with a small budget (e.g. 1.0) and increase it (e.g. 2.0) once you are confident with your features. If you don't see any improvement with further increasing the `budget`, it means that you are already extracting the most predictive power out of your data.
 
+## Usage
+
+You can use the algorithm like in the example below. Check examples folders for both Rust and Python.
+
+```python
+from perpetual import PerpetualBooster
+
+model = PerpetualBooster(objective="SquaredLoss")
+model.fit(X, y, budget=1.0)
+```
+
+## Documentation
+
+Documentation for the Python API can be found [here](https://perpetual-ml.github.io/perpetual) and for the Rust API [here](https://docs.rs/perpetual/latest/perpetual/).
+
 ## Benchmark
 
 Hyperparameter optimization usually takes 100 iterations with plain GBM algorithms. PerpetualBooster achieves the same accuracy in a single run. Thus, it achieves up to 100x speed-up at the same accuracy with different `budget` levels and with different datasets.
@@ -56,22 +71,27 @@ The results are summarized in the following table for regression tasks:
 
 PerpetualBooster outperformed AutoGluon on 8 out of 10 regression tasks, training equally fast and inferring 5x faster. 
 
+The results are summarized in the following table for classification tasks:
+
+| OpenML Task | Perpetual Training Duration | Perpetual Inference Duration | Perpetual AUC | AutoGluon Training Duration | AutoGluon Inference Duration | AutoGluon AUC |
+| -------------------------------------------------------- | ------- | ------ | ------------------- | -------- | ------ | ------------------ |
+| [BNG(spambase)](https://www.openml.org/t/146163)         | 70.1    | 2.1   | <ins> 0.671 </ins> | 73.1     | 3.7    | 0.669              |
+| [BNG(trains)](https://www.openml.org/t/208)              | 89.5    | 1.7   | <ins> 0.996 </ins> | 106.4    | 2.4    | 0.994              |
+| [breast](https://www.openml.org/t/361942)                | 13699.3 | 97.7  | <ins> 0.991 </ins> | 13330.7  | 79.7   | 0.949              |
+| [Click_prediction_small](https://www.openml.org/t/7291)  | 89.1    | 1.0   | <ins> 0.749 </ins> | 101.0    | 2.8    | 0.703              |
+| [colon](https://www.openml.org/t/361938)                 | 12435.2 | 126.7 | <ins> 0.997 </ins> | 12356.2  | 152.3  | 0.997              |
+| [Higgs](https://www.openml.org/t/362113)                 | 3485.3  | 40.9  | <ins> 0.843 </ins> | 3501.4   | 67.9   | 0.816              |
+| [SEA(50000)](https://www.openml.org/t/230)               | 21.9    | 0.2   | <ins> 0.936 </ins> | 25.6     | 0.5    | 0.935              |
+| [sf-police-incidents](https://www.openml.org/t/359994)   | 85.8    | 1.5   | <ins> 0.687 </ins> | 99.4     | 2.8    | 0.659              |
+| [bates_classif_100](https://www.openml.org/t/361941)     | 11152.8 | 50.0  | <ins> 0.864 </ins> | OOM      | OOM    | OOM                |
+| [prostate](https://www.openml.org/t/361945)              | 13699.9 | 79.8  | <ins> 0.987 </ins> | OOM      | OOM    | OOM                |
+| average                                                  | 3747.0  | 34.0  | -                  | 3699.2   | 19.7   | -                  |
+
+PerpetualBooster outperformed AutoGluon on 10 out of 10 classification tasks, training equally fast and inferring 1.1x faster. 
+
 The results can be reproduced using the automlbenchmark fork [here](https://github.com/deadsoul44/automlbenchmark).
 
-## Usage
 
-You can use the algorithm like in the example below. Check examples folders for both Rust and Python.
-
-```python
-from perpetual import PerpetualBooster
-
-model = PerpetualBooster(objective="SquaredLoss")
-model.fit(X, y, budget=1.0)
-```
-
-## Documentation
-
-Documentation for the Python API can be found [here](https://perpetual-ml.github.io/perpetual) and for the Rust API [here](https://docs.rs/perpetual/latest/perpetual/).
 
 ## Installation
 
