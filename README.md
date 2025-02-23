@@ -31,6 +31,21 @@ model.fit(X, y, budget=1.0)
 
 Documentation for the Python API can be found [here](https://perpetual-ml.github.io/perpetual) and for the Rust API [here](https://docs.rs/perpetual/latest/perpetual/).
 
+## Usage
+
+You can use the algorithm like in the example below. Check examples folders for both Rust and Python.
+
+```python
+from perpetual import PerpetualBooster
+
+model = PerpetualBooster(objective="SquaredLoss")
+model.fit(X, y, budget=1.0)
+```
+
+## Documentation
+
+Documentation for the Python API can be found [here](https://perpetual-ml.github.io/perpetual) and for the Rust API [here](https://docs.rs/perpetual/latest/perpetual/).
+
 ## Benchmark
 
 ### PerpetualBooster vs. Optuna + LightGBM
