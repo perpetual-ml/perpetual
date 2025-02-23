@@ -23,8 +23,8 @@ You can use the algorithm like in the example below. Check examples folders for 
 ```python
 from perpetual import PerpetualBooster
 
-model = PerpetualBooster(objective="SquaredLoss")
-model.fit(X, y, budget=1.0)
+model = PerpetualBooster(objective="SquaredLoss", budget=0.5)
+model.fit(X, y)
 ```
 
 ## Documentation
