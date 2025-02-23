@@ -1,6 +1,5 @@
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use perpetual::binning::bin_matrix;
-use perpetual::booster::PerpetualBooster;
 use perpetual::constraints::ConstraintMap;
 use perpetual::data::Matrix;
 use perpetual::histogram::{NodeHistogram, NodeHistogramOwned};
@@ -8,6 +7,7 @@ use perpetual::objective::{LogLoss, ObjectiveFunction};
 use perpetual::splitter::{MissingImputerSplitter, SplitInfo, SplitInfoSlice};
 use perpetual::tree::Tree;
 use perpetual::utils::{fast_f64_sum, fast_sum, naive_sum};
+use perpetual::PerpetualBooster;
 use std::fs;
 use std::time::Duration;
 
@@ -147,48 +147,18 @@ pub fn tree_benchmarks(c: &mut Criterion) {
     // booster_train.sampling_mode(SamplingMode::Linear);
     booster_train.bench_function("train_booster_default", |b| {
         b.iter(|| {
-            let mut booster = PerpetualBooster::default();
-            booster
-                .fit(
-                    black_box(&data),
-                    black_box(&y),
-                    black_box(0.3),
-                    black_box(None),
-                    black_box(None),
-                    black_box(None),
-                    black_box(None),
-                    black_box(None),
-                    black_box(None),
-                    black_box(None),
-                    black_box(None),
-                )
-                .unwrap();
+            let mut booster = PerpetualBooster::default().set_budget(0.3);
+            booster.fit(black_box(&data), black_box(&y), black_box(None)).unwrap();
         })
     });
     booster_train.bench_function("train_booster_with_column_sampling", |b| {
         b.iter(|| {
-            let mut booster = PerpetualBooster::default();
-            booster
-                .fit(
-                    black_box(&data),
-                    black_box(&y),
-                    black_box(0.3),
-                    black_box(None),
-                    black_box(None),
-                    black_box(None),
-                    black_box(None),
-                    black_box(None),
-                    black_box(None),
-                    black_box(None),
-                    black_box(None),
-                )
-                .unwrap();
+            let mut booster = PerpetualBooster::default().set_budget(0.3);
+            booster.fit(black_box(&data), black_box(&y), black_box(None)).unwrap();
         })
     });
-    let mut booster = PerpetualBooster::default();
-    booster
-        .fit(&data, &y, 0.1, None, None, None, None, None, None, None, None)
-        .unwrap();
+    let mut booster = PerpetualBooster::default().set_budget(0.1);
+    booster.fit(&data, &y, None).unwrap();
     booster_train.bench_function("Predict Booster", |b| {
         b.iter(|| booster.predict(black_box(&data), false))
     });

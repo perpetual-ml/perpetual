@@ -692,7 +692,7 @@ pub fn precision_round(n: f64, precision: i32) -> f64 {
 mod tests {
     use super::*;
     use rand::rngs::StdRng;
-    use rand::seq::SliceRandom;
+    use rand::seq::IndexedRandom;
     use rand::Rng;
     use rand::SeedableRng;
     #[test]
@@ -910,7 +910,7 @@ mod tests {
         // With missing
         let index = (0..100).collect::<Vec<usize>>();
         let mut rng = StdRng::seed_from_u64(0);
-        let f = (0..100).map(|_| rng.gen_range(0..15)).collect::<Vec<u16>>();
+        let f = (0..100).map(|_| rng.random_range(0..15)).collect::<Vec<u16>>();
         let mut idx = index.choose_multiple(&mut rng, 73).copied().collect::<Vec<usize>>();
         let mut grad = idx.iter().map(|i| *i as f32).collect::<Vec<f32>>();
         let mut hess = grad.clone();
@@ -959,7 +959,7 @@ mod tests {
         // Without missing...
         let index = (0..100).collect::<Vec<usize>>();
         let mut rng = StdRng::seed_from_u64(0);
-        let f = (0..100).map(|_| rng.gen_range(1..15)).collect::<Vec<u16>>();
+        let f = (0..100).map(|_| rng.random_range(1..15)).collect::<Vec<u16>>();
         let mut idx = index.choose_multiple(&mut rng, 73).copied().collect::<Vec<usize>>();
         let mut grad = idx.iter().map(|i| *i as f32).collect::<Vec<f32>>();
         let mut hess = grad.clone();
@@ -979,7 +979,7 @@ mod tests {
         // Using max...
         let index = (0..100).collect::<Vec<usize>>();
         let mut rng = StdRng::seed_from_u64(0);
-        let f = (0..100).map(|_| rng.gen_range(0..15)).collect::<Vec<u16>>();
+        let f = (0..100).map(|_| rng.random_range(0..15)).collect::<Vec<u16>>();
         let mut idx = index.choose_multiple(&mut rng, 73).copied().collect::<Vec<usize>>();
         let sv = idx.iter().map(|i| f[*i]).max().unwrap();
         let mut grad = idx.iter().map(|i| *i as f32).collect::<Vec<f32>>();
@@ -1000,7 +1000,7 @@ mod tests {
         // Using non-0 minimum...
         let index = (0..100).collect::<Vec<usize>>();
         let mut rng = StdRng::seed_from_u64(0);
-        let f = (0..100).map(|_| rng.gen_range(0..15)).collect::<Vec<u16>>();
+        let f = (0..100).map(|_| rng.random_range(0..15)).collect::<Vec<u16>>();
         let mut idx = index.choose_multiple(&mut rng, 73).copied().collect::<Vec<usize>>();
         let sv = idx.iter().filter(|i| f[**i] > 0).map(|i| f[*i]).min().unwrap();
         let mut grad = idx.iter().map(|i| *i as f32).collect::<Vec<f32>>();
@@ -1021,7 +1021,7 @@ mod tests {
         // Using non-0 minimum with no missing...
         let index = (0..100).collect::<Vec<usize>>();
         let mut rng = StdRng::seed_from_u64(0);
-        let f = (0..100).map(|_| rng.gen_range(1..15)).collect::<Vec<u16>>();
+        let f = (0..100).map(|_| rng.random_range(1..15)).collect::<Vec<u16>>();
         let mut idx = index.choose_multiple(&mut rng, 73).copied().collect::<Vec<usize>>();
         let sv = idx.iter().filter(|i| f[**i] > 0).map(|i| f[*i]).min().unwrap();
         let mut grad = idx.iter().map(|i| *i as f32).collect::<Vec<f32>>();
@@ -1042,7 +1042,7 @@ mod tests {
         // Left
         let index = (0..100).collect::<Vec<usize>>();
         let mut rng = StdRng::seed_from_u64(0);
-        let f = (0..100).map(|_| rng.gen_range(0..15)).collect::<Vec<u16>>();
+        let f = (0..100).map(|_| rng.random_range(0..15)).collect::<Vec<u16>>();
         let mut idx = index.choose_multiple(&mut rng, 73).copied().collect::<Vec<usize>>();
         let mut grad = idx.iter().map(|i| *i as f32).collect::<Vec<f32>>();
         let mut hess = grad.clone();
@@ -1091,7 +1091,7 @@ mod tests {
         // Without missing...
         let index = (0..100).collect::<Vec<usize>>();
         let mut rng = StdRng::seed_from_u64(0);
-        let f = (0..100).map(|_| rng.gen_range(1..15)).collect::<Vec<u16>>();
+        let f = (0..100).map(|_| rng.random_range(1..15)).collect::<Vec<u16>>();
         let mut idx = index.choose_multiple(&mut rng, 73).copied().collect::<Vec<usize>>();
         let mut grad = idx.iter().map(|i| *i as f32).collect::<Vec<f32>>();
         let mut hess = grad.clone();
@@ -1111,7 +1111,7 @@ mod tests {
         // Using max...
         let index = (0..100).collect::<Vec<usize>>();
         let mut rng = StdRng::seed_from_u64(0);
-        let f = (0..100).map(|_| rng.gen_range(0..15)).collect::<Vec<u16>>();
+        let f = (0..100).map(|_| rng.random_range(0..15)).collect::<Vec<u16>>();
         let mut idx = index.choose_multiple(&mut rng, 73).copied().collect::<Vec<usize>>();
         let sv = idx.iter().map(|i| f[*i]).max().unwrap();
         let mut grad = idx.iter().map(|i| *i as f32).collect::<Vec<f32>>();
@@ -1132,7 +1132,7 @@ mod tests {
         // Using non-0 minimum...
         let index = (0..100).collect::<Vec<usize>>();
         let mut rng = StdRng::seed_from_u64(0);
-        let f = (0..100).map(|_| rng.gen_range(0..15)).collect::<Vec<u16>>();
+        let f = (0..100).map(|_| rng.random_range(0..15)).collect::<Vec<u16>>();
         let mut idx = index.choose_multiple(&mut rng, 73).copied().collect::<Vec<usize>>();
         let sv = idx.iter().filter(|i| f[**i] > 0).map(|i| f[*i]).min().unwrap();
         let mut grad = idx.iter().map(|i| *i as f32).collect::<Vec<f32>>();
@@ -1153,7 +1153,7 @@ mod tests {
         // Using non-0 minimum with no missing...
         let index = (0..100).collect::<Vec<usize>>();
         let mut rng = StdRng::seed_from_u64(0);
-        let f = (0..100).map(|_| rng.gen_range(1..15)).collect::<Vec<u16>>();
+        let f = (0..100).map(|_| rng.random_range(1..15)).collect::<Vec<u16>>();
         let mut idx = index.choose_multiple(&mut rng, 73).copied().collect::<Vec<usize>>();
         let sv = idx.iter().filter(|i| f[**i] > 0).map(|i| f[*i]).min().unwrap();
         let mut grad = idx.iter().map(|i| *i as f32).collect::<Vec<f32>>();
@@ -1270,7 +1270,7 @@ mod tests {
         // With missing
         let index = (0..100).collect::<Vec<usize>>();
         let mut rng = StdRng::seed_from_u64(0);
-        let f = (0..100).map(|_| rng.gen_range(0..15)).collect::<Vec<u16>>();
+        let f = (0..100).map(|_| rng.random_range(0..15)).collect::<Vec<u16>>();
         let mut idx = index.choose_multiple(&mut rng, 73).copied().collect::<Vec<usize>>();
         let mut grad = idx.iter().map(|i| *i as f32).collect::<Vec<f32>>();
         let mut hess = grad.clone();
@@ -1286,7 +1286,7 @@ mod tests {
         // Without missing...
         let index = (0..100).collect::<Vec<usize>>();
         let mut rng = StdRng::seed_from_u64(0);
-        let f = (0..100).map(|_| rng.gen_range(1..15)).collect::<Vec<u16>>();
+        let f = (0..100).map(|_| rng.random_range(1..15)).collect::<Vec<u16>>();
         let mut idx = index.choose_multiple(&mut rng, 73).copied().collect::<Vec<usize>>();
         let mut grad = idx.iter().map(|i| *i as f32).collect::<Vec<f32>>();
         let mut hess = grad.clone();
@@ -1299,7 +1299,7 @@ mod tests {
         // Using max...
         let index = (0..100).collect::<Vec<usize>>();
         let mut rng = StdRng::seed_from_u64(0);
-        let f = (0..100).map(|_| rng.gen_range(0..15)).collect::<Vec<u16>>();
+        let f = (0..100).map(|_| rng.random_range(0..15)).collect::<Vec<u16>>();
         let mut idx = index.choose_multiple(&mut rng, 73).copied().collect::<Vec<usize>>();
         let sv = idx.iter().map(|i| f[*i]).max().unwrap();
         let mut grad = idx.iter().map(|i| *i as f32).collect::<Vec<f32>>();
@@ -1311,7 +1311,7 @@ mod tests {
         // Using non-0 minimum...
         let index = (0..100).collect::<Vec<usize>>();
         let mut rng = StdRng::seed_from_u64(0);
-        let f = (0..100).map(|_| rng.gen_range(0..15)).collect::<Vec<u16>>();
+        let f = (0..100).map(|_| rng.random_range(0..15)).collect::<Vec<u16>>();
         let mut idx = index.choose_multiple(&mut rng, 73).copied().collect::<Vec<usize>>();
         let sv = idx.iter().filter(|i| f[**i] > 0).map(|i| f[*i]).min().unwrap();
         let mut grad = idx.iter().map(|i| *i as f32).collect::<Vec<f32>>();
@@ -1323,7 +1323,7 @@ mod tests {
         // Using non-0 minimum with no missing...
         let index = (0..100).collect::<Vec<usize>>();
         let mut rng = StdRng::seed_from_u64(0);
-        let f = (0..100).map(|_| rng.gen_range(1..15)).collect::<Vec<u16>>();
+        let f = (0..100).map(|_| rng.random_range(1..15)).collect::<Vec<u16>>();
         let mut idx = index.choose_multiple(&mut rng, 73).copied().collect::<Vec<usize>>();
         let sv = idx.iter().filter(|i| f[**i] > 0).map(|i| f[*i]).min().unwrap();
         let mut grad = idx.iter().map(|i| *i as f32).collect::<Vec<f32>>();

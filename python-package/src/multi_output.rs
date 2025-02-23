@@ -1,10 +1,10 @@
 use crate::utils::int_map_to_constraint_map;
 use crate::utils::to_value_error;
 use numpy::{IntoPyArray, PyArray1, PyReadonlyArray1};
-use perpetual_rs::booster::MissingNodeTreatment;
+use perpetual_rs::booster::booster::MissingNodeTreatment;
+use perpetual_rs::booster::multi_output::MultiOutputBooster as CrateMultiOutputBooster;
 use perpetual_rs::constraints::Constraint;
 use perpetual_rs::data::Matrix;
-use perpetual_rs::multi_output::MultiOutputBooster as CrateMultiOutputBooster;
 use perpetual_rs::objective::Objective;
 use pyo3::exceptions::{PyKeyError, PyValueError};
 use pyo3::prelude::*;
@@ -24,6 +24,7 @@ impl MultiOutputBooster {
     #[pyo3(signature=(
         n_boosters,
         objective,
+        budget,
         max_bin,
         num_threads,
         monotone_constraints,
@@ -34,10 +35,18 @@ impl MultiOutputBooster {
         terminate_missing_features,
         missing_node_treatment,
         log_iterations,
+        quantile,
+        reset,
+        categorical_features,
+        timeout,
+        iteration_limit,
+        memory_limit,
+        stopping_rounds,
     ))]
     pub fn new(
         n_boosters: usize,
         objective: &str,
+        budget: f32,
         max_bin: u16,
         num_threads: Option<usize>,
         monotone_constraints: HashMap<usize, i8>,
@@ -48,6 +57,13 @@ impl MultiOutputBooster {
         terminate_missing_features: HashSet<usize>,
         missing_node_treatment: &str,
         log_iterations: usize,
+        quantile: Option<f64>,
+        reset: Option<bool>,
+        categorical_features: Option<HashSet<usize>>,
+        timeout: Option<f32>,
+        iteration_limit: Option<usize>,
+        memory_limit: Option<f32>,
+        stopping_rounds: Option<usize>,
     ) -> PyResult<Self> {
         let objective_ = to_value_error(serde_plain::from_str(objective))?;
         let missing_node_treatment_ = to_value_error(serde_plain::from_str(missing_node_treatment))?;
@@ -55,6 +71,7 @@ impl MultiOutputBooster {
 
         let booster = CrateMultiOutputBooster::default()
             .set_objective(objective_)
+            .set_budget(budget)
             .set_max_bin(max_bin)
             .set_num_threads(num_threads)
             .set_monotone_constraints(Some(monotone_constraints_))
@@ -65,7 +82,14 @@ impl MultiOutputBooster {
             .set_terminate_missing_features(terminate_missing_features)
             .set_missing_node_treatment(missing_node_treatment_)
             .set_log_iterations(log_iterations)
-            .set_n_boosters(n_boosters);
+            .set_n_boosters(n_boosters)
+            .set_quantile(quantile)
+            .set_reset(reset)
+            .set_categorical_features(categorical_features)
+            .set_timeout(timeout)
+            .set_iteration_limit(iteration_limit)
+            .set_memory_limit(memory_limit)
+            .set_stopping_rounds(stopping_rounds);
 
         Ok(MultiOutputBooster { booster })
     }
@@ -79,6 +103,11 @@ impl MultiOutputBooster {
     fn set_objective(&mut self, value: &str) -> PyResult<()> {
         let objective_ = to_value_error(serde_plain::from_str(value))?;
         self.booster = self.booster.clone().set_objective(objective_);
+        Ok(())
+    }
+    #[setter]
+    fn set_budget(&mut self, value: f32) -> PyResult<()> {
+        self.booster = self.booster.clone().set_budget(value);
         Ok(())
     }
     #[setter]
@@ -133,6 +162,41 @@ impl MultiOutputBooster {
         self.booster = self.booster.clone().set_log_iterations(value);
         Ok(())
     }
+    #[setter]
+    fn set_quantile(&mut self, value: Option<f64>) -> PyResult<()> {
+        self.booster = self.booster.clone().set_quantile(value);
+        Ok(())
+    }
+    #[setter]
+    fn set_reset(&mut self, value: Option<bool>) -> PyResult<()> {
+        self.booster = self.booster.clone().set_reset(value);
+        Ok(())
+    }
+    #[setter]
+    fn set_categorical_features(&mut self, value: Option<HashSet<usize>>) -> PyResult<()> {
+        self.booster = self.booster.clone().set_categorical_features(value);
+        Ok(())
+    }
+    #[setter]
+    fn set_timeout(&mut self, value: Option<f32>) -> PyResult<()> {
+        self.booster = self.booster.clone().set_timeout(value);
+        Ok(())
+    }
+    #[setter]
+    fn set_iteration_limit(&mut self, value: Option<usize>) -> PyResult<()> {
+        self.booster = self.booster.clone().set_iteration_limit(value);
+        Ok(())
+    }
+    #[setter]
+    fn set_memory_limit(&mut self, value: Option<f32>) -> PyResult<()> {
+        self.booster = self.booster.clone().set_memory_limit(value);
+        Ok(())
+    }
+    #[setter]
+    fn set_stopping_rounds(&mut self, value: Option<usize>) -> PyResult<()> {
+        self.booster = self.booster.clone().set_stopping_rounds(value);
+        Ok(())
+    }
 
     #[getter]
     fn base_score<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyArray1<f64>>> {
@@ -162,15 +226,7 @@ impl MultiOutputBooster {
         rows: usize,
         cols: usize,
         y: PyReadonlyArray1<f64>,
-        budget: Option<f32>,
         sample_weight: Option<PyReadonlyArray1<f64>>,
-        alpha: Option<f32>,
-        reset: Option<bool>,
-        categorical_features: Option<HashSet<usize>>,
-        timeout: Option<f32>,
-        iteration_limit: Option<usize>,
-        memory_limit: Option<f32>,
-        stopping_rounds: Option<usize>,
     ) -> PyResult<()> {
         let flat_data = flat_data.as_slice()?;
         let data = Matrix::new(flat_data, rows, cols);
@@ -186,19 +242,37 @@ impl MultiOutputBooster {
             None => None,
         };
 
-        match self.booster.fit(
-            &data,
-            &y_data,
-            budget.unwrap_or(1.0),
-            sample_weight_,
-            alpha,
-            reset,
-            categorical_features,
-            timeout,
-            iteration_limit,
-            memory_limit,
-            stopping_rounds,
-        ) {
+        match self.booster.fit(&data, &y_data, sample_weight_) {
+            Ok(m) => Ok(m),
+            Err(e) => Err(PyValueError::new_err(e.to_string())),
+        }?;
+
+        Ok(())
+    }
+
+    pub fn prune(
+        &mut self,
+        flat_data: PyReadonlyArray1<f64>,
+        rows: usize,
+        cols: usize,
+        y: PyReadonlyArray1<f64>,
+        sample_weight: Option<PyReadonlyArray1<f64>>,
+    ) -> PyResult<()> {
+        let flat_data = flat_data.as_slice()?;
+        let data = Matrix::new(flat_data, rows, cols);
+
+        let y = y.as_slice()?;
+        let y_data = Matrix::new(y, rows, self.booster.n_boosters);
+
+        let sample_weight_ = match sample_weight.as_ref() {
+            Some(sw) => {
+                let sw_slice = sw.as_slice()?;
+                Some(sw_slice)
+            }
+            None => None,
+        };
+
+        match self.booster.prune(&data, &y_data, sample_weight_) {
             Ok(m) => Ok(m),
             Err(e) => Err(PyValueError::new_err(e.to_string())),
         }?;
@@ -322,6 +396,13 @@ impl MultiOutputBooster {
                 "force_children_to_bound_parent",
                 self.booster.force_children_to_bound_parent.to_object(py),
             ),
+            ("quantile", self.booster.quantile.to_object(py)),
+            ("reset", self.booster.reset.to_object(py)),
+            ("categorical_features", self.booster.categorical_features.to_object(py)),
+            ("timeout", self.booster.timeout.to_object(py)),
+            ("iteration_limit", self.booster.iteration_limit.to_object(py)),
+            ("memory_limit", self.booster.memory_limit.to_object(py)),
+            ("stopping_rounds", self.booster.stopping_rounds.to_object(py)),
         ];
         let dict = key_vals.into_py_dict_bound(py);
 

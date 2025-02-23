@@ -50,8 +50,10 @@ fn main() -> Result<(), Box<dyn Error>> {
     // To provide parameters generate a default booster, and then use
     // the relevant `set_` methods for any parameters you would like to
     // adjust.
-    let mut model = PerpetualBooster::default().set_objective(Objective::LogLoss);
-    model.fit(&matrix, &y, *budget, None, None, None, None, None, None, None, None)?;
+    let mut model = PerpetualBooster::default()
+        .set_objective(Objective::LogLoss)
+        .set_budget(*budget);
+    model.fit(&matrix, &y, None)?;
 
     println!("Model prediction: {:?} ...", &model.predict(&matrix, true)[0..10]);
 

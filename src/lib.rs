@@ -1,4 +1,3 @@
-#![feature(get_many_mut)]
 #![feature(array_ptr_get)]
 
 mod node;
@@ -9,6 +8,7 @@ mod shapley;
 pub mod bin;
 pub mod binning;
 pub mod booster;
+pub mod conformal;
 pub mod constants;
 pub mod constraints;
 pub mod data;
@@ -16,14 +16,14 @@ pub mod errors;
 pub mod grower;
 pub mod histogram;
 pub mod metric;
-pub mod multi_output;
 pub mod objective;
+pub mod prune;
 pub mod sampler;
 pub mod splitter;
 pub mod tree;
 pub mod utils;
 
 // Individual classes, and functions
-pub use booster::PerpetualBooster;
+pub use booster::booster::PerpetualBooster;
+pub use booster::multi_output::MultiOutputBooster;
 pub use data::Matrix;
-pub use multi_output::MultiOutputBooster;

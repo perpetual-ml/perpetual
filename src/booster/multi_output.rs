@@ -1,11 +1,12 @@
 use crate::constraints::ConstraintMap;
 use crate::errors::PerpetualError;
 use crate::objective::Objective;
-use crate::Matrix;
-use crate::{booster::MissingNodeTreatment, PerpetualBooster};
+use crate::{Matrix, PerpetualBooster};
 use serde::{Deserialize, Deserializer, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::fs;
+
+use super::booster::MissingNodeTreatment;
 
 /// Perpetual Booster object
 #[derive(Deserialize, Serialize, Clone)]
@@ -16,6 +17,9 @@ pub struct MultiOutputBooster {
     /// Valid options include "LogLoss" to use logistic loss as the objective function,
     /// or "SquaredLoss" to use Squared Error as the objective function.
     pub objective: Objective,
+    /// Budget to fit the model.
+    #[serde(default = "default_budget")]
+    pub budget: f32,
     /// The initial prediction value of the model.
     pub base_score: f64,
     /// Number of bins to calculate to partition the data. Setting this to
@@ -56,8 +60,59 @@ pub struct MultiOutputBooster {
     pub boosters: Vec<PerpetualBooster>,
     // Metadata for the multi output booster
     metadata: HashMap<String, String>,
+    /// Integer value used to seed any randomness used in the algorithm.
+    pub seed: u64,
+    /// Used only in quantile regression.
+    #[serde(default = "default_quantile")]
+    pub quantile: Option<f64>,
+    /// Reset the model or continue training.
+    #[serde(default = "default_reset")]
+    pub reset: Option<bool>,
+    /// Features to be treated as categorical.
+    #[serde(default = "default_categorical_features")]
+    pub categorical_features: Option<HashSet<usize>>,
+    /// Fit timeout limit in seconds.
+    #[serde(default = "default_timeout")]
+    pub timeout: Option<f32>,
+    /// Optional limit for the number of boosting rounds.
+    /// The algorithm will stop automatically before this limit if budget is low enough.
+    #[serde(default = "default_iteration_limit")]
+    pub iteration_limit: Option<usize>,
+    /// Optional limit for memory allocation.
+    /// This will limit the number of allocated nodes for a tree.
+    /// The number of nodes in a final tree will be limited by this,
+    /// if it is not limited by step size control and generalization control.
+    #[serde(default = "default_memory_limit")]
+    pub memory_limit: Option<f32>,
+    /// Optional limit for auto stopping rounds.
+    #[serde(default = "default_stopping_rounds")]
+    pub stopping_rounds: Option<usize>,
 }
 
+fn default_budget() -> f32 {
+    0.5
+}
+fn default_quantile() -> Option<f64> {
+    None
+}
+fn default_reset() -> Option<bool> {
+    None
+}
+fn default_categorical_features() -> Option<HashSet<usize>> {
+    None
+}
+fn default_timeout() -> Option<f32> {
+    None
+}
+fn default_iteration_limit() -> Option<usize> {
+    None
+}
+fn default_memory_limit() -> Option<f32> {
+    None
+}
+fn default_stopping_rounds() -> Option<usize> {
+    None
+}
 fn default_terminate_missing_features() -> HashSet<usize> {
     HashSet::new()
 }
@@ -82,6 +137,7 @@ impl Default for MultiOutputBooster {
         Self::new(
             1,
             Objective::LogLoss,
+            0.5,
             f64::NAN,
             256,
             None,
@@ -93,6 +149,14 @@ impl Default for MultiOutputBooster {
             HashSet::new(),
             MissingNodeTreatment::AssignToParent,
             0,
+            0,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
         )
         .unwrap()
     }
@@ -101,9 +165,11 @@ impl Default for MultiOutputBooster {
 impl MultiOutputBooster {
     /// Multi Output Booster object
     ///
-    /// * `objective` - The name of objective function used to optimize.
-    ///     Valid options include "LogLoss" to use logistic loss as the objective function,
-    ///     or "SquaredLoss" to use Squared Error as the objective function.
+    /// * `objective` - The name of objective function used to optimize. Valid options are:
+    ///      "LogLoss" to use logistic loss as the objective function,
+    ///      "SquaredLoss" to use Squared Error as the objective function,
+    ///      "QuantileLoss" for quantile regression.
+    /// * `budget` - budget to fit the model.
     /// * `base_score` - The initial prediction value of the model. If set to None, it will be calculated based on the objective function at fit time.
     /// * `max_bin` - Number of bins to calculate to partition the data. Setting this to
     ///     a smaller number, will result in faster training time, while potentially sacrificing
@@ -120,10 +186,19 @@ impl MultiOutputBooster {
     /// * `create_missing_branch` - Should missing be split out it's own separate branch?
     /// * `missing_node_treatment` - specify how missing nodes should be handled during training.
     /// * `log_iterations` - Setting to a value (N) other than zero will result in information being logged about ever N iterations.
+    /// * `seed` - Integer value used to seed any randomness used in the algorithm.
+    /// * `quantile` - used only in quantile regression.
+    /// * `reset` - Reset the model or continue training.
+    /// * `categorical_features` - categorical features.
+    /// * `timeout` - fit timeout limit in seconds.
+    /// * `iteration_limit` - optional limit for the number of boosting rounds.
+    /// * `memory_limit` - optional limit for memory allocation.
+    /// * `stopping_rounds` - optional limit for auto stopping rounds.
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         n_boosters: usize,
         objective: Objective,
+        budget: f32,
         base_score: f64,
         max_bin: u16,
         num_threads: Option<usize>,
@@ -135,14 +210,29 @@ impl MultiOutputBooster {
         terminate_missing_features: HashSet<usize>,
         missing_node_treatment: MissingNodeTreatment,
         log_iterations: usize,
+        seed: u64,
+        quantile: Option<f64>,
+        reset: Option<bool>,
+        categorical_features: Option<HashSet<usize>>,
+        timeout: Option<f32>,
+        iteration_limit: Option<usize>,
+        memory_limit: Option<f32>,
+        stopping_rounds: Option<usize>,
     ) -> Result<Self, PerpetualError> {
         let booster_objective = objective.clone();
         let booster_monotone_constraints = monotone_constraints.clone();
         let booster_terminate_missing_features = terminate_missing_features.clone();
+        let booster_categorical_features = categorical_features.clone();
+
+        let booster_timeout = match timeout {
+            Some(t) => Some(t / n_boosters as f32),
+            None => None,
+        };
 
         let mut multi_output_booster = MultiOutputBooster {
             n_boosters,
             objective,
+            budget,
             base_score,
             max_bin,
             num_threads,
@@ -156,10 +246,19 @@ impl MultiOutputBooster {
             log_iterations,
             boosters: Vec::new(),
             metadata: HashMap::new(),
+            seed,
+            quantile,
+            reset,
+            categorical_features,
+            timeout,
+            iteration_limit,
+            memory_limit,
+            stopping_rounds,
         };
 
         let booster = PerpetualBooster::default()
             .set_objective(booster_objective)
+            .set_budget(budget)
             .set_base_score(base_score)
             .set_max_bin(max_bin)
             .set_num_threads(num_threads)
@@ -170,7 +269,15 @@ impl MultiOutputBooster {
             .set_create_missing_branch(create_missing_branch)
             .set_terminate_missing_features(booster_terminate_missing_features)
             .set_missing_node_treatment(missing_node_treatment)
-            .set_log_iterations(log_iterations);
+            .set_log_iterations(log_iterations)
+            .set_seed(seed)
+            .set_quantile(quantile)
+            .set_reset(reset)
+            .set_categorical_features(booster_categorical_features)
+            .set_timeout(booster_timeout)
+            .set_iteration_limit(iteration_limit)
+            .set_memory_limit(memory_limit)
+            .set_stopping_rounds(stopping_rounds);
 
         booster.validate_parameters()?;
 
@@ -183,41 +290,31 @@ impl MultiOutputBooster {
 
     pub fn reset(&mut self) {
         self.boosters = Vec::new();
+        for b in &mut self.boosters {
+            b.reset();
+        }
     }
 
     pub fn fit(
         &mut self,
         data: &Matrix<f64>,
         y: &Matrix<f64>,
-        budget: f32,
         sample_weight: Option<&[f64]>,
-        alpha: Option<f32>,
-        reset: Option<bool>,
-        categorical_features: Option<HashSet<usize>>,
-        timeout: Option<f32>,
-        iteration_limit: Option<usize>,
-        memory_limit: Option<f32>,
-        stopping_rounds: Option<usize>,
     ) -> Result<(), PerpetualError> {
-        let timeout_booster = match timeout {
-            Some(t) => Some(t / self.n_boosters as f32),
-            None => None,
-        };
-
         for i in 0..self.n_boosters {
-            let _ = self.boosters[i].fit(
-                data,
-                y.get_col(i),
-                budget,
-                sample_weight,
-                alpha,
-                reset,
-                categorical_features.clone(),
-                timeout_booster,
-                iteration_limit,
-                memory_limit,
-                stopping_rounds,
-            );
+            let _ = self.boosters[i].fit(data, y.get_col(i), sample_weight);
+        }
+        Ok(())
+    }
+
+    pub fn prune(
+        &mut self,
+        data: &Matrix<f64>,
+        y: &Matrix<f64>,
+        sample_weight: Option<&[f64]>,
+    ) -> Result<(), PerpetualError> {
+        for i in 0..self.n_boosters {
+            let _ = self.boosters[i].prune(data, y.get_col(i), sample_weight);
         }
         Ok(())
     }
@@ -311,6 +408,7 @@ impl MultiOutputBooster {
     /// Set the objective on the booster.
     /// * `objective` - The objective type of the booster.
     pub fn set_objective(mut self, objective: Objective) -> Self {
+        self.objective = objective.clone();
         self.boosters = self
             .boosters
             .iter()
@@ -319,9 +417,18 @@ impl MultiOutputBooster {
         self
     }
 
+    /// Set the budget on the booster.
+    /// * `budget` - Budget to fit the booster.
+    pub fn set_budget(mut self, budget: f32) -> Self {
+        self.budget = budget;
+        self.boosters = self.boosters.iter().map(|b| b.clone().set_budget(budget)).collect();
+        self
+    }
+
     /// Set the base_score on the booster.
     /// * `base_score` - The base score of the booster.
     pub fn set_base_score(mut self, base_score: f64) -> Self {
+        self.base_score = base_score;
         self.boosters = self
             .boosters
             .iter()
@@ -336,6 +443,7 @@ impl MultiOutputBooster {
     ///   accuracy. If there are more bins, than unique values in a column, all unique values
     ///   will be used.
     pub fn set_max_bin(mut self, max_bin: u16) -> Self {
+        self.max_bin = max_bin;
         self.boosters = self.boosters.iter().map(|b| b.clone().set_max_bin(max_bin)).collect();
         self
     }
@@ -343,6 +451,7 @@ impl MultiOutputBooster {
     /// Set the number of threads on the booster.
     /// * `num_threads` - Set the number of threads to be used during training.
     pub fn set_num_threads(mut self, num_threads: Option<usize>) -> Self {
+        self.num_threads = num_threads;
         self.boosters = self
             .boosters
             .iter()
@@ -354,6 +463,7 @@ impl MultiOutputBooster {
     /// Set the monotone_constraints on the booster.
     /// * `monotone_constraints` - The monotone constraints of the booster.
     pub fn set_monotone_constraints(mut self, monotone_constraints: Option<ConstraintMap>) -> Self {
+        self.monotone_constraints = monotone_constraints.clone();
         self.boosters = self
             .boosters
             .iter()
@@ -365,6 +475,7 @@ impl MultiOutputBooster {
     /// Set the force_children_to_bound_parent on the booster.
     /// * `force_children_to_bound_parent` - Set force children to bound parent.
     pub fn set_force_children_to_bound_parent(mut self, force_children_to_bound_parent: bool) -> Self {
+        self.force_children_to_bound_parent = force_children_to_bound_parent;
         self.boosters = self
             .boosters
             .iter()
@@ -379,6 +490,7 @@ impl MultiOutputBooster {
     /// Set missing value of the booster
     /// * `missing` - Float value to consider as missing.
     pub fn set_missing(mut self, missing: f64) -> Self {
+        self.missing = missing;
         self.boosters = self.boosters.iter().map(|b| b.clone().set_missing(missing)).collect();
         self
     }
@@ -386,6 +498,7 @@ impl MultiOutputBooster {
     /// Set the allow_missing_splits on the booster.
     /// * `allow_missing_splits` - Set if missing splits are allowed for the booster.
     pub fn set_allow_missing_splits(mut self, allow_missing_splits: bool) -> Self {
+        self.create_missing_branch = allow_missing_splits;
         self.boosters = self
             .boosters
             .iter()
@@ -398,6 +511,7 @@ impl MultiOutputBooster {
     /// * `create_missing_branch` - Bool specifying if missing should get it's own
     /// branch.
     pub fn set_create_missing_branch(mut self, create_missing_branch: bool) -> Self {
+        self.create_missing_branch = create_missing_branch;
         self.boosters = self
             .boosters
             .iter()
@@ -412,6 +526,7 @@ impl MultiOutputBooster {
     /// features that should always terminate the missing node, if create_missing_branch
     /// is true.
     pub fn set_terminate_missing_features(mut self, terminate_missing_features: HashSet<usize>) -> Self {
+        self.terminate_missing_features = terminate_missing_features.clone();
         self.boosters = self
             .boosters
             .iter()
@@ -426,6 +541,7 @@ impl MultiOutputBooster {
     /// Set the missing_node_treatment on the booster.
     /// * `missing_node_treatment` - The missing node treatment of the booster.
     pub fn set_missing_node_treatment(mut self, missing_node_treatment: MissingNodeTreatment) -> Self {
+        self.missing_node_treatment = missing_node_treatment;
         self.boosters = self
             .boosters
             .iter()
@@ -437,10 +553,91 @@ impl MultiOutputBooster {
     /// Set the log iterations on the booster.
     /// * `log_iterations` - The number of log iterations of the booster.
     pub fn set_log_iterations(mut self, log_iterations: usize) -> Self {
+        self.log_iterations = log_iterations;
         self.boosters = self
             .boosters
             .iter()
             .map(|b| b.clone().set_log_iterations(log_iterations))
+            .collect();
+        self
+    }
+
+    /// Set the seed on the booster.
+    /// * `seed` - Integer value used to see any randomness used in the algorithm.
+    pub fn set_seed(mut self, seed: u64) -> Self {
+        self.seed = seed;
+        self.boosters = self.boosters.iter().map(|b| b.clone().set_seed(seed)).collect();
+        self
+    }
+
+    /// Set the quantile on the booster.
+    /// * `quantile` - used only in quantile regression.
+    pub fn set_quantile(mut self, quantile: Option<f64>) -> Self {
+        self.quantile = quantile;
+        self.boosters = self.boosters.iter().map(|b| b.clone().set_quantile(quantile)).collect();
+        self
+    }
+
+    /// Set the reset on the booster.
+    /// * `reset` - Reset the model or continue training.
+    pub fn set_reset(mut self, reset: Option<bool>) -> Self {
+        self.reset = reset;
+        self.boosters = self.boosters.iter().map(|b| b.clone().set_reset(reset)).collect();
+        self
+    }
+
+    /// Set the categorical features on the booster.
+    /// * `categorical_features` - categorical features.
+    pub fn set_categorical_features(mut self, categorical_features: Option<HashSet<usize>>) -> Self {
+        self.categorical_features = categorical_features.clone();
+        self.boosters = self
+            .boosters
+            .iter()
+            .map(|b| b.clone().set_categorical_features(categorical_features.clone()))
+            .collect();
+        self
+    }
+
+    /// Set the timeout on the booster.
+    /// * `timeout` - fit timeout limit in seconds.
+    pub fn set_timeout(mut self, timeout: Option<f32>) -> Self {
+        self.timeout = timeout;
+        self.boosters = self.boosters.iter().map(|b| b.clone().set_timeout(timeout)).collect();
+        self
+    }
+
+    /// Set the iteration limit on the booster.
+    /// * `iteration_limit` - optional limit for the number of boosting rounds.
+    pub fn set_iteration_limit(mut self, iteration_limit: Option<usize>) -> Self {
+        self.iteration_limit = iteration_limit;
+        self.boosters = self
+            .boosters
+            .iter()
+            .map(|b| b.clone().set_iteration_limit(iteration_limit))
+            .collect();
+        self
+    }
+
+    /// Set the memory limit on the booster.
+    /// * `memory_limit` - optional limit for memory allocation.
+    pub fn set_memory_limit(mut self, memory_limit: Option<f32>) -> Self {
+        self.memory_limit = memory_limit;
+        self.boosters = self
+            .boosters
+            .iter()
+            .map(|b| b.clone().set_memory_limit(memory_limit))
+            .collect();
+        self
+    }
+
+    /// Set the stopping rounds on the booster.
+    /// * `stopping_rounds` - optional limit for auto stopping rounds.
+    pub fn set_stopping_rounds(mut self, stopping_rounds: Option<usize>) -> Self {
+        self.stopping_rounds = stopping_rounds;
+        self.boosters = self
+            .boosters
+            .iter()
+            .map(|b| b.clone().set_stopping_rounds(stopping_rounds))
             .collect();
         self
     }
@@ -555,14 +752,14 @@ mod tests {
         let mut booster = MultiOutputBooster::default()
             .set_objective(Objective::LogLoss)
             .set_max_bin(max_bin)
-            .set_n_boosters(n_classes);
+            .set_n_boosters(n_classes)
+            .set_budget(0.1)
+            .set_timeout(Some(60.0));
 
         println!("The number of boosters: {:?}", booster.get_boosters().len());
         assert!(booster.get_boosters().len() == n_classes);
 
-        booster
-            .fit(&data, &y, 0.1, None, None, None, None, Some(60.0), None, None, None)
-            .unwrap();
+        booster.fit(&data, &y, None).unwrap();
 
         let probas = booster.predict_proba(&data, true);
 

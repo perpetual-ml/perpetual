@@ -65,7 +65,9 @@ def convert_input_array(x, objective) -> np.ndarray:
 
 
 def convert_input_frame(
-    X, categorical_features, max_cat
+    X,
+    categorical_features,
+    max_cat,
 ) -> Tuple[List[str], np.ndarray, int, int, Optional[Iterable[int]], Optional[Dict]]:
     """Convert data to format needed by booster.
 
