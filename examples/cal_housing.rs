@@ -120,22 +120,11 @@ fn main() -> Result<(), Box<dyn Error>> {
     // adjust.
     let mut model = PerpetualBooster::default()
         .set_objective(Objective::SquaredLoss)
-        .set_num_threads(Some(*num_threads));
+        .set_num_threads(Some(*num_threads))
+        .set_budget(*budget);
 
     let now = SystemTime::now();
-    model.fit(
-        &matrix_train,
-        &y_train,
-        *budget,
-        None,
-        None,
-        None,
-        None,
-        None,
-        None,
-        None,
-        None,
-    )?;
+    model.fit(&matrix_train, &y_train, None)?;
     println!("now.elapsed: {:?}", now.elapsed().unwrap().as_secs_f32());
 
     let trees = model.get_prediction_trees();

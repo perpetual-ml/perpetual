@@ -32,7 +32,7 @@ impl Sampler for RandomSampler {
         let mut chosen = Vec::new();
         let mut excluded = Vec::new();
         for i in index {
-            if rng.gen_range(0.0..1.0) < subsample {
+            if rng.random_range(0.0..1.0) < subsample {
                 chosen.push(*i);
             } else {
                 excluded.push(*i)

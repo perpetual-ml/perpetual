@@ -1,8 +1,8 @@
 use crate::{data::FloatData, metric::Metric, utils::fast_sum};
 use serde::{Deserialize, Serialize};
 
-type ObjFn = fn(&[f64], &[f64], Option<&[f64]>, Option<f32>) -> (Vec<f32>, Option<Vec<f32>>);
-type LossFn = fn(&[f64], &[f64], Option<&[f64]>, Option<f32>) -> Vec<f32>;
+type ObjFn = fn(&[f64], &[f64], Option<&[f64]>, Option<f64>) -> (Vec<f32>, Option<Vec<f32>>);
+type LossFn = fn(&[f64], &[f64], Option<&[f64]>, Option<f64>) -> Vec<f32>;
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub enum Objective {
@@ -27,7 +27,7 @@ pub fn gradient_hessian_callables(objective: &Objective) -> ObjFn {
     }
 }
 
-pub fn calc_init_callables(objective: &Objective) -> fn(&[f64], Option<&[f64]>, Option<f32>) -> f64 {
+pub fn calc_init_callables(objective: &Objective) -> fn(&[f64], Option<&[f64]>, Option<f64>) -> f64 {
     match objective {
         Objective::LogLoss => LogLoss::calc_init,
         Objective::SquaredLoss => SquaredLoss::calc_init,
@@ -36,14 +36,14 @@ pub fn calc_init_callables(objective: &Objective) -> fn(&[f64], Option<&[f64]>, 
 }
 
 pub trait ObjectiveFunction {
-    fn calc_loss(y: &[f64], yhat: &[f64], sample_weight: Option<&[f64]>, alpha: Option<f32>) -> Vec<f32>;
+    fn calc_loss(y: &[f64], yhat: &[f64], sample_weight: Option<&[f64]>, quantile: Option<f64>) -> Vec<f32>;
     fn calc_grad_hess(
         y: &[f64],
         yhat: &[f64],
         sample_weight: Option<&[f64]>,
-        alpha: Option<f32>,
+        quantile: Option<f64>,
     ) -> (Vec<f32>, Option<Vec<f32>>);
-    fn calc_init(y: &[f64], sample_weight: Option<&[f64]>, alpha: Option<f32>) -> f64;
+    fn calc_init(y: &[f64], sample_weight: Option<&[f64]>, quantile: Option<f64>) -> f64;
     fn default_metric() -> Metric;
 }
 
@@ -52,7 +52,7 @@ pub struct LogLoss {}
 
 impl ObjectiveFunction for LogLoss {
     #[inline]
-    fn calc_loss(y: &[f64], yhat: &[f64], sample_weight: Option<&[f64]>, _alpha: Option<f32>) -> Vec<f32> {
+    fn calc_loss(y: &[f64], yhat: &[f64], sample_weight: Option<&[f64]>, _quantile: Option<f64>) -> Vec<f32> {
         match sample_weight {
             Some(sample_weight) => y
                 .iter()
@@ -74,7 +74,7 @@ impl ObjectiveFunction for LogLoss {
         }
     }
 
-    fn calc_init(y: &[f64], sample_weight: Option<&[f64]>, _alpha: Option<f32>) -> f64 {
+    fn calc_init(y: &[f64], sample_weight: Option<&[f64]>, _quantile: Option<f64>) -> f64 {
         match sample_weight {
             Some(sample_weight) => {
                 let mut ytot: f64 = 0.;
@@ -98,7 +98,7 @@ impl ObjectiveFunction for LogLoss {
         y: &[f64],
         yhat: &[f64],
         sample_weight: Option<&[f64]>,
-        _alpha: Option<f32>,
+        _quantile: Option<f64>,
     ) -> (Vec<f32>, Option<Vec<f32>>) {
         match sample_weight {
             Some(sample_weight) => {
@@ -137,7 +137,7 @@ pub struct SquaredLoss {}
 
 impl ObjectiveFunction for SquaredLoss {
     #[inline]
-    fn calc_loss(y: &[f64], yhat: &[f64], sample_weight: Option<&[f64]>, _alpha: Option<f32>) -> Vec<f32> {
+    fn calc_loss(y: &[f64], yhat: &[f64], sample_weight: Option<&[f64]>, _quantile: Option<f64>) -> Vec<f32> {
         match sample_weight {
             Some(sample_weight) => y
                 .iter()
@@ -159,7 +159,7 @@ impl ObjectiveFunction for SquaredLoss {
         }
     }
 
-    fn calc_init(y: &[f64], sample_weight: Option<&[f64]>, _alpha: Option<f32>) -> f64 {
+    fn calc_init(y: &[f64], sample_weight: Option<&[f64]>, _quantile: Option<f64>) -> f64 {
         match sample_weight {
             Some(sample_weight) => {
                 let mut ytot: f64 = 0.;
@@ -179,7 +179,7 @@ impl ObjectiveFunction for SquaredLoss {
         y: &[f64],
         yhat: &[f64],
         sample_weight: Option<&[f64]>,
-        _alpha: Option<f32>,
+        _quantile: Option<f64>,
     ) -> (Vec<f32>, Option<Vec<f32>>) {
         match sample_weight {
             Some(sample_weight) => {
@@ -208,39 +208,39 @@ pub struct QuantileLoss {}
 
 impl ObjectiveFunction for QuantileLoss {
     #[inline]
-    fn calc_loss(y: &[f64], yhat: &[f64], sample_weight: Option<&[f64]>, alpha: Option<f32>) -> Vec<f32> {
+    fn calc_loss(y: &[f64], yhat: &[f64], sample_weight: Option<&[f64]>, quantile: Option<f64>) -> Vec<f32> {
         match sample_weight {
             Some(sample_weight) => y
                 .iter()
                 .zip(yhat)
                 .zip(sample_weight)
                 .map(|((y_, yhat_), w_)| {
-                    let _alpha = alpha.unwrap();
-                    let s = (*y_ - *yhat_) as f32;
-                    let l = if s >= 0.0 { _alpha * s } else { (_alpha - 1.0) * s };
-                    l * *w_ as f32
+                    let _quantile = quantile.unwrap();
+                    let s = *y_ - *yhat_;
+                    let l = if s >= 0.0 { _quantile * s } else { (_quantile - 1.0) * s };
+                    (l * *w_) as f32
                 })
                 .collect(),
             None => y
                 .iter()
                 .zip(yhat)
                 .map(|(y_, yhat_)| {
-                    let _alpha = alpha.unwrap();
-                    let s = (*y_ - *yhat_) as f32;
-                    let l = if s >= 0.0 { _alpha * s } else { (_alpha - 1.0) * s };
-                    l
+                    let _quantile = quantile.unwrap();
+                    let s = *y_ - *yhat_;
+                    let l = if s >= 0.0 { _quantile * s } else { (_quantile - 1.0) * s };
+                    l as f32
                 })
                 .collect(),
         }
     }
 
-    fn calc_init(y: &[f64], sample_weight: Option<&[f64]>, alpha: Option<f32>) -> f64 {
+    fn calc_init(y: &[f64], sample_weight: Option<&[f64]>, quantile: Option<f64>) -> f64 {
         match sample_weight {
             Some(sample_weight) => {
                 let mut indices = (0..y.len()).collect::<Vec<_>>();
                 indices.sort_by(|&a, &b| y[a].total_cmp(&y[b]));
                 let w_tot: f64 = sample_weight.iter().sum();
-                let w_target = w_tot * alpha.unwrap() as f64;
+                let w_target = w_tot * quantile.unwrap() as f64;
                 let mut w_cum = 0.0_f64;
                 let mut init_value = f64::NAN;
                 for i in indices {
@@ -256,7 +256,7 @@ impl ObjectiveFunction for QuantileLoss {
                 let mut indices = (0..y.len()).collect::<Vec<_>>();
                 indices.sort_by(|&a, &b| y[a].total_cmp(&y[b]));
                 let w_tot: f64 = y.len() as f64;
-                let w_target = w_tot * alpha.unwrap() as f64;
+                let w_target = w_tot * quantile.unwrap() as f64;
                 let mut w_cum = 0.0_f64;
                 let mut init_value = f64::NAN;
                 for i in indices {
@@ -276,7 +276,7 @@ impl ObjectiveFunction for QuantileLoss {
         y: &[f64],
         yhat: &[f64],
         sample_weight: Option<&[f64]>,
-        alpha: Option<f32>,
+        quantile: Option<f64>,
     ) -> (Vec<f32>, Option<Vec<f32>>) {
         match sample_weight {
             Some(sample_weight) => {
@@ -285,15 +285,14 @@ impl ObjectiveFunction for QuantileLoss {
                     .zip(yhat)
                     .zip(sample_weight)
                     .map(|((y_, yhat_), w_)| {
-                        let _alpha = alpha.unwrap();
-                        let _w = *w_ as f32;
+                        let _quantile = quantile.unwrap();
                         let delta = yhat_ - *y_;
                         let g = if delta >= 0.0 {
-                            (1.0 - _alpha) * _w
+                            (1.0 - _quantile) * w_
                         } else {
-                            -1.0 * _alpha * _w
+                            -1.0 * _quantile * w_
                         };
-                        (g, _w)
+                        (g as f32, *w_ as f32)
                     })
                     .unzip();
                 (g, Some(h))
@@ -303,10 +302,14 @@ impl ObjectiveFunction for QuantileLoss {
                     .iter()
                     .zip(yhat)
                     .map(|(y_, yhat_)| {
-                        let _alpha = alpha.unwrap();
+                        let _quantile = quantile.unwrap();
                         let delta = yhat_ - *y_;
-                        let g = if delta >= 0.0 { 1.0 - _alpha } else { -1.0 * _alpha };
-                        g
+                        let g = if delta >= 0.0 {
+                            1.0 - _quantile
+                        } else {
+                            -1.0 * _quantile
+                        };
+                        g as f32
                     })
                     .collect();
                 (g, None)

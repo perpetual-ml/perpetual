@@ -26,18 +26,20 @@ class PerpetualBooster:
     # this is useful for parameters that should be
     # attempted to be loaded in and set
     # as attributes on the booster after it is loaded.
-    meta_data_attributes: Dict[str, BaseSerializer] = {
+    metadata_attributes: Dict[str, BaseSerializer] = {
         "feature_names_in_": ObjectSerializer(),
         "n_features_": ObjectSerializer(),
         "feature_importance_method": ObjectSerializer(),
         "cat_mapping": ObjectSerializer(),
         "classes_": ObjectSerializer(),
+        # "categorical_features": ObjectSerializer(),
     }
 
     def __init__(
         self,
         *,
         objective: str = "LogLoss",
+        budget: float = 0.5,
         num_threads: Optional[int] = None,
         monotone_constraints: Union[Dict[Any, int], None] = None,
         force_children_to_bound_parent: bool = False,
@@ -48,8 +50,7 @@ class PerpetualBooster:
         missing_node_treatment: str = "None",
         log_iterations: int = 0,
         feature_importance_method: str = "Gain",
-        budget: Optional[float] = None,
-        alpha: Optional[float] = None,
+        quantile: Optional[float] = None,
         reset: Optional[bool] = None,
         categorical_features: Union[Iterable[int], Iterable[str], str, None] = "auto",
         timeout: Optional[float] = None,
@@ -59,16 +60,17 @@ class PerpetualBooster:
         max_bin: int = 256,
         max_cat: int = 1000,
     ):
-        """PerpetualBooster class, used to generate gradient boosted decision tree ensembles.
-        The following parameters can also be specified in the fit method to override the values in the constructor:
-            budget, alpha, reset, categorical_features, timeout, iteration_limit, memory_limit, and stopping_rounds.
+        """PerpetualBooster class, used to create gradient boosted decision tree ensembles.
 
         Args:
-            objective (str, optional): Learning objective function to be used for optimization.
-                Valid options include "LogLoss" to use logistic loss (classification),
+            objective (str, optional): Learning objective function to be used for optimization. Valid options are:
+                "LogLoss" to use logistic loss (classification),
                 "SquaredLoss" to use squared error (regression),
                 "QuantileLoss" to use quantile error (regression).
                 Defaults to "LogLoss".
+            budget (float, optional): a positive number for fitting budget. Increasing this number will more
+                likely result in more boosting rounds and more increased predictive power.
+                Default value is 0.5.
             num_threads (int, optional): Number of threads to be used during training.
             monotone_constraints (Dict[Any, int], optional): Constraints that are used to enforce a
                 specific relationship between the training features and the target variable. A dictionary
@@ -105,10 +107,7 @@ class PerpetualBooster:
                 - "AverageNodeWeight": Set the missing node to be equal to the weighted average weight of the left and the right nodes.
             log_iterations (int, optional): Setting to a value (N) other than zero will result in information being logged about ever N iterations, info can be interacted with directly with the python [`logging`](https://docs.python.org/3/howto/logging.html) module. For an example of how to utilize the logging information see the example [here](/#logging-output).
             feature_importance_method (str, optional): The feature importance method type that will be used to calculate the `feature_importances_` attribute on the booster.
-            budget (float, optional): a positive number for fitting budget. Increasing this number will more
-                likely result in more boosting rounds and more increased predictive power.
-                Default value is 1.0.
-            alpha (float, optional): only used in quantile regression.
+            quantile (float, optional): only used in quantile regression.
             reset (bool, optional): whether to reset the model or continue training.
             categorical_features (Union[Iterable[int], Iterable[str], str, None], optional): The names or indices for categorical features.
                 Defaults to `auto` for Polars or Pandas categorical data types.
@@ -166,6 +165,7 @@ class PerpetualBooster:
         )
 
         self.objective = objective
+        self.budget = budget
         self.num_threads = num_threads
         self.monotone_constraints = monotone_constraints_
         self.force_children_to_bound_parent = force_children_to_bound_parent
@@ -176,8 +176,7 @@ class PerpetualBooster:
         self.missing_node_treatment = missing_node_treatment
         self.log_iterations = log_iterations
         self.feature_importance_method = feature_importance_method
-        self.budget = budget
-        self.alpha = alpha
+        self.quantile = quantile
         self.reset = reset
         self.categorical_features = categorical_features
         self.timeout = timeout
@@ -189,6 +188,7 @@ class PerpetualBooster:
 
         booster = CratePerpetualBooster(
             objective=self.objective,
+            budget=self.budget,
             max_bin=self.max_bin,
             num_threads=self.num_threads,
             monotone_constraints=dict(),
@@ -199,23 +199,17 @@ class PerpetualBooster:
             terminate_missing_features=set(),
             missing_node_treatment=self.missing_node_treatment,
             log_iterations=self.log_iterations,
+            quantile=self.quantile,
+            reset=self.reset,
+            categorical_features=set(),
+            timeout=self.timeout,
+            iteration_limit=self.iteration_limit,
+            memory_limit=self.memory_limit,
+            stopping_rounds=self.stopping_rounds,
         )
         self.booster = cast(BoosterType, booster)
 
-    def fit(
-        self,
-        X,
-        y,
-        sample_weight=None,
-        budget: Optional[float] = None,
-        alpha: Optional[float] = None,
-        reset: Optional[bool] = None,
-        categorical_features: Union[Iterable[int], Iterable[str], str, None] = "auto",
-        timeout: Optional[float] = None,
-        iteration_limit: Optional[int] = None,
-        memory_limit: Optional[float] = None,
-        stopping_rounds: Optional[int] = None,
-    ) -> Self:
+    def fit(self, X, y, sample_weight=None) -> Self:
         """Fit the gradient booster on a provided dataset.
 
         Args:
@@ -225,26 +219,10 @@ class PerpetualBooster:
             sample_weight (Union[ArrayLike, None], optional): Instance weights to use when
                 training the model. If None is passed, a weight of 1 will be used for every record.
                 Defaults to None.
-            budget (float, optional): a positive number for fitting budget. Increasing this number will more
-                likely result in more boosting rounds and more increased predictive power.
-                Defaults to 1.0.
-            alpha (float, optional): only used in quantile regression.
-            reset (bool, optional): whether to reset the model or continue training.
-            categorical_features (Union[Iterable[int], Iterable[str], str, None], optional): The names or indices for categorical features.
-                Defaults to `auto` for Polars or Pandas categorical data types.
-            timeout (float, optional): optional fit timeout in seconds
-            iteration_limit (int, optional): optional limit for the number of boosting rounds. The default value is 1000 boosting rounds.
-                The algorithm automatically stops for most of the cases before hitting this limit.
-                If you want to experiment with very high budget (>2.0), you can also increase this limit.
-            memory_limit (float, optional): optional limit for memory allocation in GB. If not set, the memory will be allocated based on
-                available memory and the algorithm requirements.
-            stopping_rounds (int, optional): optional limit for auto stopping. Defaults to 3.
         """
 
         features_, flat_data, rows, cols, categorical_features_, cat_mapping = (
-            convert_input_frame(
-                X, categorical_features or self.categorical_features, self.max_cat
-            )
+            convert_input_frame(X, self.categorical_features, self.max_cat)
         )
         self.n_features_ = cols
         self.cat_mapping = cat_mapping
@@ -268,6 +246,7 @@ class PerpetualBooster:
         ):
             booster = CratePerpetualBooster(
                 objective=self.objective,
+                budget=self.budget,
                 max_bin=self.max_bin,
                 num_threads=self.num_threads,
                 monotone_constraints=crate_mc,
@@ -278,12 +257,20 @@ class PerpetualBooster:
                 terminate_missing_features=crate_tmf,
                 missing_node_treatment=self.missing_node_treatment,
                 log_iterations=self.log_iterations,
+                quantile=self.quantile,
+                reset=self.reset,
+                categorical_features=categorical_features_,
+                timeout=self.timeout,
+                iteration_limit=self.iteration_limit,
+                memory_limit=self.memory_limit,
+                stopping_rounds=self.stopping_rounds,
             )
             self.booster = cast(BoosterType, booster)
         else:
             booster = CrateMultiOutputBooster(
                 n_boosters=len(classes_),
                 objective=self.objective,
+                budget=self.budget,
                 max_bin=self.max_bin,
                 num_threads=self.num_threads,
                 monotone_constraints=crate_mc,
@@ -294,6 +281,13 @@ class PerpetualBooster:
                 terminate_missing_features=crate_tmf,
                 missing_node_treatment=self.missing_node_treatment,
                 log_iterations=self.log_iterations,
+                quantile=self.quantile,
+                reset=self.reset,
+                categorical_features=categorical_features_,
+                timeout=self.timeout,
+                iteration_limit=self.iteration_limit,
+                memory_limit=self.memory_limit,
+                stopping_rounds=self.stopping_rounds,
             )
             self.booster = cast(MultiOutputBoosterType, booster)
 
@@ -305,20 +299,97 @@ class PerpetualBooster:
         )
         self._set_metadata_attributes("classes_", self.classes_)
 
+        self.categorical_features = categorical_features_
+
         self.booster.fit(
             flat_data=flat_data,
             rows=rows,
             cols=cols,
             y=y_,
-            budget=budget or self.budget,
             sample_weight=sample_weight_,  # type: ignore
-            alpha=alpha or self.alpha,
-            reset=reset or self.reset,
-            categorical_features=categorical_features_,  # type: ignore
-            timeout=timeout or self.timeout,
-            iteration_limit=iteration_limit or self.iteration_limit,
-            memory_limit=memory_limit or self.memory_limit,
-            stopping_rounds=stopping_rounds or self.stopping_rounds,
+        )
+
+        return self
+
+    def prune(self, X, y, sample_weight=None) -> Self:
+        """Prune the gradient booster on a provided dataset.
+
+        Args:
+            X (FrameLike): Either a Polars or Pandas DataFrame, or a 2 dimensional Numpy array.
+            y (Union[FrameLike, ArrayLike]): Either a Polars or Pandas DataFrame or Series,
+                or a 1 or 2 dimensional Numpy array.
+            sample_weight (Union[ArrayLike, None], optional): Instance weights to use when
+                training the model. If None is passed, a weight of 1 will be used for every record.
+                Defaults to None.
+        """
+
+        _, flat_data, rows, cols = transform_input_frame(X, self.cat_mapping)
+
+        y_, _ = convert_input_array(y, self.objective)
+
+        if sample_weight is None:
+            sample_weight_ = None
+        else:
+            sample_weight_, _ = convert_input_array(sample_weight, self.objective)
+
+        self.booster.prune(
+            flat_data=flat_data,
+            rows=rows,
+            cols=cols,
+            y=y_,
+            sample_weight=sample_weight_,  # type: ignore
+        )
+
+        return self
+
+    def calibrate(
+        self, X_train, y_train, X_cal, y_cal, alpha, sample_weight=None
+    ) -> Self:
+        """Calibrate the gradient booster on a provided dataset.
+
+        Args:
+            X_train (FrameLike): Either a Polars or Pandas DataFrame, or a 2 dimensional Numpy array.
+            y_train (Union[FrameLike, ArrayLike]): Either a Polars or Pandas DataFrame or Series,
+                or a 1 or 2 dimensional Numpy array.
+            X_cal (FrameLike): Either a Polars or Pandas DataFrame, or a 2 dimensional Numpy array.
+            y_cal (Union[FrameLike, ArrayLike]): Either a Polars or Pandas DataFrame or Series,
+                or a 1 or 2 dimensional Numpy array.
+            alpha (ArrayLike): Between 0 and 1, represents the uncertainty of the confidence interval.
+                Lower alpha produce larger (more conservative) prediction intervals.
+                alpha is the complement of the target coverage level.
+            sample_weight (Union[ArrayLike, None], optional): Instance weights to use when
+                training the model. If None is passed, a weight of 1 will be used for every record.
+                Defaults to None.
+        """
+
+        _, flat_data_train, rows_train, cols_train = transform_input_frame(
+            X_train, self.cat_mapping
+        )
+
+        y_train_, _ = convert_input_array(y_train, self.objective)
+
+        _, flat_data_cal, rows_cal, cols_cal = transform_input_frame(
+            X_cal, self.cat_mapping
+        )
+
+        y_cal_, _ = convert_input_array(y_cal, self.objective)
+
+        if sample_weight is None:
+            sample_weight_ = None
+        else:
+            sample_weight_, _ = convert_input_array(sample_weight, self.objective)
+
+        self.booster.calibrate(
+            flat_data=flat_data_train,
+            rows=rows_train,
+            cols=cols_train,
+            y=y_train_,
+            flat_data_cal=flat_data_cal,
+            rows_cal=rows_cal,
+            cols_cal=cols_cal,
+            y_cal=y_cal_,
+            alpha=np.array(alpha),
+            sample_weight=sample_weight_,  # type: ignore
         )
 
         return self
@@ -330,6 +401,29 @@ class PerpetualBooster:
                     raise ValueError(
                         f"Columns mismatch between data {features} passed, and data {self.feature_names_in_} used at fit."
                     )
+
+    def predict_intervals(self, X, parallel: Union[bool, None] = None) -> dict:
+        """Predict intervals with the fitted booster on new data.
+
+        Args:
+            X (FrameLike): Either a Polars or Pandas DataFrame, or a 2 dimensional Numpy array.
+            parallel (Union[bool, None], optional): Optionally specify if the predict
+                function should run in parallel on multiple threads. If `None` is
+                passed, the `parallel` attribute of the booster will be used.
+                Defaults to `None`.
+
+        Returns:
+            np.ndarray: Returns a numpy array of the predictions.
+        """
+        features_, flat_data, rows, cols = transform_input_frame(X, self.cat_mapping)
+        self._validate_features(features_)
+
+        return self.booster.predict_intervals(
+            flat_data=flat_data,
+            rows=rows,
+            cols=cols,
+            parallel=parallel,
+        )
 
     def predict(self, X, parallel: Union[bool, None] = None) -> np.ndarray:
         """Predict with the fitted booster on new data.
@@ -706,7 +800,7 @@ class PerpetualBooster:
             warnings.simplefilter("ignore")
             c = cls(**params)
         c.booster = booster
-        for m in c.meta_data_attributes:
+        for m in c.metadata_attributes:
             try:
                 m_ = c._get_metadata_attributes(m)
                 setattr(c, m, m_)
@@ -774,12 +868,12 @@ class PerpetualBooster:
         return v
 
     def _set_metadata_attributes(self, key: str, value: Any) -> None:
-        value_ = self.meta_data_attributes[key].serialize(value)
+        value_ = self.metadata_attributes[key].serialize(value)
         self.insert_metadata(key=key, value=value_)
 
     def _get_metadata_attributes(self, key: str) -> Any:
         value = self.get_metadata(key)
-        return self.meta_data_attributes[key].deserialize(value)
+        return self.metadata_attributes[key].deserialize(value)
 
     @property
     def base_score(self) -> Union[float, Iterable[float]]:

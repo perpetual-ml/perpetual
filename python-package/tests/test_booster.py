@@ -10,6 +10,7 @@ from typing import Tuple
 import numpy as np
 import pandas as pd
 from sklearn.base import clone
+from sklearn.model_selection import train_test_split
 
 import perpetual
 from perpetual import PerpetualBooster
@@ -381,9 +382,7 @@ def test_missing_branch_with_contributions(X_y):
     X, y = X_y
     X = X
     model_miss_leaf = PerpetualBooster(
-        objective="LogLoss",
-        allow_missing_splits=False,
-        create_missing_branch=True,
+        objective="LogLoss", allow_missing_splits=False, create_missing_branch=True
     )
     model_miss_leaf.fit(X, y)
     model_miss_leaf_preds = model_miss_leaf.predict_log_proba(X)
@@ -401,9 +400,7 @@ def test_missing_branch_with_contributions(X_y):
     )
 
     model_miss_branch = PerpetualBooster(
-        objective="LogLoss",
-        allow_missing_splits=True,
-        create_missing_branch=True,
+        objective="LogLoss", allow_missing_splits=True, create_missing_branch=True
     )
     model_miss_branch.fit(X, y)
     model_miss_branch_preds = model_miss_branch.predict_log_proba(X)
@@ -668,6 +665,10 @@ class TestSaveLoadFunctions:
             elif isinstance(v, perpetual.booster.CratePerpetualBooster):
                 assert isinstance(c_v, perpetual.booster.CratePerpetualBooster)
             else:
+                print("else_block:")
+                print(k)
+                print(v)
+                print(c_v)
                 assert v == c_v, k
         loaded_preds = loaded.predict(X)
         assert np.allclose(preds, loaded_preds)
@@ -705,10 +706,7 @@ class TestSaveLoadFunctions:
         f64_model_path = tmp_path / "modelf64_sl.json"
         X, y = X_y
         mono_ = X.apply(lambda x: int(np.sign(x.corr(y)))).to_dict()
-        model = PerpetualBooster(
-            objective="SquaredLoss",
-            monotone_constraints=mono_,
-        )
+        model = PerpetualBooster(objective="SquaredLoss", monotone_constraints=mono_)
         model.fit(X, y)
         preds = model.predict(X)
         save_func(model, f64_model_path)
@@ -739,10 +737,7 @@ class TestSaveLoadFunctions:
         f64_model_path = tmp_path / "modelf64_ll.json"
         X, y = X_y
         X = X
-        model = PerpetualBooster(
-            objective="LogLoss",
-            monotone_constraints=mono_,
-        )
+        model = PerpetualBooster(objective="LogLoss", monotone_constraints=mono_)
         model.fit(X, y)
         preds = model.predict(X)
         save_func(model, f64_model_path)
@@ -792,7 +787,66 @@ def test_polars():
         "embark_town",
     ]
     X = X.with_columns(pl.col(cols).cast(pl.String).cast(pl.Categorical))
-    model = PerpetualBooster()
-    model.fit(X, y, budget=0.1)
+    model = PerpetualBooster(budget=0.1)
+    model.fit(X, y)
     model.predict(X)
     model.trees_to_dataframe()
+
+
+def test_calibration(X_y):
+    X_train = pd.read_csv("../resources/cal_housing_train.csv", index_col=False)
+    y_train = X_train.pop("MedHouseVal").to_numpy()
+    X_cal = pd.read_csv("../resources/cal_housing_test.csv", index_col=False)
+    y_cal = X_cal.pop("MedHouseVal").to_numpy()
+    X_train, X_test, y_train, y_test = train_test_split(
+        X_train, y_train, random_state=42
+    )
+
+    model = PerpetualBooster(objective="SquaredLoss")
+    model.fit(X_train, y_train)
+
+    alpha = [0.1]
+    model.calibrate(X_train, y_train, X_cal, y_cal, alpha)
+    predicted_intervals = model.predict_intervals(X_test)
+
+    for i, (alpha_, intervals) in enumerate(predicted_intervals.items()):
+        lower_preds = intervals[0]
+        upper_preds = intervals[1]
+        assert float(alpha_) == alpha[i]
+        target_coverage = 1.0 - alpha[i]
+        coverage_count = 0
+        for j in range(len(X_test)):
+            if lower_preds[j] < y_test[j] < upper_preds[j]:
+                coverage_count += 1
+        actual_coverage = coverage_count / len(X_test)
+        assert actual_coverage > target_coverage
+
+
+def test_pruning(X_y):
+    X_train = pd.read_csv("../resources/titanic_test_df.csv", index_col=False)
+    y_train = np.array(
+        pd.read_csv(
+            "../resources/titanic_test_y.csv", index_col=False, header=None
+        ).squeeze("columns")
+    )
+    X_cal = pd.read_csv("../resources/titanic_test_df.csv", index_col=False)
+    y_cal = np.array(
+        pd.read_csv(
+            "../resources/titanic_test_y.csv", index_col=False, header=None
+        ).squeeze("columns")
+    )
+    cols = [
+        "pclass",
+        "sibsp",
+        "parch",
+        "embarked",
+        "class",
+        "who",
+        "deck",
+        "embark_town",
+    ]
+    X_train[cols] = X_train[cols].astype("category")
+    X_cal[cols] = X_cal[cols].astype("category")
+    model = PerpetualBooster()
+    model.fit(X_train, y_train)
+    model.prune(X_cal, y_cal)

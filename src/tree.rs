@@ -14,7 +14,7 @@ use std::fmt::{self, Display};
 #[derive(Deserialize, Serialize, Clone, PartialEq, Debug)]
 pub enum TreeStopper {
     Generalization,
-    LossDecrement,
+    StepSize,
     MaxNodes,
 }
 
@@ -55,10 +55,10 @@ impl Tree {
         target_loss_decrement: Option<f32>,
         loss: &[f32],
         y: &[f64],
-        calc_loss: fn(&[f64], &[f64], Option<&[f64]>, Option<f32>) -> Vec<f32>,
+        calc_loss: fn(&[f64], &[f64], Option<&[f64]>, Option<f64>) -> Vec<f32>,
         yhat: &[f64],
         sample_weight: Option<&[f64]>,
-        alpha: Option<f32>,
+        quantile: Option<f64>,
         is_const_hess: bool,
         mut hist_tree: &mut [NodeHistogram],
         cat_index: Option<&HashSet<usize>>,
@@ -101,7 +101,7 @@ impl Tree {
 
             if let Some(tld) = target_loss_decrement {
                 if loss_decr_avg > tld {
-                    self.stopper = TreeStopper::LossDecrement;
+                    self.stopper = TreeStopper::StepSize;
                     break;
                 }
             }
@@ -161,7 +161,7 @@ impl Tree {
                                 None => None,
                             };
                             let yhat_new = yhat[_i] + node.weight_value as f64;
-                            let loss_new = calc_loss(&[y[_i]], &[yhat_new], s_w, alpha)[0];
+                            let loss_new = calc_loss(&[y[_i]], &[yhat_new], s_w, quantile)[0];
                             loss_decr_avg -= loss_decr[_i] / index_length;
                             loss_decr[_i] = loss[_i] - loss_new;
                             loss_decr_avg += loss_decr[_i] / index_length;
