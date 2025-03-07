@@ -1,6 +1,6 @@
 import numpy as np
 from typing_extensions import Self
-from typing import Any, Dict, Iterable, Protocol, Set
+from typing import Any, Dict, Iterable, Optional, Protocol, Set
 
 
 class BoosterType(Protocol):

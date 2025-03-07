@@ -32,7 +32,6 @@ class PerpetualBooster:
         "feature_importance_method": ObjectSerializer(),
         "cat_mapping": ObjectSerializer(),
         "classes_": ObjectSerializer(),
-        # "categorical_features": ObjectSerializer(),
     }
 
     def __init__(
@@ -793,7 +792,10 @@ class PerpetualBooster:
         Returns:
             PerpetualBooster: An initialized booster object.
         """
-        booster = CratePerpetualBooster.load_booster(str(path))
+        try:
+            booster = CratePerpetualBooster.load_booster(str(path))
+        except ValueError:
+            booster = CrateMultiOutputBooster.load_booster(str(path))
 
         params = booster.get_params()
         with warnings.catch_warnings():
@@ -904,7 +906,12 @@ class PerpetualBooster:
 
     def __setstate__(self, d: Dict[Any, Any]) -> None:
         # Load the booster object the pickled JSon string.
-        booster_object = CratePerpetualBooster.from_json(d["__booster_json_file__"])
+        try:
+            booster_object = CratePerpetualBooster.from_json(d["__booster_json_file__"])
+        except ValueError:
+            booster_object = CrateMultiOutputBooster.from_json(
+                d["__booster_json_file__"]
+            )
         d["booster"] = booster_object
         # Are there any new parameters, that need to be added to the python object,
         # that would have been loaded in as defaults on the json object?
