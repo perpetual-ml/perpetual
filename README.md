@@ -31,6 +31,7 @@ model.fit(X, y)
 
 Documentation for the Python API can be found [here](https://perpetual-ml.github.io/perpetual) and for the Rust API [here](https://docs.rs/perpetual/latest/perpetual/).
 
+
 ## Benchmark
 
 ### PerpetualBooster vs. Optuna + LightGBM

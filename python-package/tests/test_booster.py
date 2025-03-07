@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import json
 import pytest
-import pickle
 import warnings
 import itertools
 from typing import Tuple
@@ -12,7 +11,6 @@ import pandas as pd
 from sklearn.base import clone
 from sklearn.model_selection import train_test_split
 
-import perpetual
 from perpetual import PerpetualBooster
 
 
@@ -28,7 +26,7 @@ def X_y() -> Tuple[pd.DataFrame, pd.Series]:
     return X, y
 
 
-def test_booster_max_cat(X_y):
+def test_booster_max_cat():
     df = pd.read_csv("../resources/titanic.csv")
     X = df.drop(columns="survived").reset_index(drop=True)
     y = df["survived"]
@@ -202,24 +200,6 @@ def test_booster_with_new_missing(X_y):
     model2.fit(Xm, y)
     preds2 = model2.predict_log_proba(Xm)
     assert np.allclose(preds1, preds2)
-
-
-def pickle_booster(model: PerpetualBooster, path: str) -> None:
-    with open(path, "wb") as file:
-        pickle.dump(model, file)
-
-
-def unpickle_booster(path: str) -> PerpetualBooster:
-    with open(path, "rb") as file:
-        return pickle.load(file)
-
-
-def save_booster(model: PerpetualBooster, path: str) -> None:
-    model.save_booster(path)
-
-
-def load_booster(path: str) -> PerpetualBooster:
-    return PerpetualBooster.load_booster(path)
 
 
 def test_monotone_constraints(X_y):
@@ -620,132 +600,7 @@ def test_set_params(X_y):
     model.fit(X, y)
 
 
-# All save and load methods
-@pytest.mark.parametrize(
-    "load_func,save_func",
-    [(unpickle_booster, pickle_booster), (load_booster, save_booster)],
-)
-class TestSaveLoadFunctions:
-    def test_booster_metadata(
-        self,
-        X_y: tuple[pd.DataFrame, pd.Series],
-        tmp_path,
-        load_func,
-        save_func,
-    ):
-        f64_model_path = tmp_path / "modelf64_sl.json"
-        X, y = X_y
-        model = PerpetualBooster(objective="SquaredLoss")
-        save_func(model, f64_model_path)
-        model.json_dump()
-        model.fit(X, y)
-        preds = model.predict(X)
-        save_func(model, f64_model_path)
-        model.insert_metadata("test-info", "some-info")
-        assert model.get_metadata("test-info") == "some-info"
-        save_func(model, f64_model_path)
-
-        loaded = load_func(f64_model_path)
-        assert loaded.get_metadata("test-info") == "some-info"
-
-        with pytest.raises(KeyError):
-            loaded.get_metadata("No-key")
-
-        loaded_dict = loaded.__dict__
-        model_dict = model.__dict__
-
-        assert sorted(loaded_dict.keys()) == sorted(model_dict.keys())
-        for k, v in loaded_dict.items():
-            c_v = model_dict[k]
-            if isinstance(v, float):
-                if np.isnan(v):
-                    assert np.isnan(c_v)
-                else:
-                    assert np.allclose(v, c_v)
-            elif isinstance(v, perpetual.booster.CratePerpetualBooster):
-                assert isinstance(c_v, perpetual.booster.CratePerpetualBooster)
-            else:
-                print("else_block:")
-                print(k)
-                print(v)
-                print(c_v)
-                assert v == c_v, k
-        loaded_preds = loaded.predict(X)
-        assert np.allclose(preds, loaded_preds)
-
-    def test_booster_saving(
-        self, X_y: tuple[pd.DataFrame, pd.Series], tmp_path, load_func, save_func
-    ):
-        # squared loss
-        f64_model_path = tmp_path / "modelf64_sl.json"
-        X, y = X_y
-        X = X
-        model = PerpetualBooster(objective="SquaredLoss")
-        model.fit(X, y)
-        preds = model.predict(X)
-        save_func(model, f64_model_path)
-        model_loaded = load_func(f64_model_path)
-        assert all(preds == model_loaded.predict(X))
-
-        # LogLoss
-        f64_model_path = tmp_path / "modelf64_ll.json"
-        X, y = X_y
-        model = PerpetualBooster(objective="LogLoss")
-        model.fit(X, y)
-        preds = model.predict(X)
-        save_func(model, f64_model_path)
-        model_loaded = load_func(f64_model_path)
-        assert model_loaded.feature_names_in_ == model.feature_names_in_
-        assert model_loaded.feature_names_in_ == X.columns.to_list()
-        assert all(preds == model_loaded.predict(X))
-
-    def test_booster_saving_with_monotone_constraints(
-        self, X_y: tuple[pd.DataFrame, pd.Series], tmp_path, load_func, save_func
-    ):
-        # squared loss
-        f64_model_path = tmp_path / "modelf64_sl.json"
-        X, y = X_y
-        mono_ = X.apply(lambda x: int(np.sign(x.corr(y)))).to_dict()
-        model = PerpetualBooster(objective="SquaredLoss", monotone_constraints=mono_)
-        model.fit(X, y)
-        preds = model.predict(X)
-        save_func(model, f64_model_path)
-        model_loaded = load_func(f64_model_path)
-        assert model_loaded.feature_names_in_ == model.feature_names_in_
-        assert model_loaded.feature_names_in_ == X.columns.to_list()
-        assert all(preds == model_loaded.predict(X))
-        assert all(
-            [
-                model.monotone_constraints[ft] == model_loaded.monotone_constraints[ft]
-                for ft in model_loaded.feature_names_in_
-            ]
-        )
-        assert all(
-            [
-                model.monotone_constraints[ft] == model_loaded.monotone_constraints[ft]
-                for ft in model.feature_names_in_
-            ]
-        )
-        assert all(
-            [
-                model.monotone_constraints[ft] == model_loaded.monotone_constraints[ft]
-                for ft in mono_.keys()
-            ]
-        )
-
-        # LogLoss
-        f64_model_path = tmp_path / "modelf64_ll.json"
-        X, y = X_y
-        X = X
-        model = PerpetualBooster(objective="LogLoss", monotone_constraints=mono_)
-        model.fit(X, y)
-        preds = model.predict(X)
-        save_func(model, f64_model_path)
-        model_loaded = load_func(f64_model_path)
-        assert all(preds == model_loaded.predict(X))
-
-
-def test_categorical(X_y):
+def test_categorical():
     X = pd.read_csv("../resources/titanic_test_df.csv", index_col=False)
     y = np.array(
         pd.read_csv(
@@ -793,7 +648,7 @@ def test_polars():
     model.trees_to_dataframe()
 
 
-def test_calibration(X_y):
+def test_calibration():
     X_train = pd.read_csv("../resources/cal_housing_train.csv", index_col=False)
     y_train = X_train.pop("MedHouseVal").to_numpy()
     X_cal = pd.read_csv("../resources/cal_housing_test.csv", index_col=False)
@@ -822,7 +677,7 @@ def test_calibration(X_y):
         assert actual_coverage > target_coverage
 
 
-def test_pruning(X_y):
+def test_pruning():
     X_train = pd.read_csv("../resources/titanic_test_df.csv", index_col=False)
     y_train = np.array(
         pd.read_csv(

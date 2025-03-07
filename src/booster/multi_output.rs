@@ -20,8 +20,6 @@ pub struct MultiOutputBooster {
     /// Budget to fit the model.
     #[serde(default = "default_budget")]
     pub budget: f32,
-    /// The initial prediction value of the model.
-    pub base_score: f64,
     /// Number of bins to calculate to partition the data. Setting this to
     /// a smaller number, will result in faster training time, while potentially sacrificing
     /// accuracy. If there are more bins, than unique values in a column, all unique values
@@ -138,7 +136,6 @@ impl Default for MultiOutputBooster {
             1,
             Objective::LogLoss,
             0.5,
-            f64::NAN,
             256,
             None,
             None,
@@ -170,7 +167,6 @@ impl MultiOutputBooster {
     ///      "SquaredLoss" to use Squared Error as the objective function,
     ///      "QuantileLoss" for quantile regression.
     /// * `budget` - budget to fit the model.
-    /// * `base_score` - The initial prediction value of the model. If set to None, it will be calculated based on the objective function at fit time.
     /// * `max_bin` - Number of bins to calculate to partition the data. Setting this to
     ///     a smaller number, will result in faster training time, while potentially sacrificing
     ///     accuracy. If there are more bins, than unique values in a column, all unique values
@@ -199,7 +195,6 @@ impl MultiOutputBooster {
         n_boosters: usize,
         objective: Objective,
         budget: f32,
-        base_score: f64,
         max_bin: u16,
         num_threads: Option<usize>,
         monotone_constraints: Option<ConstraintMap>,
@@ -233,7 +228,6 @@ impl MultiOutputBooster {
             n_boosters,
             objective,
             budget,
-            base_score,
             max_bin,
             num_threads,
             monotone_constraints,
@@ -259,7 +253,6 @@ impl MultiOutputBooster {
         let booster = PerpetualBooster::default()
             .set_objective(booster_objective)
             .set_budget(budget)
-            .set_base_score(base_score)
             .set_max_bin(max_bin)
             .set_num_threads(num_threads)
             .set_monotone_constraints(booster_monotone_constraints)
@@ -289,7 +282,6 @@ impl MultiOutputBooster {
     }
 
     pub fn reset(&mut self) {
-        self.boosters = Vec::new();
         for b in &mut self.boosters {
             b.reset();
         }
@@ -422,18 +414,6 @@ impl MultiOutputBooster {
     pub fn set_budget(mut self, budget: f32) -> Self {
         self.budget = budget;
         self.boosters = self.boosters.iter().map(|b| b.clone().set_budget(budget)).collect();
-        self
-    }
-
-    /// Set the base_score on the booster.
-    /// * `base_score` - The base score of the booster.
-    pub fn set_base_score(mut self, base_score: f64) -> Self {
-        self.base_score = base_score;
-        self.boosters = self
-            .boosters
-            .iter()
-            .map(|b| b.clone().set_base_score(base_score))
-            .collect();
         self
     }
 
