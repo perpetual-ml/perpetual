@@ -1,5 +1,4 @@
-use crate::node::Node;
-use crate::tree::Tree;
+use crate::{node::Node, tree::tree::Tree};
 
 #[derive(Debug, Clone, Copy)]
 struct PathElement {
@@ -69,8 +68,7 @@ fn extend_path(
     unique_path.get_element_mut(unique_depth).pweight = if unique_depth == 0 { 1.0 } else { 0.0 };
     for i in (0..unique_depth).rev() {
         unique_path.get_element_mut(i + 1).pweight +=
-            (one_fraction * unique_path.get_element(i).pweight * (i + 1) as f32)
-                / (unique_depth + 1) as f32;
+            (one_fraction * unique_path.get_element(i).pweight * (i + 1) as f32) / (unique_depth + 1) as f32;
         unique_path.get_element_mut(i).pweight =
             (zero_fraction * unique_path.get_element(i).pweight * (unique_depth - i) as f32)
                 / (unique_depth + 1) as f32;
@@ -90,8 +88,7 @@ fn unwind_path(unique_path: &mut PathList, unique_depth: usize, path_index: usiz
                 - (unique_path.get_element(i).pweight * zero_fraction * (unique_depth - i) as f32)
                     / (unique_depth + 1) as f32;
         } else {
-            unique_path.get_element_mut(i).pweight = (unique_path.get_element(i).pweight
-                * (unique_depth + 1) as f32)
+            unique_path.get_element_mut(i).pweight = (unique_path.get_element(i).pweight * (unique_depth + 1) as f32)
                 / (zero_fraction * (unique_depth - i) as f32);
         }
     }
@@ -109,8 +106,7 @@ fn unwound_path_sum(unique_path: &mut PathList, unique_depth: usize, path_index:
     let mut total = 0.0;
     for i in (0..unique_depth).rev() {
         if one_fraction != 0.0 {
-            let tmp =
-                (next_one_portion * (unique_depth + 1) as f32) / ((i + 1) as f32 * one_fraction);
+            let tmp = (next_one_portion * (unique_depth + 1) as f32) / ((i + 1) as f32 * one_fraction);
             total += tmp;
             next_one_portion = unique_path.get_element(i).pweight
                 - tmp * zero_fraction * ((unique_depth - i) as f32 / (unique_depth + 1) as f32);
@@ -166,8 +162,7 @@ fn tree_shap(
         for i in 1..(unique_depth + 1) {
             let w = unwound_path_sum(&mut unique_path, unique_depth, i);
             let el = unique_path.get_element(i);
-            contribs[el.feature_index] +=
-                f64::from(w * (el.one_fraction - el.zero_fraction) * node.weight_value);
+            contribs[el.feature_index] += f64::from(w * (el.one_fraction - el.zero_fraction) * node.weight_value);
         }
     } else {
         let next_node_idx = node.get_child_idx(&row[node.split_feature], missing);
@@ -191,8 +186,7 @@ fn tree_shap(
         }
 
         for (i, n_idx) in hot_cold_children.into_iter().enumerate() {
-            let zero_fraction =
-                (tree.nodes[&n_idx].hessian_sum / node.hessian_sum) * incoming_zero_fraction;
+            let zero_fraction = (tree.nodes[&n_idx].hessian_sum / node.hessian_sum) * incoming_zero_fraction;
             let onf = if i == 0 { incoming_one_fraction } else { 0. };
             tree_shap(
                 tree,
@@ -210,12 +204,7 @@ fn tree_shap(
     }
 }
 
-pub fn predict_contributions_row_shapley(
-    tree: &Tree,
-    row: &[f64],
-    contribs: &mut [f64],
-    missing: &f64,
-) {
+pub fn predict_contributions_row_shapley(tree: &Tree, row: &[f64], contribs: &mut [f64], missing: &f64) {
     contribs[contribs.len() - 1] += tree.get_average_leaf_weights(0);
     tree_shap(
         tree,

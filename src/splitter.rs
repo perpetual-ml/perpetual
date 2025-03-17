@@ -5,7 +5,7 @@ use crate::constraints::{Constraint, ConstraintMap};
 use crate::data::{FloatData, Matrix};
 use crate::histogram::{update_histogram, FeatureHistogram, NodeHistogram};
 use crate::node::{NodeType, SplittableNode};
-use crate::tree::Tree;
+use crate::tree::tree::Tree;
 use crate::utils::{
     between, bound_to_parent, constrained_weight, constrained_weight_const_hess, cull_gain, gain_given_weight,
     gain_given_weight_const_hess, pivot_on_split, pivot_on_split_const_hess, pivot_on_split_exclude_missing,
@@ -109,7 +109,7 @@ pub struct NodeInfo {
     pub gain: f32,
     pub grad: f32,     // used as gradient_sum in SplittableNode.from_node_info
     pub cover: f32,    // used as hessian_sum in SplittableNode.from_node_info
-    pub counts: usize, // used as hessian_sum in SplittableNode.from_node_info
+    pub counts: usize, // used as counts_sum in SplittableNode.from_node_info
     pub weight: f32,   // used as weight_value in SplittableNode.from_node_info
     pub bounds: (f32, f32),
 }
@@ -1822,7 +1822,7 @@ mod tests {
     use crate::histogram::NodeHistogramOwned;
     use crate::node::SplittableNode;
     use crate::objective::{LogLoss, ObjectiveFunction, SquaredLoss};
-    use crate::tree::create_root_node;
+    use crate::tree::tree::create_root_node;
     use crate::utils::gain;
     use crate::utils::weight;
     use polars::prelude::*;

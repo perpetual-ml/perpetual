@@ -442,26 +442,17 @@ class PerpetualBooster:
 
         if len(self.classes_) == 0:
             return self.booster.predict(
-                flat_data=flat_data,
-                rows=rows,
-                cols=cols,
-                parallel=parallel,
+                flat_data=flat_data, rows=rows, cols=cols, parallel=parallel
             )
         elif len(self.classes_) == 2:
             return np.rint(
                 self.booster.predict_proba(
-                    flat_data=flat_data,
-                    rows=rows,
-                    cols=cols,
-                    parallel=parallel,
+                    flat_data=flat_data, rows=rows, cols=cols, parallel=parallel
                 )
-            )
+            ).astype(int)
         else:
             preds = self.booster.predict(
-                flat_data=flat_data,
-                rows=rows,
-                cols=cols,
-                parallel=parallel,
+                flat_data=flat_data, rows=rows, cols=cols, parallel=parallel
             )
             preds_matrix = preds.reshape((-1, len(self.classes_)), order="F")
             indices = np.argmax(preds_matrix, axis=1)
@@ -485,18 +476,12 @@ class PerpetualBooster:
 
         if len(self.classes_) > 2:
             probabilities = self.booster.predict_proba(
-                flat_data=flat_data,
-                rows=rows,
-                cols=cols,
-                parallel=parallel,
+                flat_data=flat_data, rows=rows, cols=cols, parallel=parallel
             )
             return probabilities.reshape((-1, len(self.classes_)), order="C")
         elif len(self.classes_) == 2:
             probabilities = self.booster.predict_proba(
-                flat_data=flat_data,
-                rows=rows,
-                cols=cols,
-                parallel=parallel,
+                flat_data=flat_data, rows=rows, cols=cols, parallel=parallel
             )
             return np.concatenate(
                 [(1.0 - probabilities).reshape(-1, 1), probabilities.reshape(-1, 1)],
@@ -542,6 +527,26 @@ class PerpetualBooster:
             raise NotImplementedError(
                 "predict_log_proba not implemented for regression."
             )
+
+    def predict_nodes(self, X, parallel: Union[bool, None] = None) -> List:
+        """Predict nodes with the fitted booster on new data.
+
+        Args:
+            X (FrameLike): Either a Polars or Pandas DataFrame, or a 2 dimensional Numpy array.
+            parallel (Union[bool, None], optional): Optionally specify if the predict
+                function should run in parallel on multiple threads. If `None` is
+                passed, the `parallel` attribute of the booster will be used.
+                Defaults to `None`.
+
+        Returns:
+            List: Returns a list of node predictions.
+        """
+        features_, flat_data, rows, cols = transform_input_frame(X, self.cat_mapping)
+        self._validate_features(features_)
+
+        return self.booster.predict_nodes(
+            flat_data=flat_data, rows=rows, cols=cols, parallel=parallel
+        )
 
     @property
     def feature_importances_(self) -> np.ndarray:

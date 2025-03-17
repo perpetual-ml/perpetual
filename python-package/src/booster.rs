@@ -315,7 +315,7 @@ impl PerpetualBooster {
             py_dict.set_item(key, py_array)?;
         }
 
-        py_dict.into_py_dict(py)
+        Ok(py_dict.into_py_dict(py)?)
     }
 
     pub fn predict<'py>(
@@ -329,7 +329,7 @@ impl PerpetualBooster {
         let flat_data = flat_data.as_slice()?;
         let data = Matrix::new(flat_data, rows, cols);
         let parallel = parallel.unwrap_or(true);
-        Ok(self.booster.predict(&data, parallel).into_pyarray_bound(py))
+        Ok(self.booster.predict(&data, parallel).into_pyarray(py))
     }
 
     pub fn predict_proba<'py>(
@@ -343,7 +343,24 @@ impl PerpetualBooster {
         let flat_data = flat_data.as_slice()?;
         let data = Matrix::new(flat_data, rows, cols);
         let parallel = parallel.unwrap_or(true);
-        Ok(self.booster.predict_proba(&data, parallel).into_pyarray_bound(py))
+        Ok(self.booster.predict_proba(&data, parallel).into_pyarray(py))
+    }
+
+    pub fn predict_nodes<'py>(
+        &self,
+        py: Python<'py>,
+        flat_data: PyReadonlyArray1<f64>,
+        rows: usize,
+        cols: usize,
+        parallel: Option<bool>,
+    ) -> PyResult<PyObject> {
+        let flat_data = flat_data.as_slice()?;
+        let data = Matrix::new(flat_data, rows, cols);
+        let parallel = parallel.unwrap_or(true);
+
+        let value: Vec<Vec<HashSet<usize>>> = self.booster.predict_nodes(&data, parallel);
+
+        Ok(value.into_py(py))
     }
 
     pub fn predict_contributions<'py>(
@@ -362,7 +379,7 @@ impl PerpetualBooster {
         Ok(self
             .booster
             .predict_contributions(&data, method_, parallel)
-            .into_pyarray_bound(py))
+            .into_pyarray(py))
     }
 
     pub fn calculate_feature_importance(&self, method: &str, normalize: bool) -> PyResult<HashMap<usize, f32>> {
@@ -481,6 +498,6 @@ impl PerpetualBooster {
         ];
         let dict = key_vals.into_py_dict_bound(py);
 
-        Ok(dict.to_object(py))
+        Ok(dict.into_pyobject(py)?.into())
     }
 }

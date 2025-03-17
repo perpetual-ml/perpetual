@@ -308,6 +308,23 @@ impl MultiOutputBooster {
         Ok(self.booster.predict_proba(&data, parallel).into_pyarray_bound(py))
     }
 
+    pub fn predict_nodes<'py>(
+        &self,
+        py: Python<'py>,
+        flat_data: PyReadonlyArray1<f64>,
+        rows: usize,
+        cols: usize,
+        parallel: Option<bool>,
+    ) -> PyResult<PyObject> {
+        let flat_data = flat_data.as_slice()?;
+        let data = Matrix::new(flat_data, rows, cols);
+        let parallel = parallel.unwrap_or(true);
+
+        let value: Vec<Vec<Vec<HashSet<usize>>>> = self.booster.predict_nodes(&data, parallel);
+
+        Ok(value.into_py(py))
+    }
+
     pub fn save_booster(&self, path: &str) -> PyResult<()> {
         match self.booster.save_booster(path) {
             Ok(_) => Ok(()),
