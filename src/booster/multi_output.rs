@@ -341,6 +341,14 @@ impl MultiOutputBooster {
         preds
     }
 
+    /// Generate node predictions on data using the gradient booster.
+    ///
+    /// * `data` -  Either a Polars or Pandas DataFrame, or a 2 dimensional Numpy array.
+    /// * `parallel` -  Predict in parallel.
+    pub fn predict_nodes(&self, data: &Matrix<f64>, parallel: bool) -> Vec<Vec<Vec<HashSet<usize>>>> {
+        self.boosters.iter().map(|b| b.predict_nodes(data, parallel)).collect()
+    }
+
     /// Get the boosters
     pub fn get_boosters(&self) -> &[PerpetualBooster] {
         &self.boosters

@@ -2,7 +2,7 @@ use crate::{
     errors::PerpetualError,
     node::{Node, NodeType},
     objective::{calc_init_callables, loss_callables},
-    tree::Tree,
+    tree::tree::Tree,
     Matrix, PerpetualBooster,
 };
 use std::collections::HashMap;

@@ -22,3 +22,4 @@ class Node:
     generalization: Optional[float]
     left_cats: Optional[Iterable]
     right_cats: Optional[Iterable]
+    count: int

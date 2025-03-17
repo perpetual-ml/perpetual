@@ -1,4 +1,4 @@
-use crate::{tree::Tree, utils::is_missing};
+use crate::{tree::tree::Tree, utils::is_missing};
 
 /// Partial Dependence Calculator
 // struct PDCalculator {
@@ -81,7 +81,7 @@ mod tests {
     use crate::histogram::{NodeHistogram, NodeHistogramOwned};
     use crate::objective::{LogLoss, ObjectiveFunction};
     use crate::splitter::{MissingImputerSplitter, SplitInfo, SplitInfoSlice};
-    use crate::tree::Tree;
+    use crate::tree::tree::Tree;
     use std::fs;
 
     #[test]

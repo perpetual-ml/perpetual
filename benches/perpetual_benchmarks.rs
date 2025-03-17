@@ -5,7 +5,7 @@ use perpetual::data::Matrix;
 use perpetual::histogram::{NodeHistogram, NodeHistogramOwned};
 use perpetual::objective::{LogLoss, ObjectiveFunction};
 use perpetual::splitter::{MissingImputerSplitter, SplitInfo, SplitInfoSlice};
-use perpetual::tree::Tree;
+use perpetual::tree::tree::Tree;
 use perpetual::utils::{fast_f64_sum, fast_sum, naive_sum};
 use perpetual::PerpetualBooster;
 use std::fs;

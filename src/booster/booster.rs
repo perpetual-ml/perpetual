@@ -10,7 +10,7 @@ use crate::errors::PerpetualError;
 use crate::histogram::{update_cuts, NodeHistogram, NodeHistogramOwned};
 use crate::objective::{calc_init_callables, gradient_hessian_callables, loss_callables, Objective};
 use crate::splitter::{MissingBranchSplitter, MissingImputerSplitter, SplitInfo, SplitInfoSlice, Splitter};
-use crate::tree::{Tree, TreeStopper};
+use crate::tree::tree::{Tree, TreeStopper};
 use core::{f32, f64};
 use log::{info, warn};
 use rand::rngs::StdRng;
@@ -1087,6 +1087,11 @@ mod tests {
             assert_relative_eq!(root_node.split_gain, split_gains_test[i], max_relative = 0.99);
         }
         assert_eq!(iter_limit, booster.get_prediction_trees().len());
+
+        let pred_nodes = booster.predict_nodes(&data, true);
+        println!("pred_nodes.len: {}", pred_nodes.len());
+        assert_eq!(booster.get_prediction_trees().len(), pred_nodes.len());
+        assert_eq!(data.rows, pred_nodes[0].len());
 
         Ok(())
     }

@@ -1,12 +1,11 @@
 [build-system]
-requires = ["maturin>=1.0,<1.7"]
+requires = ["maturin"]
 build-backend = "maturin"
 
 [project]
 name = "perpetual"
-version = "0.8.1"
+version = "0.9.1"
 description = "A self-generalizing gradient boosting machine that doesn't need hyperparameter optimization"
-license = { file = "LICENSE" }
 keywords = [
   "rust",
   "perpetual",
@@ -17,7 +16,6 @@ keywords = [
   "gradient boosting machine"
 ]
 authors = [{ name = "Mutlu Simsek" }]
-readme = "README.md"
 dependencies = ["numpy", "typing-extensions"]
 requires-python = ">=3.9"
 classifiers = [
@@ -31,7 +29,7 @@ classifiers = [
 ]
 
 [project.optional-dependencies]
-dev = ["black", "pandas", "polars", "pyarrow", "maturin==1.6.0", "pytest", "seaborn", "scikit-learn", "mkdocs-material", "mkdocstrings[python]", "mkdocs-autorefs", "ruff"]
+dev = ["black", "pandas", "polars", "pyarrow", "maturin", "pytest", "seaborn", "scikit-learn", "mkdocs-material", "mkdocstrings[python]", "mkdocs-autorefs", "ruff"]
 
 [tool.maturin]
 sdist-include = ["LICENSE", "README.md"]

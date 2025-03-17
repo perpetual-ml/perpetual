@@ -52,6 +52,7 @@ pub struct Node {
     pub parent_node: usize,
     pub left_cats: HashSet<usize>,
     pub right_cats: HashSet<usize>,
+    pub count: usize,
 }
 
 impl Ord for SplittableNode {
@@ -258,6 +259,7 @@ impl SplittableNode {
             parent_node: self.parent_node,
             left_cats: self.left_cats.clone(),
             right_cats: self.right_cats.clone(),
+            count: self.counts_sum,
         }
     }
 }

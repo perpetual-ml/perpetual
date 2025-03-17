@@ -1,10 +1,10 @@
 [package]
 name = "perpetual"
-version = "0.8.1"
+version = "0.9.1"
 edition = "2021"
 authors = ["Mutlu Simsek <msimsek@perpetual-ml.com>"]
 homepage = "https://perpetual-ml.com"
-description = "A self-generalizing gradient boosting machine which doesn't need hyperparameter optimization"
+description = "A self-generalizing gradient boosting machine that doesn't need hyperparameter optimization"
 license-file = "LICENSE"
 readme = "README.md"
 repository = "https://github.com/perpetual-ml/perpetual"
@@ -23,7 +23,7 @@ codegen-units = 1
 rayon = "1.10.0"
 thiserror = "2.0.12"
 serde_json = { version = "1.0.140", features = ["float_roundtrip"] }
-serde = { version = "1.0.218", features = ["derive"] }
+serde = { version = "1.0.219", features = ["derive"] }
 approx = "0.5.1"
 log = "0.4.26"
 rand = "0.9.0"
@@ -32,7 +32,7 @@ sysinfo = "0.33.1"
 [dev-dependencies]
 criterion = "0.5.1"
 polars = "0.41"
-reqwest = { version = "0.12.12", features = ["blocking"] }
+reqwest = { version = "0.12.14", features = ["blocking"] }
 csv = "1.3.1"
 chrono = "0.4.40"
 

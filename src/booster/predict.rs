@@ -1,12 +1,10 @@
-use std::collections::HashMap;
-
-use rayon::prelude::*;
-
-use crate::{
-    objective::Objective, shapley::predict_contributions_row_shapley, tree::Tree, utils::odds, Matrix, PerpetualBooster,
-};
-
 use super::booster::ContributionsMethod;
+use crate::{
+    objective::Objective, shapley::predict_contributions_row_shapley, tree::tree::Tree, utils::odds, Matrix,
+    PerpetualBooster,
+};
+use rayon::prelude::*;
+use std::collections::{HashMap, HashSet};
 
 impl PerpetualBooster {
     /// Generate predictions on data using the gradient booster.
@@ -198,5 +196,18 @@ impl PerpetualBooster {
                 });
         }
         contribs
+    }
+
+    /// Generate node predictions on data using the gradient booster.
+    ///
+    /// * `data` -  Either a Polars or Pandas DataFrame, or a 2 dimensional Numpy array.
+    /// * `parallel` -  Predict in parallel.
+    pub fn predict_nodes(&self, data: &Matrix<f64>, parallel: bool) -> Vec<Vec<HashSet<usize>>> {
+        let mut v = Vec::with_capacity(data.rows);
+        self.get_prediction_trees().iter().for_each(|tree| {
+            let tree_nodes = tree.predict_nodes(data, parallel, &self.missing);
+            v.push(tree_nodes);
+        });
+        v
     }
 }

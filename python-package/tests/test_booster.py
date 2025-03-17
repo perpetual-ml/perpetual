@@ -133,9 +133,26 @@ def test_predict_proba(X_y):
     assert np.allclose(y_proba.shape, (len(X), 2))
 
 
+def test_predict_nodes(X_y):
+    X, y = X_y
+
+    model = PerpetualBooster(
+        objective="LogLoss",
+        budget=0.1,
+        memory_limit=0.1,
+        iteration_limit=10,
+    )
+    model.fit(X, y)
+
+    prediction_nodes = model.predict_nodes(X)
+
+    assert np.allclose(len(prediction_nodes), model.number_of_trees)
+    assert np.allclose(len(prediction_nodes[0]), len(X))
+
+
 def test_get_node_list(X_y):
     X, y = X_y
-    X = X
+
     model = PerpetualBooster(objective="LogLoss")
     model.fit(X, y)
     assert all(
