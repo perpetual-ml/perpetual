@@ -6,7 +6,6 @@ build-backend = "maturin"
 name = "perpetual"
 version = "0.9.1"
 description = "A self-generalizing gradient boosting machine that doesn't need hyperparameter optimization"
-license = { file = "LICENSE" }
 keywords = [
   "rust",
   "perpetual",
