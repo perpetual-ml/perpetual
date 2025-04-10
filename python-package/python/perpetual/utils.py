@@ -32,7 +32,7 @@ def type_series(y):
         return ""
 
 
-def convert_input_array(x, objective, is_target = False) -> np.ndarray:
+def convert_input_array(x, objective, is_target=False) -> np.ndarray:
     classes_ = []
 
     if type(x).__module__.split(".")[0] == "numpy":

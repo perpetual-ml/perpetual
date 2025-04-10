@@ -227,7 +227,7 @@ class PerpetualBooster:
         self.cat_mapping = cat_mapping
         self.feature_names_in_ = features_
 
-        y_, classes_ = convert_input_array(y, self.objective, is_target = True)
+        y_, classes_ = convert_input_array(y, self.objective, is_target=True)
         self.classes_ = np.array(classes_).tolist()
 
         if sample_weight is None:
