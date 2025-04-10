@@ -49,7 +49,7 @@ def convert_input_array(x, objective, is_target = False) -> np.ndarray:
     else:
         x_ = x.to_numpy()
 
-    if objective == "LogLoss" and len(x_.shape) == 1 and is_target:
+    if is_target and objective == "LogLoss" and len(x_.shape) == 1:
         classes_ = np.unique(x_)
         x_index = np.array([np.where(classes_ == i) for i in x_])
         if len(classes_) > 2:
