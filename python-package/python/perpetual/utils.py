@@ -32,7 +32,7 @@ def type_series(y):
         return ""
 
 
-def convert_input_array(x, objective) -> np.ndarray:
+def convert_input_array(x, objective, is_target = False) -> np.ndarray:
     classes_ = []
 
     if type(x).__module__.split(".")[0] == "numpy":
@@ -49,7 +49,7 @@ def convert_input_array(x, objective) -> np.ndarray:
     else:
         x_ = x.to_numpy()
 
-    if objective == "LogLoss" and len(x_.shape) == 1:
+    if objective == "LogLoss" and len(x_.shape) == 1 and is_target:
         classes_ = np.unique(x_)
         x_index = np.array([np.where(classes_ == i) for i in x_])
         if len(classes_) > 2:
