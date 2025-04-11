@@ -1,8 +1,10 @@
-name: Test and Deploy
-on: [pull_request]
+name: Publish
+on:
+  release:
+    types: [published]
 
 jobs:
-  windows-build-test:
+  windows-build:
     strategy:
       matrix:
         pyversion: ["3.9", "3.10", "3.11", "3.12", "3.13"]
@@ -22,35 +24,19 @@ jobs:
       - run: |
           cp README.md python-package/README.md
           cp LICENSE python-package/LICENSE
-      - name: Build test data
-        run: |
-          cd python-package
-          python -m pip install -e .[dev]
-          cd ..
-          python scripts/make_resources.py
       - name: Build wheels with maturin
         uses: PyO3/maturin-action@v1
         with:
           target: x86_64
           command: build
           args: --release --strip --interpreter python --manifest-path python-package/Cargo.toml --out dist --sdist
-      - name: Install wheel
-        run: pip install perpetual --no-index --find-links dist --no-deps --force-reinstall
-      - name: Run Package Tests
-        run: |
-          pip install pytest pytest-cov black ruff setuptools --upgrade
-          cd python-package
-          ruff check .
-          black --check .
-          pytest --cov-fail-under=90 tests
-          cd ..
       - name: Save Artifacts
         uses: actions/upload-artifact@v4
         with:
           name: dist-windows-${{ matrix.pyversion }}
           path: dist
 
-  macos-build-test:
+  macos-build:
     strategy:
       matrix:
         pyversion: ["3.11", "3.12", "3.13"]
@@ -70,34 +56,18 @@ jobs:
       - run: |
           cp README.md python-package/README.md
           cp LICENSE python-package/LICENSE
-      - name: Build test data
-        run: |
-          cd python-package
-          python -m pip install -e .[dev]
-          cd ..
-          python scripts/make_resources.py
       - name: Build wheels with maturin
         uses: PyO3/maturin-action@v1
         with:
           command: build
           args: --release --strip --interpreter python --manifest-path python-package/Cargo.toml --out dist --sdist
-      - name: Install wheel
-        run: pip install perpetual --no-index --find-links dist --no-deps --force-reinstall
-      - name: Run Package Tests
-        run: |
-          pip install pytest pytest-cov black ruff setuptools --upgrade
-          cd python-package
-          ruff check .
-          black --check .
-          pytest --cov-fail-under=90 tests
-          cd ..
       - name: Save Artifacts
         uses: actions/upload-artifact@v4
         with:
           name: dist-${{ matrix.os }}-${{ matrix.pyversion }}
           path: dist
 
-  linux-build-test:
+  linux-build:
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -117,12 +87,6 @@ jobs:
       - run: |
           cp README.md python-package/README.md
           cp LICENSE python-package/LICENSE
-      - name: Build test data
-        run: |
-          cd python-package
-          python -m pip install -e .[dev]
-          cd ..
-          python scripts/make_resources.py
       - name: Build wheels with maturin
         uses: PyO3/maturin-action@v1
         with:
@@ -130,23 +94,13 @@ jobs:
           manylinux: auto
           command: build
           args: --release --strip --interpreter python${{ matrix.pyversion }} --manifest-path python-package/Cargo.toml --out dist --sdist
-      - name: Install wheel
-        run: pip install perpetual --no-index --find-links dist --no-deps --force-reinstall
-      - name: Run Package Tests
-        run: |
-          pip install pytest pytest-cov black ruff setuptools --upgrade
-          cd python-package
-          ruff check .
-          black --check .
-          pytest --cov-fail-under=90 tests
-          cd ..
       - name: Save Artifacts
         uses: actions/upload-artifact@v4
         with:
           name: dist-linux-${{ matrix.pyversion }}
           path: dist
 
-  linux-arm-build-test:
+  linux-arm-build:
     runs-on: ubuntu-24.04-arm
     strategy:
       matrix:
@@ -166,37 +120,20 @@ jobs:
       - run: |
           cp README.md python-package/README.md
           cp LICENSE python-package/LICENSE
-      - name: Build test data
-        run: |
-          cd python-package
-          python -m pip install -e .[dev]
-          cd ..
-          python scripts/make_resources.py
       - name: Build wheels with maturin
         uses: PyO3/maturin-action@v1
         with:
           manylinux: auto
           command: build
           args: --release --strip --interpreter python${{ matrix.pyversion }} --manifest-path python-package/Cargo.toml --out dist --sdist
-      - name: Install wheel
-        run: pip install perpetual --no-index --find-links dist --no-deps --force-reinstall
-      - name: Run Package Tests
-        run: |
-          pip install pytest pytest-cov black ruff setuptools --upgrade
-          cd python-package
-          ruff check .
-          black --check .
-          pytest --cov-fail-under=90 tests
-          cd ..
       - name: Save Artifacts
         uses: actions/upload-artifact@v4
         with:
           name: dist-linux-arm-${{ matrix.pyversion }}
           path: dist
 
-  cargo-build-test:
+  cargo-publish:
     runs-on: ubuntu-latest
-    needs: ["linux-build-test"]
     steps:
       - uses: actions/checkout@v4
       - name: Install latest stable Rust
@@ -212,14 +149,6 @@ jobs:
       - run: |
           cp README.md python-package/README.md
           cp LICENSE python-package/LICENSE
-      - name: Build test data
-        run: |
-          cd python-package
-          python -m pip install -e .[dev]
-          cd ..
-          python scripts/make_resources.py
-      - name: Run tests
-        run: cargo test --verbose
       - name: Publish Crate
         run: cargo publish --token ${CRATES_TOKEN} --allow-dirty
         env:
@@ -227,7 +156,7 @@ jobs:
 
   pypi-publish:
     runs-on: ubuntu-latest
-    needs: ["windows-build-test", "macos-build-test", "linux-build-test", "linux-arm-build-test"]
+    needs: ["windows-build", "macos-build", "linux-build", "linux-arm-build"]
     environment:
       name: Test and Deploy
       url: https://pypi.org/p/perpetual
