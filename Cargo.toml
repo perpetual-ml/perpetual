@@ -1,6 +1,6 @@
 [package]
 name = "perpetual"
-version = "0.9.1"
+version = "0.9.2"
 edition = "2021"
 authors = ["Mutlu Simsek <msimsek@perpetual-ml.com>"]
 homepage = "https://perpetual-ml.com"
@@ -25,7 +25,7 @@ thiserror = "2.0.12"
 serde_json = { version = "1.0.140", features = ["float_roundtrip"] }
 serde = { version = "1.0.219", features = ["derive"] }
 approx = "0.5.1"
-log = "0.4.26"
+log = "0.4.27"
 rand = "0.9.0"
 sysinfo = "0.33.1"
 

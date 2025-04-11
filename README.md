@@ -9,7 +9,7 @@
 [![Crates.io Version](https://img.shields.io/crates/v/perpetual?logo=rust&logoColor=white)](https://crates.io/crates/perpetual)
 [![Static Badge](https://img.shields.io/badge/join-discord-blue?logo=discord)](https://discord.gg/AyUK7rr6wy)
 ![PyPI - Downloads](https://img.shields.io/pypi/dm/perpetual)
-[![libs.tech recommends](https://libs.tech/project/803330098/badge.svg)](https://libs.tech/project/803330098/perpetual)
+
 
 </div>
 
