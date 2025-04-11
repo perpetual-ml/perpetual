@@ -196,7 +196,6 @@ jobs:
 
   cargo-build-test:
     runs-on: ubuntu-latest
-    needs: ["linux-build-test"]
     steps:
       - uses: actions/checkout@v4
       - name: Install latest stable Rust
@@ -220,25 +219,3 @@ jobs:
           python scripts/make_resources.py
       - name: Run tests
         run: cargo test --verbose
-      - name: Publish Crate
-        run: cargo publish --token ${CRATES_TOKEN} --allow-dirty
-        env:
-          CRATES_TOKEN: ${{ secrets.CRATES_TOKEN }}
-
-  pypi-publish:
-    runs-on: ubuntu-latest
-    needs: ["windows-build-test", "macos-build-test", "linux-build-test", "linux-arm-build-test"]
-    environment:
-      name: Test and Deploy
-      url: https://pypi.org/p/perpetual
-    permissions:
-      id-token: write
-    steps:
-      - name: Retrieve release distributions
-        uses: actions/download-artifact@v4
-        with:
-          pattern: dist-*
-          merge-multiple: true
-          path: dist
-      - name: Publish release distributions to PyPI
-        uses: pypa/gh-action-pypi-publish@release/v1
