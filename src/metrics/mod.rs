@@ -1,3 +1,6 @@
+pub mod regression;
+pub mod classification;
+
 use crate::data::FloatData;
 use crate::errors::PerpetualError;
 use crate::utils::items_to_strings;
@@ -66,17 +69,17 @@ impl FromStr for Metric {
 
 pub fn metric_callables(metric_type: &Metric) -> (MetricFn, bool) {
     match metric_type {
-        Metric::AUC => (AUCMetric::calculate_metric, AUCMetric::maximize()),
-        Metric::LogLoss => (LogLossMetric::calculate_metric, LogLossMetric::maximize()),
+        Metric::AUC => (classification::AUCMetric::calculate_metric, classification::AUCMetric::maximize()),
+        Metric::LogLoss => (classification::LogLossMetric::calculate_metric, classification::LogLossMetric::maximize()),
         Metric::RootMeanSquaredLogError => (
-            RootMeanSquaredLogErrorMetric::calculate_metric,
-            RootMeanSquaredLogErrorMetric::maximize(),
+            regression::RootMeanSquaredLogErrorMetric::calculate_metric,
+            regression::RootMeanSquaredLogErrorMetric::maximize(),
         ),
         Metric::RootMeanSquaredError => (
-            RootMeanSquaredErrorMetric::calculate_metric,
-            RootMeanSquaredErrorMetric::maximize(),
+            regression::RootMeanSquaredErrorMetric::calculate_metric,
+            regression::RootMeanSquaredErrorMetric::maximize(),
         ),
-        Metric::QuantileLoss => (QuantileLossMetric::calculate_metric, QuantileLossMetric::maximize()),
+        Metric::QuantileLoss => (regression::QuantileLossMetric::calculate_metric, regression::QuantileLossMetric::maximize()),
     }
 }
 
@@ -85,157 +88,11 @@ pub trait EvaluationMetric {
     fn maximize() -> bool;
 }
 
-pub struct QuantileLossMetric {}
-impl EvaluationMetric for QuantileLossMetric {
-    fn calculate_metric(y: &[f64], yhat: &[f64], sample_weight: &[f64], alpha: Option<f32>) -> f64 {
-        quantile_loss(y, yhat, sample_weight, alpha)
-    }
-    fn maximize() -> bool {
-        false
-    }
-}
-
-pub struct LogLossMetric {}
-impl EvaluationMetric for LogLossMetric {
-    fn calculate_metric(y: &[f64], yhat: &[f64], sample_weight: &[f64], _alpha: Option<f32>) -> f64 {
-        log_loss(y, yhat, sample_weight)
-    }
-    fn maximize() -> bool {
-        false
-    }
-}
-
-pub struct AUCMetric {}
-impl EvaluationMetric for AUCMetric {
-    fn calculate_metric(y: &[f64], yhat: &[f64], sample_weight: &[f64], _alpha: Option<f32>) -> f64 {
-        roc_auc_score(y, yhat, sample_weight)
-    }
-    fn maximize() -> bool {
-        true
-    }
-}
-
-pub struct RootMeanSquaredLogErrorMetric {}
-impl EvaluationMetric for RootMeanSquaredLogErrorMetric {
-    fn calculate_metric(y: &[f64], yhat: &[f64], sample_weight: &[f64], _alpha: Option<f32>) -> f64 {
-        root_mean_squared_log_error(y, yhat, sample_weight)
-    }
-    fn maximize() -> bool {
-        false
-    }
-}
-
-pub struct RootMeanSquaredErrorMetric {}
-impl EvaluationMetric for RootMeanSquaredErrorMetric {
-    fn calculate_metric(y: &[f64], yhat: &[f64], sample_weight: &[f64], _alpha: Option<f32>) -> f64 {
-        root_mean_squared_error(y, yhat, sample_weight)
-    }
-    fn maximize() -> bool {
-        false
-    }
-}
-
-pub fn quantile_loss(y: &[f64], yhat: &[f64], sample_weight: &[f64], alpha: Option<f32>) -> f64 {
-    let mut w_sum = 0.;
-    let res = y
-        .iter()
-        .zip(yhat)
-        .zip(sample_weight)
-        .map(|((y_, yhat_), w_)| {
-            w_sum += *w_;
-            let _alpha = alpha.unwrap() as f64;
-            let s = *y_ - *yhat_;
-            let l = if s >= 0.0 { _alpha * s } else { (1.0 - _alpha) * s };
-            l * *w_
-        })
-        .sum::<f64>();
-    res / w_sum
-}
-
-pub fn log_loss(y: &[f64], yhat: &[f64], sample_weight: &[f64]) -> f64 {
-    let mut w_sum = 0.;
-    let res = y
-        .iter()
-        .zip(yhat)
-        .zip(sample_weight)
-        .map(|((y_, yhat_), w_)| {
-            w_sum += *w_;
-            let yhat_ = f64::ONE / (f64::ONE + (-*yhat_).exp());
-            -(*y_ * yhat_.ln() + (f64::ONE - *y_) * ((f64::ONE - yhat_).ln())) * *w_
-        })
-        .sum::<f64>();
-    res / w_sum
-}
-
-pub fn root_mean_squared_log_error(y: &[f64], yhat: &[f64], sample_weight: &[f64]) -> f64 {
-    let mut w_sum = 0.;
-    let res = y
-        .iter()
-        .zip(yhat)
-        .zip(sample_weight)
-        .map(|((y_, yhat_), w_)| {
-            w_sum += *w_;
-            (y_.ln_1p() - yhat_.ln_1p()).powi(2) * *w_
-        })
-        .sum::<f64>();
-    (res / w_sum).sqrt()
-}
-
-pub fn root_mean_squared_error(y: &[f64], yhat: &[f64], sample_weight: &[f64]) -> f64 {
-    let mut w_sum = 0.;
-    let res = y
-        .iter()
-        .zip(yhat)
-        .zip(sample_weight)
-        .map(|((y_, yhat_), w_)| {
-            w_sum += *w_;
-            (y_ - yhat_).powi(2) * *w_
-        })
-        .sum::<f64>();
-    (res / w_sum).sqrt()
-}
-
-fn trapezoid_area(x0: f64, x1: f64, y0: f64, y1: f64) -> f64 {
-    (x0 - x1).abs() * (y0 + y1) * 0.5
-}
-
-pub fn roc_auc_score(y: &[f64], yhat: &[f64], sample_weight: &[f64]) -> f64 {
-    let mut indices = (0..y.len()).collect::<Vec<_>>();
-    indices.sort_unstable_by(|&a, &b| yhat[b].total_cmp(&yhat[a]));
-    let mut auc: f64 = 0.0;
-
-    let mut label = y[indices[0]];
-    let mut w = sample_weight[indices[0]];
-    let mut fp = (1.0 - label) * w;
-    let mut tp: f64 = label * w;
-    let mut tp_prev: f64 = 0.0;
-    let mut fp_prev: f64 = 0.0;
-
-    for i in 1..indices.len() {
-        if yhat[indices[i]] != yhat[indices[i - 1]] {
-            auc += trapezoid_area(fp_prev, fp, tp_prev, tp);
-            tp_prev = tp;
-            fp_prev = fp;
-        }
-        label = y[indices[i]];
-        w = sample_weight[indices[i]];
-        fp += (1.0 - label) * w;
-        tp += label * w;
-    }
-
-    auc += trapezoid_area(fp_prev, fp, tp_prev, tp);
-    if fp <= 0.0 || tp <= 0.0 {
-        auc = 0.0;
-        fp = 0.0;
-        tp = 0.0;
-    }
-
-    auc / (tp * fp)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::metrics::classification::*;
+    use crate::metrics::regression::*;
     use crate::utils::precision_round;
     #[test]
     fn test_root_mean_squared_log_error() {

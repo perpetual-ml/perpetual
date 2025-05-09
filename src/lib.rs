@@ -15,7 +15,7 @@ pub mod data;
 pub mod errors;
 pub mod grower;
 pub mod histogram;
-pub mod metric;
+pub mod metrics;
 pub mod objective;
 pub mod prune;
 pub mod sampler;
