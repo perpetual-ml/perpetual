@@ -67,21 +67,21 @@ impl FromStr for Metric {
     }
 }
 
-// pub fn metric_callables(metric_type: &Metric) -> (MetricFn, bool) {
-//     match metric_type {
-//         Metric::AUC => (AUCMetric::calculate_metric, AUCMetric::maximize()),
-//         Metric::LogLoss => (LogLossMetric::calculate_metric, LogLossMetric::maximize()),
-//         Metric::RootMeanSquaredLogError => (
-//             RootMeanSquaredLogErrorMetric::calculate_metric,
-//             RootMeanSquaredLogErrorMetric::maximize(),
-//         ),
-//         Metric::RootMeanSquaredError => (
-//             RootMeanSquaredErrorMetric::calculate_metric,
-//             RootMeanSquaredErrorMetric::maximize(),
-//         ),
-//         Metric::QuantileLoss => (QuantileLossMetric::calculate_metric, QuantileLossMetric::maximize()),
-//     }
-// }
+pub fn metric_callables(metric_type: &Metric) -> (MetricFn, bool) {
+    match metric_type {
+        Metric::AUC => (classification::AUCMetric::calculate_metric, classification::AUCMetric::maximize()),
+        Metric::LogLoss => (classification::LogLossMetric::calculate_metric, classification::LogLossMetric::maximize()),
+        Metric::RootMeanSquaredLogError => (
+            regression::RootMeanSquaredLogErrorMetric::calculate_metric,
+            regression::RootMeanSquaredLogErrorMetric::maximize(),
+        ),
+        Metric::RootMeanSquaredError => (
+            regression::RootMeanSquaredErrorMetric::calculate_metric,
+            regression::RootMeanSquaredErrorMetric::maximize(),
+        ),
+        Metric::QuantileLoss => (regression::QuantileLossMetric::calculate_metric, regression::QuantileLossMetric::maximize()),
+    }
+}
 
 pub trait EvaluationMetric {
     fn calculate_metric(y: &[f64], yhat: &[f64], sample_weight: &[f64], alpha: Option<f32>) -> f64;
