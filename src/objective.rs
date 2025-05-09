@@ -1,4 +1,4 @@
-use crate::{data::FloatData, metric::Metric, utils::fast_sum};
+use crate::{data::FloatData, metrics::Metric, utils::fast_sum};
 use serde::{Deserialize, Serialize};
 
 type ObjFn = fn(&[f64], &[f64], Option<&[f64]>, Option<f64>) -> (Vec<f32>, Option<Vec<f32>>);
