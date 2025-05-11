@@ -5,6 +5,7 @@ mod partial_dependence;
 mod shapley;
 
 // Modules
+pub mod objective_functions;
 pub mod bin;
 pub mod binning;
 pub mod booster;
@@ -16,7 +17,6 @@ pub mod errors;
 pub mod grower;
 pub mod histogram;
 pub mod metrics;
-pub mod objective;
 pub mod prune;
 pub mod sampler;
 pub mod splitter;

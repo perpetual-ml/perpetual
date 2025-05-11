@@ -1,7 +1,7 @@
 use crate::{
     errors::PerpetualError,
     node::{Node, NodeType},
-    objective::{calc_init_callables, loss_callables},
+    objective_functions::{calc_init_callables, loss_callables},
     tree::tree::Tree,
     Matrix, PerpetualBooster,
 };

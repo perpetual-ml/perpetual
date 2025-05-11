@@ -8,7 +8,7 @@ use crate::constraints::ConstraintMap;
 use crate::data::Matrix;
 use crate::errors::PerpetualError;
 use crate::histogram::{update_cuts, NodeHistogram, NodeHistogramOwned};
-use crate::objective::{calc_init_callables, gradient_hessian_callables, loss_callables, Objective};
+use crate::objective_functions::{calc_init_callables, gradient_hessian_callables, loss_callables, Objective};
 use crate::splitter::{MissingBranchSplitter, MissingImputerSplitter, SplitInfo, SplitInfoSlice, Splitter};
 use crate::tree::tree::{Tree, TreeStopper};
 use core::{f32, f64};
