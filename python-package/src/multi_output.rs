@@ -5,7 +5,7 @@ use perpetual_rs::booster::booster::MissingNodeTreatment;
 use perpetual_rs::booster::multi_output::MultiOutputBooster as CrateMultiOutputBooster;
 use perpetual_rs::constraints::Constraint;
 use perpetual_rs::data::Matrix;
-use perpetual_rs::objective::Objective;
+use perpetual_rs::objective_functions::Objective;
 use pyo3::exceptions::{PyKeyError, PyValueError};
 use pyo3::prelude::*;
 use pyo3::types::IntoPyDict;
