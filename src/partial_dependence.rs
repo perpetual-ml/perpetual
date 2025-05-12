@@ -79,7 +79,7 @@ mod tests {
     use crate::constraints::ConstraintMap;
     use crate::data::Matrix;
     use crate::histogram::{NodeHistogram, NodeHistogramOwned};
-    use crate::objective::{LogLoss, ObjectiveFunction};
+    use crate::objective_functions::{LogLoss, ObjectiveFunction};
     use crate::splitter::{MissingImputerSplitter, SplitInfo, SplitInfoSlice};
     use crate::tree::tree::Tree;
     use std::fs;

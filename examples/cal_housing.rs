@@ -10,7 +10,7 @@
 
 // cargo flamegraph --example cal_housing
 
-use perpetual::{objective::Objective, Matrix, PerpetualBooster};
+use perpetual::{objective_functions::Objective, Matrix, PerpetualBooster};
 use polars::prelude::*;
 use std::env;
 use std::error::Error;

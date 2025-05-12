@@ -1,5 +1,5 @@
 //! An example using the `titanic` dataset
-use perpetual::objective::Objective;
+use perpetual::objective_functions::Objective;
 use perpetual::{Matrix, PerpetualBooster};
 use polars::prelude::*;
 use std::env;

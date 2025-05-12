@@ -340,7 +340,7 @@ mod tests {
     use crate::binning::bin_matrix;
     use crate::constraints::{Constraint, ConstraintMap};
     use crate::histogram::NodeHistogramOwned;
-    use crate::objective::{LogLoss, ObjectiveFunction, SquaredLoss};
+    use crate::objective_functions::{LogLoss, ObjectiveFunction, SquaredLoss};
     use crate::splitter::{MissingImputerSplitter, SplitInfo};
     use crate::utils::precision_round;
     use polars::datatypes::DataType;

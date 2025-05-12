@@ -275,7 +275,7 @@ impl Tree {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::objective::Objective;
+    use crate::objective_functions::Objective;
     use polars::io::SerReader;
     use polars::prelude::{CsvReadOptions, DataType};
     use std::error::Error;
