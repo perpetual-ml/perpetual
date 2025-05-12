@@ -1,4 +1,4 @@
-use crate::{errors::PerpetualError, objective::Objective, utils::percentiles, Matrix, PerpetualBooster};
+use crate::{errors::PerpetualError, objective_functions::Objective, utils::percentiles, Matrix, PerpetualBooster};
 use std::collections::HashMap;
 
 pub type CalData<'a> = (Matrix<'a, f64>, &'a [f64], &'a [f64]); // (x_flat_data, rows, cols), y, alpha
@@ -66,7 +66,7 @@ impl PerpetualBooster {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::objective::Objective;
+    use crate::objective_functions::Objective;
     use polars::io::SerReader;
     use polars::prelude::{CsvReadOptions, DataType};
     use std::error::Error;

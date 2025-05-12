@@ -1,6 +1,6 @@
 use crate::constraints::ConstraintMap;
 use crate::errors::PerpetualError;
-use crate::objective::Objective;
+use crate::objective_functions::Objective;
 use crate::{Matrix, PerpetualBooster};
 use serde::{Deserialize, Deserializer, Serialize};
 use std::collections::{HashMap, HashSet};

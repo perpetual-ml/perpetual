@@ -1,5 +1,5 @@
 use super::booster::MissingNodeTreatment;
-use crate::{constraints::ConstraintMap, objective::Objective, PerpetualBooster};
+use crate::{constraints::ConstraintMap, objective_functions::Objective, PerpetualBooster};
 use std::collections::HashSet;
 
 impl PerpetualBooster {
