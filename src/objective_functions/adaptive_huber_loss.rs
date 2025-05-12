@@ -63,7 +63,7 @@ impl ObjectiveFunction for AdaptiveHuberLoss {
     }
 
     // calculate gradient and hessians
-    fn calc_grad_hess(y: &[f64], yhat: &[f64], sample_weight: Option<&[f64]>,quantile: Option<f64>,) -> (Vec<f32>, Option<Vec<f32>>) {
+    fn calc_grad_hess(y: &[f64], yhat: &[f64], sample_weight: Option<&[f64]>, quantile: Option<f64>,) -> (Vec<f32>, Option<Vec<f32>>) {
 
         // default alpha: 0.5
         // if not passed explicitly
@@ -119,7 +119,7 @@ impl ObjectiveFunction for AdaptiveHuberLoss {
         }
     }
 
-    fn calc_init(y: &[f64], sample_weight: Option<&[f64]>, _quantile: Option<f64>,) -> f64 {
+    fn calc_init(y: &[f64], sample_weight: Option<&[f64]>, quantile: Option<f64>,) -> f64 {
 
         let mut idxs: Vec<usize> = (0..y.len()).collect();
         idxs.sort_by(|&i, &j| y[i].partial_cmp(&y[j]).unwrap());
