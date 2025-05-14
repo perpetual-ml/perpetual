@@ -414,6 +414,7 @@ impl PerpetualBooster {
             None => match &self.objective {
                 Objective::LogLoss => false,
                 Objective::AdaptiveHuberLoss => false,
+                Objective::HuberLoss => false,
                 _ => true,
             },
         };
