@@ -1100,7 +1100,7 @@ mod tests {
 
 
     #[test]
-    fn test_adaptive_huberloss() -> Result<(), Box<dyn Error>> {
+    fn test_adaptive_huber_loss() -> Result<(), Box<dyn Error>> {
         let all_names = [
             "MedInc".to_string(),
             "HouseAge".to_string(),
@@ -1205,7 +1205,7 @@ mod tests {
     }
 
     #[test]
-    fn test_huberloss() -> Result<(), Box<dyn Error>> {
+    fn test_huber_loss() -> Result<(), Box<dyn Error>> {
         let all_names = [
             "MedInc".to_string(),
             "HouseAge".to_string(),
