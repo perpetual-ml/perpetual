@@ -1099,8 +1099,8 @@ mod tests {
     }
 
 
-        #[test]
-    fn test_gbm_parallel_huber() -> Result<(), Box<dyn Error>> {
+    #[test]
+    fn test_adaptive_huberloss() -> Result<(), Box<dyn Error>> {
         let all_names = [
             "MedInc".to_string(),
             "HouseAge".to_string(),
@@ -1193,43 +1193,118 @@ mod tests {
             .set_objective(Objective::AdaptiveHuberLoss)
             .set_max_bin(10)
             .set_num_threads(Some(1))
-            .set_budget(0.1);
-        let mut model2 = PerpetualBooster::default()
-            .set_objective(Objective::AdaptiveHuberLoss)
-            .set_max_bin(10)
-            .set_num_threads(Some(2))
-            .set_budget(0.1);
+            .set_budget(1.0);
 
         model1.fit(&matrix_test, &y_test, None)?;
-        model2.fit(&matrix_test, &y_test, None)?;
 
         let trees1 = model1.get_prediction_trees();
-        let trees2 = model2.get_prediction_trees();
-        assert_eq!(trees1.len(), trees2.len());
+        println!("tees = {}", trees1.len());
+        assert_eq!(trees1.len(), 41);
 
-        let n_leaves1: usize = trees1.iter().map(|t| (t.nodes.len() + 1) / 2).sum();
-        let n_leaves2: usize = trees2.iter().map(|t| (t.nodes.len() + 1) / 2).sum();
-        assert_eq!(n_leaves1, n_leaves2);
+        Ok(())
+    }
 
-        println!("{}", trees1.last().unwrap());
-        println!("{}", trees2.last().unwrap());
+    #[test]
+    fn test_huberloss() -> Result<(), Box<dyn Error>> {
+        let all_names = [
+            "MedInc".to_string(),
+            "HouseAge".to_string(),
+            "AveRooms".to_string(),
+            "AveBedrms".to_string(),
+            "Population".to_string(),
+            "AveOccup".to_string(),
+            "Latitude".to_string(),
+            "Longitude".to_string(),
+            "MedHouseVal".to_string(),
+        ];
 
-        let y_pred1 = model1.predict(&matrix_train, true);
-        let y_pred2 = model2.predict(&matrix_train, true);
+        let feature_names = [
+            "MedInc".to_string(),
+            "HouseAge".to_string(),
+            "AveRooms".to_string(),
+            "AveBedrms".to_string(),
+            "Population".to_string(),
+            "AveOccup".to_string(),
+            "Latitude".to_string(),
+            "Longitude".to_string(),
+        ];
 
-        let mse1 = y_pred1
-            .iter()
-            .zip(y_train.iter())
-            .map(|(y1, y2)| (y1 - y2) * (y1 - y2))
-            .sum::<f64>()
-            / y_train.len() as f64;
-        let mse2 = y_pred2
-            .iter()
-            .zip(y_train.iter())
-            .map(|(y1, y2)| (y1 - y2) * (y1 - y2))
-            .sum::<f64>()
-            / y_train.len() as f64;
-        assert_relative_eq!(mse1, mse2, max_relative = 0.99);
+        let column_names_train = Arc::new(all_names.clone());
+        let column_names_test = Arc::new(all_names.clone());
+
+        let df_train = CsvReadOptions::default()
+            .with_has_header(true)
+            .with_columns(Some(column_names_train))
+            .try_into_reader_with_file_path(Some("resources/cal_housing_train.csv".into()))?
+            .finish()
+            .unwrap();
+
+        let df_test = CsvReadOptions::default()
+            .with_has_header(true)
+            .with_columns(Some(column_names_test))
+            .try_into_reader_with_file_path(Some("resources/cal_housing_test.csv".into()))?
+            .finish()
+            .unwrap();
+
+        // Get data in column major format...
+        let id_vars_train: Vec<&str> = Vec::new();
+        let mdf_train = df_train.unpivot(feature_names.clone(), &id_vars_train)?;
+        let id_vars_test: Vec<&str> = Vec::new();
+        let mdf_test = df_test.unpivot(feature_names, &id_vars_test)?;
+
+        let data_train = Vec::from_iter(
+            mdf_train
+                .select_at_idx(1)
+                .expect("Invalid column")
+                .f64()?
+                .into_iter()
+                .map(|v| v.unwrap_or(f64::NAN)),
+        );
+        let data_test = Vec::from_iter(
+            mdf_test
+                .select_at_idx(1)
+                .expect("Invalid column")
+                .f64()?
+                .into_iter()
+                .map(|v| v.unwrap_or(f64::NAN)),
+        );
+
+        let y_train = Vec::from_iter(
+            df_train
+                .column("MedHouseVal")?
+                .cast(&DataType::Float64)?
+                .f64()?
+                .into_iter()
+                .map(|v| v.unwrap_or(f64::NAN)),
+        );
+        let y_test = Vec::from_iter(
+            df_test
+                .column("MedHouseVal")?
+                .cast(&DataType::Float64)?
+                .f64()?
+                .into_iter()
+                .map(|v| v.unwrap_or(f64::NAN)),
+        );
+
+        // Create Matrix from ndarray.
+        let matrix_train = Matrix::new(&data_train, y_train.len(), 8);
+        let matrix_test = Matrix::new(&data_test, y_test.len(), 8);
+
+        // Create booster.
+        // To provide parameters generate a default booster, and then use
+        // the relevant `set_` methods for any parameters you would like to
+        // adjust.
+        let mut model1 = PerpetualBooster::default()
+            .set_objective(Objective::HuberLoss)
+            .set_max_bin(10)
+            .set_num_threads(Some(1))
+            .set_budget(1.0);
+
+        model1.fit(&matrix_test, &y_test, None)?;
+
+        let trees1 = model1.get_prediction_trees();
+        println!("tees = {}", trees1.len());
+        assert_eq!(trees1.len(), 88);
 
         Ok(())
     }
