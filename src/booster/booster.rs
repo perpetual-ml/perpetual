@@ -1192,7 +1192,6 @@ mod tests {
         let mut model = PerpetualBooster::default()
             .set_objective(Objective::AdaptiveHuberLoss)
             .set_max_bin(10)
-            .set_num_threads(Some(1))
             .set_budget(0.1);
 
         model.fit(&matrix_test, &y_test, None)?;
@@ -1297,7 +1296,6 @@ mod tests {
         let mut model = PerpetualBooster::default()
             .set_objective(Objective::HuberLoss)
             .set_max_bin(10)
-            .set_num_threads(Some(1))
             .set_budget(0.1);
 
         model.fit(&matrix_test, &y_test, None)?;
