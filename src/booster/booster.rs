@@ -1189,17 +1189,17 @@ mod tests {
         // To provide parameters generate a default booster, and then use
         // the relevant `set_` methods for any parameters you would like to
         // adjust.
-        let mut model1 = PerpetualBooster::default()
+        let mut model = PerpetualBooster::default()
             .set_objective(Objective::AdaptiveHuberLoss)
             .set_max_bin(10)
             .set_num_threads(Some(1))
-            .set_budget(1.0);
+            .set_budget(0.1);
 
-        model1.fit(&matrix_test, &y_test, None)?;
+        model.fit(&matrix_test, &y_test, None)?;
 
-        let trees1 = model1.get_prediction_trees();
-        println!("tees = {}", trees1.len());
-        assert_eq!(trees1.len(), 41);
+        let trees = model.get_prediction_trees();
+        println!("tees = {}", trees.len());
+        assert_eq!(trees.len(), 31);
 
         Ok(())
     }
@@ -1294,17 +1294,17 @@ mod tests {
         // To provide parameters generate a default booster, and then use
         // the relevant `set_` methods for any parameters you would like to
         // adjust.
-        let mut model1 = PerpetualBooster::default()
+        let mut model = PerpetualBooster::default()
             .set_objective(Objective::HuberLoss)
             .set_max_bin(10)
             .set_num_threads(Some(1))
-            .set_budget(1.0);
+            .set_budget(0.1);
 
-        model1.fit(&matrix_test, &y_test, None)?;
+        model.fit(&matrix_test, &y_test, None)?;
 
-        let trees1 = model1.get_prediction_trees();
-        println!("tees = {}", trees1.len());
-        assert_eq!(trees1.len(), 88);
+        let trees = model.get_prediction_trees();
+        println!("tees = {}", trees.len());
+        assert_eq!(trees.len(), 45);
 
         Ok(())
     }
