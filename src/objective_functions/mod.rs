@@ -2,11 +2,13 @@ mod log_loss;
 mod squared_loss;
 mod quantile_loss;
 mod adaptive_huber_loss;
+mod huber_loss;
 
 pub use log_loss::LogLoss;
 pub use squared_loss::SquaredLoss;
 pub use quantile_loss::QuantileLoss;
 pub use adaptive_huber_loss::AdaptiveHuberLoss;
+pub use huber_loss::HuberLoss;
 
 
 use crate::{data::FloatData, metrics::Metric, utils::fast_sum};
@@ -20,7 +22,8 @@ pub enum Objective {
     LogLoss,
     SquaredLoss,
     QuantileLoss,
-    AdaptiveHuberLoss
+    AdaptiveHuberLoss,
+    HuberLoss
 }
 
 pub fn loss_callables(objective: &Objective) -> LossFn {
@@ -29,6 +32,7 @@ pub fn loss_callables(objective: &Objective) -> LossFn {
         Objective::SquaredLoss => SquaredLoss::calc_loss,
         Objective::QuantileLoss => QuantileLoss::calc_loss,
         Objective::AdaptiveHuberLoss => AdaptiveHuberLoss::calc_loss,
+        Objective::HuberLoss => HuberLoss::calc_loss
     }
 }
 
@@ -37,7 +41,8 @@ pub fn gradient_hessian_callables(objective: &Objective) -> ObjFn {
         Objective::LogLoss => LogLoss::calc_grad_hess,
         Objective::SquaredLoss => SquaredLoss::calc_grad_hess,
         Objective::QuantileLoss => QuantileLoss::calc_grad_hess,
-        Objective::AdaptiveHuberLoss => AdaptiveHuberLoss::calc_grad_hess
+        Objective::AdaptiveHuberLoss => AdaptiveHuberLoss::calc_grad_hess,
+        Objective::HuberLoss => HuberLoss::calc_grad_hess
     }
 }
 
@@ -47,6 +52,7 @@ pub fn calc_init_callables(objective: &Objective) -> fn(&[f64], Option<&[f64]>, 
         Objective::SquaredLoss => SquaredLoss::calc_init,
         Objective::QuantileLoss => QuantileLoss::calc_init,
         Objective::AdaptiveHuberLoss => AdaptiveHuberLoss::calc_init,
+        Objective::HuberLoss => HuberLoss::calc_init
     }
 }
 

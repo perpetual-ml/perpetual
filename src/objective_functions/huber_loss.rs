@@ -3,28 +3,14 @@ use super::ObjectiveFunction;
 use crate::{data::FloatData, metrics::Metric};
 use serde::{Deserialize, Serialize};
 
-/// Adaptive Huber Loss
+/// Huber Loss
 #[derive(Default)]
-pub struct AdaptiveHuberLoss {}
-impl ObjectiveFunction for AdaptiveHuberLoss {
-    fn calc_loss(y: &[f64], yhat: &[f64], sample_weight: Option<&[f64]>, quantile: Option<f64>,) -> Vec<f32> {
+pub struct HuberLoss {}
+impl ObjectiveFunction for HuberLoss {
+    fn calc_loss(y: &[f64], yhat: &[f64], sample_weight: Option<&[f64]>, delta: Option<f64>,) -> Vec<f32> {
 
-        // default alpha: 0.5
-        // if not passed explicitly
-        let alpha = quantile.unwrap_or(0.5);
-        let n = y.len();
-
-        let mut abs_res = y
-            .iter()
-            .zip(yhat.iter())
-            .map(|(&yi, &yh)| (yi - yh).abs())
-            .collect::<Vec<_>>();
-        abs_res.sort_by(|a, b| a.partial_cmp(b).unwrap());
-
-
-        let idx = ((n as f64) * alpha).floor() as usize;
-        let delta = abs_res[idx.min(n - 1)];
-
+        // Default delta value
+        let delta = delta.unwrap_or(1.0);
         match sample_weight {
             Some(weights) => y
                 .iter()
@@ -58,21 +44,10 @@ impl ObjectiveFunction for AdaptiveHuberLoss {
         }
     }
 
-    fn calc_grad_hess(y: &[f64], yhat: &[f64], sample_weight: Option<&[f64]>, quantile: Option<f64>,) -> (Vec<f32>, Option<Vec<f32>>) {
+    fn calc_grad_hess(y: &[f64], yhat: &[f64], sample_weight: Option<&[f64]>,delta: Option<f64>,) -> (Vec<f32>, Option<Vec<f32>>) {
 
-        // default alpha: 0.5
-        // if not passed explicitly
-        let alpha = quantile.unwrap_or(0.5);
-        let n = y.len();
-
-        let mut abs_res = y
-            .iter()
-            .zip(yhat.iter())
-            .map(|(&yi, &yh)| (yi - yh).abs())
-            .collect::<Vec<_>>();
-        abs_res.sort_by(|a, b| a.partial_cmp(b).unwrap());
-        let idx = ((n as f64) * alpha).floor() as usize;
-        let delta = abs_res[idx.min(n - 1)];
+        // default delta value
+        let delta = delta.unwrap_or(1.0);
 
         match sample_weight {
             Some(weights) => {
@@ -118,6 +93,7 @@ impl ObjectiveFunction for AdaptiveHuberLoss {
     }
 
     fn calc_init(y: &[f64], sample_weight: Option<&[f64]>, _quantile: Option<f64>,) -> f64 {
+
         let mut idxs = (0..y.len()).collect::<Vec<_>>();
         idxs.sort_by(|&i, &j| y[i].partial_cmp(&y[j]).unwrap());
 
@@ -126,7 +102,6 @@ impl ObjectiveFunction for AdaptiveHuberLoss {
             .unwrap_or(y.len() as f64);
         let target = total_w * 0.5;
 
-        // find weighted median via scan()
         let median = idxs
             .iter()
             .scan(0.0, |cum, &i| {
