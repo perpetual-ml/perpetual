@@ -1,7 +1,5 @@
 use super::ObjectiveFunction;
-
 use crate::{data::FloatData, metrics::Metric, utils::fast_sum};
-use serde::{Deserialize, Serialize};
 
 #[derive(Default)]
 pub struct LogLoss {}

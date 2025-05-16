@@ -1,14 +1,11 @@
 use super::ObjectiveFunction;
-
-use crate::{data::FloatData, metrics::Metric};
-use serde::{Deserialize, Serialize};
+use crate::metrics::Metric;
 
 /// Huber Loss
 #[derive(Default)]
 pub struct HuberLoss {}
 impl ObjectiveFunction for HuberLoss {
-    fn calc_loss(y: &[f64], yhat: &[f64], sample_weight: Option<&[f64]>, delta: Option<f64>,) -> Vec<f32> {
-
+    fn calc_loss(y: &[f64], yhat: &[f64], sample_weight: Option<&[f64]>, delta: Option<f64>) -> Vec<f32> {
         // Default delta value
         let delta = delta.unwrap_or(1.0);
         match sample_weight {
@@ -44,8 +41,12 @@ impl ObjectiveFunction for HuberLoss {
         }
     }
 
-    fn calc_grad_hess(y: &[f64], yhat: &[f64], sample_weight: Option<&[f64]>,delta: Option<f64>,) -> (Vec<f32>, Option<Vec<f32>>) {
-
+    fn calc_grad_hess(
+        y: &[f64],
+        yhat: &[f64],
+        sample_weight: Option<&[f64]>,
+        delta: Option<f64>,
+    ) -> (Vec<f32>, Option<Vec<f32>>) {
         // default delta value
         let delta = delta.unwrap_or(1.0);
 
@@ -78,11 +79,7 @@ impl ObjectiveFunction for HuberLoss {
                         let r = yi - yh;
                         let ar = r.abs();
                         let sign = (yh - yi).signum();
-                        let g = if ar <= delta {
-                            yh - yi
-                        } else {
-                            delta * sign
-                        };
+                        let g = if ar <= delta { yh - yi } else { delta * sign };
                         let h = if ar <= delta { 1.0 } else { 0.0 };
                         (g as f32, h as f32)
                     })
@@ -92,14 +89,11 @@ impl ObjectiveFunction for HuberLoss {
         }
     }
 
-    fn calc_init(y: &[f64], sample_weight: Option<&[f64]>, _quantile: Option<f64>,) -> f64 {
-
+    fn calc_init(y: &[f64], sample_weight: Option<&[f64]>, _quantile: Option<f64>) -> f64 {
         let mut idxs = (0..y.len()).collect::<Vec<_>>();
         idxs.sort_by(|&i, &j| y[i].partial_cmp(&y[j]).unwrap());
 
-        let total_w = sample_weight
-            .map(|w| w.iter().sum::<f64>())
-            .unwrap_or(y.len() as f64);
+        let total_w = sample_weight.map(|w| w.iter().sum::<f64>()).unwrap_or(y.len() as f64);
         let target = total_w * 0.5;
 
         let median = idxs

@@ -3,7 +3,7 @@ use perpetual::binning::bin_matrix;
 use perpetual::constraints::ConstraintMap;
 use perpetual::data::Matrix;
 use perpetual::histogram::{NodeHistogram, NodeHistogramOwned};
-use perpetual::objective::{LogLoss, ObjectiveFunction};
+use perpetual::objective_functions::{LogLoss, ObjectiveFunction};
 use perpetual::splitter::{MissingImputerSplitter, SplitInfo, SplitInfoSlice};
 use perpetual::tree::tree::Tree;
 use perpetual::utils::{fast_f64_sum, fast_sum, naive_sum};

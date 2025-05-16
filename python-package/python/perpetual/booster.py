@@ -65,7 +65,9 @@ class PerpetualBooster:
             objective (str, optional): Learning objective function to be used for optimization. Valid options are:
                 "LogLoss" to use logistic loss (classification),
                 "SquaredLoss" to use squared error (regression),
-                "QuantileLoss" to use quantile error (regression).
+                "QuantileLoss" to use quantile error (regression),
+                "HuberLoss" to use huber error (regression),
+                "AdaptiveHuberLoss" to use adaptive huber error (regression).
                 Defaults to "LogLoss".
             budget (float, optional): a positive number for fitting budget. Increasing this number will more
                 likely result in more boosting rounds and more increased predictive power.
@@ -488,9 +490,10 @@ class PerpetualBooster:
                 axis=1,
             )
         else:
-            raise NotImplementedError(
+            warnings.warn(
                 f"predict_proba not implemented for regression. n_classes = {len(self.classes_)}"
             )
+            return np.ones((rows, 1))
 
     def predict_log_proba(self, X, parallel: Union[bool, None] = None) -> np.ndarray:
         """Predict class log-probabilities with the fitted booster on new data.
@@ -524,9 +527,8 @@ class PerpetualBooster:
                 parallel=parallel,
             )
         else:
-            raise NotImplementedError(
-                "predict_log_proba not implemented for regression."
-            )
+            warnings.warn("predict_log_proba not implemented for regression.")
+            return np.ones((rows, 1))
 
     def predict_nodes(self, X, parallel: Union[bool, None] = None) -> List:
         """Predict nodes with the fitted booster on new data.

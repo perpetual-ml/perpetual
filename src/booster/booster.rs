@@ -1098,7 +1098,6 @@ mod tests {
         Ok(())
     }
 
-
     #[test]
     fn test_adaptive_huber_loss() -> Result<(), Box<dyn Error>> {
         let all_names = [
@@ -1124,15 +1123,7 @@ mod tests {
             "Longitude".to_string(),
         ];
 
-        let column_names_train = Arc::new(all_names.clone());
         let column_names_test = Arc::new(all_names.clone());
-
-        let df_train = CsvReadOptions::default()
-            .with_has_header(true)
-            .with_columns(Some(column_names_train))
-            .try_into_reader_with_file_path(Some("resources/cal_housing_train.csv".into()))?
-            .finish()
-            .unwrap();
 
         let df_test = CsvReadOptions::default()
             .with_has_header(true)
@@ -1142,19 +1133,10 @@ mod tests {
             .unwrap();
 
         // Get data in column major format...
-        let id_vars_train: Vec<&str> = Vec::new();
-        let mdf_train = df_train.unpivot(feature_names.clone(), &id_vars_train)?;
+
         let id_vars_test: Vec<&str> = Vec::new();
         let mdf_test = df_test.unpivot(feature_names, &id_vars_test)?;
 
-        let data_train = Vec::from_iter(
-            mdf_train
-                .select_at_idx(1)
-                .expect("Invalid column")
-                .f64()?
-                .into_iter()
-                .map(|v| v.unwrap_or(f64::NAN)),
-        );
         let data_test = Vec::from_iter(
             mdf_test
                 .select_at_idx(1)
@@ -1164,14 +1146,6 @@ mod tests {
                 .map(|v| v.unwrap_or(f64::NAN)),
         );
 
-        let y_train = Vec::from_iter(
-            df_train
-                .column("MedHouseVal")?
-                .cast(&DataType::Float64)?
-                .f64()?
-                .into_iter()
-                .map(|v| v.unwrap_or(f64::NAN)),
-        );
         let y_test = Vec::from_iter(
             df_test
                 .column("MedHouseVal")?
@@ -1182,7 +1156,6 @@ mod tests {
         );
 
         // Create Matrix from ndarray.
-        let matrix_train = Matrix::new(&data_train, y_train.len(), 8);
         let matrix_test = Matrix::new(&data_test, y_test.len(), 8);
 
         // Create booster.
@@ -1197,7 +1170,7 @@ mod tests {
         model.fit(&matrix_test, &y_test, None)?;
 
         let trees = model.get_prediction_trees();
-        println!("tees = {}", trees.len());
+        println!("trees = {}", trees.len());
         assert_eq!(trees.len(), 31);
 
         Ok(())
@@ -1228,15 +1201,7 @@ mod tests {
             "Longitude".to_string(),
         ];
 
-        let column_names_train = Arc::new(all_names.clone());
         let column_names_test = Arc::new(all_names.clone());
-
-        let df_train = CsvReadOptions::default()
-            .with_has_header(true)
-            .with_columns(Some(column_names_train))
-            .try_into_reader_with_file_path(Some("resources/cal_housing_train.csv".into()))?
-            .finish()
-            .unwrap();
 
         let df_test = CsvReadOptions::default()
             .with_has_header(true)
@@ -1246,19 +1211,10 @@ mod tests {
             .unwrap();
 
         // Get data in column major format...
-        let id_vars_train: Vec<&str> = Vec::new();
-        let mdf_train = df_train.unpivot(feature_names.clone(), &id_vars_train)?;
+
         let id_vars_test: Vec<&str> = Vec::new();
         let mdf_test = df_test.unpivot(feature_names, &id_vars_test)?;
 
-        let data_train = Vec::from_iter(
-            mdf_train
-                .select_at_idx(1)
-                .expect("Invalid column")
-                .f64()?
-                .into_iter()
-                .map(|v| v.unwrap_or(f64::NAN)),
-        );
         let data_test = Vec::from_iter(
             mdf_test
                 .select_at_idx(1)
@@ -1268,14 +1224,6 @@ mod tests {
                 .map(|v| v.unwrap_or(f64::NAN)),
         );
 
-        let y_train = Vec::from_iter(
-            df_train
-                .column("MedHouseVal")?
-                .cast(&DataType::Float64)?
-                .f64()?
-                .into_iter()
-                .map(|v| v.unwrap_or(f64::NAN)),
-        );
         let y_test = Vec::from_iter(
             df_test
                 .column("MedHouseVal")?
@@ -1286,7 +1234,6 @@ mod tests {
         );
 
         // Create Matrix from ndarray.
-        let matrix_train = Matrix::new(&data_train, y_train.len(), 8);
         let matrix_test = Matrix::new(&data_test, y_test.len(), 8);
 
         // Create booster.
@@ -1301,7 +1248,7 @@ mod tests {
         model.fit(&matrix_test, &y_test, None)?;
 
         let trees = model.get_prediction_trees();
-        println!("tees = {}", trees.len());
+        println!("trees = {}", trees.len());
         assert_eq!(trees.len(), 45);
 
         Ok(())

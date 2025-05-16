@@ -1,5 +1,5 @@
-pub mod regression;
 pub mod classification;
+pub mod regression;
 
 use crate::data::FloatData;
 use crate::errors::PerpetualError;
@@ -69,8 +69,14 @@ impl FromStr for Metric {
 
 pub fn metric_callables(metric_type: &Metric) -> (MetricFn, bool) {
     match metric_type {
-        Metric::AUC => (classification::AUCMetric::calculate_metric, classification::AUCMetric::maximize()),
-        Metric::LogLoss => (classification::LogLossMetric::calculate_metric, classification::LogLossMetric::maximize()),
+        Metric::AUC => (
+            classification::AUCMetric::calculate_metric,
+            classification::AUCMetric::maximize(),
+        ),
+        Metric::LogLoss => (
+            classification::LogLossMetric::calculate_metric,
+            classification::LogLossMetric::maximize(),
+        ),
         Metric::RootMeanSquaredLogError => (
             regression::RootMeanSquaredLogErrorMetric::calculate_metric,
             regression::RootMeanSquaredLogErrorMetric::maximize(),
@@ -79,7 +85,10 @@ pub fn metric_callables(metric_type: &Metric) -> (MetricFn, bool) {
             regression::RootMeanSquaredErrorMetric::calculate_metric,
             regression::RootMeanSquaredErrorMetric::maximize(),
         ),
-        Metric::QuantileLoss => (regression::QuantileLossMetric::calculate_metric, regression::QuantileLossMetric::maximize()),
+        Metric::QuantileLoss => (
+            regression::QuantileLossMetric::calculate_metric,
+            regression::QuantileLossMetric::maximize(),
+        ),
     }
 }
 
@@ -90,7 +99,6 @@ pub trait EvaluationMetric {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use crate::metrics::classification::*;
     use crate::metrics::regression::*;
     use crate::utils::precision_round;

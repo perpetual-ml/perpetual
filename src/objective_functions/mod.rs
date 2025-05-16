@@ -1,17 +1,16 @@
-mod log_loss;
-mod squared_loss;
-mod quantile_loss;
 mod adaptive_huber_loss;
 mod huber_loss;
+mod log_loss;
+mod quantile_loss;
+mod squared_loss;
 
-pub use log_loss::LogLoss;
-pub use squared_loss::SquaredLoss;
-pub use quantile_loss::QuantileLoss;
 pub use adaptive_huber_loss::AdaptiveHuberLoss;
 pub use huber_loss::HuberLoss;
+pub use log_loss::LogLoss;
+pub use quantile_loss::QuantileLoss;
+pub use squared_loss::SquaredLoss;
 
-
-use crate::{data::FloatData, metrics::Metric, utils::fast_sum};
+use crate::metrics::Metric;
 use serde::{Deserialize, Serialize};
 
 type ObjFn = fn(&[f64], &[f64], Option<&[f64]>, Option<f64>) -> (Vec<f32>, Option<Vec<f32>>);
@@ -23,7 +22,7 @@ pub enum Objective {
     SquaredLoss,
     QuantileLoss,
     AdaptiveHuberLoss,
-    HuberLoss
+    HuberLoss,
 }
 
 pub fn loss_callables(objective: &Objective) -> LossFn {
@@ -32,7 +31,7 @@ pub fn loss_callables(objective: &Objective) -> LossFn {
         Objective::SquaredLoss => SquaredLoss::calc_loss,
         Objective::QuantileLoss => QuantileLoss::calc_loss,
         Objective::AdaptiveHuberLoss => AdaptiveHuberLoss::calc_loss,
-        Objective::HuberLoss => HuberLoss::calc_loss
+        Objective::HuberLoss => HuberLoss::calc_loss,
     }
 }
 
@@ -42,7 +41,7 @@ pub fn gradient_hessian_callables(objective: &Objective) -> ObjFn {
         Objective::SquaredLoss => SquaredLoss::calc_grad_hess,
         Objective::QuantileLoss => QuantileLoss::calc_grad_hess,
         Objective::AdaptiveHuberLoss => AdaptiveHuberLoss::calc_grad_hess,
-        Objective::HuberLoss => HuberLoss::calc_grad_hess
+        Objective::HuberLoss => HuberLoss::calc_grad_hess,
     }
 }
 
@@ -52,7 +51,7 @@ pub fn calc_init_callables(objective: &Objective) -> fn(&[f64], Option<&[f64]>, 
         Objective::SquaredLoss => SquaredLoss::calc_init,
         Objective::QuantileLoss => QuantileLoss::calc_init,
         Objective::AdaptiveHuberLoss => AdaptiveHuberLoss::calc_init,
-        Objective::HuberLoss => HuberLoss::calc_init
+        Objective::HuberLoss => HuberLoss::calc_init,
     }
 }
 
@@ -67,9 +66,6 @@ pub trait ObjectiveFunction {
     fn calc_init(y: &[f64], sample_weight: Option<&[f64]>, quantile: Option<f64>) -> f64;
     fn default_metric() -> Metric;
 }
-
-
-
 
 #[cfg(test)]
 mod tests {
