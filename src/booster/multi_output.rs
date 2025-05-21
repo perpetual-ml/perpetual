@@ -9,110 +9,54 @@ use crate::booster::config::*;
 use crate::booster::config::MissingNodeTreatment;
 
 /// Perpetual Booster object
-#[derive(Deserialize, Serialize, Clone)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct MultiOutputBooster {
-    /// The number of boosters to fit.
     pub n_boosters: usize,
-    /// The name of objective function used to optimize.
-    /// Valid options include "LogLoss" to use logistic loss as the objective function,
-    /// or "SquaredLoss" to use Squared Error as the objective function.
-    pub objective: Objective,
-    /// Budget to fit the model.
-    #[serde(default = "default_budget")]
-    pub budget: f32,
-    /// Number of bins to calculate to partition the data. Setting this to
-    /// a smaller number, will result in faster training time, while potentially sacrificing
-    /// accuracy. If there are more bins, than unique values in a column, all unique values
-    /// will be used.
-    pub max_bin: u16,
-    /// Number of threads to be used during training.
-    pub num_threads: Option<usize>,
-    /// Constraints that are used to enforce a specific relationship
-    /// between the training features and the target variable.
-    pub monotone_constraints: Option<ConstraintMap>,
-    /// Should the children nodes contain the parent node in their bounds, setting this to true, will result in no children being created that result in the higher and lower child values both being greater than, or less than the parent weight.
-    #[serde(default = "default_force_children_to_bound_parent")]
-    pub force_children_to_bound_parent: bool,
-    /// Value to consider missing.
-    #[serde(deserialize_with = "parse_missing")]
-    pub missing: f64,
-    /// Should the algorithm allow splits that completed seperate out missing
-    /// and non-missing values, in the case where `create_missing_branch` is false. When `create_missing_branch`
-    /// is true, setting this to true will result in the missin branch being further split.
-    pub allow_missing_splits: bool,
-    /// Should missing be split out it's own separate branch?
-    pub create_missing_branch: bool,
-    /// A set of features for which the missing node will always be terminated, even
-    /// if `allow_missing_splits` is set to true. This value is only valid if
-    /// `create_missing_branch` is also True.
-    #[serde(default = "default_terminate_missing_features")]
-    pub terminate_missing_features: HashSet<usize>,
-    /// How the missing nodes weights should be treated at training time.
-    #[serde(default = "default_missing_node_treatment")]
-    pub missing_node_treatment: MissingNodeTreatment,
-    /// Should the model be trained showing output.
-    #[serde(default = "default_log_iterations")]
-    pub log_iterations: usize,
-    // Members internal to the multi output booster object, and not parameters set by the user.
-    // Boosters is public, just to interact with it directly in the python wrapper.
+    pub cfg: BoosterConfig,
     pub boosters: Vec<PerpetualBooster>,
-    // Metadata for the multi output booster
     metadata: HashMap<String, String>,
-    /// Integer value used to seed any randomness used in the algorithm.
-    pub seed: u64,
-    /// Used only in quantile regression.
-    #[serde(default = "default_quantile")]
-    pub quantile: Option<f64>,
-    /// Reset the model or continue training.
-    #[serde(default = "default_reset")]
-    pub reset: Option<bool>,
-    /// Features to be treated as categorical.
-    #[serde(default = "default_categorical_features")]
-    pub categorical_features: Option<HashSet<usize>>,
-    /// Fit timeout limit in seconds.
-    #[serde(default = "default_timeout")]
-    pub timeout: Option<f32>,
-    /// Optional limit for the number of boosting rounds.
-    /// The algorithm will stop automatically before this limit if budget is low enough.
-    #[serde(default = "default_iteration_limit")]
-    pub iteration_limit: Option<usize>,
-    /// Optional limit for memory allocation.
-    /// This will limit the number of allocated nodes for a tree.
-    /// The number of nodes in a final tree will be limited by this,
-    /// if it is not limited by step size control and generalization control.
-    #[serde(default = "default_memory_limit")]
-    pub memory_limit: Option<f32>,
-    /// Optional limit for auto stopping rounds.
-    #[serde(default = "default_stopping_rounds")]
-    pub stopping_rounds: Option<usize>,
 }
 
 impl Default for MultiOutputBooster {
     fn default() -> Self {
-        Self::new(
-            1,
-            Objective::LogLoss,
-            0.5,
-            256,
-            None,
-            None,
-            false,
-            f64::NAN,
-            true,
-            false,
-            HashSet::new(),
-            MissingNodeTreatment::AssignToParent,
-            0,
-            0,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-        )
-        .unwrap()
+        let cfg = BoosterConfig {
+            objective: Objective::LogLoss,
+            budget: 0.5,
+            max_bin: 256,
+            num_threads: None,
+            monotone_constraints: None,
+            force_children_to_bound_parent: false,
+            missing: f64::NAN,
+            allow_missing_splits: true,
+            create_missing_branch: false,
+            terminate_missing_features: HashSet::new(),
+            missing_node_treatment: MissingNodeTreatment::AssignToParent,
+            log_iterations: 0,
+            seed: 0,
+            quantile: None,
+            reset: None,
+            categorical_features: None,
+            timeout: None,
+            iteration_limit: None,
+            memory_limit: None,
+            stopping_rounds: None,
+        };
+
+        // Spawn `n_boosters` independent single‑output boosters that share
+        // the same config (cloned for each).
+        let n_boosters = 1;
+        let boosters = vec![{
+            let mut p = PerpetualBooster::default();
+            p.cfg = cfg.clone();
+            p
+        }];
+
+        Self {
+            n_boosters,
+            cfg,
+            boosters,
+            metadata: HashMap::new(),
+        }
     }
 }
 
@@ -171,71 +115,48 @@ impl MultiOutputBooster {
         memory_limit: Option<f32>,
         stopping_rounds: Option<usize>,
     ) -> Result<Self, PerpetualError> {
-        let booster_objective = objective.clone();
-        let booster_monotone_constraints = monotone_constraints.clone();
-        let booster_terminate_missing_features = terminate_missing_features.clone();
-        let booster_categorical_features = categorical_features.clone();
-
-        let booster_timeout = match timeout {
-            Some(t) => Some(t / n_boosters as f32),
-            None => None,
-        };
-
-        let mut multi_output_booster = MultiOutputBooster {
-            n_boosters,
-            objective,
+        // Build the common configuration object.
+        let cfg = BoosterConfig {
+            objective: objective.clone(),
             budget,
             max_bin,
             num_threads,
-            monotone_constraints,
+            monotone_constraints: monotone_constraints.clone(),
             force_children_to_bound_parent,
             missing,
             allow_missing_splits,
             create_missing_branch,
-            terminate_missing_features,
+            terminate_missing_features: terminate_missing_features.clone(),
             missing_node_treatment,
             log_iterations,
-            boosters: Vec::new(),
-            metadata: HashMap::new(),
             seed,
             quantile,
             reset,
-            categorical_features,
+            categorical_features: categorical_features.clone(),
             timeout,
             iteration_limit,
             memory_limit,
             stopping_rounds,
         };
 
-        let booster = PerpetualBooster::default()
-            .set_objective(booster_objective)
-            .set_budget(budget)
-            .set_max_bin(max_bin)
-            .set_num_threads(num_threads)
-            .set_monotone_constraints(booster_monotone_constraints)
-            .set_force_children_to_bound_parent(force_children_to_bound_parent)
-            .set_missing(missing)
-            .set_allow_missing_splits(allow_missing_splits)
-            .set_create_missing_branch(create_missing_branch)
-            .set_terminate_missing_features(booster_terminate_missing_features)
-            .set_missing_node_treatment(missing_node_treatment)
-            .set_log_iterations(log_iterations)
-            .set_seed(seed)
-            .set_quantile(quantile)
-            .set_reset(reset)
-            .set_categorical_features(booster_categorical_features)
-            .set_timeout(booster_timeout)
-            .set_iteration_limit(iteration_limit)
-            .set_memory_limit(memory_limit)
-            .set_stopping_rounds(stopping_rounds);
+        // Base booster template that child boosters will clone.
+        let template_booster = {
+            let mut b = PerpetualBooster::default();
+            b.cfg = cfg.clone();
+            b
+        };
+        template_booster.validate_parameters()?;
 
-        booster.validate_parameters()?;
+        // Assemble the wrapper with `n_boosters` copies.
+        let boosters = vec![template_booster; n_boosters.max(1)];
 
-        for _ in 0..n_boosters {
-            multi_output_booster.boosters.push(booster.clone());
-        }
-
-        Ok(multi_output_booster)
+        Ok(MultiOutputBooster {
+            n_boosters: n_boosters.max(1),
+            cfg,
+            boosters,
+            metadata: HashMap::new(),
+        })
+        
     }
 
     pub fn reset(&mut self) {
@@ -365,7 +286,7 @@ impl MultiOutputBooster {
     /// Set the objective on the booster.
     /// * `objective` - The objective type of the booster.
     pub fn set_objective(mut self, objective: Objective) -> Self {
-        self.objective = objective.clone();
+        self.cfg.objective = objective.clone();
         self.boosters = self
             .boosters
             .iter()
@@ -377,7 +298,7 @@ impl MultiOutputBooster {
     /// Set the budget on the booster.
     /// * `budget` - Budget to fit the booster.
     pub fn set_budget(mut self, budget: f32) -> Self {
-        self.budget = budget;
+        self.cfg.budget = budget;
         self.boosters = self.boosters.iter().map(|b| b.clone().set_budget(budget)).collect();
         self
     }
@@ -388,7 +309,7 @@ impl MultiOutputBooster {
     ///   accuracy. If there are more bins, than unique values in a column, all unique values
     ///   will be used.
     pub fn set_max_bin(mut self, max_bin: u16) -> Self {
-        self.max_bin = max_bin;
+        self.cfg.max_bin = max_bin;
         self.boosters = self.boosters.iter().map(|b| b.clone().set_max_bin(max_bin)).collect();
         self
     }
@@ -396,7 +317,7 @@ impl MultiOutputBooster {
     /// Set the number of threads on the booster.
     /// * `num_threads` - Set the number of threads to be used during training.
     pub fn set_num_threads(mut self, num_threads: Option<usize>) -> Self {
-        self.num_threads = num_threads;
+        self.cfg.num_threads = num_threads;
         self.boosters = self
             .boosters
             .iter()
@@ -408,7 +329,7 @@ impl MultiOutputBooster {
     /// Set the monotone_constraints on the booster.
     /// * `monotone_constraints` - The monotone constraints of the booster.
     pub fn set_monotone_constraints(mut self, monotone_constraints: Option<ConstraintMap>) -> Self {
-        self.monotone_constraints = monotone_constraints.clone();
+        self.cfg.monotone_constraints = monotone_constraints.clone();
         self.boosters = self
             .boosters
             .iter()
@@ -420,7 +341,7 @@ impl MultiOutputBooster {
     /// Set the force_children_to_bound_parent on the booster.
     /// * `force_children_to_bound_parent` - Set force children to bound parent.
     pub fn set_force_children_to_bound_parent(mut self, force_children_to_bound_parent: bool) -> Self {
-        self.force_children_to_bound_parent = force_children_to_bound_parent;
+        self.cfg.force_children_to_bound_parent = force_children_to_bound_parent;
         self.boosters = self
             .boosters
             .iter()
@@ -435,7 +356,7 @@ impl MultiOutputBooster {
     /// Set missing value of the booster
     /// * `missing` - Float value to consider as missing.
     pub fn set_missing(mut self, missing: f64) -> Self {
-        self.missing = missing;
+        self.cfg.missing = missing;
         self.boosters = self.boosters.iter().map(|b| b.clone().set_missing(missing)).collect();
         self
     }
@@ -443,7 +364,7 @@ impl MultiOutputBooster {
     /// Set the allow_missing_splits on the booster.
     /// * `allow_missing_splits` - Set if missing splits are allowed for the booster.
     pub fn set_allow_missing_splits(mut self, allow_missing_splits: bool) -> Self {
-        self.create_missing_branch = allow_missing_splits;
+        self.cfg.create_missing_branch = allow_missing_splits;
         self.boosters = self
             .boosters
             .iter()
@@ -456,7 +377,7 @@ impl MultiOutputBooster {
     /// * `create_missing_branch` - Bool specifying if missing should get it's own
     /// branch.
     pub fn set_create_missing_branch(mut self, create_missing_branch: bool) -> Self {
-        self.create_missing_branch = create_missing_branch;
+        self.cfg.create_missing_branch = create_missing_branch;
         self.boosters = self
             .boosters
             .iter()
@@ -471,7 +392,7 @@ impl MultiOutputBooster {
     /// features that should always terminate the missing node, if create_missing_branch
     /// is true.
     pub fn set_terminate_missing_features(mut self, terminate_missing_features: HashSet<usize>) -> Self {
-        self.terminate_missing_features = terminate_missing_features.clone();
+        self.cfg.terminate_missing_features = terminate_missing_features.clone();
         self.boosters = self
             .boosters
             .iter()
@@ -486,7 +407,7 @@ impl MultiOutputBooster {
     /// Set the missing_node_treatment on the booster.
     /// * `missing_node_treatment` - The missing node treatment of the booster.
     pub fn set_missing_node_treatment(mut self, missing_node_treatment: MissingNodeTreatment) -> Self {
-        self.missing_node_treatment = missing_node_treatment;
+        self.cfg.missing_node_treatment = missing_node_treatment;
         self.boosters = self
             .boosters
             .iter()
@@ -498,7 +419,7 @@ impl MultiOutputBooster {
     /// Set the log iterations on the booster.
     /// * `log_iterations` - The number of log iterations of the booster.
     pub fn set_log_iterations(mut self, log_iterations: usize) -> Self {
-        self.log_iterations = log_iterations;
+        self.cfg.log_iterations = log_iterations;
         self.boosters = self
             .boosters
             .iter()
@@ -510,7 +431,7 @@ impl MultiOutputBooster {
     /// Set the seed on the booster.
     /// * `seed` - Integer value used to see any randomness used in the algorithm.
     pub fn set_seed(mut self, seed: u64) -> Self {
-        self.seed = seed;
+        self.cfg.seed = seed;
         self.boosters = self.boosters.iter().map(|b| b.clone().set_seed(seed)).collect();
         self
     }
@@ -518,7 +439,7 @@ impl MultiOutputBooster {
     /// Set the quantile on the booster.
     /// * `quantile` - used only in quantile regression.
     pub fn set_quantile(mut self, quantile: Option<f64>) -> Self {
-        self.quantile = quantile;
+        self.cfg.quantile = quantile;
         self.boosters = self.boosters.iter().map(|b| b.clone().set_quantile(quantile)).collect();
         self
     }
@@ -526,7 +447,7 @@ impl MultiOutputBooster {
     /// Set the reset on the booster.
     /// * `reset` - Reset the model or continue training.
     pub fn set_reset(mut self, reset: Option<bool>) -> Self {
-        self.reset = reset;
+        self.cfg.reset = reset;
         self.boosters = self.boosters.iter().map(|b| b.clone().set_reset(reset)).collect();
         self
     }
@@ -534,7 +455,7 @@ impl MultiOutputBooster {
     /// Set the categorical features on the booster.
     /// * `categorical_features` - categorical features.
     pub fn set_categorical_features(mut self, categorical_features: Option<HashSet<usize>>) -> Self {
-        self.categorical_features = categorical_features.clone();
+        self.cfg.categorical_features = categorical_features.clone();
         self.boosters = self
             .boosters
             .iter()
@@ -546,7 +467,7 @@ impl MultiOutputBooster {
     /// Set the timeout on the booster.
     /// * `timeout` - fit timeout limit in seconds.
     pub fn set_timeout(mut self, timeout: Option<f32>) -> Self {
-        self.timeout = timeout;
+        self.cfg.timeout = timeout;
         self.boosters = self.boosters.iter().map(|b| b.clone().set_timeout(timeout)).collect();
         self
     }
@@ -554,7 +475,7 @@ impl MultiOutputBooster {
     /// Set the iteration limit on the booster.
     /// * `iteration_limit` - optional limit for the number of boosting rounds.
     pub fn set_iteration_limit(mut self, iteration_limit: Option<usize>) -> Self {
-        self.iteration_limit = iteration_limit;
+        self.cfg.iteration_limit = iteration_limit;
         self.boosters = self
             .boosters
             .iter()
@@ -566,7 +487,7 @@ impl MultiOutputBooster {
     /// Set the memory limit on the booster.
     /// * `memory_limit` - optional limit for memory allocation.
     pub fn set_memory_limit(mut self, memory_limit: Option<f32>) -> Self {
-        self.memory_limit = memory_limit;
+        self.cfg.memory_limit = memory_limit;
         self.boosters = self
             .boosters
             .iter()
@@ -578,7 +499,7 @@ impl MultiOutputBooster {
     /// Set the stopping rounds on the booster.
     /// * `stopping_rounds` - optional limit for auto stopping rounds.
     pub fn set_stopping_rounds(mut self, stopping_rounds: Option<usize>) -> Self {
-        self.stopping_rounds = stopping_rounds;
+        self.cfg.stopping_rounds = stopping_rounds;
         self.boosters = self
             .boosters
             .iter()
