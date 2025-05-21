@@ -1,3 +1,5 @@
+use std::collections::{HashMap, HashSet};
+
 use crate::bin::Bin;
 use crate::binning::bin_matrix;
 use crate::constants::{
@@ -17,58 +19,13 @@ use rand::rngs::StdRng;
 use rand::seq::IteratorRandom;
 use rand::SeedableRng;
 use rayon::prelude::*;
-use serde::{Deserialize, Deserializer, Serialize};
-use std::collections::{HashMap, HashSet};
+use serde::{Deserialize, Serialize};
 use std::time::Instant;
 use std::{fs, mem};
 use sysinfo::System;
 
 type ImportanceFn = fn(&Tree, &mut HashMap<usize, (f32, usize)>);
-
-#[derive(Serialize, Deserialize)]
-pub enum ContributionsMethod {
-    /// This method will use the internal leaf weights, to calculate the contributions. This is the same as what is described by Saabas [here](https://blog.datadive.net/interpreting-random-forests/).
-    Weight,
-    /// If this option is specified, the average internal node values are calculated, this is equivalent to the `approx_contribs` parameter in XGBoost.
-    Average,
-    /// This method will calculate contributions by subtracting the weight of the node the record will travel down by the weight of the other non-missing branch. This method does not have the property where the contributions summed is equal to the final prediction of the model.
-    BranchDifference,
-    /// This method will calculate contributions by subtracting the weight of the node the record will travel down by the mid-point between the right and left node weighted by the cover of each node. This method does not have the property where the contributions summed is equal to the final prediction of the model.
-    MidpointDifference,
-    /// This method will calculate contributions by subtracting the weight of the node the record will travel down by the weight of the node with the largest cover (the mode node). This method does not have the property where the contributions summed is equal to the final prediction of the model.
-    ModeDifference,
-    /// This method is only valid when the objective type is set to "LogLoss". This method will calculate contributions as the change in a records probability of being 1 moving from a parent node to a child node. The sum of the returned contributions matrix, will be equal to the probability a record will be 1. For example, given a model, `model.predict_contributions(X, method="ProbabilityChange") == 1 / (1 + np.exp(-model.predict(X)))`
-    ProbabilityChange,
-    /// This method computes the Shapley values for each record, and feature.
-    Shapley,
-}
-
-/// Method to calculate variable importance.
-#[derive(Serialize, Deserialize)]
-pub enum ImportanceMethod {
-    /// The number of times a feature is used to split the data across all trees.
-    Weight,
-    /// The average split gain across all splits the feature is used in.
-    Gain,
-    /// The average coverage across all splits the feature is used in.
-    Cover,
-    /// The total gain across all splits the feature is used in.
-    TotalGain,
-    /// The total coverage across all splits the feature is used in.
-    TotalCover,
-}
-
-#[derive(Serialize, Deserialize, Clone, Copy)]
-pub enum MissingNodeTreatment {
-    /// Calculate missing node weight values without any constraints.
-    None,
-    /// Assign the weight of the missing node to that of the parent.
-    AssignToParent,
-    /// After training each tree, starting from the bottom of the tree, assign the missing node weight to the weighted average of the left and right child nodes. Next assign the parent to the weighted average of the children nodes. This is performed recursively up through the entire tree. This is performed as a post processing step on each tree after it is built, and prior to updating the predictions for which to train the next tree.
-    AverageLeafWeight,
-    /// Set the missing node to be equal to the weighted average weight of the left and the right nodes.
-    AverageNodeWeight,
-}
+use crate::booster::config::*;
 
 /// Perpetual Booster object
 #[derive(Deserialize, Serialize, Clone)]
@@ -157,51 +114,7 @@ pub struct PerpetualBooster {
     pub(crate) cal_models: HashMap<String, [(PerpetualBooster, f64); 2]>,
 }
 
-fn default_cal_models() -> HashMap<String, [(PerpetualBooster, f64); 2]> {
-    HashMap::new()
-}
-fn default_budget() -> f32 {
-    0.5
-}
-fn default_quantile() -> Option<f64> {
-    None
-}
-fn default_reset() -> Option<bool> {
-    None
-}
-fn default_categorical_features() -> Option<HashSet<usize>> {
-    None
-}
-fn default_timeout() -> Option<f32> {
-    None
-}
-fn default_iteration_limit() -> Option<usize> {
-    None
-}
-fn default_memory_limit() -> Option<f32> {
-    None
-}
-fn default_stopping_rounds() -> Option<usize> {
-    None
-}
-fn default_terminate_missing_features() -> HashSet<usize> {
-    HashSet::new()
-}
-fn default_missing_node_treatment() -> MissingNodeTreatment {
-    MissingNodeTreatment::AssignToParent
-}
-fn default_log_iterations() -> usize {
-    0
-}
-fn default_force_children_to_bound_parent() -> bool {
-    false
-}
-fn parse_missing<'de, D>(d: D) -> Result<f64, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    Deserialize::deserialize(d).map(|x: Option<_>| x.unwrap_or(f64::NAN))
-}
+
 
 impl Default for PerpetualBooster {
     fn default() -> Self {

@@ -2,11 +2,11 @@ use crate::constraints::ConstraintMap;
 use crate::errors::PerpetualError;
 use crate::objective_functions::Objective;
 use crate::{Matrix, PerpetualBooster};
-use serde::{Deserialize, Deserializer, Serialize};
+use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::fs;
-
-use super::booster::MissingNodeTreatment;
+use crate::booster::config::*;
+use crate::booster::config::MissingNodeTreatment;
 
 /// Perpetual Booster object
 #[derive(Deserialize, Serialize, Clone)]
@@ -85,49 +85,6 @@ pub struct MultiOutputBooster {
     /// Optional limit for auto stopping rounds.
     #[serde(default = "default_stopping_rounds")]
     pub stopping_rounds: Option<usize>,
-}
-
-fn default_budget() -> f32 {
-    0.5
-}
-fn default_quantile() -> Option<f64> {
-    None
-}
-fn default_reset() -> Option<bool> {
-    None
-}
-fn default_categorical_features() -> Option<HashSet<usize>> {
-    None
-}
-fn default_timeout() -> Option<f32> {
-    None
-}
-fn default_iteration_limit() -> Option<usize> {
-    None
-}
-fn default_memory_limit() -> Option<f32> {
-    None
-}
-fn default_stopping_rounds() -> Option<usize> {
-    None
-}
-fn default_terminate_missing_features() -> HashSet<usize> {
-    HashSet::new()
-}
-fn default_missing_node_treatment() -> MissingNodeTreatment {
-    MissingNodeTreatment::AssignToParent
-}
-fn default_log_iterations() -> usize {
-    0
-}
-fn default_force_children_to_bound_parent() -> bool {
-    false
-}
-fn parse_missing<'de, D>(d: D) -> Result<f64, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    Deserialize::deserialize(d).map(|x: Option<_>| x.unwrap_or(f64::NAN))
 }
 
 impl Default for MultiOutputBooster {

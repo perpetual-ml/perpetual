@@ -1,0 +1,97 @@
+use serde::{Deserialize, Deserializer, Serialize};
+use std::collections::{HashMap, HashSet};
+use crate::PerpetualBooster;
+
+// Common configuration
+// across implementations
+#[derive(Serialize, Deserialize)]
+pub enum ContributionsMethod {
+    /// This method will use the internal leaf weights, to calculate the contributions. This is the same as what is described by Saabas [here](https://blog.datadive.net/interpreting-random-forests/).
+    Weight,
+    /// If this option is specified, the average internal node values are calculated, this is equivalent to the `approx_contribs` parameter in XGBoost.
+    Average,
+    /// This method will calculate contributions by subtracting the weight of the node the record will travel down by the weight of the other non-missing branch. This method does not have the property where the contributions summed is equal to the final prediction of the model.
+    BranchDifference,
+    /// This method will calculate contributions by subtracting the weight of the node the record will travel down by the mid-point between the right and left node weighted by the cover of each node. This method does not have the property where the contributions summed is equal to the final prediction of the model.
+    MidpointDifference,
+    /// This method will calculate contributions by subtracting the weight of the node the record will travel down by the weight of the node with the largest cover (the mode node). This method does not have the property where the contributions summed is equal to the final prediction of the model.
+    ModeDifference,
+    /// This method is only valid when the objective type is set to "LogLoss". This method will calculate contributions as the change in a records probability of being 1 moving from a parent node to a child node. The sum of the returned contributions matrix, will be equal to the probability a record will be 1. For example, given a model, `model.predict_contributions(X, method="ProbabilityChange") == 1 / (1 + np.exp(-model.predict(X)))`
+    ProbabilityChange,
+    /// This method computes the Shapley values for each record, and feature.
+    Shapley,
+}
+
+/// Method to calculate variable importance.
+#[derive(Serialize, Deserialize)]
+pub enum ImportanceMethod {
+    /// The number of times a feature is used to split the data across all trees.
+    Weight,
+    /// The average split gain across all splits the feature is used in.
+    Gain,
+    /// The average coverage across all splits the feature is used in.
+    Cover,
+    /// The total gain across all splits the feature is used in.
+    TotalGain,
+    /// The total coverage across all splits the feature is used in.
+    TotalCover,
+}
+
+#[derive(Serialize, Deserialize, Clone, Copy)]
+pub enum MissingNodeTreatment {
+    /// Calculate missing node weight values without any constraints.
+    None,
+    /// Assign the weight of the missing node to that of the parent.
+    AssignToParent,
+    /// After training each tree, starting from the bottom of the tree, assign the missing node weight to the weighted average of the left and right child nodes. Next assign the parent to the weighted average of the children nodes. This is performed recursively up through the entire tree. This is performed as a post processing step on each tree after it is built, and prior to updating the predictions for which to train the next tree.
+    AverageLeafWeight,
+    /// Set the missing node to be equal to the weighted average weight of the left and the right nodes.
+    AverageNodeWeight,
+}
+
+// Common functions
+pub fn default_cal_models() -> HashMap<String, [(PerpetualBooster, f64); 2]> {
+    HashMap::new()
+}
+pub fn default_budget() -> f32 {
+    0.5
+}
+pub fn default_quantile() -> Option<f64> {
+    None
+}
+pub fn default_reset() -> Option<bool> {
+    None
+}
+pub fn default_categorical_features() -> Option<HashSet<usize>> {
+    None
+}
+pub fn default_timeout() -> Option<f32> {
+    None
+}
+pub fn default_iteration_limit() -> Option<usize> {
+    None
+}
+pub fn default_memory_limit() -> Option<f32> {
+    None
+}
+pub fn default_stopping_rounds() -> Option<usize> {
+    None
+}
+pub fn default_terminate_missing_features() -> HashSet<usize> {
+    HashSet::new()
+}
+pub fn default_missing_node_treatment() -> MissingNodeTreatment {
+    MissingNodeTreatment::AssignToParent
+}
+pub fn default_log_iterations() -> usize {
+    0
+}
+pub fn default_force_children_to_bound_parent() -> bool {
+    false
+}
+pub fn parse_missing<'de, D>(d: D) -> Result<f64, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    Deserialize::deserialize(d).map(|x: Option<_>| x.unwrap_or(f64::NAN))
+}
