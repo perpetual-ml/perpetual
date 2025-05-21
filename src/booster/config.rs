@@ -100,7 +100,7 @@ where
 
 // Common Booster configuration
 // across
-#[derive(Clone, Serialize, Deserialize, Default)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct BoosterConfig {
     /// The name of objective function used to optimize. Valid options are:
     /// "LogLoss" to use logistic loss as the objective function,

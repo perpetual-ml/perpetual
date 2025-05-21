@@ -19,25 +19,25 @@ impl PerpetualBooster {
         y: &[f64],
         sample_weight: Option<&[f64]>,
     ) -> Result<(), PerpetualError> {
-        let calc_loss = loss_callables(&self.objective);
+        let calc_loss = loss_callables(&self.cfg.objective);
 
         let old_length = self.trees.len();
         let old_n_nodes: usize = self.trees.iter().map(|t| t.nodes.len()).sum();
 
-        let base_score = calc_init_callables(&self.objective)(y, sample_weight, self.quantile);
+        let base_score = calc_init_callables(&self.cfg.objective)(y, sample_weight, self.cfg.quantile);
         let yhat = vec![base_score; y.len()];
-        let init_losses = calc_loss(y, &yhat, sample_weight, self.quantile);
+        let init_losses = calc_loss(y, &yhat, sample_weight, self.cfg.quantile);
         let init_loss = init_losses.iter().sum::<f32>() / init_losses.len() as f32;
 
         self.trees.iter_mut().for_each(|t| {
             t.prune_bottom_up(
                 data,
-                &self.missing,
+                &self.cfg.missing,
                 calc_loss,
                 init_loss,
                 y,
                 sample_weight,
-                self.quantile,
+                self.cfg.quantile,
                 self.base_score,
             )
         });

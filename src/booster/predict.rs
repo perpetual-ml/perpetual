@@ -14,7 +14,7 @@ impl PerpetualBooster {
     pub fn predict(&self, data: &Matrix<f64>, parallel: bool) -> Vec<f64> {
         let mut init_preds = vec![self.base_score; data.rows];
         self.get_prediction_trees().iter().for_each(|tree| {
-            for (p_, val) in init_preds.iter_mut().zip(tree.predict(data, parallel, &self.missing)) {
+            for (p_, val) in init_preds.iter_mut().zip(tree.predict(data, parallel, &self.cfg.missing)) {
                 *p_ += val;
             }
         });
@@ -39,7 +39,7 @@ impl PerpetualBooster {
         match method {
             ContributionsMethod::Average => self.predict_contributions_average(data, parallel),
             ContributionsMethod::ProbabilityChange => {
-                match self.objective {
+                match self.cfg.objective {
                     Objective::LogLoss => {}
                     _ => panic!("ProbabilityChange contributions method is only valid when LogLoss objective is used."),
                 }
@@ -87,7 +87,7 @@ impl PerpetualBooster {
                 .for_each(|(row, c)| {
                     let r_ = data.get_row(*row);
                     self.get_prediction_trees().iter().for_each(|t| {
-                        row_pred_fn(t, &r_, c, &self.missing);
+                        row_pred_fn(t, &r_, c, &self.cfg.missing);
                     });
                 });
         } else {
@@ -97,7 +97,7 @@ impl PerpetualBooster {
                 .for_each(|(row, c)| {
                     let r_ = data.get_row(*row);
                     self.get_prediction_trees().iter().for_each(|t| {
-                        row_pred_fn(t, &r_, c, &self.missing);
+                        row_pred_fn(t, &r_, c, &self.cfg.missing);
                     });
                 });
         }
@@ -144,7 +144,7 @@ impl PerpetualBooster {
                         .iter()
                         .zip(weights.iter())
                         .for_each(|(t, w)| {
-                            t.predict_contributions_row_average(&r_, c, w, &self.missing);
+                            t.predict_contributions_row_average(&r_, c, w, &self.cfg.missing);
                         });
                 });
         } else {
@@ -157,7 +157,7 @@ impl PerpetualBooster {
                         .iter()
                         .zip(weights.iter())
                         .for_each(|(t, w)| {
-                            t.predict_contributions_row_average(&r_, c, w, &self.missing);
+                            t.predict_contributions_row_average(&r_, c, w, &self.cfg.missing);
                         });
                 });
         }
@@ -181,7 +181,7 @@ impl PerpetualBooster {
                 .for_each(|(row, c)| {
                     let r_ = data.get_row(*row);
                     self.get_prediction_trees().iter().fold(self.base_score, |acc, t| {
-                        t.predict_contributions_row_probability_change(&r_, c, &self.missing, acc)
+                        t.predict_contributions_row_probability_change(&r_, c, &self.cfg.missing, acc)
                     });
                 });
         } else {
@@ -191,7 +191,7 @@ impl PerpetualBooster {
                 .for_each(|(row, c)| {
                     let r_ = data.get_row(*row);
                     self.get_prediction_trees().iter().fold(self.base_score, |acc, t| {
-                        t.predict_contributions_row_probability_change(&r_, c, &self.missing, acc)
+                        t.predict_contributions_row_probability_change(&r_, c, &self.cfg.missing, acc)
                     });
                 });
         }
@@ -205,7 +205,7 @@ impl PerpetualBooster {
     pub fn predict_nodes(&self, data: &Matrix<f64>, parallel: bool) -> Vec<Vec<HashSet<usize>>> {
         let mut v = Vec::with_capacity(data.rows);
         self.get_prediction_trees().iter().for_each(|tree| {
-            let tree_nodes = tree.predict_nodes(data, parallel, &self.missing);
+            let tree_nodes = tree.predict_nodes(data, parallel, &self.cfg.missing);
             v.push(tree_nodes);
         });
         v
