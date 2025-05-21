@@ -39,31 +39,8 @@ pub struct PerpetualBooster {
 }
 impl Default for PerpetualBooster {
     fn default() -> Self {
-        let cfg = BoosterConfig {
-            objective: Objective::LogLoss,
-            budget: 0.5,
-            max_bin: 256,
-            num_threads: None,
-            monotone_constraints: None,
-            force_children_to_bound_parent: false,
-            missing: f64::NAN,
-            allow_missing_splits: true,
-            create_missing_branch: false,
-            terminate_missing_features: HashSet::new(),
-            missing_node_treatment: MissingNodeTreatment::AssignToParent,
-            log_iterations: 0,
-            seed: 0,
-            quantile: None,
-            reset: None,
-            categorical_features: None,
-            timeout: None,
-            iteration_limit: None,
-            memory_limit: None,
-            stopping_rounds: None,
-        };
-
         PerpetualBooster {
-            cfg,
+            cfg: BoosterConfig::default(),
             base_score: f64::NAN,
             eta: f32::NAN,
             trees: Vec::new(),
