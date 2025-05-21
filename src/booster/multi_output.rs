@@ -209,47 +209,6 @@ impl MultiOutputBooster {
         &self.boosters
     }
 
-    /// Save a booster as a json object to a file.
-    ///
-    /// * `path` - Path to save booster.
-    pub fn save_booster(&self, path: &str) -> Result<(), PerpetualError> {
-        let model = self.json_dump()?;
-        match fs::write(path, model) {
-            Err(e) => Err(PerpetualError::UnableToWrite(e.to_string())),
-            Ok(_) => Ok(()),
-        }
-    }
-
-    /// Dump a booster as a json object
-    pub fn json_dump(&self) -> Result<String, PerpetualError> {
-        match serde_json::to_string(self) {
-            Ok(s) => Ok(s),
-            Err(e) => Err(PerpetualError::UnableToWrite(e.to_string())),
-        }
-    }
-
-    /// Load a multi-output booster from Json string
-    ///
-    /// * `json_str` - String object, which can be serialized to json.
-    pub fn from_json(json_str: &str) -> Result<Self, PerpetualError> {
-        let model = serde_json::from_str::<MultiOutputBooster>(json_str);
-        match model {
-            Ok(m) => Ok(m),
-            Err(e) => Err(PerpetualError::UnableToRead(e.to_string())),
-        }
-    }
-
-    /// Load a booster from a path to a json booster object.
-    ///
-    /// * `path` - Path to load booster from.
-    pub fn load_booster(path: &str) -> Result<Self, PerpetualError> {
-        let json_str = match fs::read_to_string(path) {
-            Ok(s) => Ok(s),
-            Err(e) => Err(PerpetualError::UnableToRead(e.to_string())),
-        }?;
-        Self::from_json(&json_str)
-    }
-
     // Set methods for paramters
 
     /// Set n_boosters on the booster. This will also initialize the boosters by cloning the first one.
