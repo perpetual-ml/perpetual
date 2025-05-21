@@ -5,7 +5,7 @@ use serde::{Deserialize, Deserializer, Serialize, de::DeserializeOwned};
 use std::collections::{HashMap, HashSet};
 use crate::PerpetualBooster;
 use crate::constraints::ConstraintMap;
-use crate::objective_functions::{calc_init_callables, gradient_hessian_callables, loss_callables, Objective};
+use crate::objective_functions::{Objective};
 
 // Common configuration
 // across implementations

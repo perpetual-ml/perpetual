@@ -1,5 +1,4 @@
 use std::collections::{HashMap, HashSet};
-
 use crate::bin::Bin;
 use crate::binning::bin_matrix;
 use crate::constants::{
@@ -13,6 +12,7 @@ use crate::histogram::{update_cuts, NodeHistogram, NodeHistogramOwned};
 use crate::objective_functions::{calc_init_callables, gradient_hessian_callables, loss_callables, Objective};
 use crate::splitter::{MissingBranchSplitter, MissingImputerSplitter, SplitInfo, SplitInfoSlice, Splitter};
 use crate::tree::tree::{Tree, TreeStopper};
+use crate::booster::config::*;
 use core::{f32, f64};
 use log::{info, warn};
 use rand::rngs::StdRng;
@@ -21,11 +21,11 @@ use rand::SeedableRng;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::time::Instant;
-use std::{fs, mem};
+use std::{mem};
 use sysinfo::System;
 
 type ImportanceFn = fn(&Tree, &mut HashMap<usize, (f32, usize)>);
-use crate::booster::config::*;
+
 
 /// Perpetual Booster object
 #[derive(Clone, Serialize, Deserialize)]
@@ -37,6 +37,7 @@ pub struct PerpetualBooster {
     pub cal_models: HashMap<String, [(PerpetualBooster, f64); 2]>,
     pub metadata: HashMap<String, String>,
 }
+
 impl Default for PerpetualBooster {
     fn default() -> Self {
         PerpetualBooster {
