@@ -1,6 +1,8 @@
 use serde::{Deserialize, Deserializer, Serialize};
 use std::collections::{HashMap, HashSet};
 use crate::PerpetualBooster;
+use crate::constraints::ConstraintMap;
+use crate::objective_functions::{calc_init_callables, gradient_hessian_callables, loss_callables, Objective};
 
 // Common configuration
 // across implementations
@@ -94,4 +96,78 @@ where
     D: Deserializer<'de>,
 {
     Deserialize::deserialize(d).map(|x: Option<_>| x.unwrap_or(f64::NAN))
+}
+
+// Common Booster configuration
+// across
+#[derive(Clone, Serialize, Deserialize, Default)]
+pub struct BoosterConfig {
+    /// The name of objective function used to optimize. Valid options are:
+    /// "LogLoss" to use logistic loss as the objective function,
+    /// "SquaredLoss" to use Squared Error as the objective function,
+    /// "QuantileLoss" for quantile regression.
+    pub objective: Objective,
+    /// Budget to fit the model.
+    #[serde(default = "default_budget")]
+    pub budget: f32,
+    /// Number of bins to calculate to partition the data. Setting this to
+    /// a smaller number, will result in faster training time, while potentially sacrificing
+    /// accuracy. If there are more bins, than unique values in a column, all unique values
+    /// will be used.
+    pub max_bin: u16,
+    /// Number of threads to use during training.
+    pub num_threads: Option<usize>,
+    /// Constraints that are used to enforce a specific relationship
+    /// between the training features and the target variable.
+    pub monotone_constraints: Option<ConstraintMap>,
+    /// Should the children nodes contain the parent node in their bounds, setting this to true, will result in no children being created that result in the higher and lower child values both being greater than, or less than the parent weight.
+    #[serde(default = "default_force_children_to_bound_parent")]
+    pub force_children_to_bound_parent: bool,
+    /// Value to consider missing.
+    #[serde(deserialize_with = "parse_missing")]
+    pub missing: f64,
+     /// Should the algorithm allow splits that completed seperate out missing
+    /// and non-missing values, in the case where `create_missing_branch` is false. When `create_missing_branch`
+    /// is true, setting this to true will result in the missin branch being further split.
+    pub allow_missing_splits: bool,
+    /// Should missing be split out it's own separate branch?
+    pub create_missing_branch: bool,
+    /// A set of features for which the missing node will always be terminated, even
+    /// if `allow_missing_splits` is set to true. This value is only valid if
+    /// `create_missing_branch` is also True.
+    #[serde(default = "default_terminate_missing_features")]
+    pub terminate_missing_features: HashSet<usize>,
+    /// How the missing nodes weights should be treated at training time.
+    #[serde(default = "default_missing_node_treatment")]
+    pub missing_node_treatment: MissingNodeTreatment,
+    /// Should the model be trained showing output.
+    #[serde(default = "default_log_iterations")]
+    pub log_iterations: usize,
+    /// Integer value used to seed any randomness used in the algorithm.
+    pub seed: u64,
+    /// Used only in quantile regression.
+    #[serde(default = "default_quantile")]
+    pub quantile: Option<f64>,
+    /// Reset the model or continue training.
+    #[serde(default = "default_reset")]
+    pub reset: Option<bool>,
+    /// Features to be treated as categorical.
+    #[serde(default = "default_categorical_features")]
+    pub categorical_features: Option<HashSet<usize>>,
+    /// Fit timeout limit in seconds.
+    #[serde(default = "default_timeout")]
+    pub timeout: Option<f32>,
+    /// Optional limit for the number of boosting rounds.
+    /// The algorithm will stop automatically before this limit if budget is low enough.
+    #[serde(default = "default_iteration_limit")]
+    pub iteration_limit: Option<usize>,
+    /// Optional limit for memory allocation.
+    /// This will limit the number of allocated nodes for a tree.
+    /// The number of nodes in a final tree will be limited by this,
+    /// if it is not limited by step size control and generalization control.
+    #[serde(default = "default_memory_limit")]
+    pub memory_limit: Option<f32>,
+    /// Optional limit for auto stopping rounds.
+    #[serde(default = "default_stopping_rounds")]
+    pub stopping_rounds: Option<usize>,
 }
