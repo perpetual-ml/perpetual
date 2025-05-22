@@ -2,7 +2,7 @@ mod booster;
 mod multi_output;
 mod utils;
 
-use crate::booster::UnivariateBooster;
+use perpetual_rs::UnivariateBooster;
 use crate::multi_output::MultiOutputBooster;
 use crate::utils::percentiles;
 use crate::utils::print_matrix;

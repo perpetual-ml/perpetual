@@ -2,7 +2,7 @@ use crate::utils::int_map_to_constraint_map;
 use crate::utils::to_value_error;
 use numpy::{IntoPyArray, PyArray1, PyArray2, PyReadonlyArray1};
 use perpetual_rs::booster::config::MissingNodeTreatment;
-use perpetual_rs::booster::UnivariateBooster as CratePerpetualBooster;
+use perpetual_rs::UnivariateBooster as CratePerpetualBooster;
 use perpetual_rs::conformal::cqr::CalData;
 use perpetual_rs::constraints::Constraint;
 use perpetual_rs::data::Matrix;
