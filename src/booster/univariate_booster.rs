@@ -1,3 +1,7 @@
+//! Univariate Booster
+//! 
+//! 
+
 use std::collections::{HashMap, HashSet};
 use crate::bin::Bin;
 use crate::binning::bin_matrix;

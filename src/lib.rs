@@ -24,6 +24,6 @@ pub mod tree;
 pub mod utils;
 
 // Individual classes, and functions
-pub use booster::booster::PerpetualBooster;
-pub use booster::multi_output::MultiOutputBooster;
+pub use booster::univariate_booster::PerpetualBooster;
+pub use booster::multivariate_booster::MultiOutputBooster;
 pub use data::Matrix;
