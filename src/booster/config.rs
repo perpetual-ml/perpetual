@@ -1,3 +1,9 @@
+//! Booster configurations
+//! 
+//! Booster specific configurations.
+//! 
+//! 
+//! 
 use std::fs;
 use std::path::Path;
 use crate::errors::PerpetualError;
@@ -9,6 +15,8 @@ use crate::objective_functions::{Objective};
 
 // Common configuration
 // across implementations
+
+/// Contributions
 #[derive(Serialize, Deserialize)]
 pub enum ContributionsMethod {
     /// This method will use the internal leaf weights, to calculate the contributions. This is the same as what is described by Saabas [here](https://blog.datadive.net/interpreting-random-forests/).
@@ -42,6 +50,7 @@ pub enum ImportanceMethod {
     TotalCover,
 }
 
+/// Missing values
 #[derive(Serialize, Deserialize, Clone, Copy)]
 pub enum MissingNodeTreatment {
     /// Calculate missing node weight values without any constraints.
@@ -55,46 +64,46 @@ pub enum MissingNodeTreatment {
 }
 
 // Common functions
-pub fn default_cal_models() -> HashMap<String, [(PerpetualBooster, f64); 2]> {
+fn default_cal_models() -> HashMap<String, [(PerpetualBooster, f64); 2]> {
     HashMap::new()
 }
-pub fn default_budget() -> f32 {
+fn default_budget() -> f32 {
     0.5
 }
-pub fn default_quantile() -> Option<f64> {
+fn default_quantile() -> Option<f64> {
     None
 }
-pub fn default_reset() -> Option<bool> {
+fn default_reset() -> Option<bool> {
     None
 }
-pub fn default_categorical_features() -> Option<HashSet<usize>> {
+fn default_categorical_features() -> Option<HashSet<usize>> {
     None
 }
-pub fn default_timeout() -> Option<f32> {
+fn default_timeout() -> Option<f32> {
     None
 }
-pub fn default_iteration_limit() -> Option<usize> {
+fn default_iteration_limit() -> Option<usize> {
     None
 }
-pub fn default_memory_limit() -> Option<f32> {
+fn default_memory_limit() -> Option<f32> {
     None
 }
-pub fn default_stopping_rounds() -> Option<usize> {
+fn default_stopping_rounds() -> Option<usize> {
     None
 }
-pub fn default_terminate_missing_features() -> HashSet<usize> {
+fn default_terminate_missing_features() -> HashSet<usize> {
     HashSet::new()
 }
-pub fn default_missing_node_treatment() -> MissingNodeTreatment {
+fn default_missing_node_treatment() -> MissingNodeTreatment {
     MissingNodeTreatment::AssignToParent
 }
-pub fn default_log_iterations() -> usize {
+fn default_log_iterations() -> usize {
     0
 }
-pub fn default_force_children_to_bound_parent() -> bool {
+fn default_force_children_to_bound_parent() -> bool {
     false
 }
-pub fn parse_missing<'de, D>(d: D) -> Result<f64, D::Error>
+fn parse_missing<'de, D>(d: D) -> Result<f64, D::Error>
 where
     D: Deserializer<'de>,
 {
@@ -103,6 +112,7 @@ where
 
 // Common Booster configuration
 // across
+/// Booster configurations
 #[derive(Clone, Serialize, Deserialize)]
 pub struct BoosterConfig {
     /// The name of objective function used to optimize. Valid options are:
@@ -203,6 +213,7 @@ impl Default for BoosterConfig {
     }
 }
 
+/// IO
 pub trait BoosterIO: Serialize + DeserializeOwned + Sized {
     
     /// Save a booster as a json object to a file.
