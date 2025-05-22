@@ -3,6 +3,7 @@ use crate::utils::to_value_error;
 use numpy::{IntoPyArray, PyArray1, PyArray2, PyReadonlyArray1};
 use perpetual_rs::booster::config::MissingNodeTreatment;
 use perpetual_rs::UnivariateBooster as CratePerpetualBooster;
+use perpetual_rs::booster::config::BoosterIO;
 use perpetual_rs::conformal::cqr::CalData;
 use perpetual_rs::constraints::Constraint;
 use perpetual_rs::data::Matrix;
@@ -98,99 +99,99 @@ impl PerpetualBooster {
     #[setter]
     fn set_objective(&mut self, value: &str) -> PyResult<()> {
         let objective_ = to_value_error(serde_plain::from_str(value))?;
-        self.booster.objective = objective_;
+        self.booster.cfg.objective = objective_;
         Ok(())
     }
     #[setter]
     fn set_budget(&mut self, value: f32) -> PyResult<()> {
-        self.booster.budget = value;
+        self.booster.cfg.budget = value;
         Ok(())
     }
     #[setter]
     fn set_max_bin(&mut self, value: u16) -> PyResult<()> {
-        self.booster.max_bin = value;
+        self.booster.cfg.max_bin = value;
         Ok(())
     }
     #[setter]
     fn set_num_threads(&mut self, value: Option<usize>) -> PyResult<()> {
-        self.booster.num_threads = value;
+        self.booster.cfg.num_threads = value;
         Ok(())
     }
     #[setter]
     fn set_monotone_constraints(&mut self, value: HashMap<usize, i8>) -> PyResult<()> {
         let map = int_map_to_constraint_map(value)?;
-        self.booster.monotone_constraints = Some(map);
+        self.booster.cfg.monotone_constraints = Some(map);
         Ok(())
     }
     #[setter]
     fn set_force_children_to_bound_parent(&mut self, value: bool) -> PyResult<()> {
-        self.booster.force_children_to_bound_parent = value;
+        self.booster.cfg.force_children_to_bound_parent = value;
         Ok(())
     }
     #[setter]
     fn set_missing(&mut self, value: f64) -> PyResult<()> {
-        self.booster.missing = value;
+        self.booster.cfg.missing = value;
         Ok(())
     }
     #[setter]
     fn set_allow_missing_splits(&mut self, value: bool) -> PyResult<()> {
-        self.booster.allow_missing_splits = value;
+        self.booster.cfg.allow_missing_splits = value;
         Ok(())
     }
     #[setter]
     fn set_create_missing_branch(&mut self, value: bool) -> PyResult<()> {
-        self.booster.create_missing_branch = value;
+        self.booster.cfg.create_missing_branch = value;
         Ok(())
     }
     #[setter]
     fn set_terminate_missing_features(&mut self, value: HashSet<usize>) -> PyResult<()> {
-        self.booster.terminate_missing_features = value;
+        self.booster.cfg.terminate_missing_features = value;
         Ok(())
     }
     #[setter]
     fn set_missing_node_treatment(&mut self, value: &str) -> PyResult<()> {
         let missing_node_treatment_ = to_value_error(serde_plain::from_str(value))?;
-        self.booster.missing_node_treatment = missing_node_treatment_;
+        self.booster.cfg.missing_node_treatment = missing_node_treatment_;
         Ok(())
     }
     #[setter]
     fn set_log_iterations(&mut self, value: usize) -> PyResult<()> {
-        self.booster.log_iterations = value;
+        self.booster.cfg.log_iterations = value;
         Ok(())
     }
     #[setter]
     fn set_quantile(&mut self, value: Option<f64>) -> PyResult<()> {
-        self.booster.quantile = value;
+        self.booster.cfg.quantile = value;
         Ok(())
     }
     #[setter]
     fn set_reset(&mut self, value: Option<bool>) -> PyResult<()> {
-        self.booster.reset = value;
+        self.booster.cfg.reset = value;
         Ok(())
     }
     #[setter]
     fn set_categorical_features(&mut self, value: Option<HashSet<usize>>) -> PyResult<()> {
-        self.booster.categorical_features = value;
+        self.booster.cfg.categorical_features = value;
         Ok(())
     }
     #[setter]
     fn set_timeout(&mut self, value: Option<f32>) -> PyResult<()> {
-        self.booster.timeout = value;
+        self.booster.cfg.timeout = value;
         Ok(())
     }
     #[setter]
     fn set_iteration_limit(&mut self, value: Option<usize>) -> PyResult<()> {
-        self.booster.iteration_limit = value;
+        self.booster.cfg.iteration_limit = value;
         Ok(())
     }
     #[setter]
     fn set_memory_limit(&mut self, value: Option<f32>) -> PyResult<()> {
-        self.booster.memory_limit = value;
+        self.booster.cfg.memory_limit = value;
         Ok(())
     }
     #[setter]
     fn set_stopping_rounds(&mut self, value: Option<usize>) -> PyResult<()> {
-        self.booster.stopping_rounds = value;
+        self.booster.cfg.stopping_rounds = value;
         Ok(())
     }
 
@@ -447,13 +448,13 @@ impl PerpetualBooster {
     }
 
     pub fn get_params(&self, py: Python) -> PyResult<PyObject> {
-        let objective_ = to_value_error(serde_plain::to_string::<Objective>(&self.booster.objective))?;
+        let objective_ = to_value_error(serde_plain::to_string::<Objective>(&self.booster.cfg.objective))?;
         let missing_node_treatment_ = to_value_error(serde_plain::to_string::<MissingNodeTreatment>(
-            &self.booster.missing_node_treatment,
+            &self.booster.cfg.missing_node_treatment,
         ))?;
         let monotone_constraints_: HashMap<usize, i8> = self
             .booster
-            .monotone_constraints
+            .cfg.monotone_constraints
             .as_ref()
             .unwrap_or(&HashMap::new())
             .iter()
@@ -469,32 +470,32 @@ impl PerpetualBooster {
 
         let key_vals: Vec<(&str, PyObject)> = vec![
             ("objective", objective_.to_object(py)),
-            ("budget", self.booster.budget.to_object(py)),
-            ("num_threads", self.booster.num_threads.to_object(py)),
-            ("allow_missing_splits", self.booster.allow_missing_splits.to_object(py)),
+            ("budget", self.booster.cfg.budget.to_object(py)),
+            ("num_threads", self.booster.cfg.num_threads.to_object(py)),
+            ("allow_missing_splits", self.booster.cfg.allow_missing_splits.to_object(py)),
             ("monotone_constraints", monotone_constraints_.to_object(py)),
-            ("missing", self.booster.missing.to_object(py)),
+            ("missing", self.booster.cfg.missing.to_object(py)),
             (
                 "create_missing_branch",
-                self.booster.create_missing_branch.to_object(py),
+                self.booster.cfg.create_missing_branch.to_object(py),
             ),
             (
                 "terminate_missing_features",
-                self.booster.terminate_missing_features.to_object(py),
+                self.booster.cfg.terminate_missing_features.to_object(py),
             ),
             ("missing_node_treatment", missing_node_treatment_.to_object(py)),
-            ("log_iterations", self.booster.log_iterations.to_object(py)),
+            ("log_iterations", self.booster.cfg.log_iterations.to_object(py)),
             (
                 "force_children_to_bound_parent",
-                self.booster.force_children_to_bound_parent.to_object(py),
+                self.booster.cfg.force_children_to_bound_parent.to_object(py),
             ),
-            ("quantile", self.booster.quantile.to_object(py)),
-            ("reset", self.booster.reset.to_object(py)),
-            ("categorical_features", self.booster.categorical_features.to_object(py)),
-            ("timeout", self.booster.timeout.to_object(py)),
-            ("iteration_limit", self.booster.iteration_limit.to_object(py)),
-            ("memory_limit", self.booster.memory_limit.to_object(py)),
-            ("stopping_rounds", self.booster.stopping_rounds.to_object(py)),
+            ("quantile", self.booster.cfg.quantile.to_object(py)),
+            ("reset", self.booster.cfg.reset.to_object(py)),
+            ("categorical_features", self.booster.cfg.categorical_features.to_object(py)),
+            ("timeout", self.booster.cfg.timeout.to_object(py)),
+            ("iteration_limit", self.booster.cfg.iteration_limit.to_object(py)),
+            ("memory_limit", self.booster.cfg.memory_limit.to_object(py)),
+            ("stopping_rounds", self.booster.cfg.stopping_rounds.to_object(py)),
         ];
         let dict = key_vals.into_py_dict_bound(py);
 
