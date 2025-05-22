@@ -3,11 +3,11 @@ use crate::{
     node::{Node, NodeType},
     objective_functions::{calc_init_callables, loss_callables},
     tree::tree::Tree,
-    Matrix, PerpetualBooster,
+    Matrix, UnivariateBooster,
 };
 use std::collections::HashMap;
 
-impl PerpetualBooster {
+impl UnivariateBooster {
     /// Remove trees which don't generalize with new data.
     ///
     /// * `data` -  Either a pandas DataFrame, or a 2 dimensional numpy array.
@@ -367,7 +367,7 @@ mod tests {
         let matrix_train = Matrix::new(&data_train, y_train.len(), 8);
         let matrix_test = Matrix::new(&data_test, y_test.len(), 8);
 
-        let mut model = PerpetualBooster::default()
+        let mut model = UnivariateBooster::default()
             .set_objective(Objective::SquaredLoss)
             .set_max_bin(10)
             .set_budget(0.1);

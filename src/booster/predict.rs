@@ -5,12 +5,12 @@
 use crate::booster::config::ContributionsMethod;
 use crate::{
     objective_functions::Objective, shapley::predict_contributions_row_shapley, tree::tree::Tree, utils::odds, Matrix,
-    PerpetualBooster,
+    UnivariateBooster,
 };
 use rayon::prelude::*;
 use std::collections::{HashMap, HashSet};
 
-impl PerpetualBooster {
+impl UnivariateBooster {
     /// Generate predictions on data using the gradient booster.
     ///
     /// * `data` -  Either a Polars or Pandas DataFrame, or a 2 dimensional Numpy array.

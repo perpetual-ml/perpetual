@@ -1,9 +1,9 @@
-use crate::{errors::PerpetualError, objective_functions::Objective, utils::percentiles, Matrix, PerpetualBooster};
+use crate::{errors::PerpetualError, objective_functions::Objective, utils::percentiles, Matrix, UnivariateBooster};
 use std::collections::HashMap;
 
 pub type CalData<'a> = (Matrix<'a, f64>, &'a [f64], &'a [f64]); // (x_flat_data, rows, cols), y, alpha
 
-impl PerpetualBooster {
+impl UnivariateBooster {
     /// Calibrate models to get prediction intervals
     /// * `alpha` - Alpha list to train calibration models for
     pub fn calibrate(
@@ -17,13 +17,13 @@ impl PerpetualBooster {
 
         for alpha_ in alpha {
             let lower_quantile = Some(alpha_ / 2.0);
-            let mut model_lower = PerpetualBooster::default()
+            let mut model_lower = UnivariateBooster::default()
                 .set_objective(Objective::QuantileLoss)
                 .set_quantile(lower_quantile);
             model_lower.fit(&data, &y, sample_weight)?;
 
             let upper_quantile = Some(1.0 - alpha_ / 2.0);
-            let mut model_upper = PerpetualBooster::default()
+            let mut model_upper = UnivariateBooster::default()
                 .set_objective(Objective::QuantileLoss)
                 .set_quantile(upper_quantile);
             model_upper.fit(&data, &y, sample_weight)?;
@@ -158,7 +158,7 @@ mod tests {
         let matrix_train = Matrix::new(&data_train, y_train.len(), 8);
         let matrix_test = Matrix::new(&data_test, y_test.len(), 8);
 
-        let mut model = PerpetualBooster::default()
+        let mut model = UnivariateBooster::default()
             .set_objective(Objective::SquaredLoss)
             .set_max_bin(10)
             .set_budget(0.1);

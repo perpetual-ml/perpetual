@@ -1,8 +1,8 @@
 use crate::booster::config::MissingNodeTreatment;
-use crate::{constraints::ConstraintMap, objective_functions::Objective, PerpetualBooster};
+use crate::{constraints::ConstraintMap, objective_functions::Objective, UnivariateBooster};
 use std::collections::HashSet;
 
-impl PerpetualBooster {
+impl UnivariateBooster {
     // Set methods for paramters
 
     /// Set the objective on the booster.

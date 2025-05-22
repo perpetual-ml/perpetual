@@ -7,25 +7,25 @@ use std::collections::{HashMap, HashSet};
 use crate::constraints::ConstraintMap;
 use crate::errors::PerpetualError;
 use crate::objective_functions::Objective;
-use crate::{Matrix, PerpetualBooster};
+use crate::{Matrix, UnivariateBooster};
 use crate::booster::config::*;
 use crate::booster::config::MissingNodeTreatment;
 
 /// Perpetual Booster object
 #[derive(Clone, Serialize, Deserialize)]
-pub struct MultiOutputBooster {
+pub struct MultivariateBooster {
     pub n_boosters: usize,
     pub cfg: BoosterConfig,
-    pub boosters: Vec<PerpetualBooster>,
+    pub boosters: Vec<UnivariateBooster>,
     metadata: HashMap<String, String>,
 }
 
-impl Default for MultiOutputBooster {
+impl Default for MultivariateBooster {
     fn default() -> Self {
         let cfg = BoosterConfig::default();
         let n_boosters = 1;
         let boosters = vec![{
-            let mut p = PerpetualBooster::default();
+            let mut p = UnivariateBooster::default();
             p.cfg = cfg.clone();
             p
         }];
@@ -40,7 +40,7 @@ impl Default for MultiOutputBooster {
 }
 
 
-impl MultiOutputBooster {
+impl MultivariateBooster {
     /// Multi Output Booster object
     ///
     /// * `objective` - The name of objective function used to optimize. Valid options are:
@@ -121,7 +121,7 @@ impl MultiOutputBooster {
 
         // Base booster template that child boosters will clone.
         let template_booster = {
-            let mut b = PerpetualBooster::default();
+            let mut b = UnivariateBooster::default();
             b.cfg = cfg.clone();
             b
         };
@@ -130,7 +130,7 @@ impl MultiOutputBooster {
         // Assemble the wrapper with `n_boosters` copies.
         let boosters = vec![template_booster; n_boosters.max(1)];
 
-        Ok(MultiOutputBooster {
+        Ok(MultivariateBooster {
             n_boosters: n_boosters.max(1),
             cfg,
             boosters,
@@ -208,7 +208,7 @@ impl MultiOutputBooster {
     }
 
     /// Get the boosters
-    pub fn get_boosters(&self) -> &[PerpetualBooster] {
+    pub fn get_boosters(&self) -> &[UnivariateBooster] {
         &self.boosters
     }
 
@@ -554,7 +554,7 @@ mod tests {
         let y_data = y_vec.into_iter().flatten().collect::<Vec<f64>>();
         let y = Matrix::new(&y_data, y_test.len(), n_classes);
 
-        let mut booster = MultiOutputBooster::default()
+        let mut booster = MultivariateBooster::default()
             .set_objective(Objective::LogLoss)
             .set_max_bin(max_bin)
             .set_n_boosters(n_classes)

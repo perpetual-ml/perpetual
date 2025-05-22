@@ -33,18 +33,18 @@ type ImportanceFn = fn(&Tree, &mut HashMap<usize, (f32, usize)>);
 
 /// Perpetual Booster object
 #[derive(Clone, Serialize, Deserialize)]
-pub struct PerpetualBooster {
+pub struct UnivariateBooster {
     pub cfg: BoosterConfig,
     pub base_score: f64,
     pub eta: f32,
     pub trees: Vec<Tree>,
-    pub cal_models: HashMap<String, [(PerpetualBooster, f64); 2]>,
+    pub cal_models: HashMap<String, [(UnivariateBooster, f64); 2]>,
     pub metadata: HashMap<String, String>,
 }
 
-impl Default for PerpetualBooster {
+impl Default for UnivariateBooster {
     fn default() -> Self {
-        PerpetualBooster {
+        UnivariateBooster {
             cfg: BoosterConfig::default(),
             base_score: f64::NAN,
             eta: f32::NAN,
@@ -55,7 +55,7 @@ impl Default for PerpetualBooster {
     }
 }
 
-impl PerpetualBooster {
+impl UnivariateBooster {
     /// Perpetual Booster object
     ///
     /// * `objective` - The name of objective function used to optimize. Valid options are:
@@ -135,7 +135,7 @@ impl PerpetualBooster {
             stopping_rounds,
         };
 
-        let booster = PerpetualBooster {
+        let booster = UnivariateBooster {
             cfg,
             base_score,
             eta: f32::NAN,
@@ -561,7 +561,7 @@ mod tests {
         let y: Vec<f64> = file.lines().map(|x| x.parse::<f64>().unwrap()).collect();
 
         let data = Matrix::new(&data_vec, 891, 5);
-        let mut booster = PerpetualBooster::default()
+        let mut booster = UnivariateBooster::default()
             .set_max_bin(300)
             .set_base_score(0.5)
             .set_budget(0.3);
@@ -585,7 +585,7 @@ mod tests {
 
         let data = Matrix::new(&data_vec, 891, 5);
 
-        let mut booster = PerpetualBooster::default().set_budget(0.3);
+        let mut booster = UnivariateBooster::default().set_budget(0.3);
 
         booster.fit(&data, &y, None).unwrap();
         let preds = booster.predict(&data, false);
@@ -607,7 +607,7 @@ mod tests {
 
         let data = Matrix::new(&data_vec, 891, 5);
 
-        let mut booster = PerpetualBooster::default()
+        let mut booster = UnivariateBooster::default()
             .set_objective(Objective::SquaredLoss)
             .set_max_bin(300)
             .set_budget(0.3);
@@ -633,7 +633,7 @@ mod tests {
         let y: Vec<f64> = file.lines().map(|x| x.parse::<f64>().unwrap()).collect();
 
         //let data = Matrix::new(data.get_col(1), 891, 1);
-        let mut booster = PerpetualBooster::default()
+        let mut booster = UnivariateBooster::default()
             .set_max_bin(300)
             .set_base_score(0.5)
             .set_budget(0.3);
@@ -642,13 +642,13 @@ mod tests {
         let preds = booster.predict(&data, true);
 
         booster.save_booster("resources/model64.json").unwrap();
-        let booster2 = PerpetualBooster::load_booster("resources/model64.json").unwrap();
+        let booster2 = UnivariateBooster::load_booster("resources/model64.json").unwrap();
         assert_eq!(booster2.predict(&data, true)[0..10], preds[0..10]);
 
         // Test with non-NAN missing.
         booster.cfg.missing = 0.0;
         booster.save_booster("resources/modelmissing.json").unwrap();
-        let booster3 = PerpetualBooster::load_booster("resources/modelmissing.json").unwrap();
+        let booster3 = UnivariateBooster::load_booster("resources/modelmissing.json").unwrap();
         assert_eq!(booster3.cfg.missing, 0.);
         assert_eq!(booster3.cfg.missing, booster.cfg.missing);
     }
@@ -666,7 +666,7 @@ mod tests {
 
         let cat_index = HashSet::from([0, 3, 4, 6, 7, 8, 10, 11]);
 
-        let mut booster = PerpetualBooster::default()
+        let mut booster = UnivariateBooster::default()
             .set_budget(0.1)
             .set_categorical_features(Some(cat_index));
 
@@ -784,12 +784,12 @@ mod tests {
         // To provide parameters generate a default booster, and then use
         // the relevant `set_` methods for any parameters you would like to
         // adjust.
-        let mut model1 = PerpetualBooster::default()
+        let mut model1 = UnivariateBooster::default()
             .set_objective(Objective::SquaredLoss)
             .set_max_bin(10)
             .set_num_threads(Some(1))
             .set_budget(0.1);
-        let mut model2 = PerpetualBooster::default()
+        let mut model2 = UnivariateBooster::default()
             .set_objective(Objective::SquaredLoss)
             .set_max_bin(10)
             .set_num_threads(Some(2))
@@ -842,7 +842,7 @@ mod tests {
 
         let cat_index = HashSet::from([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
 
-        let mut booster = PerpetualBooster::default()
+        let mut booster = UnivariateBooster::default()
             .set_log_iterations(1)
             .set_objective(Objective::SquaredLoss)
             .set_categorical_features(Some(cat_index))
@@ -950,7 +950,7 @@ mod tests {
         // To provide parameters generate a default booster, and then use
         // the relevant `set_` methods for any parameters you would like to
         // adjust.
-        let mut model = PerpetualBooster::default()
+        let mut model = UnivariateBooster::default()
             .set_objective(Objective::AdaptiveHuberLoss)
             .set_max_bin(10)
             .set_budget(0.1);
@@ -1028,7 +1028,7 @@ mod tests {
         // To provide parameters generate a default booster, and then use
         // the relevant `set_` methods for any parameters you would like to
         // adjust.
-        let mut model = PerpetualBooster::default()
+        let mut model = UnivariateBooster::default()
             .set_objective(Objective::HuberLoss)
             .set_max_bin(10)
             .set_budget(0.1);
