@@ -24,9 +24,9 @@ impl UnivariateBooster {
         let old_length = self.trees.len();
         let old_n_nodes: usize = self.trees.iter().map(|t| t.nodes.len()).sum();
 
-        let base_score = calc_init_callables(&self.cfg.objective)(y, sample_weight, self.cfg.quantile);
+        let base_score = calc_init_callables(&self.cfg.objective)(y, sample_weight);
         let yhat = vec![base_score; y.len()];
-        let init_losses = calc_loss(y, &yhat, sample_weight, self.cfg.quantile);
+        let init_losses = calc_loss(y, &yhat, sample_weight);
         let init_loss = init_losses.iter().sum::<f32>() / init_losses.len() as f32;
 
         self.trees.iter_mut().for_each(|t| {

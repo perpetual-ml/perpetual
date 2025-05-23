@@ -6,7 +6,6 @@ use std::collections::{HashMap, HashSet};
 
 use crate::constraints::ConstraintMap;
 use crate::errors::PerpetualError;
-use crate::objective_functions::Objective;
 use crate::{Matrix, UnivariateBooster};
 use crate::booster::config::*;
 use crate::booster::config::MissingNodeTreatment;

@@ -13,7 +13,7 @@ use crate::constraints::ConstraintMap;
 use crate::data::Matrix;
 use crate::errors::PerpetualError;
 use crate::histogram::{update_cuts, NodeHistogram, NodeHistogramOwned};
-use crate::objective_functions::{calc_init_callables, gradient_hessian_callables, loss_callables, Objective};
+use crate::objective_functions::{calc_init_callables, gradient_hessian_callables, loss_callables};
 use crate::splitter::{MissingBranchSplitter, MissingImputerSplitter, SplitInfo, SplitInfoSlice, Splitter};
 use crate::tree::tree::{Tree, TreeStopper};
 use crate::booster::config::*;
@@ -215,7 +215,7 @@ impl UnivariateBooster {
         if self.cfg.reset.unwrap_or(true) || self.trees.len() == 0 {
             self.cfg.reset;
             if self.base_score.is_nan() {
-                self.base_score = calc_init_callables(&self.cfg.objective)(y, sample_weight, self.cfg.quantile);
+                self.base_score = calc_init_callables(&self.cfg.objective)(y, sample_weight);
             }
             yhat = vec![self.base_score; y.len()];
         } else {
@@ -223,11 +223,11 @@ impl UnivariateBooster {
         }
 
         let calc_grad_hess = gradient_hessian_callables(&self.cfg.objective);
-        let (mut grad, mut hess) = calc_grad_hess(y, &yhat, sample_weight, self.cfg.quantile);
+        let (mut grad, mut hess) = calc_grad_hess(y, &yhat, sample_weight);
 
-        let mut loss = calc_loss(y, &yhat, sample_weight, self.cfg.quantile);
+        let mut loss = calc_loss(y, &yhat, sample_weight);
 
-        let loss_base = calc_loss(y, &vec![self.base_score; y.len()], sample_weight, self.cfg.quantile);
+        let loss_base = calc_loss(y, &vec![self.base_score; y.len()], sample_weight);
         let loss_avg = loss_base.iter().sum::<f32>() / loss_base.len() as f32;
 
         let base = 10.0_f32;
@@ -404,8 +404,8 @@ impl UnivariateBooster {
                 n_low_loss_rounds = 0;
             }
 
-            (grad, hess) = calc_grad_hess(y, &yhat, sample_weight, self.cfg.quantile);
-            loss = calc_loss(y, &yhat, sample_weight, self.cfg.quantile);
+            (grad, hess) = calc_grad_hess(y, &yhat, sample_weight);
+            loss = calc_loss(y, &yhat, sample_weight);
 
             if verbose {
                 info!(

@@ -11,7 +11,6 @@ use serde::{Deserialize, Deserializer, Serialize, de::DeserializeOwned};
 use std::collections::{HashMap, HashSet};
 use crate::UnivariateBooster;
 use crate::constraints::ConstraintMap;
-use crate::objective_functions::{Objective};
 
 // Common configuration
 // across implementations
