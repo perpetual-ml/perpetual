@@ -1,13 +1,17 @@
+//! Squared Loss function
+//! 
+//! 
 use super::ObjectiveFunction;
 use crate::{metrics::Metric, utils::fast_sum};
 use serde::{Deserialize, Serialize};
 
 #[derive(Default, Debug, Deserialize, Serialize, Clone)]
 pub struct SquaredLoss {}
-
 impl ObjectiveFunction for SquaredLoss {
+
     #[inline]
     fn calc_loss(&self, y: &[f64], yhat: &[f64], sample_weight: Option<&[f64]>) -> Vec<f32> {
+            
         match sample_weight {
             Some(sample_weight) => y
                 .iter()
@@ -27,30 +31,12 @@ impl ObjectiveFunction for SquaredLoss {
                 })
                 .collect(),
         }
-    }
 
-    fn calc_init(&self, y: &[f64], sample_weight: Option<&[f64]>) -> f64 {
-        match sample_weight {
-            Some(sample_weight) => {
-                let mut ytot: f64 = 0.;
-                let mut ntot: f64 = 0.;
-                for i in 0..y.len() {
-                    ytot += sample_weight[i] * y[i];
-                    ntot += sample_weight[i];
-                }
-                ytot / ntot
-            }
-            None => fast_sum(y) / y.len() as f64,
-        }
     }
 
     #[inline]
-    fn calc_grad_hess(
-        &self, 
-        y: &[f64],
-        yhat: &[f64],
-        sample_weight: Option<&[f64]>
-    ) -> (Vec<f32>, Option<Vec<f32>>) {
+    fn calc_grad_hess(&self, y: &[f64], yhat: &[f64], sample_weight: Option<&[f64]> ) -> (Vec<f32>, Option<Vec<f32>>) {
+
         match sample_weight {
             Some(sample_weight) => {
                 let (g, h) = y
@@ -66,6 +52,25 @@ impl ObjectiveFunction for SquaredLoss {
                 None,
             ),
         }
+
+    }
+
+    #[inline]
+    fn calc_init(&self, y: &[f64], sample_weight: Option<&[f64]>) -> f64 {
+
+        match sample_weight {
+            Some(sample_weight) => {
+                let mut ytot: f64 = 0.;
+                let mut ntot: f64 = 0.;
+                for i in 0..y.len() {
+                    ytot += sample_weight[i] * y[i];
+                    ntot += sample_weight[i];
+                }
+                ytot / ntot
+            }
+            None => fast_sum(y) / y.len() as f64,
+        }
+
     }
 
     fn default_metric(&self) -> Metric {
@@ -75,4 +80,5 @@ impl ObjectiveFunction for SquaredLoss {
     fn hessian_is_constant(&self) -> bool {
         true
     }
+
 }
