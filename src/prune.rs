@@ -6,6 +6,7 @@ use crate::{
     Matrix, UnivariateBooster,
 };
 use std::collections::HashMap;
+use crate::objective_functions::{ObjectiveFunction, Objective, CustomObjective};
 
 impl UnivariateBooster {
     /// Remove trees which don't generalize with new data.

@@ -9,6 +9,7 @@ use crate::errors::PerpetualError;
 use crate::{Matrix, UnivariateBooster};
 use crate::booster::config::*;
 use crate::booster::config::MissingNodeTreatment;
+use crate::objective_functions::{ObjectiveFunction, Objective, CustomObjective};
 
 /// Perpetual Booster object
 #[derive(Clone, Serialize, Deserialize)]

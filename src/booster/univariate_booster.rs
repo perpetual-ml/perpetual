@@ -27,6 +27,8 @@ use serde::{Deserialize, Serialize};
 use std::time::Instant;
 use std::{mem};
 use sysinfo::System;
+use crate::objective_functions::{ObjectiveFunction, Objective, CustomObjective};
+use std::sync::Arc;
 
 type ImportanceFn = fn(&Tree, &mut HashMap<usize, (f32, usize)>);
 
@@ -110,6 +112,7 @@ impl UnivariateBooster {
         iteration_limit: Option<usize>,
         memory_limit: Option<f32>,
         stopping_rounds: Option<usize>,
+        custom_objective: Option<CustomObjective>,
     ) -> Result<Self, PerpetualError> {
 
         let cfg = BoosterConfig {
@@ -133,6 +136,7 @@ impl UnivariateBooster {
             iteration_limit,
             memory_limit,
             stopping_rounds,
+            custom_objective
         };
 
         let booster = UnivariateBooster {
@@ -156,6 +160,9 @@ impl UnivariateBooster {
     pub fn reset(&mut self) {
         self.trees = Vec::new();
     }
+
+    
+
 
     /// Fit the gradient booster on a provided dataset.
     ///
@@ -196,6 +203,28 @@ impl UnivariateBooster {
         splitter: &T,
         sample_weight: Option<&[f64]>,
     ) -> Result<(), PerpetualError> {
+
+        let (calc_grad_hess, calc_loss, calc_init, is_const_hess, _metric) =
+            if let Some(custom) = &self.cfg.custom_objective {
+                (
+                    Arc::clone(&custom.grad_hess),
+                    Arc::clone(&custom.loss),
+                    Arc::clone(&custom.init),
+                    custom.hessian_constant,
+                    custom.metric,
+                )
+            } else {
+                let inst = self.cfg.objective.instantiate();
+                (
+                    gradient_hessian_callables(inst.clone()),
+                    loss_callables(inst.clone()),
+                    calc_init_callables(inst.clone()),
+                    inst.hessian_is_constant(),
+                    inst.default_metric(),
+                )
+            };
+
+
         let start = Instant::now();
 
         let n_threads_available = std::thread::available_parallelism().unwrap().get();
@@ -208,21 +237,21 @@ impl UnivariateBooster {
             .build()
             .unwrap();
 
-        let calc_loss = loss_callables(&self.cfg.objective);
+        // let calc_loss = loss_callables(&self.cfg.objective);
 
         // If reset, reset the trees. Otherwise continue training.
         let mut yhat;
         if self.cfg.reset.unwrap_or(true) || self.trees.len() == 0 {
             self.cfg.reset;
             if self.base_score.is_nan() {
-                self.base_score = calc_init_callables(&self.cfg.objective)(y, sample_weight);
+                self.base_score = calc_init(y, sample_weight);
             }
             yhat = vec![self.base_score; y.len()];
         } else {
             yhat = self.predict(data, true);
         }
 
-        let calc_grad_hess = gradient_hessian_callables(&self.cfg.objective);
+        //let calc_grad_hess = gradient_hessian_callables(&self.cfg.objective);
         let (mut grad, mut hess) = calc_grad_hess(y, &yhat, sample_weight);
 
         let mut loss = calc_loss(y, &yhat, sample_weight);
