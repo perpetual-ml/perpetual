@@ -6,7 +6,7 @@ pub struct SquaredLoss {}
 
 impl ObjectiveFunction for SquaredLoss {
     #[inline]
-    fn calc_loss(y: &[f64], yhat: &[f64], sample_weight: Option<&[f64]>, _quantile: Option<f64>) -> Vec<f32> {
+    fn calc_loss(&self, y: &[f64], yhat: &[f64], sample_weight: Option<&[f64]>) -> Vec<f32> {
         match sample_weight {
             Some(sample_weight) => y
                 .iter()
@@ -28,7 +28,7 @@ impl ObjectiveFunction for SquaredLoss {
         }
     }
 
-    fn calc_init(y: &[f64], sample_weight: Option<&[f64]>, _quantile: Option<f64>) -> f64 {
+    fn calc_init(&self, y: &[f64], sample_weight: Option<&[f64]>) -> f64 {
         match sample_weight {
             Some(sample_weight) => {
                 let mut ytot: f64 = 0.;
@@ -45,10 +45,10 @@ impl ObjectiveFunction for SquaredLoss {
 
     #[inline]
     fn calc_grad_hess(
+        &self, 
         y: &[f64],
         yhat: &[f64],
-        sample_weight: Option<&[f64]>,
-        _quantile: Option<f64>,
+        sample_weight: Option<&[f64]>
     ) -> (Vec<f32>, Option<Vec<f32>>) {
         match sample_weight {
             Some(sample_weight) => {
@@ -67,7 +67,7 @@ impl ObjectiveFunction for SquaredLoss {
         }
     }
 
-    fn default_metric() -> Metric {
+    fn default_metric(&self) -> Metric {
         Metric::RootMeanSquaredLogError
     }
 }
