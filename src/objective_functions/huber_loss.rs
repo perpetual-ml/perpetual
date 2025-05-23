@@ -1,8 +1,9 @@
 use super::ObjectiveFunction;
 use crate::metrics::Metric;
+use serde::{Deserialize, Serialize};
 
 /// Huber Loss
-#[derive(Default)]
+#[derive(Default, Debug, Deserialize, Serialize, Clone)]
 pub struct HuberLoss {
     pub delta: Option<f64>
 }
@@ -113,5 +114,9 @@ impl ObjectiveFunction for HuberLoss {
 
     fn default_metric(&self) -> Metric {
         Metric::RootMeanSquaredError
+    }
+
+    fn hessian_is_constant(&self) -> bool {
+        true
     }
 }

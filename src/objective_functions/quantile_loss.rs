@@ -1,7 +1,8 @@
 use super::ObjectiveFunction;
 use crate::metrics::Metric;
+use serde::{Deserialize, Serialize};
 
-#[derive(Default)]
+#[derive(Default, Debug, Deserialize, Serialize, Clone)]
 pub struct QuantileLoss {
     pub quantile: Option<f64>
 }
@@ -119,5 +120,9 @@ impl ObjectiveFunction for QuantileLoss {
 
     fn default_metric(&self) -> Metric {
         Metric::QuantileLoss
+    }
+
+    fn hessian_is_constant(&self) -> bool {
+        true
     }
 }

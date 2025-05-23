@@ -1,7 +1,8 @@
 use super::ObjectiveFunction;
 use crate::{data::FloatData, metrics::Metric, utils::fast_sum};
+use serde::{Deserialize, Serialize};
 
-#[derive(Default)]
+#[derive(Default, Debug, Deserialize, Serialize, Clone)]
 pub struct LogLoss {}
 impl ObjectiveFunction for LogLoss {
     #[inline]
@@ -83,4 +84,9 @@ impl ObjectiveFunction for LogLoss {
     fn default_metric(&self) -> Metric {
         Metric::LogLoss
     }
+
+    fn hessian_is_constant(&self) -> bool {
+        true
+    }
+
 }

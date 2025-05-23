@@ -12,7 +12,14 @@ pub use squared_loss::SquaredLoss;
 
 use crate::metrics::Metric;
 
+
 pub trait ObjectiveFunction {
+    // The objective function
+    // constrols the the flow downstream
+
+    // Is the hessian const?
+    fn hessian_is_constant(&self) -> bool;
+
     fn calc_loss(
         &self,
         y: &[f64],
