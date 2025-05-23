@@ -398,7 +398,7 @@ impl UnivariateBooster {
                 tld,
                 &loss,
                 y,
-                calc_loss,
+                calc_loss.clone(),
                 &yhat,
                 sample_weight,
                 self.cfg.quantile,
