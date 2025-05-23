@@ -266,6 +266,7 @@ impl UnivariateBooster {
         let c = 1.0 / n - truncated_series_sum;
         let target_loss_decrement = c * base.powf(-self.cfg.budget) * loss_avg;
 
+        
         let is_const_hess = match sample_weight {
             Some(_sample_weight) => false,
             None => match &self.cfg.objective {
@@ -578,6 +579,8 @@ mod tests {
     use crate::{Matrix, UnivariateBooster};
     use crate::objective_functions::{HuberLoss, Objective};
 
+
+
      #[test]
     fn test_huber_loss() -> Result<(), Box<dyn Error>> {
         let all_names = [
@@ -643,9 +646,9 @@ mod tests {
         // the relevant `set_` methods for any parameters you would like to
         // adjust.
         let mut model = UnivariateBooster::default()
-            .set_objective(Objective::HuberLoss { delta: Some(1.6) })
+            .set_objective(Objective::HuberLoss { delta: Some(1.0) })
             .set_max_bin(10)
-            .set_budget(0.9);
+            .set_budget(0.1);
 
         model.fit(&matrix_test, &y_test, None)?;
 

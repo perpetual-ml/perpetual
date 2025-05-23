@@ -86,7 +86,7 @@ impl ObjectiveFunction for LogLoss {
     }
 
     fn hessian_is_constant(&self) -> bool {
-        true
+        false
     }
 
 }
