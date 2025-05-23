@@ -10,6 +10,7 @@ use crate::{Matrix, UnivariateBooster};
 use crate::booster::config::*;
 use crate::booster::config::MissingNodeTreatment;
 use crate::objective_functions::{ObjectiveFunction, Objective, CustomObjective};
+use std::sync::Arc;
 
 /// Perpetual Booster object
 #[derive(Clone, Serialize, Deserialize)]
@@ -94,6 +95,7 @@ impl MultivariateBooster {
         iteration_limit: Option<usize>,
         memory_limit: Option<f32>,
         stopping_rounds: Option<usize>,
+        custom_objective: Option<CustomObjective>,
     ) -> Result<Self, PerpetualError> {
         // Build the common configuration object.
         let cfg = BoosterConfig {
@@ -117,6 +119,7 @@ impl MultivariateBooster {
             iteration_limit,
             memory_limit,
             stopping_rounds,
+            custom_objective
         };
 
         // Base booster template that child boosters will clone.
