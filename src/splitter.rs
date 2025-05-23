@@ -1,5 +1,5 @@
 use crate::bin::sort_cat_bins_by_stat;
-use crate::booster::booster::MissingNodeTreatment;
+use crate::booster::config::MissingNodeTreatment;
 use crate::constants::GENERALIZATION_THRESHOLD;
 use crate::constraints::{Constraint, ConstraintMap};
 use crate::data::{FloatData, Matrix};

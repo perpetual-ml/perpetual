@@ -1,4 +1,8 @@
-pub mod booster;
-pub mod multi_output;
+// public modules
+pub mod univariate_booster;
+pub mod multivariate_booster;
 pub mod predict;
-pub mod setters;
+pub mod config;
+
+// private modules
+mod setters;

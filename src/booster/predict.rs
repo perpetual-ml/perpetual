@@ -1,12 +1,17 @@
-use super::booster::ContributionsMethod;
+//! Predictions
+//! 
+//! 
+
+use crate::booster::config::ContributionsMethod;
+use crate::MultivariateBooster;
 use crate::{
     objective_functions::Objective, shapley::predict_contributions_row_shapley, tree::tree::Tree, utils::odds, Matrix,
-    PerpetualBooster,
+    UnivariateBooster,
 };
 use rayon::prelude::*;
 use std::collections::{HashMap, HashSet};
 
-impl PerpetualBooster {
+impl UnivariateBooster {
     /// Generate predictions on data using the gradient booster.
     ///
     /// * `data` -  Either a Polars or Pandas DataFrame, or a 2 dimensional Numpy array.
@@ -14,7 +19,7 @@ impl PerpetualBooster {
     pub fn predict(&self, data: &Matrix<f64>, parallel: bool) -> Vec<f64> {
         let mut init_preds = vec![self.base_score; data.rows];
         self.get_prediction_trees().iter().for_each(|tree| {
-            for (p_, val) in init_preds.iter_mut().zip(tree.predict(data, parallel, &self.missing)) {
+            for (p_, val) in init_preds.iter_mut().zip(tree.predict(data, parallel, &self.cfg.missing)) {
                 *p_ += val;
             }
         });
@@ -39,7 +44,7 @@ impl PerpetualBooster {
         match method {
             ContributionsMethod::Average => self.predict_contributions_average(data, parallel),
             ContributionsMethod::ProbabilityChange => {
-                match self.objective {
+                match self.cfg.objective {
                     Objective::LogLoss => {}
                     _ => panic!("ProbabilityChange contributions method is only valid when LogLoss objective is used."),
                 }
@@ -87,7 +92,7 @@ impl PerpetualBooster {
                 .for_each(|(row, c)| {
                     let r_ = data.get_row(*row);
                     self.get_prediction_trees().iter().for_each(|t| {
-                        row_pred_fn(t, &r_, c, &self.missing);
+                        row_pred_fn(t, &r_, c, &self.cfg.missing);
                     });
                 });
         } else {
@@ -97,7 +102,7 @@ impl PerpetualBooster {
                 .for_each(|(row, c)| {
                     let r_ = data.get_row(*row);
                     self.get_prediction_trees().iter().for_each(|t| {
-                        row_pred_fn(t, &r_, c, &self.missing);
+                        row_pred_fn(t, &r_, c, &self.cfg.missing);
                     });
                 });
         }
@@ -144,7 +149,7 @@ impl PerpetualBooster {
                         .iter()
                         .zip(weights.iter())
                         .for_each(|(t, w)| {
-                            t.predict_contributions_row_average(&r_, c, w, &self.missing);
+                            t.predict_contributions_row_average(&r_, c, w, &self.cfg.missing);
                         });
                 });
         } else {
@@ -157,7 +162,7 @@ impl PerpetualBooster {
                         .iter()
                         .zip(weights.iter())
                         .for_each(|(t, w)| {
-                            t.predict_contributions_row_average(&r_, c, w, &self.missing);
+                            t.predict_contributions_row_average(&r_, c, w, &self.cfg.missing);
                         });
                 });
         }
@@ -181,7 +186,7 @@ impl PerpetualBooster {
                 .for_each(|(row, c)| {
                     let r_ = data.get_row(*row);
                     self.get_prediction_trees().iter().fold(self.base_score, |acc, t| {
-                        t.predict_contributions_row_probability_change(&r_, c, &self.missing, acc)
+                        t.predict_contributions_row_probability_change(&r_, c, &self.cfg.missing, acc)
                     });
                 });
         } else {
@@ -191,7 +196,7 @@ impl PerpetualBooster {
                 .for_each(|(row, c)| {
                     let r_ = data.get_row(*row);
                     self.get_prediction_trees().iter().fold(self.base_score, |acc, t| {
-                        t.predict_contributions_row_probability_change(&r_, c, &self.missing, acc)
+                        t.predict_contributions_row_probability_change(&r_, c, &self.cfg.missing, acc)
                     });
                 });
         }
@@ -205,9 +210,51 @@ impl PerpetualBooster {
     pub fn predict_nodes(&self, data: &Matrix<f64>, parallel: bool) -> Vec<Vec<HashSet<usize>>> {
         let mut v = Vec::with_capacity(data.rows);
         self.get_prediction_trees().iter().for_each(|tree| {
-            let tree_nodes = tree.predict_nodes(data, parallel, &self.missing);
+            let tree_nodes = tree.predict_nodes(data, parallel, &self.cfg.missing);
             v.push(tree_nodes);
         });
         v
     }
+}
+
+impl MultivariateBooster {
+
+    /// Generate predictions on data using the multi-output booster.
+    ///
+    /// * `data` -  Either a Polars or Pandas DataFrame, or a 2 dimensional Numpy array.
+    /// * `parallel` -  Predict in parallel.
+    pub fn predict(&self, data: &Matrix<f64>, parallel: bool) -> Vec<f64> {
+        self.boosters
+            .iter()
+            .map(|b| b.predict(data, parallel))
+            .into_iter()
+            .flatten()
+            .collect::<Vec<f64>>()
+    }
+
+    /// Generate probabilities on data using the multi-output booster.
+    ///
+    /// * `data` -  Either a Polars or Pandas DataFrame, or a 2 dimensional Numpy array.
+    /// * `parallel` -  Predict in parallel.
+    pub fn predict_proba(&self, data: &Matrix<f64>, parallel: bool) -> Vec<f64> {
+        let log_odds = self.predict(data, parallel);
+        let data_log_odds = Matrix::new(&log_odds, data.rows, data.cols);
+        let mut preds = Vec::with_capacity(log_odds.len());
+        for row in 0..data.rows {
+            let y_p_exp = data_log_odds.get_row(row).iter().map(|e| e.exp()).collect::<Vec<f64>>();
+            let y_p_exp_sum = y_p_exp.iter().sum::<f64>();
+            let probabilities = y_p_exp.iter().map(|e| e / y_p_exp_sum).collect::<Vec<f64>>();
+            preds.extend(probabilities);
+        }
+        preds
+    }
+
+    /// Generate node predictions on data using the gradient booster.
+    ///
+    /// * `data` -  Either a Polars or Pandas DataFrame, or a 2 dimensional Numpy array.
+    /// * `parallel` -  Predict in parallel.
+    pub fn predict_nodes(&self, data: &Matrix<f64>, parallel: bool) -> Vec<Vec<Vec<HashSet<usize>>>> {
+        self.boosters.iter().map(|b| b.predict_nodes(data, parallel)).collect()
+    }
+    
 }

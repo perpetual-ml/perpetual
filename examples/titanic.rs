@@ -1,6 +1,6 @@
 //! An example using the `titanic` dataset
 use perpetual::objective_functions::Objective;
-use perpetual::{Matrix, PerpetualBooster};
+use perpetual::{Matrix, UnivariateBooster};
 use polars::prelude::*;
 use std::env;
 use std::error::Error;
@@ -50,7 +50,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     // To provide parameters generate a default booster, and then use
     // the relevant `set_` methods for any parameters you would like to
     // adjust.
-    let mut model = PerpetualBooster::default()
+    let mut model = UnivariateBooster::default()
         .set_objective(Objective::LogLoss)
         .set_budget(*budget);
     model.fit(&matrix, &y, None)?;
