@@ -11,7 +11,7 @@ use crate::{
 };
 use rayon::prelude::*;
 use std::collections::{HashMap, HashSet};
-use crate::objective_functions::{ObjectiveFunction, Objective, CustomObjective};
+use crate::objective_functions::{Objective};
 
 impl UnivariateBooster {
     /// Generate predictions on data using the gradient booster.

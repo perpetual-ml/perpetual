@@ -204,7 +204,9 @@ impl UnivariateBooster {
         sample_weight: Option<&[f64]>,
     ) -> Result<(), PerpetualError> {
 
-        let (calc_grad_hess, calc_loss, calc_init, is_const_hess, _metric) =
+        // NOTE: is_cost_hess is unused BUT
+        // it is going to be used at some point.
+        let (calc_grad_hess, calc_loss, calc_init, _is_const_hess, _metric) =
             if let Some(custom) = &self.cfg.custom_objective {
                 (
                     Arc::clone(&custom.grad_hess),
@@ -402,7 +404,6 @@ impl UnivariateBooster {
                 calc_loss.clone(),
                 &yhat,
                 sample_weight,
-                self.cfg.quantile,
                 is_const_hess,
                 &mut hist_tree,
                 self.cfg.categorical_features.as_ref(),

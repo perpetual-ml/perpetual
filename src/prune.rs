@@ -1,6 +1,5 @@
 use crate::{
     errors::PerpetualError,
-    node::{Node, NodeType},
     tree::tree::Tree,
     Matrix, UnivariateBooster,
 };
@@ -10,7 +9,6 @@ use crate::objective_functions::{
     loss_callables,
     calc_init_callables,
     LossFn,
-    Objective,
 };
 use std::sync::Arc;
 

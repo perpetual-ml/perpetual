@@ -8,8 +8,8 @@ use std::fs;
 use std::path::Path;
 use crate::errors::PerpetualError;
 use serde::{Deserialize, Deserializer, Serialize, de::DeserializeOwned};
-use std::collections::{HashMap, HashSet};
-use crate::UnivariateBooster;
+use std::collections::{HashSet};
+// use crate::UnivariateBooster;
 use crate::constraints::ConstraintMap;
 use crate::objective_functions::{ObjectiveFunction, Objective, CustomObjective};
 use crate::objective_functions::{gradient_hessian_callables, loss_callables, calc_init_callables};
@@ -65,9 +65,9 @@ pub enum MissingNodeTreatment {
 }
 
 // Common functions
-fn default_cal_models() -> HashMap<String, [(UnivariateBooster, f64); 2]> {
-    HashMap::new()
-}
+// fn default_cal_models() -> HashMap<String, [(UnivariateBooster, f64); 2]> {
+//     HashMap::new()
+// }
 fn default_budget() -> f32 {
     0.5
 }

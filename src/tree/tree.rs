@@ -58,7 +58,6 @@ impl Tree {
         calc_loss: crate::objective_functions::LossFn,
         yhat: &[f64],
         sample_weight: Option<&[f64]>,
-        quantile: Option<f64>,
         is_const_hess: bool,
         mut hist_tree: &mut [NodeHistogram],
         cat_index: Option<&HashSet<usize>>,

@@ -1,5 +1,5 @@
 use crate::{errors::PerpetualError, utils::percentiles, Matrix, UnivariateBooster};
-use crate::objective_functions::{ObjectiveFunction, Objective, CustomObjective};
+use crate::objective_functions::{Objective};
 use std::collections::HashMap;
 
 pub type CalData<'a> = (Matrix<'a, f64>, &'a [f64], &'a [f64]); // (x_flat_data, rows, cols), y, alpha
