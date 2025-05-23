@@ -74,20 +74,20 @@ where
 pub enum Objective {
     LogLoss,
     SquaredLoss,
-    QuantileLoss,
-    HuberLoss,
-    AdaptiveHuberLoss,
+    QuantileLoss { quantile: Option<f64> },
+    HuberLoss { delta: Option<f64> },
+    AdaptiveHuberLoss { quantile: Option<f64> },
 }
 
 impl Objective {
-    /// Instantiate the boxed ObjectiveFunction for this variant.
+    /// Instantiate the concrete ObjectiveFunction for this variant
     pub fn instantiate(&self) -> Arc<dyn ObjectiveFunction> {
         match self {
-            Objective::LogLoss           => Arc::new(LogLoss::default()),
-            Objective::SquaredLoss       => Arc::new(SquaredLoss::default()),
-            Objective::QuantileLoss      => Arc::new(QuantileLoss::default()),
-            Objective::HuberLoss         => Arc::new(HuberLoss::default()),
-            Objective::AdaptiveHuberLoss => Arc::new(AdaptiveHuberLoss::default()),
+            Objective::LogLoss => Arc::new(LogLoss::default()),
+            Objective::SquaredLoss => Arc::new(SquaredLoss::default()),
+            Objective::QuantileLoss { quantile} => Arc::new(QuantileLoss { quantile: *quantile }),
+            Objective::HuberLoss { delta } => Arc::new(HuberLoss { delta: *delta }),
+            Objective::AdaptiveHuberLoss { quantile } => Arc::new(AdaptiveHuberLoss { quantile: *quantile }),
         }
     }
 }
