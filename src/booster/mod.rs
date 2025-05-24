@@ -13,15 +13,15 @@ mod setters;
 // multivariate booster
 #[cfg(test)]
 mod univariate_booster_test {
-    use super::*;
+    
     use std::error::Error;
     use std::sync::Arc;
     use polars::io::SerReader;
     use polars::prelude::{CsvReadOptions, DataType};
     use crate::{Matrix, UnivariateBooster};
-    use crate::objective_functions::{HuberLoss, Objective};
+    use crate::objective_functions::Objective;
     use crate::booster::config::*;
-    use std::collections::{HashMap, HashSet};
+    use std::collections::HashSet;
     use crate::utils::between;
     use approx::assert_relative_eq;
     use std::fs;
@@ -522,7 +522,7 @@ mod univariate_booster_test {
 
 #[cfg(test)]
 mod multivariate_booster_test {
-    use super::*;
+    
     use crate::{utils::between, MultivariateBooster};
     use polars::{
         io::SerReader,

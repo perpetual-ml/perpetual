@@ -7,7 +7,7 @@ pub mod cqr;
 // Unit-tests
 #[cfg(test)]
 mod tests {
-    use super::*;
+    
     use crate::objective_functions::Objective;
     use polars::io::SerReader;
     use polars::prelude::{CsvReadOptions, DataType};

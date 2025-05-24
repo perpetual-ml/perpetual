@@ -4,19 +4,17 @@ pub mod tree;
 // Unit-testing
 #[cfg(test)]
 mod tests {
-    use super::*;
+    
     use crate::binning::bin_matrix;
     use crate::constraints::{Constraint, ConstraintMap};
     use crate::histogram::NodeHistogramOwned;
-    use crate::objective_functions::{LogLoss, Objective, ObjectiveFunction, SquaredLoss};
+    use crate::objective_functions::{Objective, ObjectiveFunction};
     use crate::splitter::{MissingImputerSplitter, SplitInfo};
     use crate::utils::precision_round;
-    use polars::datatypes::DataType;
-    use polars::io::csv::read::CsvReadOptions;
-    use polars::io::SerReader;
+    
     use std::error::Error;
     use std::fs;
-    use std::sync::Arc;
+    
     
     use crate::Matrix;
     use crate::splitter::SplitInfoSlice;

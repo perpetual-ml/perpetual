@@ -1822,7 +1822,7 @@ mod tests {
     use crate::data::Matrix;
     use crate::histogram::NodeHistogramOwned;
     use crate::node::SplittableNode;
-    use crate::objective_functions::{LogLoss, ObjectiveFunction, SquaredLoss, Objective};
+    use crate::objective_functions::{ObjectiveFunction, Objective};
     use crate::tree::tree::create_root_node;
     use crate::utils::gain;
     use crate::utils::weight;
