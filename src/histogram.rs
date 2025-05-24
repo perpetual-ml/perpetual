@@ -309,3 +309,276 @@ pub fn update_histogram(
         }
     }
 }
+
+
+#[cfg(test)]
+mod tests {
+    use crate::binning::bin_matrix;
+    use crate::histogram::{
+        update_histogram, FeatureHistogram, FeatureHistogramOwned, NodeHistogram, NodeHistogramOwned,
+    };
+    use crate::objective_functions::{LogLoss, ObjectiveFunction, Objective};
+    use crate::Matrix;
+    use approx::assert_relative_eq;
+    use std::collections::HashSet;
+    use std::fs;
+
+    #[test]
+    fn test_simple_histogram() {
+
+        // instantiate objective function
+        let objective_function = Objective::LogLoss.instantiate();
+
+        let nbins = 90;
+
+        let data_vec: Vec<f64> = (0..100).map(|i| i as f64).collect();
+        let y: Vec<f64> = (0..100).map(|i| i as f64).collect();
+
+        let data = Matrix::new(&data_vec, data_vec.len(), 1);
+
+        let b = bin_matrix(&data, None, nbins, f64::NAN, None).unwrap();
+        let bdata = Matrix::new(&b.binned_data, data.rows, data.cols);
+
+        let y_avg = y.iter().sum::<f64>() / y.len() as f64;
+        let yhat = vec![y_avg; y.len()];
+        let (g, h) = objective_function.calc_grad_hess(&y, &yhat, None);
+
+        let col = 0;
+        let mut hist_feat_owned = FeatureHistogramOwned::empty_from_cuts(&b.cuts.get_col(col), false);
+        let hist_feat = FeatureHistogram::new(&mut hist_feat_owned.data);
+        unsafe { hist_feat.update(&bdata.get_col(col), &g, h.as_deref(), &bdata.index) };
+
+        let mut f = bdata.get_col(col).to_owned();
+
+        println!("histogram:");
+        println!("{:?}", hist_feat);
+        println!("histogram.cuts:");
+        println!(
+            "{:?}",
+            hist_feat
+                .data
+                .iter()
+                .map(|b| unsafe { b.get().as_ref().unwrap().cut_value })
+                .collect::<Vec<_>>()
+        );
+        println!("feature_data:");
+        println!("{:?}", &data.get_col(col));
+        println!("feature_data_bin_indices:");
+        println!("{:?}", &bdata.get_col(col));
+        println!("data_indices:");
+        println!("{:?}", &bdata.index);
+        println!("cuts:");
+        println!("{:?}", &b.cuts.get_col(col));
+        f.sort();
+        f.dedup();
+        println!("f:");
+        println!("{:?}", &f);
+        println!("{:?}", &f.len());
+        println!("{:?}", &hist_feat.data.len());
+        assert_eq!(f.len() + 1, hist_feat.data.len());
+        println!("b.cuts:");
+        println!("{:?}", &b.cuts);
+        println!("b.nunique:");
+        println!("{:?}", &b.nunique);
+    }
+
+    #[test]
+    fn test_single_histogram() {
+
+        // instantiate objective function
+        let objective_function = Objective::LogLoss.instantiate();
+
+        let nbins = 10;
+
+        let file =
+            fs::read_to_string("resources/contiguous_no_missing.csv").expect("Something went wrong reading the file");
+        let data_vec: Vec<f64> = file.lines().map(|x| x.parse::<f64>().unwrap()).collect();
+        let data = Matrix::new(&data_vec, 891, 5);
+        let b = bin_matrix(&data, None, nbins, f64::NAN, None).unwrap();
+        let bdata = Matrix::new(&b.binned_data, data.rows, data.cols);
+        let y: Vec<f64> = file.lines().map(|x| x.parse::<f64>().unwrap()).collect();
+        let yhat = vec![0.5; y.len()];
+        let (g, h) = objective_function.calc_grad_hess(&y, &yhat, None);
+
+        let col_index: Vec<usize> = (0..data.cols).collect();
+        let mut hist_init_owned = NodeHistogramOwned::empty_from_cuts(&b.cuts, &col_index, true, false);
+        let mut hist_init = NodeHistogram::from_owned(&mut hist_init_owned);
+
+        let col = 1;
+
+        unsafe {
+            hist_init
+                .data
+                .get_mut(col)
+                .unwrap()
+                .update(&bdata.get_col(col), &g, h.as_deref(), &bdata.index)
+        };
+
+        let mut f = bdata.get_col(col).to_owned();
+
+        println!("histogram:");
+        println!("{:?}", hist_init.data.get(col).unwrap());
+        println!("feature_data:");
+        println!("{:?}", &data.get_col(col));
+        println!("feature_data_bin_indices:");
+        println!("{:?}", &bdata.get_col(col));
+        println!("data_indices:");
+        println!("{:?}", &bdata.index);
+        println!("cuts:");
+        println!("{:?}", &b.cuts.get_col(col));
+        f.sort();
+        f.dedup();
+        println!("f:");
+        println!("{:?}", &f);
+        println!("{:?}", &f.len());
+        println!("{:?}", &hist_init.data.get(col).unwrap().data.len());
+        assert_eq!(f.len() + 1, hist_init.data.get(col).unwrap().data.len());
+    }
+
+    #[test]
+    fn test_histogram_categorical() {
+
+        // instantiate objective function
+        let objective_function = Objective::LogLoss.instantiate();
+
+        let file =
+            fs::read_to_string("resources/titanic_train_flat.csv").expect("Something went wrong reading the file");
+        let n_rows = 712;
+        let n_columns = 13;
+        let n_lines = n_columns * n_rows;
+        let data_vec: Vec<f64> = file
+            .lines()
+            .take(n_lines)
+            .map(|x| x.trim().parse::<f64>().unwrap_or(f64::NAN))
+            .collect();
+        let data = Matrix::new(&data_vec, n_rows, n_columns);
+        let b = bin_matrix(
+            &data,
+            None,
+            256,
+            f64::NAN,
+            Some(&HashSet::from([0, 3, 4, 6, 7, 8, 10, 11])),
+        )
+        .unwrap();
+        let bdata = Matrix::new(&b.binned_data, data.rows, data.cols);
+        let y: Vec<f64> = file.lines().map(|x| x.parse::<f64>().unwrap_or(f64::NAN)).collect();
+        let yhat = vec![0.5; y.len()];
+        let (g, h) = objective_function.calc_grad_hess(&y, &yhat, None);
+
+        let col_index: Vec<usize> = (0..data.cols).collect();
+        let mut hist_init_owned = NodeHistogramOwned::empty_from_cuts(&b.cuts, &col_index, false, false);
+        let mut hist_init = NodeHistogram::from_owned(&mut hist_init_owned);
+
+        let col = 0;
+
+        let pool = rayon::ThreadPoolBuilder::new().num_threads(2).build().unwrap();
+
+        update_histogram(
+            &mut hist_init,
+            0,
+            bdata.index.len(),
+            &bdata,
+            &g,
+            h.as_deref(),
+            &bdata.index,
+            &col_index,
+            &pool,
+            false,
+        );
+
+        let mut f = bdata.get_col(col).to_owned();
+
+        println!("histogram:");
+        println!("{:?}", unsafe { hist_init.data.get_unchecked(col) });
+        println!("cuts:");
+        println!("{:?}", &b.cuts.get_col(col));
+        f.sort();
+        f.dedup();
+        println!("f:");
+        println!("{:?}", &f);
+        println!("{:?}", &f.len());
+        println!("{:?}", unsafe { hist_init.data.get_unchecked(col) }.data.len());
+        assert_eq!(f.len() + 1, unsafe { hist_init.data.get_unchecked(col) }.data.len());
+    }
+
+    #[test]
+    fn test_histogram_parallel() {
+
+        // instantiate objective function
+        let objective_function = Objective::LogLoss.instantiate();
+
+        let file =
+            fs::read_to_string("resources/titanic_train_flat.csv").expect("Something went wrong reading the file");
+        let n_rows = 712;
+        let n_columns = 13;
+        let n_lines = n_columns * n_rows;
+        let data_vec: Vec<f64> = file
+            .lines()
+            .take(n_lines)
+            .map(|x| x.trim().parse::<f64>().unwrap_or(f64::NAN))
+            .collect();
+        let data = Matrix::new(&data_vec, n_rows, n_columns);
+        let b = bin_matrix(&data, None, 256, f64::NAN, Some(&HashSet::from([1]))).unwrap();
+        let bdata = Matrix::new(&b.binned_data, data.rows, data.cols);
+        let y: Vec<f64> = file.lines().map(|x| x.parse::<f64>().unwrap_or(f64::NAN)).collect();
+        let yhat = vec![0.5; y.len()];
+        let (g, h) = objective_function.calc_grad_hess(&y, &yhat, None);
+
+        let col_index: Vec<usize> = (0..data.cols).collect();
+
+        let mut hist_init_owned1 = NodeHistogramOwned::empty_from_cuts(&b.cuts, &col_index, false, false);
+        let mut hist_init1 = NodeHistogram::from_owned(&mut hist_init_owned1);
+
+        let mut hist_init_owned2 = NodeHistogramOwned::empty_from_cuts(&b.cuts, &col_index, false, false);
+        let mut hist_init2 = NodeHistogram::from_owned(&mut hist_init_owned2);
+
+        let col = 1;
+
+        let pool1 = rayon::ThreadPoolBuilder::new().num_threads(1).build().unwrap();
+        let pool2 = rayon::ThreadPoolBuilder::new().num_threads(2).build().unwrap();
+
+        update_histogram(
+            &mut hist_init1,
+            0,
+            bdata.index.len(),
+            &bdata,
+            &g,
+            h.as_deref(),
+            &bdata.index,
+            &col_index,
+            &pool1,
+            false,
+        );
+        update_histogram(
+            &mut hist_init2,
+            0,
+            bdata.index.len(),
+            &bdata,
+            &g,
+            h.as_deref(),
+            &bdata.index,
+            &col_index,
+            &pool2,
+            false,
+        );
+
+        let bins1 = unsafe { &hist_init_owned1.data.get_unchecked(col).data };
+        let bins2 = unsafe { &hist_init_owned2.data.get_unchecked(col).data };
+
+        println!("{:?}", bins1[0].g_folded);
+        println!("{:?}", bins2[0].g_folded);
+
+        bins1.iter().zip(bins2.iter()).for_each(|(b1, b2)| {
+            b1.g_folded.iter().zip(b2.g_folded.iter()).for_each(|(g1, g2)| {
+                assert_relative_eq!(g1, g2);
+            });
+            b1.h_folded
+                .unwrap()
+                .iter()
+                .zip(b2.h_folded.unwrap().iter())
+                .for_each(|(h1, h2)| {
+                    assert_relative_eq!(h1, h2);
+                });
+        });
+    }
+}
