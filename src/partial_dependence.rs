@@ -70,3 +70,87 @@ pub fn tree_partial_dependence(
         ) + missing_pd
     }
 }
+
+
+#[cfg(test)]
+mod tests {
+
+    use super::*;
+    use crate::binning::bin_matrix;
+    use crate::constraints::ConstraintMap;
+    use crate::data::Matrix;
+    use crate::histogram::{NodeHistogram, NodeHistogramOwned};
+    use crate::objective_functions::{LogLoss, ObjectiveFunction, Objective};
+    use crate::splitter::{MissingImputerSplitter, SplitInfo, SplitInfoSlice};
+    use crate::tree::tree::Tree;
+    use std::fs;
+
+    #[test]
+    fn test_partial_dependence() {
+
+        // instantiate objective function
+        let objective_function = Objective::LogLoss.instantiate();
+        let loss_fn = crate::objective_functions::loss_callables(objective_function.clone());
+
+        let is_const_hess = false;
+
+        let file =
+            fs::read_to_string("resources/contiguous_no_missing.csv").expect("Something went wrong reading the file");
+        let data_vec: Vec<f64> = file.lines().map(|x| x.parse::<f64>().unwrap()).collect();
+        let file = fs::read_to_string("resources/performance.csv").expect("Something went wrong reading the file");
+        let y: Vec<f64> = file.lines().map(|x| x.parse::<f64>().unwrap()).collect();
+        let yhat = vec![0.5; y.len()];
+        let (mut g, mut h) = objective_function.calc_grad_hess(&y, &yhat, None);
+        let loss = objective_function.calc_loss(&y, &yhat, None);
+
+        let data = Matrix::new(&data_vec, 891, 5);
+        let splitter = MissingImputerSplitter::new(0.3, true, ConstraintMap::new());
+        let mut tree = Tree::new();
+
+        let b = bin_matrix(&data, None, 300, f64::NAN, None).unwrap();
+        let bdata = Matrix::new(&b.binned_data, data.rows, data.cols);
+        let col_index: Vec<usize> = (0..data.cols).collect();
+
+        let n_nodes_alloc = 100;
+
+        let mut hist_tree_owned: Vec<NodeHistogramOwned> = (0..n_nodes_alloc)
+            .map(|_| NodeHistogramOwned::empty_from_cuts(&b.cuts, &col_index, is_const_hess, true))
+            .collect();
+
+        let mut hist_tree: Vec<NodeHistogram> = hist_tree_owned
+            .iter_mut()
+            .map(|node_hist| NodeHistogram::from_owned(node_hist))
+            .collect();
+
+        let pool = rayon::ThreadPoolBuilder::new().num_threads(2).build().unwrap();
+
+        let mut split_info_vec: Vec<SplitInfo> = (0..col_index.len()).map(|_| SplitInfo::default()).collect();
+        let split_info_slice = SplitInfoSlice::new(&mut split_info_vec);
+
+        tree.fit(
+            &bdata,
+            data.index.to_owned(),
+            &col_index,
+            &mut g,
+            h.as_deref_mut(),
+            &splitter,
+            &pool,
+            Some(f32::MAX),
+            &loss,
+            &y,
+            loss_fn.clone(),
+            &yhat,
+            None,
+            false,
+            &mut hist_tree,
+            None,
+            &split_info_slice,
+            n_nodes_alloc,
+        );
+
+        let pdp1 = tree_partial_dependence(&tree, 0, 0, 1.0, 1.0, &f64::NAN);
+        let pdp2 = tree_partial_dependence(&tree, 0, 0, 2.0, 1.0, &f64::NAN);
+        let pdp3 = tree_partial_dependence(&tree, 0, 0, 3.0, 1.0, &f64::NAN);
+        println!("{}, {}, {}", pdp1, pdp2, pdp3);
+    }
+}
