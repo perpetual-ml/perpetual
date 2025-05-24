@@ -121,7 +121,7 @@ impl ObjectiveFunction for HuberLoss {
     }
 
     fn hessian_is_constant(&self) -> bool {
-        true
+        false
     }
 
 }

@@ -206,7 +206,7 @@ impl UnivariateBooster {
 
         // NOTE: is_cost_hess is unused BUT
         // it is going to be used at some point.
-        let (calc_grad_hess, calc_loss, calc_init, _is_const_hess, _metric) =
+        let (calc_grad_hess, calc_loss, calc_init, constant_gradient, _metric) =
             if let Some(custom) = &self.cfg.custom_objective {
                 (
                     Arc::clone(&custom.grad_hess),
@@ -271,12 +271,7 @@ impl UnivariateBooster {
         
         let is_const_hess = match sample_weight {
             Some(_sample_weight) => false,
-            None => match &self.cfg.objective {
-                Objective::LogLoss => false,
-                Objective::AdaptiveHuberLoss { quantile: _} => false,
-                Objective::HuberLoss{ delta: _ } => false,
-                _ => true,
-            },
+            None => constant_gradient,
         };
 
         // Generate binned data
