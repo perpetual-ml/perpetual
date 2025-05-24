@@ -136,3 +136,24 @@ pub fn sort_cat_bins_by_stat(histogram: &mut [&UnsafeCell<Bin>], is_const_hess: 
         }
     }
 }
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_bin() {
+        let mut root_bin = Bin::empty_const_hess(0, 0.0);
+        root_bin.counts = [10, 10, 10, 10, 10];
+        let mut child_bin = Bin::empty_const_hess(1, 0.0);
+        child_bin.counts = [9, 8, 7, 6, 5];
+        let mut update_bin = Bin::empty_const_hess(2, 0.0);
+        Bin::from_parent_child(
+            &mut root_bin as *mut Bin,
+            &mut child_bin as *mut Bin,
+            &mut update_bin as *mut Bin,
+        );
+        assert!(update_bin.counts == [1, 2, 3, 4, 5]);
+    }
+}
