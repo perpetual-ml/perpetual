@@ -137,6 +137,7 @@ pub fn sort_cat_bins_by_stat(histogram: &mut [&UnsafeCell<Bin>], is_const_hess: 
     }
 }
 
+
 #[cfg(test)]
 mod tests {
     use super::*;

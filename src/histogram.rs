@@ -310,13 +310,14 @@ pub fn update_histogram(
     }
 }
 
+
 #[cfg(test)]
 mod tests {
     use crate::binning::bin_matrix;
     use crate::histogram::{
         update_histogram, FeatureHistogram, FeatureHistogramOwned, NodeHistogram, NodeHistogramOwned,
     };
-    use crate::objective_functions::{LogLoss, ObjectiveFunction};
+    use crate::objective_functions::{ObjectiveFunction, Objective};
     use crate::Matrix;
     use approx::assert_relative_eq;
     use std::collections::HashSet;
@@ -324,6 +325,10 @@ mod tests {
 
     #[test]
     fn test_simple_histogram() {
+
+        // instantiate objective function
+        let objective_function = Objective::LogLoss.instantiate();
+
         let nbins = 90;
 
         let data_vec: Vec<f64> = (0..100).map(|i| i as f64).collect();
@@ -336,7 +341,7 @@ mod tests {
 
         let y_avg = y.iter().sum::<f64>() / y.len() as f64;
         let yhat = vec![y_avg; y.len()];
-        let (g, h) = LogLoss::calc_grad_hess(&y, &yhat, None, None);
+        let (g, h) = objective_function.calc_grad_hess(&y, &yhat, None);
 
         let col = 0;
         let mut hist_feat_owned = FeatureHistogramOwned::empty_from_cuts(&b.cuts.get_col(col), false);
@@ -379,6 +384,10 @@ mod tests {
 
     #[test]
     fn test_single_histogram() {
+
+        // instantiate objective function
+        let objective_function = Objective::LogLoss.instantiate();
+
         let nbins = 10;
 
         let file =
@@ -389,7 +398,7 @@ mod tests {
         let bdata = Matrix::new(&b.binned_data, data.rows, data.cols);
         let y: Vec<f64> = file.lines().map(|x| x.parse::<f64>().unwrap()).collect();
         let yhat = vec![0.5; y.len()];
-        let (g, h) = LogLoss::calc_grad_hess(&y, &yhat, None, None);
+        let (g, h) = objective_function.calc_grad_hess(&y, &yhat, None);
 
         let col_index: Vec<usize> = (0..data.cols).collect();
         let mut hist_init_owned = NodeHistogramOwned::empty_from_cuts(&b.cuts, &col_index, true, false);
@@ -428,6 +437,10 @@ mod tests {
 
     #[test]
     fn test_histogram_categorical() {
+
+        // instantiate objective function
+        let objective_function = Objective::LogLoss.instantiate();
+
         let file =
             fs::read_to_string("resources/titanic_train_flat.csv").expect("Something went wrong reading the file");
         let n_rows = 712;
@@ -450,7 +463,7 @@ mod tests {
         let bdata = Matrix::new(&b.binned_data, data.rows, data.cols);
         let y: Vec<f64> = file.lines().map(|x| x.parse::<f64>().unwrap_or(f64::NAN)).collect();
         let yhat = vec![0.5; y.len()];
-        let (g, h) = LogLoss::calc_grad_hess(&y, &yhat, None, None);
+        let (g, h) = objective_function.calc_grad_hess(&y, &yhat, None);
 
         let col_index: Vec<usize> = (0..data.cols).collect();
         let mut hist_init_owned = NodeHistogramOwned::empty_from_cuts(&b.cuts, &col_index, false, false);
@@ -490,6 +503,10 @@ mod tests {
 
     #[test]
     fn test_histogram_parallel() {
+
+        // instantiate objective function
+        let objective_function = Objective::LogLoss.instantiate();
+
         let file =
             fs::read_to_string("resources/titanic_train_flat.csv").expect("Something went wrong reading the file");
         let n_rows = 712;
@@ -505,7 +522,7 @@ mod tests {
         let bdata = Matrix::new(&b.binned_data, data.rows, data.cols);
         let y: Vec<f64> = file.lines().map(|x| x.parse::<f64>().unwrap_or(f64::NAN)).collect();
         let yhat = vec![0.5; y.len()];
-        let (g, h) = LogLoss::calc_grad_hess(&y, &yhat, None, None);
+        let (g, h) = objective_function.calc_grad_hess(&y, &yhat, None);
 
         let col_index: Vec<usize> = (0..data.cols).collect();
 

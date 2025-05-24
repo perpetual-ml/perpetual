@@ -1,5 +1,5 @@
 use crate::bin::sort_cat_bins_by_stat;
-use crate::booster::booster::MissingNodeTreatment;
+use crate::booster::config::MissingNodeTreatment;
 use crate::constants::GENERALIZATION_THRESHOLD;
 use crate::constraints::{Constraint, ConstraintMap};
 use crate::data::{FloatData, Matrix};
@@ -1814,6 +1814,7 @@ fn evaluate_branch_split_var_hess(
     ))
 }
 
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1821,7 +1822,7 @@ mod tests {
     use crate::data::Matrix;
     use crate::histogram::NodeHistogramOwned;
     use crate::node::SplittableNode;
-    use crate::objective_functions::{LogLoss, ObjectiveFunction, SquaredLoss};
+    use crate::objective_functions::{ObjectiveFunction, Objective};
     use crate::tree::tree::create_root_node;
     use crate::utils::gain;
     use crate::utils::weight;
@@ -1831,6 +1832,10 @@ mod tests {
 
     #[test]
     fn test_data_split() {
+
+        // instantiate objective function
+        let objective_function = Objective::LogLoss.instantiate();
+
         let is_const_hess = false;
         let num_threads = 2;
 
@@ -1841,7 +1846,7 @@ mod tests {
         let y: Vec<f64> = file.lines().map(|x| x.parse::<f64>().unwrap()).collect();
         let yhat = vec![0.5; y.len()];
 
-        let (grad, hess) = LogLoss::calc_grad_hess(&y, &yhat, None, None);
+        let (grad, hess) = objective_function.calc_grad_hess(&y, &yhat, None);
 
         let splitter = MissingImputerSplitter::new(0.3, true, ConstraintMap::new());
         let gradient_sum = grad.iter().sum();
@@ -1933,6 +1938,10 @@ mod tests {
 
     #[test]
     fn test_cal_housing() -> Result<(), Box<dyn Error>> {
+
+        // instantiate objective function
+        let objective_function = Objective::SquaredLoss.instantiate();
+
         let n_bins = 256;
         let n_cols = 8;
         let is_const_hess = true;
@@ -1992,7 +2001,7 @@ mod tests {
 
         let y_test_avg = y_test.iter().sum::<f64>() / y_test.len() as f64;
         let yhat = vec![y_test_avg; y_test.len()];
-        let (grad, hess) = SquaredLoss::calc_grad_hess(&y_test, &yhat, None, None);
+        let (grad, hess) = objective_function.calc_grad_hess(&y_test, &yhat, None);
 
         let splitter = MissingImputerSplitter::new(0.3, false, ConstraintMap::new());
 
@@ -2056,6 +2065,10 @@ mod tests {
 
     #[test]
     fn test_categorical() -> Result<(), Box<dyn Error>> {
+
+        // instantiate objective function
+        let objective_function = Objective::LogLoss.instantiate();
+
         let n_bins = 256;
         let n_rows = 712;
         let n_cols = 9;
@@ -2073,7 +2086,7 @@ mod tests {
 
         let y_avg = y.iter().sum::<f64>() / y.len() as f64;
         let yhat = vec![y_avg; y.len()];
-        let (grad, hess) = LogLoss::calc_grad_hess(&y, &yhat, None, None);
+        let (grad, hess) = objective_function.calc_grad_hess(&y, &yhat, None);
 
         let splitter = MissingImputerSplitter::new(eta, false, ConstraintMap::new());
 
@@ -2167,6 +2180,10 @@ mod tests {
 
     #[test]
     fn test_gbm_categorical_sensory() -> Result<(), Box<dyn Error>> {
+
+        // instantiate objective function
+        let objective_function = Objective::SquaredLoss.instantiate();
+
         let n_bins = 256;
         let n_cols = 11;
         let is_const_hess = true;
@@ -2182,7 +2199,7 @@ mod tests {
 
         let y_avg = y.iter().sum::<f64>() / y.len() as f64;
         let yhat = vec![y_avg; y.len()];
-        let (grad, hess) = SquaredLoss::calc_grad_hess(&y, &yhat, None, None);
+        let (grad, hess) = objective_function.calc_grad_hess(&y, &yhat, None);
 
         let splitter = MissingImputerSplitter::new(eta, false, ConstraintMap::new());
 

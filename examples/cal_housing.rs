@@ -10,7 +10,7 @@
 
 // cargo flamegraph --example cal_housing
 
-use perpetual::{objective_functions::Objective, Matrix, PerpetualBooster};
+use perpetual::{objective_functions::Objective, Matrix, UnivariateBooster};
 use polars::prelude::*;
 use std::env;
 use std::error::Error;
@@ -118,7 +118,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     // To provide parameters generate a default booster, and then use
     // the relevant `set_` methods for any parameters you would like to
     // adjust.
-    let mut model = PerpetualBooster::default()
+    let mut model = UnivariateBooster::default()
         .set_objective(Objective::SquaredLoss)
         .set_num_threads(Some(*num_threads))
         .set_budget(*budget);

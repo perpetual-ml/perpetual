@@ -1,8 +1,9 @@
 use crate::utils::int_map_to_constraint_map;
 use crate::utils::to_value_error;
 use numpy::{IntoPyArray, PyArray1, PyReadonlyArray1};
-use perpetual_rs::booster::booster::MissingNodeTreatment;
-use perpetual_rs::booster::multi_output::MultiOutputBooster as CrateMultiOutputBooster;
+use perpetual_rs::booster::config::MissingNodeTreatment;
+use perpetual_rs::booster::multivariate_booster::MultivariateBooster as CrateMultiOutputBooster;
+use perpetual_rs::booster::config::BoosterIO;
 use perpetual_rs::constraints::Constraint;
 use perpetual_rs::data::Matrix;
 use perpetual_rs::objective_functions::Objective;
@@ -373,13 +374,13 @@ impl MultiOutputBooster {
     }
 
     pub fn get_params(&self, py: Python) -> PyResult<PyObject> {
-        let objective_ = to_value_error(serde_plain::to_string::<Objective>(&self.booster.objective))?;
+        let objective_ = to_value_error(serde_plain::to_string::<Objective>(&self.booster.cfg.objective))?;
         let missing_node_treatment_ = to_value_error(serde_plain::to_string::<MissingNodeTreatment>(
-            &self.booster.missing_node_treatment,
+            &self.booster.cfg.missing_node_treatment,
         ))?;
         let monotone_constraints_: HashMap<usize, i8> = self
             .booster
-            .monotone_constraints
+            .cfg.monotone_constraints
             .as_ref()
             .unwrap_or(&HashMap::new())
             .iter()
@@ -395,31 +396,31 @@ impl MultiOutputBooster {
 
         let key_vals: Vec<(&str, PyObject)> = vec![
             ("objective", objective_.to_object(py)),
-            ("num_threads", self.booster.num_threads.to_object(py)),
-            ("allow_missing_splits", self.booster.allow_missing_splits.to_object(py)),
+            ("num_threads", self.booster.cfg.num_threads.to_object(py)),
+            ("allow_missing_splits", self.booster.cfg.allow_missing_splits.to_object(py)),
             ("monotone_constraints", monotone_constraints_.to_object(py)),
-            ("missing", self.booster.missing.to_object(py)),
+            ("missing", self.booster.cfg.missing.to_object(py)),
             (
                 "create_missing_branch",
-                self.booster.create_missing_branch.to_object(py),
+                self.booster.cfg.create_missing_branch.to_object(py),
             ),
             (
                 "terminate_missing_features",
-                self.booster.terminate_missing_features.to_object(py),
+                self.booster.cfg.terminate_missing_features.to_object(py),
             ),
             ("missing_node_treatment", missing_node_treatment_.to_object(py)),
-            ("log_iterations", self.booster.log_iterations.to_object(py)),
+            ("log_iterations", self.booster.cfg.log_iterations.to_object(py)),
             (
                 "force_children_to_bound_parent",
-                self.booster.force_children_to_bound_parent.to_object(py),
+                self.booster.cfg.force_children_to_bound_parent.to_object(py),
             ),
-            ("quantile", self.booster.quantile.to_object(py)),
-            ("reset", self.booster.reset.to_object(py)),
-            ("categorical_features", self.booster.categorical_features.to_object(py)),
-            ("timeout", self.booster.timeout.to_object(py)),
-            ("iteration_limit", self.booster.iteration_limit.to_object(py)),
-            ("memory_limit", self.booster.memory_limit.to_object(py)),
-            ("stopping_rounds", self.booster.stopping_rounds.to_object(py)),
+            ("quantile", self.booster.cfg.quantile.to_object(py)),
+            ("reset", self.booster.cfg.reset.to_object(py)),
+            ("categorical_features", self.booster.cfg.categorical_features.to_object(py)),
+            ("timeout", self.booster.cfg.timeout.to_object(py)),
+            ("iteration_limit", self.booster.cfg.iteration_limit.to_object(py)),
+            ("memory_limit", self.booster.cfg.memory_limit.to_object(py)),
+            ("stopping_rounds", self.booster.cfg.stopping_rounds.to_object(py)),
         ];
         let dict = key_vals.into_py_dict_bound(py);
 

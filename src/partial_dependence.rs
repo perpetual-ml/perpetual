@@ -71,6 +71,7 @@ pub fn tree_partial_dependence(
     }
 }
 
+
 #[cfg(test)]
 mod tests {
 
@@ -79,13 +80,18 @@ mod tests {
     use crate::constraints::ConstraintMap;
     use crate::data::Matrix;
     use crate::histogram::{NodeHistogram, NodeHistogramOwned};
-    use crate::objective_functions::{LogLoss, ObjectiveFunction};
+    use crate::objective_functions::{ObjectiveFunction, Objective};
     use crate::splitter::{MissingImputerSplitter, SplitInfo, SplitInfoSlice};
     use crate::tree::tree::Tree;
     use std::fs;
 
     #[test]
     fn test_partial_dependence() {
+
+        // instantiate objective function
+        let objective_function = Objective::LogLoss.instantiate();
+        let loss_fn = crate::objective_functions::loss_callables(objective_function.clone());
+
         let is_const_hess = false;
 
         let file =
@@ -94,8 +100,8 @@ mod tests {
         let file = fs::read_to_string("resources/performance.csv").expect("Something went wrong reading the file");
         let y: Vec<f64> = file.lines().map(|x| x.parse::<f64>().unwrap()).collect();
         let yhat = vec![0.5; y.len()];
-        let (mut g, mut h) = LogLoss::calc_grad_hess(&y, &yhat, None, None);
-        let loss = LogLoss::calc_loss(&y, &yhat, None, None);
+        let (mut g, mut h) = objective_function.calc_grad_hess(&y, &yhat, None);
+        let loss = objective_function.calc_loss(&y, &yhat, None);
 
         let data = Matrix::new(&data_vec, 891, 5);
         let splitter = MissingImputerSplitter::new(0.3, true, ConstraintMap::new());
@@ -132,9 +138,8 @@ mod tests {
             Some(f32::MAX),
             &loss,
             &y,
-            LogLoss::calc_loss,
+            loss_fn.clone(),
             &yhat,
-            None,
             None,
             false,
             &mut hist_tree,
