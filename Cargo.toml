@@ -37,5 +37,10 @@ csv = "1.3.1"
 chrono = "0.4.40"
 
 [[bench]]
-name = "perpetual_benchmarks"
+name    = "benchmark_booster"
 harness = false
+
+[[bench]]
+name    = "benchmark_objective_function"
+harness = false
+
