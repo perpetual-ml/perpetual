@@ -28,7 +28,7 @@ struct CustomSquaredLoss;
 impl ObjectiveFunction for CustomSquaredLoss {
 
     fn hessian_is_constant(&self) -> bool {
-        true
+        false
     }
 
     fn calc_loss(&self, y: &[f64], yhat: &[f64], sample_weight: Option<&[f64]>) -> Vec<f32> {

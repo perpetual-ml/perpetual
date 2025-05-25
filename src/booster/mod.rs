@@ -23,8 +23,11 @@ mod univariate_booster_test {
     use crate::booster::config::*;
     use std::collections::HashSet;
     use crate::utils::between;
-    use approx::assert_relative_eq;
+    use approx::{assert_relative_eq, relative_eq};
     use std::fs;
+    use crate::objective_functions::ObjectiveFunction;
+    use crate::metrics::Metric;
+
 
      #[test]
     fn test_booster_fit() {
@@ -512,6 +515,148 @@ mod univariate_booster_test {
         let trees = model.get_prediction_trees();
         println!("trees = {}", trees.len());
         assert_eq!(trees.len(), 31);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_custom_objective_function() -> Result<(), Box<dyn Error>> {
+
+        // define objective function
+        #[derive(Clone)]
+        struct CustomSquaredLoss;
+        impl ObjectiveFunction for CustomSquaredLoss {
+
+            fn hessian_is_constant(&self) -> bool {
+                false // fails if true
+            }
+
+            fn calc_loss(&self, y: &[f64], yhat: &[f64], sample_weight: Option<&[f64]>) -> Vec<f32> {
+                y.iter()
+                    .zip(yhat)
+                    .enumerate()
+                    .map(|(idx, (y_i, yhat_i))| {
+                        let diff = y_i - yhat_i;
+                        let l = diff * diff;
+                        match sample_weight {
+                            Some(w) => (l * w[idx]) as f32,
+                            None => l as f32,
+                        }
+                    })
+                    .collect()
+            }
+
+            fn calc_grad_hess(&self, y: &[f64], yhat: &[f64], sample_weight: Option<&[f64]>,) -> (Vec<f32>, Option<Vec<f32>>) {
+                let grad: Vec<f32> = y
+                    .iter()
+                    .zip(yhat)
+                    .enumerate()
+                    .map(|(idx, (y_i, yhat_i))| {
+                        let g = yhat_i - y_i;
+                        match sample_weight {
+                            Some(w) => (g * w[idx]) as f32,
+                            None => g as f32,
+                        }
+                    })
+                    .collect();
+                let hess = vec![2.0_f32; y.len()];
+                (grad, Some(hess))
+            }
+
+            fn calc_init(&self, y: &[f64], sample_weight: Option<&[f64]>) -> f64 {
+                match sample_weight {
+                    Some(w) => {
+                        let sw: f64 = w.iter().sum();
+                        y.iter().enumerate().map(|(i, y_i)| y_i * w[i]).sum::<f64>() / sw
+                    }
+                    None => y.iter().sum::<f64>() / y.len() as f64,
+                }
+            }
+
+            fn default_metric(&self) -> Metric {
+                Metric::RootMeanSquaredError
+            }
+        }
+
+
+         let all_names = [
+        "MedInc".to_string(),
+        "HouseAge".to_string(),
+        "AveRooms".to_string(),
+        "AveBedrms".to_string(),
+        "Population".to_string(),
+        "AveOccup".to_string(),
+        "Latitude".to_string(),
+        "Longitude".to_string(),
+        "MedHouseVal".to_string(),
+        ];
+
+        let feature_names = [
+            "MedInc".to_string(),
+            "HouseAge".to_string(),
+            "AveRooms".to_string(),
+            "AveBedrms".to_string(),
+            "Population".to_string(),
+            "AveOccup".to_string(),
+            "Latitude".to_string(),
+            "Longitude".to_string(),
+        ];
+
+        let df = CsvReadOptions::default()
+            .with_has_header(true)
+            .with_columns(Some(Arc::new(all_names.clone())))
+            .try_into_reader_with_file_path(Some("resources/cal_housing_test.csv".into()))?
+            .finish()?;
+
+        
+        let id_vars: Vec<&str> = Vec::new();
+        let mdf = df.unpivot(feature_names.to_vec(), &id_vars)?;
+
+        let data: Vec<f64> = mdf
+            .select_at_idx(1)
+            .expect("Invalid column")
+            .f64()? // Returns Result<Float64Chunked>
+            .into_iter()
+            .map(|v| v.unwrap_or(f64::NAN))
+            .collect();
+
+        let y: Vec<f64> = df
+            .column("MedHouseVal")?
+            .cast(&DataType::Float64)?
+            .f64()? // Returns Result<Float64Chunked>
+            .into_iter()
+            .map(|v| v.unwrap_or(f64::NAN))
+            .collect();
+
+        let matrix = Matrix::new(&data, y.len(), 8);
+
+        // define booster with custom loss 
+        // function
+        let mut custom_booster = UnivariateBooster::default();
+        custom_booster.cfg = custom_booster.cfg.clone().with_custom_objective(CustomSquaredLoss);
+        custom_booster.cfg.max_bin = 1;
+        custom_booster.cfg.budget = 0.1;
+        custom_booster.clone().set_stopping_rounds(Some(1));
+
+        // define booster with builting
+        // squared loss
+        let mut booster = UnivariateBooster::default()
+        .set_objective(Objective::SquaredLoss)
+        .set_max_bin(1)
+        .set_budget(0.1)
+        .set_stopping_rounds(Some(1));
+
+        // fit
+        booster.fit(&matrix, &y, None)?;
+        custom_booster.fit(&matrix, &y, None)?;
+
+        // // predict values
+        let custom_prediction = custom_booster.predict(&matrix, false);
+        let booster_prediction = booster.predict(&matrix, false);
+
+        relative_eq!(custom_prediction[..5], booster_prediction[..5]);
+
+
 
         Ok(())
     }

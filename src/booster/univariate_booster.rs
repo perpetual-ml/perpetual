@@ -268,9 +268,9 @@ impl UnivariateBooster {
         let c = 1.0 / n - truncated_series_sum;
         let target_loss_decrement = c * base.powf(-self.cfg.budget) * loss_avg;
 
-        
+                
         let is_const_hess = match sample_weight {
-            Some(_sample_weight) => false,
+            Some(_) => false,
             None => constant_gradient,
         };
 
