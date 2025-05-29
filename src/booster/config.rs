@@ -13,6 +13,7 @@ use std::collections::{HashSet};
 use crate::constraints::ConstraintMap;
 use crate::objective_functions::{ObjectiveFunction, Objective, CustomObjective};
 use crate::objective_functions::{gradient_hessian_callables, loss_callables, calc_init_callables};
+use std::sync::Arc;
 
 // Common configuration
 // across implementations
@@ -184,27 +185,6 @@ pub struct BoosterConfig {
     /// Optional limit for auto stopping rounds.
     #[serde(default = "default_stopping_rounds")]
     pub stopping_rounds: Option<usize>,
-    #[serde(skip)]
-    pub custom_objective: Option<CustomObjective>,
-}
-
-impl BoosterConfig {
-    /// Builder method to inject any T: ObjectiveFunction
-    /// at runtime.
-    pub fn with_custom_objective<T>(mut self, obj: T) -> Self
-    where
-        T: ObjectiveFunction + Clone + 'static,
-    {
-        self.custom_objective = Some(CustomObjective {
-            grad_hess:           gradient_hessian_callables(obj.clone()),
-            loss:                loss_callables(obj.clone()),
-            init:                calc_init_callables(obj.clone()),
-            hessian_constant:    obj.hessian_is_constant(),
-            metric:              obj.default_metric(),
-        });
-        
-        self
-    }
 }
 
 // Default booster base configuration
@@ -231,7 +211,6 @@ impl Default for BoosterConfig {
             iteration_limit: None,
             memory_limit: None,
             stopping_rounds: None,
-            custom_objective: None,
         }
     }
 }
