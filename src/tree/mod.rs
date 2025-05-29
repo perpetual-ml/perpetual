@@ -26,7 +26,7 @@ mod tests {
     fn test_tree_fit() {
 
         // instantiate objective function
-        let objective_function = Objective::LogLoss.instantiate();
+        let objective_function = Objective::LogLoss.as_function();
         let loss_fn = crate::objective_functions::loss_callables(objective_function.clone());
 
 
@@ -65,6 +65,7 @@ mod tests {
         let split_info_slice = SplitInfoSlice::new(&mut split_info_vec);
 
         tree.fit(
+            &objective_function,
             &bdata,
             data.index.to_owned(),
             &col_index,
@@ -75,7 +76,7 @@ mod tests {
             Some(f32::MAX),
             &loss,
             &y,
-            loss_fn.clone(),
+            //loss_fn.clone(),
             &yhat,
             None,
             is_const_hess,
@@ -125,7 +126,7 @@ mod tests {
     fn test_tree_fit_monotone() {
 
         // instantiate objective function
-        let objective_function = Objective::LogLoss.instantiate();
+        let objective_function = Objective::LogLoss.as_function();
         let loss_fn = crate::objective_functions::loss_callables(objective_function.clone());
 
         let file =
@@ -166,6 +167,7 @@ mod tests {
         let split_info_slice = SplitInfoSlice::new(&mut split_info_vec);
 
         tree.fit(
+            &objective_function,
             &bdata,
             data.index.to_owned(),
             &col_index,
@@ -176,7 +178,7 @@ mod tests {
             Some(f32::MAX),
             &loss,
             &y,
-            loss_fn.clone(),
+            //loss_fn.clone(),
             &yhat,
             None,
             is_const_hess,
@@ -224,7 +226,7 @@ mod tests {
     fn test_tree_fit_lossguide() {
 
         // instantiate objective function
-        let objective_function = Objective::LogLoss.instantiate();
+        let objective_function = Objective::LogLoss.as_function();
         let loss_fn = crate::objective_functions::loss_callables(objective_function.clone());
 
         let file =
@@ -262,6 +264,7 @@ mod tests {
         let split_info_slice = SplitInfoSlice::new(&mut split_info_vec);
 
         tree.fit(
+            &objective_function,
             &bdata,
             data.index.to_owned(),
             &col_index,
@@ -272,7 +275,7 @@ mod tests {
             Some(f32::MAX),
             &loss,
             &y,
-            loss_fn.clone(),
+            //loss_fn.clone(),
             &yhat,
             None,
             is_const_hess,
@@ -322,7 +325,7 @@ mod tests {
     fn test_tree_categorical() -> Result<(), Box<dyn Error>> {
 
         // instantiate objective function
-        let objective_function = Objective::LogLoss.instantiate();
+        let objective_function = Objective::LogLoss.as_function();
         let loss_fn = crate::objective_functions::loss_callables(objective_function.clone());
 
         let n_bins = 256;
@@ -369,6 +372,7 @@ mod tests {
 
         let mut tree = Tree::new();
         tree.fit(
+            &objective_function,
             &bdata,
             data.index.to_owned(),
             &col_index,
@@ -379,7 +383,7 @@ mod tests {
             Some(f32::MAX),
             &loss,
             &y,
-            loss_fn.clone(),
+            //loss_fn.clone(),
             &yhat,
             None,
             false,

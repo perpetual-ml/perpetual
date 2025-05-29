@@ -632,11 +632,11 @@ mod univariate_booster_test {
 
         // define booster with custom loss 
         // function
-        let mut custom_booster = UnivariateBooster::default();
-        custom_booster.cfg = custom_booster.cfg.clone().with_custom_objective(CustomSquaredLoss);
-        custom_booster.cfg.max_bin = 1;
-        custom_booster.cfg.budget = 0.1;
-        custom_booster.clone().set_stopping_rounds(Some(1));
+        let mut custom_booster = UnivariateBooster::default()
+        .set_objective(Objective::function(CustomSquaredLoss))
+        .set_max_bin(1)
+        .set_budget(0.1)
+        .set_stopping_rounds(Some(1));
 
         // define booster with builting
         // squared loss
