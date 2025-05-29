@@ -129,28 +129,37 @@ pub enum Objective {
 }
 
 impl Objective {
-    /// Instantiate the boxed ObjectiveFunction
-    pub fn instantiate(&self) -> Arc<dyn ObjectiveFunction> {
-        match self {
-            Objective::LogLoss => Arc::new(LogLoss::default()),
-            Objective::SquaredLoss => Arc::new(SquaredLoss::default()),
-            Objective::QuantileLoss { quantile } => Arc::new(QuantileLoss { quantile: *quantile }),
-            Objective::HuberLoss { delta } => Arc::new(HuberLoss { delta: *delta }),
-            Objective::AdaptiveHuberLoss { quantile } => Arc::new(AdaptiveHuberLoss { quantile: *quantile }),
-            Objective::Custom(obj) => obj.clone(),
-        }
-    }
-}
-
-// default constructor
-// to enable Objective::function(CustomSquaredLoss)
-// in .set_objective()
-impl Objective {
+    /// Construct a custom objective directly from any `ObjectiveFunction` implementor.
+    /// 
+    /// # Example
+    /// ```rust
+    /// let obj = Objective::custom(MyLoss::new());
+    /// ```
+    
+    // default constructor
+    // to enable Objective::function(CustomSquaredLoss)
+    // in .set_objective()
     pub fn function<T>(obj: T) -> Self
     where
-        T: ObjectiveFunction + Clone + 'static,
+        T: ObjectiveFunction + 'static,
     {
-        Objective::Custom(Arc::new(CustomObjective::new(obj)))
+        // Wrap the user-provided objective in Arc<dyn>
+        let shared: Arc<dyn ObjectiveFunction> = Arc::new(obj);
+
+        // Embed directly in the enum
+        Objective::Custom(shared)
+    }
+
+    /// Instantiate the boxed `ObjectiveFunction`
+    pub fn instantiate(&self) -> Arc<dyn ObjectiveFunction> {
+        match self {
+            Objective::LogLoss => Arc::new(crate::objective_functions::LogLoss::default()),
+            Objective::SquaredLoss => Arc::new(crate::objective_functions::SquaredLoss::default()),
+            Objective::QuantileLoss { quantile } => Arc::new(crate::objective_functions::QuantileLoss { quantile: *quantile }),
+            Objective::HuberLoss { delta } => Arc::new(crate::objective_functions::HuberLoss { delta: *delta }),
+            Objective::AdaptiveHuberLoss { quantile } => Arc::new(crate::objective_functions::AdaptiveHuberLoss { quantile: *quantile }),
+            Objective::Custom(obj) => obj.clone(),
+        }
     }
 }
 
