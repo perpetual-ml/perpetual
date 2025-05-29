@@ -5,9 +5,7 @@ use crate::{
 };
 use std::collections::HashMap;
 use crate::objective_functions::{
-    gradient_hessian_callables,
     loss_callables,
-    calc_init_callables,
     LossFn,
     ObjectiveFunction
 };

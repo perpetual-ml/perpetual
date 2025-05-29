@@ -9,11 +9,8 @@ use std::path::Path;
 use crate::errors::PerpetualError;
 use serde::{Deserialize, Deserializer, Serialize, de::DeserializeOwned};
 use std::collections::{HashSet};
-// use crate::UnivariateBooster;
 use crate::constraints::ConstraintMap;
-use crate::objective_functions::{ObjectiveFunction, Objective, CustomObjective};
-use crate::objective_functions::{gradient_hessian_callables, loss_callables, calc_init_callables};
-use std::sync::Arc;
+use crate::objective_functions::{Objective};
 
 // Common configuration
 // across implementations

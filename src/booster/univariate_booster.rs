@@ -13,7 +13,6 @@ use crate::constraints::ConstraintMap;
 use crate::data::Matrix;
 use crate::errors::PerpetualError;
 use crate::histogram::{update_cuts, NodeHistogram, NodeHistogramOwned};
-use crate::objective_functions::{calc_init_callables, gradient_hessian_callables, loss_callables};
 use crate::splitter::{MissingBranchSplitter, MissingImputerSplitter, SplitInfo, SplitInfoSlice, Splitter};
 use crate::tree::tree::{Tree, TreeStopper};
 use crate::booster::config::*;
@@ -27,7 +26,7 @@ use serde::{Deserialize, Serialize};
 use std::time::Instant;
 use std::{mem};
 use sysinfo::System;
-use crate::objective_functions::{ObjectiveFunction, Objective, CustomObjective};
+use crate::objective_functions::{ObjectiveFunction, Objective};
 use std::sync::Arc;
 
 type ImportanceFn = fn(&Tree, &mut HashMap<usize, (f32, usize)>);

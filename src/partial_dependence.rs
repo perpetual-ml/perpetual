@@ -90,7 +90,6 @@ mod tests {
 
         // instantiate objective function
         let objective_function = Objective::LogLoss.as_function();
-        let loss_fn = crate::objective_functions::loss_callables(objective_function.clone());
 
         let is_const_hess = false;
 

@@ -27,8 +27,6 @@ mod tests {
 
         // instantiate objective function
         let objective_function = Objective::LogLoss.as_function();
-        let loss_fn = crate::objective_functions::loss_callables(objective_function.clone());
-
 
         let file =
             fs::read_to_string("resources/contiguous_no_missing.csv").expect("Something went wrong reading the file");
@@ -127,7 +125,6 @@ mod tests {
 
         // instantiate objective function
         let objective_function = Objective::LogLoss.as_function();
-        let loss_fn = crate::objective_functions::loss_callables(objective_function.clone());
 
         let file =
             fs::read_to_string("resources/contiguous_no_missing.csv").expect("Something went wrong reading the file");
@@ -227,7 +224,6 @@ mod tests {
 
         // instantiate objective function
         let objective_function = Objective::LogLoss.as_function();
-        let loss_fn = crate::objective_functions::loss_callables(objective_function.clone());
 
         let file =
             fs::read_to_string("resources/contiguous_no_missing.csv").expect("Something went wrong reading the file");
@@ -326,8 +322,7 @@ mod tests {
 
         // instantiate objective function
         let objective_function = Objective::LogLoss.as_function();
-        let loss_fn = crate::objective_functions::loss_callables(objective_function.clone());
-
+        
         let n_bins = 256;
         let n_rows = 712;
         let n_columns = 13;

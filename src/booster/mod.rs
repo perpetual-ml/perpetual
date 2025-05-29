@@ -23,7 +23,7 @@ mod univariate_booster_test {
     use crate::booster::config::*;
     use std::collections::HashSet;
     use crate::utils::between;
-    use approx::{assert_relative_eq, relative_eq};
+    use approx::{assert_relative_eq};
     use std::fs;
     use crate::objective_functions::ObjectiveFunction;
     use crate::metrics::Metric;
@@ -654,9 +654,7 @@ mod univariate_booster_test {
         let custom_prediction = custom_booster.predict(&matrix, false);
         let booster_prediction = booster.predict(&matrix, false);
 
-        relative_eq!(custom_prediction[..5], booster_prediction[..5]);
-
-
+        assert_relative_eq!(custom_prediction[..5], booster_prediction[..5], max_relative = 1e-6);
 
         Ok(())
     }
