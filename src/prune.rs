@@ -9,6 +9,7 @@ use crate::objective_functions::{
     loss_callables,
     calc_init_callables,
     LossFn,
+    ObjectiveFunction
 };
 use std::sync::Arc;
 
@@ -20,40 +21,27 @@ impl UnivariateBooster {
         y: &[f64],
         sample_weight: Option<&[f64]>,
     ) -> Result<(), PerpetualError> {
-        // Pull objective callables once
-        let (_gh, calc_loss, calc_init, _hess_const, _metric) =
-            if let Some(custom) = &self.cfg.custom_objective {
-                (
-                    Arc::clone(&custom.grad_hess),
-                    Arc::clone(&custom.loss),
-                    Arc::clone(&custom.init),
-                    custom.hessian_constant,
-                    custom.metric,
-                )
-            } else {
-                let inst = self.cfg.objective.instantiate();
-                (
-                    gradient_hessian_callables(inst.clone()),
-                    loss_callables(inst.clone()),
-                    calc_init_callables(inst.clone()),
-                    inst.hessian_is_constant(),
-                    inst.default_metric(),
-                )
-            };
+
+        // initialize objective function
+        let objective_fn: Arc<dyn ObjectiveFunction> = self.cfg.objective.as_function();
 
         let old_length = self.trees.len();
         let old_n_nodes: usize = self.trees.iter().map(|t| t.nodes.len()).sum();
 
-        let base_score = calc_init(y, sample_weight);
+        let base_score = objective_fn.calc_init(y, sample_weight);
         let yhat = vec![base_score; y.len()];
-        let init_losses = calc_loss(y, &yhat, sample_weight);
+        let init_losses = objective_fn.calc_loss(y, &yhat, sample_weight);
         let init_loss = init_losses.iter().sum::<f32>() / init_losses.len() as f32;
 
+        // generate loss calculator
+        // from the objective function
+        let loss_fn: LossFn = loss_callables(objective_fn);
+        
         for tree in &mut self.trees {
             tree.prune_bottom_up(
                 data,
                 &self.cfg.missing,
-                calc_loss.clone(),
+                &loss_fn,
                 init_loss,
                 y,
                 sample_weight,
@@ -173,7 +161,8 @@ impl Tree {
         &mut self,
         data: &Matrix<f64>,
         missing: &f64,
-        calc_loss: LossFn,
+        //objective_function: &Arc<dyn ObjectiveFunction>,
+        calc_loss: &LossFn,
         init_loss: f32,
         y: &[f64],
         sample_weight: Option<&[f64]>,
@@ -185,7 +174,7 @@ impl Tree {
 
         for &i in &data.index {
             let (pred, nid) = self.predict_row_and_node_idx(data, i, missing);
-            let loss = calc_loss(&[y[i]], &[pred + base_score], sample_weight)[0];
+            let loss = (calc_loss)(&[y[i]], &[pred + base_score], sample_weight)[0];
             node_losses.get_mut(&nid).unwrap().push(loss);
         }
 

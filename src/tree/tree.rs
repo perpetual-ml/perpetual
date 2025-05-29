@@ -10,6 +10,8 @@ use serde::{Deserialize, Serialize};
 use std::cmp::max;
 use std::collections::{BinaryHeap, HashMap, HashSet};
 use std::fmt::{self, Display};
+use crate::objective_functions::{ObjectiveFunction};
+use std::sync::Arc;
 
 #[derive(Deserialize, Serialize, Clone, PartialEq, Debug)]
 pub enum TreeStopper {
@@ -45,6 +47,7 @@ impl Tree {
     #[allow(clippy::too_many_arguments)]
     pub fn fit<T: Splitter>(
         &mut self,
+        objective_function: &Arc<dyn ObjectiveFunction>,
         data: &Matrix<u16>,
         mut index: Vec<usize>,
         col_index: &[usize],
@@ -55,7 +58,7 @@ impl Tree {
         target_loss_decrement: Option<f32>,
         loss: &[f32],
         y: &[f64],
-        calc_loss: crate::objective_functions::LossFn,
+        //calc_loss: crate::objective_functions::LossFn,
         yhat: &[f64],
         sample_weight: Option<&[f64]>,
         is_const_hess: bool,
@@ -64,9 +67,11 @@ impl Tree {
         split_info_slice: &SplitInfoSlice,
         n_nodes_alloc: usize,
     ) {
+
         let mut n_nodes = 1;
         self.n_leaves = 1;
 
+        
         let root_hist = unsafe { hist_tree.get_unchecked_mut(0) };
         update_histogram(
             root_hist,
@@ -160,7 +165,7 @@ impl Tree {
                                 None => None,
                             };
                             let yhat_new = yhat[_i] + node.weight_value as f64;
-                            let loss_new = calc_loss(&[y[_i]], &[yhat_new], s_w)[0];
+                            let loss_new = objective_function.calc_loss(&[y[_i]], &[yhat_new], s_w)[0];
                             loss_decr_avg -= loss_decr[_i] / index_length;
                             loss_decr[_i] = loss[_i] - loss_new;
                             loss_decr_avg += loss_decr[_i] / index_length;

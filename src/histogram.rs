@@ -327,7 +327,7 @@ mod tests {
     fn test_simple_histogram() {
 
         // instantiate objective function
-        let objective_function = Objective::LogLoss.instantiate();
+        let objective_function = Objective::LogLoss.as_function();
 
         let nbins = 90;
 
@@ -386,7 +386,7 @@ mod tests {
     fn test_single_histogram() {
 
         // instantiate objective function
-        let objective_function = Objective::LogLoss.instantiate();
+        let objective_function = Objective::LogLoss.as_function();
 
         let nbins = 10;
 
@@ -439,7 +439,7 @@ mod tests {
     fn test_histogram_categorical() {
 
         // instantiate objective function
-        let objective_function = Objective::LogLoss.instantiate();
+        let objective_function = Objective::LogLoss.as_function();
 
         let file =
             fs::read_to_string("resources/titanic_train_flat.csv").expect("Something went wrong reading the file");
@@ -505,7 +505,7 @@ mod tests {
     fn test_histogram_parallel() {
 
         // instantiate objective function
-        let objective_function = Objective::LogLoss.instantiate();
+        let objective_function = Objective::LogLoss.as_function();
 
         let file =
             fs::read_to_string("resources/titanic_train_flat.csv").expect("Something went wrong reading the file");

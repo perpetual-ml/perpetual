@@ -89,7 +89,7 @@ mod tests {
     fn test_partial_dependence() {
 
         // instantiate objective function
-        let objective_function = Objective::LogLoss.instantiate();
+        let objective_function = Objective::LogLoss.as_function();
         let loss_fn = crate::objective_functions::loss_callables(objective_function.clone());
 
         let is_const_hess = false;
@@ -128,6 +128,7 @@ mod tests {
         let split_info_slice = SplitInfoSlice::new(&mut split_info_vec);
 
         tree.fit(
+            &objective_function,
             &bdata,
             data.index.to_owned(),
             &col_index,
@@ -138,7 +139,7 @@ mod tests {
             Some(f32::MAX),
             &loss,
             &y,
-            loss_fn.clone(),
+            //loss_fn.clone(),
             &yhat,
             None,
             false,

@@ -1834,7 +1834,7 @@ mod tests {
     fn test_data_split() {
 
         // instantiate objective function
-        let objective_function = Objective::LogLoss.instantiate();
+        let objective_function = Objective::LogLoss.as_function();
 
         let is_const_hess = false;
         let num_threads = 2;
@@ -1940,7 +1940,7 @@ mod tests {
     fn test_cal_housing() -> Result<(), Box<dyn Error>> {
 
         // instantiate objective function
-        let objective_function = Objective::SquaredLoss.instantiate();
+        let objective_function = Objective::SquaredLoss.as_function();
 
         let n_bins = 256;
         let n_cols = 8;
@@ -2067,7 +2067,7 @@ mod tests {
     fn test_categorical() -> Result<(), Box<dyn Error>> {
 
         // instantiate objective function
-        let objective_function = Objective::LogLoss.instantiate();
+        let objective_function = Objective::LogLoss.as_function();
 
         let n_bins = 256;
         let n_rows = 712;
@@ -2182,7 +2182,7 @@ mod tests {
     fn test_gbm_categorical_sensory() -> Result<(), Box<dyn Error>> {
 
         // instantiate objective function
-        let objective_function = Objective::SquaredLoss.instantiate();
+        let objective_function = Objective::SquaredLoss.as_function();
 
         let n_bins = 256;
         let n_cols = 11;

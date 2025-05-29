@@ -18,41 +18,43 @@ use polars::prelude::{CsvReadOptions, DataType};
 
 use perpetual::{Matrix, UnivariateBooster};
 use perpetual::metrics::Metric;
-use perpetual::objective_functions::ObjectiveFunction;
+use perpetual::objective_functions::{Objective};
 
 //-----------------//
 // Define function //
 //-----------------//
 #[derive(Clone)]
 struct CustomSquaredLoss;
-impl ObjectiveFunction for CustomSquaredLoss {
-
-    fn hessian_is_constant(&self) -> bool {
-        false
-    }
+impl perpetual::objective_functions::ObjectiveFunction for CustomSquaredLoss {
+    fn hessian_is_constant(&self) -> bool { false }
 
     fn calc_loss(&self, y: &[f64], yhat: &[f64], sample_weight: Option<&[f64]>) -> Vec<f32> {
         y.iter()
             .zip(yhat)
             .enumerate()
-            .map(|(idx, (y_i, yhat_i))| {
-                let diff = yhat_i - y_i;
-                let l = diff * diff;
+            .map(|(idx, (yi, yhi))| {
+                let diff = yhi - yi;
+                let loss = diff * diff;
                 match sample_weight {
-                    Some(w) => (l * w[idx]) as f32,
-                    None => l as f32,
+                    Some(w) => (loss * w[idx]) as f32,
+                    None => loss as f32,
                 }
             })
             .collect()
     }
 
-    fn calc_grad_hess(&self, y: &[f64], yhat: &[f64], sample_weight: Option<&[f64]>,) -> (Vec<f32>, Option<Vec<f32>>) {
+    fn calc_grad_hess(
+        &self,
+        y: &[f64],
+        yhat: &[f64],
+        sample_weight: Option<&[f64]>,
+    ) -> (Vec<f32>, Option<Vec<f32>>) {
         let grad: Vec<f32> = y
             .iter()
             .zip(yhat)
             .enumerate()
-            .map(|(idx, (y_i, yhat_i))| {
-                let g = 2.0 * (yhat_i - y_i);
+            .map(|(idx, (yi, yhi))| {
+                let g = 2.0 * (yhi - yi);
                 match sample_weight {
                     Some(w) => (g * w[idx]) as f32,
                     None => g as f32,
@@ -64,12 +66,11 @@ impl ObjectiveFunction for CustomSquaredLoss {
     }
 
     fn calc_init(&self, y: &[f64], sample_weight: Option<&[f64]>) -> f64 {
-        match sample_weight {
-            Some(w) => {
-                let sw: f64 = w.iter().sum();
-                y.iter().enumerate().map(|(i, y_i)| y_i * w[i]).sum::<f64>() / sw
-            }
-            None => y.iter().sum::<f64>() / y.len() as f64,
+        if let Some(w) = sample_weight {
+            let sum_w: f64 = w.iter().sum();
+            y.iter().zip(w).map(|(yi, wi)| yi * wi).sum::<f64>() / sum_w
+        } else {
+            y.iter().sum::<f64>() / y.len() as f64
         }
     }
 
@@ -138,10 +139,10 @@ fn main() -> Result<(), Box<dyn Error>> {
     //--------------------------------------//
     // 2. Build booster w/ custom objective //
     //--------------------------------------//
-    let mut booster = UnivariateBooster::default();
-    booster.cfg = booster.cfg.clone().with_custom_objective(CustomSquaredLoss);
-    booster.cfg.max_bin = 10;
-    booster.cfg.budget = 0.1;
+    let mut booster = UnivariateBooster::default()
+    .set_objective(Objective::function(CustomSquaredLoss))
+    .set_max_bin(10)
+    .set_budget(0.1);
 
     //-------------------//
     // 3. Fit and report //

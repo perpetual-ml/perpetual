@@ -94,7 +94,6 @@ impl MultivariateBooster {
         iteration_limit: Option<usize>,
         memory_limit: Option<f32>,
         stopping_rounds: Option<usize>,
-        custom_objective: Option<CustomObjective>,
     ) -> Result<Self, PerpetualError> {
         // Build the common configuration object.
         let cfg = BoosterConfig {
@@ -117,8 +116,7 @@ impl MultivariateBooster {
             timeout,
             iteration_limit,
             memory_limit,
-            stopping_rounds,
-            custom_objective
+            stopping_rounds
         };
 
         // Base booster template that child boosters will clone.
@@ -188,13 +186,18 @@ impl MultivariateBooster {
 
     /// Set the objective on the booster.
     /// * `objective` - The objective type of the booster.
-    pub fn set_objective(mut self, objective: Objective) -> Self {
-        self.cfg.objective = objective.clone();
+   pub fn set_objective(mut self, objective: Objective) -> Self {
+
+        let tree_objective = objective.clone();
+
         self.boosters = self
             .boosters
-            .iter()
-            .map(|b| b.clone().set_objective(objective.clone()))
+            .into_iter()
+            .map(|b| b.set_objective(tree_objective.clone()))
             .collect();
+
+        self.cfg.objective = objective;
+
         self
     }
 

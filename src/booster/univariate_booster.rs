@@ -112,7 +112,6 @@ impl UnivariateBooster {
         iteration_limit: Option<usize>,
         memory_limit: Option<f32>,
         stopping_rounds: Option<usize>,
-        custom_objective: Option<CustomObjective>,
     ) -> Result<Self, PerpetualError> {
 
         let cfg = BoosterConfig {
@@ -135,8 +134,7 @@ impl UnivariateBooster {
             timeout,
             iteration_limit,
             memory_limit,
-            stopping_rounds,
-            custom_objective
+            stopping_rounds
         };
 
         let booster = UnivariateBooster {
@@ -204,30 +202,11 @@ impl UnivariateBooster {
         sample_weight: Option<&[f64]>,
     ) -> Result<(), PerpetualError> {
 
-        // NOTE: is_cost_hess is unused BUT
-        // it is going to be used at some point.
-        let (calc_grad_hess, calc_loss, calc_init, constant_gradient, _metric) =
-            if let Some(custom) = &self.cfg.custom_objective {
-                (
-                    Arc::clone(&custom.grad_hess),
-                    Arc::clone(&custom.loss),
-                    Arc::clone(&custom.init),
-                    custom.hessian_constant,
-                    custom.metric,
-                )
-            } else {
-                let inst = self.cfg.objective.instantiate();
-                (
-                    gradient_hessian_callables(inst.clone()),
-                    loss_callables(inst.clone()),
-                    calc_init_callables(inst.clone()),
-                    inst.hessian_is_constant(),
-                    inst.default_metric(),
-                )
-            };
-
-
+        // initialize trees
         let start = Instant::now();
+
+        // initialize objective function
+        let objective_fn: Arc<dyn ObjectiveFunction> = self.cfg.objective.as_function();
 
         let n_threads_available = std::thread::available_parallelism().unwrap().get();
         let num_threads = match self.cfg.num_threads {
@@ -239,26 +218,26 @@ impl UnivariateBooster {
             .build()
             .unwrap();
 
-        // let calc_loss = loss_callables(&self.cfg.objective);
-
         // If reset, reset the trees. Otherwise continue training.
         let mut yhat;
         if self.cfg.reset.unwrap_or(true) || self.trees.len() == 0 {
             self.cfg.reset;
             if self.base_score.is_nan() {
-                self.base_score = calc_init(y, sample_weight);
+                self.base_score = objective_fn.calc_init(y, sample_weight);
             }
             yhat = vec![self.base_score; y.len()];
         } else {
             yhat = self.predict(data, true);
         }
 
-        //let calc_grad_hess = gradient_hessian_callables(&self.cfg.objective);
-        let (mut grad, mut hess) = calc_grad_hess(y, &yhat, sample_weight);
+        
 
-        let mut loss = calc_loss(y, &yhat, sample_weight);
-
-        let loss_base = calc_loss(y, &vec![self.base_score; y.len()], sample_weight);
+        // calculate gradient
+        // and hessian
+        // let (mut grad, mut hess) = calc_grad_hess(y, &yhat, sample_weight);
+        let (mut grad, mut hess) = objective_fn.calc_grad_hess(y, &yhat, sample_weight);
+        let mut loss = objective_fn.calc_loss(y, &yhat, sample_weight);
+        let loss_base = objective_fn.calc_loss(y, &vec![self.base_score; y.len()], sample_weight);
         let loss_avg = loss_base.iter().sum::<f32>() / loss_base.len() as f32;
 
         let base = 10.0_f32;
@@ -271,7 +250,7 @@ impl UnivariateBooster {
                 
         let is_const_hess = match sample_weight {
             Some(_) => false,
-            None => constant_gradient,
+            None => objective_fn.hessian_is_constant(),
         };
 
         // Generate binned data
@@ -386,6 +365,7 @@ impl UnivariateBooster {
 
             let mut tree = Tree::new();
             tree.fit(
+                &objective_fn,
                 &bdata,
                 data.index.to_owned(),
                 &col_index_fit,
@@ -396,7 +376,7 @@ impl UnivariateBooster {
                 tld,
                 &loss,
                 y,
-                calc_loss.clone(),
+                //objective_fn,
                 &yhat,
                 sample_weight,
                 is_const_hess,
@@ -430,8 +410,8 @@ impl UnivariateBooster {
                 n_low_loss_rounds = 0;
             }
 
-            (grad, hess) = calc_grad_hess(y, &yhat, sample_weight);
-            loss = calc_loss(y, &yhat, sample_weight);
+            (grad, hess) = objective_fn.calc_grad_hess(y, &yhat, sample_weight);
+            loss = objective_fn.calc_loss(y, &yhat, sample_weight);
 
             if verbose {
                 info!(
