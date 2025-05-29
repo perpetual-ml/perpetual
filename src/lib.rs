@@ -25,5 +25,5 @@ pub mod utils;
 
 // Individual classes, and functions
 pub use booster::univariate_booster::UnivariateBooster;
-pub use booster::multivariate_booster::MultivariateBooster;
+// pub use booster::multivariate_booster::MultivariateBooster;
 pub use data::Matrix;
