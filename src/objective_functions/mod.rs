@@ -1,5 +1,5 @@
 //! Objective Functions
-//! 
+//!
 //! 
 //! 
 //! 
@@ -39,68 +39,37 @@ pub type InitFn   = Arc<dyn Fn(&[f64], Option<&[f64]>) -> f64 + Send + Sync + 's
 // The ObjectiveFunction controls the
 // logical flow downstream.
 pub trait ObjectiveFunction: Send + Sync {
-
     fn hessian_is_constant(&self) -> bool;
-
-    fn calc_loss(
-        &self,
-        y: &[f64],
-        yhat: &[f64],
-        sample_weight: Option<&[f64]>,
-    ) -> Vec<f32>;
-
-    fn calc_grad_hess(
-        &self,
-        y: &[f64],
-        yhat: &[f64],
-        sample_weight: Option<&[f64]>,
-    ) -> (Vec<f32>, Option<Vec<f32>>);
-
-    fn calc_init(
-        &self,
-        y: &[f64],
-        sample_weight: Option<&[f64]>,
-    ) -> f64;
-
+    fn calc_loss(&self, y: &[f64], yhat: &[f64], sample_weight: Option<&[f64]>) -> Vec<f32>;
+    fn calc_grad_hess(&self, y: &[f64], yhat: &[f64], sample_weight: Option<&[f64]>) -> (Vec<f32>, Option<Vec<f32>>);
+    fn calc_init(&self, y: &[f64], sample_weight: Option<&[f64]>) -> f64;
     fn default_metric(&self) -> Metric;
-
 }
+
 
 // define dispatches for each
 // function in ObjectiveFunction
 //
 // These functions are called downstrean
 // *after* instantiation
-pub fn loss_callables<T>(instance: T) -> LossFn
-where T: ObjectiveFunction + 'static
+pub fn loss_callables<T>(instance: Arc<T>) -> LossFn
+where T: ObjectiveFunction + ?Sized + 'static,
 {
-    Arc::new(
-        move |y, yhat, weight| {
-            instance.calc_loss(y, yhat, weight)
-        }
-    )
+    Arc::new(move |y, yhat, w| instance.calc_loss(y, yhat, w))
 }
 
-pub fn gradient_hessian_callables<T>(instance: T) -> ObjFn
-where T: ObjectiveFunction + 'static
+pub fn gradient_hessian_callables<T>(instance: Arc<T>) -> ObjFn
+where T: ObjectiveFunction + ?Sized + 'static,
 {
-    Arc::new(
-        move |y, yhat, weight| {
-            instance.calc_grad_hess(y, yhat, weight)
-        }
-    )
+    Arc::new(move |y, yhat, w| instance.calc_grad_hess(y, yhat, w))
 }
 
-pub fn calc_init_callables<T>(instance: T) -> InitFn
-where
-    T: ObjectiveFunction + 'static,
+pub fn calc_init_callables<T>(instance: Arc<T>) -> InitFn
+where T: ObjectiveFunction + ?Sized + 'static,
 {
-    Arc::new(
-        move |y, weight| {
-            instance.calc_init(y, weight)
-        }
-    )
+    Arc::new(move |y, w| instance.calc_init(y, w))
 }
+
 
 // define Objective enum
 // as before moving to smartpointers. The current
@@ -114,8 +83,10 @@ where
 // Option<f64>
 //
 // TODO: test at some point
-/// Enum for objectives, with simplified custom variant constructor
-#[derive(Clone, Serialize, Deserialize)]
+//
+// NOTE: clone is only added for temporary
+// compatibility downstream
+#[derive(Serialize, Deserialize, Clone)]
 pub enum Objective {
     LogLoss,
     SquaredLoss,
@@ -123,65 +94,53 @@ pub enum Objective {
     HuberLoss { delta: Option<f64> },
     AdaptiveHuberLoss { quantile: Option<f64> },
 
-    /// Run-time objective functions
+    /// Runtime custom objective
     #[serde(skip_serializing, skip_deserializing)]
-    Custom(#[serde(skip)] Arc<dyn ObjectiveFunction>),
+    Custom(Arc<dyn ObjectiveFunction>),
 }
 
+// NOTE: it is (most likely) not
+// possible to pass parameters
+// without foo::bar{} structure
 impl Objective {
-    /// Construct a custom objective directly from any `ObjectiveFunction` implementor.
-    /// 
-    /// # Example
-    /// ```rust
-    /// let obj = Objective::custom(MyLoss::new());
-    /// ```
     
-    // default constructor
-    // to enable Objective::function(CustomSquaredLoss)
-    // in .set_objective()
-    pub fn function<T>(obj: T) -> Self
+    // custom function instantiation
+    pub fn function<T>(objective: T) -> Self
     where
         T: ObjectiveFunction + 'static,
     {
-        // Wrap the user-provided objective in Arc<dyn>
-        let shared: Arc<dyn ObjectiveFunction> = Arc::new(obj);
-
-        // Embed directly in the enum
-        Objective::Custom(shared)
+        Objective::Custom(Arc::new(objective))
     }
 
-    /// Instantiate the boxed `ObjectiveFunction`
-    pub fn instantiate(&self) -> Arc<dyn ObjectiveFunction> {
+    pub fn as_function(self) -> Arc<dyn ObjectiveFunction> {
         match self {
-            Objective::LogLoss => Arc::new(crate::objective_functions::LogLoss::default()),
-            Objective::SquaredLoss => Arc::new(crate::objective_functions::SquaredLoss::default()),
-            Objective::QuantileLoss { quantile } => Arc::new(crate::objective_functions::QuantileLoss { quantile: *quantile }),
-            Objective::HuberLoss { delta } => Arc::new(crate::objective_functions::HuberLoss { delta: *delta }),
-            Objective::AdaptiveHuberLoss { quantile } => Arc::new(crate::objective_functions::AdaptiveHuberLoss { quantile: *quantile }),
-            Objective::Custom(obj) => obj.clone(),
+            Objective::LogLoss => Arc::new(LogLoss::default()),
+            Objective::SquaredLoss => Arc::new(SquaredLoss::default()),
+            Objective::QuantileLoss { quantile } => Arc::new(QuantileLoss { quantile }),
+            Objective::HuberLoss { delta } => Arc::new(HuberLoss { delta }),
+            Objective::AdaptiveHuberLoss { quantile } => Arc::new(AdaptiveHuberLoss { quantile }),
+            Objective::Custom(arc) => arc,
         }
     }
 }
 
-// Blanket implementation for Arc-wrapped ObjectiveFunctions
+// This ensures that the objective
+// functions can be called downstream
+// - I am not sure exactly what it does
+// but it works.
 impl<T> ObjectiveFunction for Arc<T>
 where
     T: ObjectiveFunction + Send + Sync + ?Sized + 'static,
 {
     fn hessian_is_constant(&self) -> bool { (**self).hessian_is_constant() }
-    fn calc_loss(&self, y: &[f64], yhat: &[f64], sample_weight: Option<&[f64]>) -> Vec<f32> {
-        (**self).calc_loss(y, yhat, sample_weight)
-    }
-    fn calc_grad_hess(&self, y: &[f64], yhat: &[f64], sample_weight: Option<&[f64]>) -> (Vec<f32>, Option<Vec<f32>>) {
-        (**self).calc_grad_hess(y, yhat, sample_weight)
-    }
-    fn calc_init(&self, y: &[f64], sample_weight: Option<&[f64]>) -> f64 {
-        (**self).calc_init(y, sample_weight)
-    }
+    fn calc_loss(&self, y: &[f64], yhat: &[f64], sample_weight: Option<&[f64]>) -> Vec<f32> { (**self).calc_loss(y, yhat, sample_weight) }
+    fn calc_grad_hess(&self, y: &[f64], yhat: &[f64], sample_weight: Option<&[f64]>) -> (Vec<f32>, Option<Vec<f32>>) { (**self).calc_grad_hess(y, yhat, sample_weight) }
+    fn calc_init(&self, y: &[f64], sample_weight: Option<&[f64]>) -> f64 { (**self).calc_init(y, sample_weight) }
     fn default_metric(&self) -> Metric { (**self).default_metric() }
 }
 
-/// Wrapper for building a custom objective from closures or existing ObjectiveFunction
+// Custom objective
+// struct (experimental)
 #[derive(Clone)]
 pub struct CustomObjective {
     pub grad_hess: ObjFn,
@@ -192,45 +151,18 @@ pub struct CustomObjective {
 }
 
 impl CustomObjective {
-    /// Wrap any type implementing ObjectiveFunction
     pub fn new<T>(obj: T) -> Self
     where
         T: ObjectiveFunction + Clone + 'static,
     {
+        let shared: Arc<T> = Arc::new(obj);
         CustomObjective {
-            grad_hess: gradient_hessian_callables(obj.clone()),
-            loss:      loss_callables(obj.clone()),
-            init:      calc_init_callables(obj.clone()),
-            hessian_constant: obj.hessian_is_constant(),
-            metric:    obj.default_metric(),
+            grad_hess: gradient_hessian_callables(shared.clone()),
+            loss:      loss_callables(shared.clone()),
+            init:      calc_init_callables(shared.clone()),
+            hessian_constant: shared.hessian_is_constant(),
+            metric:    shared.default_metric(),
         }
-    }
-}
-
-impl ObjectiveFunction for CustomObjective {
-    #[inline]
-    fn hessian_is_constant(&self) -> bool {
-        self.hessian_constant
-    }
-
-    #[inline]
-    fn calc_loss(&self, y: &[f64], yhat: &[f64], sample_weight: Option<&[f64]>) -> Vec<f32> {
-        (self.loss)(y, yhat, sample_weight)
-    }
-
-    #[inline]
-    fn calc_grad_hess(&self, y: &[f64], yhat: &[f64], sample_weight: Option<&[f64]>) -> (Vec<f32>, Option<Vec<f32>>) {
-        (self.grad_hess)(y, yhat, sample_weight)
-    }
-
-    #[inline]
-    fn calc_init(&self, y: &[f64], sample_weight: Option<&[f64]>) -> f64 {
-        (self.init)(y, sample_weight)
-    }
-
-    #[inline]
-    fn default_metric(&self) -> Metric {
-        self.metric.clone()
     }
 }
 
@@ -260,45 +192,45 @@ mod test {
     // actual tests
     #[test]
     fn test_logloss_loss() {
-        let objective_function = Objective::LogLoss.instantiate();
+        let objective_function = Objective::LogLoss.as_function();
         assert!(sum_loss(&objective_function, YHAT1) < sum_loss(&objective_function, YHAT2));
     }
 
     #[test]
     fn test_logloss_grad() {
-        let objective_function = Objective::LogLoss.instantiate();
+        let objective_function = Objective::LogLoss.as_function();
         assert!(sum_grad(&objective_function, YHAT1) < sum_grad(&objective_function, YHAT2));
     }
 
     #[test]
     fn test_logloss_init() {
-        let objective_function = Objective::LogLoss.instantiate();
+        let objective_function = Objective::LogLoss.as_function();
         assert_eq!(objective_function.calc_init(Y, None), 0.0);
 
         let all_ones = vec![1.0; 6];
-        assert_eq!(Objective::LogLoss.instantiate().calc_init(&all_ones, None), f64::INFINITY);
+        assert_eq!(Objective::LogLoss.as_function().calc_init(&all_ones, None), f64::INFINITY);
 
         let all_zeros = vec![0.0; 6];
-        assert_eq!(Objective::LogLoss.instantiate().calc_init(&all_zeros, None), f64::NEG_INFINITY);
+        assert_eq!(Objective::LogLoss.as_function().calc_init(&all_zeros, None), f64::NEG_INFINITY);
 
         let mixed = &[0.0, 0.0, 0.0, 0.0, 1.0, 1.0];
         let expected = f64::ln(2.0 / 4.0);
-        assert_eq!(Objective::LogLoss.instantiate().calc_init(mixed, None), expected);
+        assert_eq!(Objective::LogLoss.as_function().calc_init(mixed, None), expected);
     }
 
     #[test]
     fn test_mse_init() {
-        let objective_function = Objective::SquaredLoss.instantiate();
+        let objective_function = Objective::SquaredLoss.as_function();
         assert_eq!(objective_function.calc_init(Y, None), 0.5);
 
         let all_ones = vec![1.0; 6];
-        assert_eq!(Objective::SquaredLoss.instantiate().calc_init(&all_ones, None), 1.0);
+        assert_eq!(Objective::SquaredLoss.as_function().calc_init(&all_ones, None), 1.0);
 
         let all_minus = vec![-1.0; 6];
-        assert_eq!(Objective::SquaredLoss.instantiate().calc_init(&all_minus, None), -1.0);
+        assert_eq!(Objective::SquaredLoss.as_function().calc_init(&all_minus, None), -1.0);
 
         let mixed = &[-1.0, -1.0, -1.0, 1.0, 1.0, 1.0];
-        assert_eq!(Objective::SquaredLoss.instantiate().calc_init(mixed, None), 0.0);
+        assert_eq!(Objective::SquaredLoss.as_function().calc_init(mixed, None), 0.0);
     }
 
     #[test]
@@ -306,23 +238,23 @@ mod test {
         let weights = &[0.0, 0.5, 1.0, 0.3, 0.5];
         let y_vals = &[1.0, 2.0, 9.0, 3.2, 4.0];
 
-        let objective_function_low = Objective::QuantileLoss { quantile: Some(0.1) }.instantiate();
+        let objective_function_low = Objective::QuantileLoss { quantile: Some(0.1) }.as_function();
         assert_eq!(objective_function_low.calc_init(y_vals, Some(weights)), 2.0);
 
-        let objective_function_high = Objective::QuantileLoss { quantile: Some(0.9) }.instantiate();
+        let objective_function_high = Objective::QuantileLoss { quantile: Some(0.9) }.as_function();
         assert_eq!(objective_function_high.calc_init(y_vals, Some(weights)), 9.0);
     }
 
     #[test]
     fn test_adaptive_huberloss_loss_and_grad() {
-        let objective_function = Objective::AdaptiveHuberLoss { quantile: Some(0.5) }.instantiate();
+        let objective_function = Objective::AdaptiveHuberLoss { quantile: Some(0.5) }.as_function();
         assert!(sum_loss(&objective_function, YHAT1) > sum_loss(&objective_function, YHAT2));
         assert!(sum_grad(&objective_function, YHAT1) < sum_grad(&objective_function, YHAT2));
     }
 
     #[test]
     fn test_huberloss_loss_and_grad() {
-        let objective_function = Objective::HuberLoss { delta: Some(1.0) }.instantiate();
+        let objective_function = Objective::HuberLoss { delta: Some(1.0) }.as_function();
         assert!(sum_loss(&objective_function, YHAT1) > sum_loss(&objective_function, YHAT2));
         assert!(sum_grad(&objective_function, YHAT1) < sum_grad(&objective_function, YHAT2));
     }
