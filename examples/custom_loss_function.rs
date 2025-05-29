@@ -18,7 +18,7 @@ use polars::prelude::{CsvReadOptions, DataType};
 
 use perpetual::{Matrix, UnivariateBooster};
 use perpetual::metrics::Metric;
-use perpetual::objective_functions::{Objective, CustomObjective};
+use perpetual::objective_functions::{Objective};
 
 //-----------------//
 // Define function //
@@ -140,12 +140,9 @@ fn main() -> Result<(), Box<dyn Error>> {
     // 2. Build booster w/ custom objective //
     //--------------------------------------//
     let mut booster = UnivariateBooster::default()
-    .set_objective(Objective::Custom(CustomObjective::from(CustomSquaredLoss)))
+    .set_objective(Objective::function(CustomSquaredLoss))
     .set_max_bin(10)
     .set_budget(0.1);
-    //booster.cfg = booster.cfg.clone().with_custom_objective(CustomSquaredLoss);
-    // booster.cfg.max_bin = 10;
-    // booster.cfg.budget = 0.1;
 
     //-------------------//
     // 3. Fit and report //

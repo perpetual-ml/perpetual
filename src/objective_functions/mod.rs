@@ -114,6 +114,7 @@ where
 // Option<f64>
 //
 // TODO: test at some point
+/// Enum for objectives, with simplified custom variant constructor
 #[derive(Clone, Serialize, Deserialize)]
 pub enum Objective {
     LogLoss,
@@ -122,13 +123,13 @@ pub enum Objective {
     HuberLoss { delta: Option<f64> },
     AdaptiveHuberLoss { quantile: Option<f64> },
 
-    /// Runtime-only variant: not serialized.
+    /// Run-time objective functions
     #[serde(skip_serializing, skip_deserializing)]
-    Custom(CustomObjective),
+    Custom(#[serde(skip)] Arc<dyn ObjectiveFunction>),
 }
 
-
 impl Objective {
+    /// Instantiate the boxed ObjectiveFunction
     pub fn instantiate(&self) -> Arc<dyn ObjectiveFunction> {
         match self {
             Objective::LogLoss => Arc::new(LogLoss::default()),
@@ -136,8 +137,20 @@ impl Objective {
             Objective::QuantileLoss { quantile } => Arc::new(QuantileLoss { quantile: *quantile }),
             Objective::HuberLoss { delta } => Arc::new(HuberLoss { delta: *delta }),
             Objective::AdaptiveHuberLoss { quantile } => Arc::new(AdaptiveHuberLoss { quantile: *quantile }),
-            Objective::Custom(c) => Arc::new(c.clone()),
+            Objective::Custom(obj) => obj.clone(),
         }
+    }
+}
+
+// default constructor
+// to enable Objective::function(CustomSquaredLoss)
+// in .set_objective()
+impl Objective {
+    pub fn function<T>(obj: T) -> Self
+    where
+        T: ObjectiveFunction + Clone + 'static,
+    {
+        Objective::Custom(Arc::new(CustomObjective::new(obj)))
     }
 }
 
@@ -159,8 +172,7 @@ where
     fn default_metric(&self) -> Metric { (**self).default_metric() }
 }
 
-
-/// A runtime-constructed objective that wraps closures or other `ObjectiveFunction` implementations.
+/// Wrapper for building a custom objective from closures or existing ObjectiveFunction
 #[derive(Clone)]
 pub struct CustomObjective {
     pub grad_hess: ObjFn,
@@ -171,8 +183,8 @@ pub struct CustomObjective {
 }
 
 impl CustomObjective {
-    /// Wrap an existing `ObjectiveFunction` implementation.
-    pub fn from<T>(obj: T) -> Self
+    /// Wrap any type implementing ObjectiveFunction
+    pub fn new<T>(obj: T) -> Self
     where
         T: ObjectiveFunction + Clone + 'static,
     {
@@ -184,17 +196,6 @@ impl CustomObjective {
             metric:    obj.default_metric(),
         }
     }
-
-    /// Construct by specifying each component closure manually.
-    pub fn new(
-        grad_hess: ObjFn,
-        loss: LossFn,
-        init: InitFn,
-        hessian_constant: bool,
-        metric: Metric,
-    ) -> Self {
-        CustomObjective { grad_hess, loss, init, hessian_constant, metric }
-    }
 }
 
 impl ObjectiveFunction for CustomObjective {
@@ -204,31 +205,17 @@ impl ObjectiveFunction for CustomObjective {
     }
 
     #[inline]
-    fn calc_loss(
-        &self,
-        y: &[f64],
-        yhat: &[f64],
-        sample_weight: Option<&[f64]>,
-    ) -> Vec<f32> {
+    fn calc_loss(&self, y: &[f64], yhat: &[f64], sample_weight: Option<&[f64]>) -> Vec<f32> {
         (self.loss)(y, yhat, sample_weight)
     }
 
     #[inline]
-    fn calc_grad_hess(
-        &self,
-        y: &[f64],
-        yhat: &[f64],
-        sample_weight: Option<&[f64]>,
-    ) -> (Vec<f32>, Option<Vec<f32>>) {
+    fn calc_grad_hess(&self, y: &[f64], yhat: &[f64], sample_weight: Option<&[f64]>) -> (Vec<f32>, Option<Vec<f32>>) {
         (self.grad_hess)(y, yhat, sample_weight)
     }
 
     #[inline]
-    fn calc_init(
-        &self,
-        y: &[f64],
-        sample_weight: Option<&[f64]>,
-    ) -> f64 {
+    fn calc_init(&self, y: &[f64], sample_weight: Option<&[f64]>) -> f64 {
         (self.init)(y, sample_weight)
     }
 
@@ -237,7 +224,6 @@ impl ObjectiveFunction for CustomObjective {
         self.metric.clone()
     }
 }
-
 
 #[cfg(test)]
 mod test {
