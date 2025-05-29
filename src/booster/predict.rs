@@ -3,7 +3,7 @@
 //! 
 
 use crate::booster::config::ContributionsMethod;
-use crate::MultivariateBooster;
+//use crate::MultivariateBooster;
 use crate::{
     shapley::predict_contributions_row_shapley, 
     tree::tree::Tree, utils::odds, Matrix,
@@ -219,44 +219,44 @@ impl UnivariateBooster {
     }
 }
 
-impl MultivariateBooster {
+// impl MultivariateBooster {
 
-    /// Generate predictions on data using the multi-output booster.
-    ///
-    /// * `data` -  Either a Polars or Pandas DataFrame, or a 2 dimensional Numpy array.
-    /// * `parallel` -  Predict in parallel.
-    pub fn predict(&self, data: &Matrix<f64>, parallel: bool) -> Vec<f64> {
-        self.boosters
-            .iter()
-            .map(|b| b.predict(data, parallel))
-            .into_iter()
-            .flatten()
-            .collect::<Vec<f64>>()
-    }
+//     /// Generate predictions on data using the multi-output booster.
+//     ///
+//     /// * `data` -  Either a Polars or Pandas DataFrame, or a 2 dimensional Numpy array.
+//     /// * `parallel` -  Predict in parallel.
+//     pub fn predict(&self, data: &Matrix<f64>, parallel: bool) -> Vec<f64> {
+//         self.boosters
+//             .iter()
+//             .map(|b| b.predict(data, parallel))
+//             .into_iter()
+//             .flatten()
+//             .collect::<Vec<f64>>()
+//     }
 
-    /// Generate probabilities on data using the multi-output booster.
-    ///
-    /// * `data` -  Either a Polars or Pandas DataFrame, or a 2 dimensional Numpy array.
-    /// * `parallel` -  Predict in parallel.
-    pub fn predict_proba(&self, data: &Matrix<f64>, parallel: bool) -> Vec<f64> {
-        let log_odds = self.predict(data, parallel);
-        let data_log_odds = Matrix::new(&log_odds, data.rows, data.cols);
-        let mut preds = Vec::with_capacity(log_odds.len());
-        for row in 0..data.rows {
-            let y_p_exp = data_log_odds.get_row(row).iter().map(|e| e.exp()).collect::<Vec<f64>>();
-            let y_p_exp_sum = y_p_exp.iter().sum::<f64>();
-            let probabilities = y_p_exp.iter().map(|e| e / y_p_exp_sum).collect::<Vec<f64>>();
-            preds.extend(probabilities);
-        }
-        preds
-    }
+//     /// Generate probabilities on data using the multi-output booster.
+//     ///
+//     /// * `data` -  Either a Polars or Pandas DataFrame, or a 2 dimensional Numpy array.
+//     /// * `parallel` -  Predict in parallel.
+//     pub fn predict_proba(&self, data: &Matrix<f64>, parallel: bool) -> Vec<f64> {
+//         let log_odds = self.predict(data, parallel);
+//         let data_log_odds = Matrix::new(&log_odds, data.rows, data.cols);
+//         let mut preds = Vec::with_capacity(log_odds.len());
+//         for row in 0..data.rows {
+//             let y_p_exp = data_log_odds.get_row(row).iter().map(|e| e.exp()).collect::<Vec<f64>>();
+//             let y_p_exp_sum = y_p_exp.iter().sum::<f64>();
+//             let probabilities = y_p_exp.iter().map(|e| e / y_p_exp_sum).collect::<Vec<f64>>();
+//             preds.extend(probabilities);
+//         }
+//         preds
+//     }
 
-    /// Generate node predictions on data using the gradient booster.
-    ///
-    /// * `data` -  Either a Polars or Pandas DataFrame, or a 2 dimensional Numpy array.
-    /// * `parallel` -  Predict in parallel.
-    pub fn predict_nodes(&self, data: &Matrix<f64>, parallel: bool) -> Vec<Vec<Vec<HashSet<usize>>>> {
-        self.boosters.iter().map(|b| b.predict_nodes(data, parallel)).collect()
-    }
+//     /// Generate node predictions on data using the gradient booster.
+//     ///
+//     /// * `data` -  Either a Polars or Pandas DataFrame, or a 2 dimensional Numpy array.
+//     /// * `parallel` -  Predict in parallel.
+//     pub fn predict_nodes(&self, data: &Matrix<f64>, parallel: bool) -> Vec<Vec<Vec<HashSet<usize>>>> {
+//         self.boosters.iter().map(|b| b.predict_nodes(data, parallel)).collect()
+//     }
     
-}
+// }
