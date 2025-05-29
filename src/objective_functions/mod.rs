@@ -121,76 +121,123 @@ pub enum Objective {
     QuantileLoss { quantile: Option<f64> },
     HuberLoss { delta: Option<f64> },
     AdaptiveHuberLoss { quantile: Option<f64> },
+
+    /// Runtime-only variant: not serialized.
+    #[serde(skip_serializing, skip_deserializing)]
+    Custom(CustomObjective),
 }
 
-// NOTE: it is (most likely) not
-// possible to pass parameters
-// without foo::bar{} structure
+
 impl Objective {
     pub fn instantiate(&self) -> Arc<dyn ObjectiveFunction> {
         match self {
             Objective::LogLoss => Arc::new(LogLoss::default()),
             Objective::SquaredLoss => Arc::new(SquaredLoss::default()),
-            Objective::QuantileLoss { quantile} => Arc::new(QuantileLoss { quantile: *quantile }),
+            Objective::QuantileLoss { quantile } => Arc::new(QuantileLoss { quantile: *quantile }),
             Objective::HuberLoss { delta } => Arc::new(HuberLoss { delta: *delta }),
             Objective::AdaptiveHuberLoss { quantile } => Arc::new(AdaptiveHuberLoss { quantile: *quantile }),
+            Objective::Custom(c) => Arc::new(c.clone()),
         }
     }
 }
 
-// This ensures that the objective
-// functions can be called downstream
-// - I am not sure exactly what it does
-// but it works.
+// Blanket implementation for Arc-wrapped ObjectiveFunctions
 impl<T> ObjectiveFunction for Arc<T>
 where
     T: ObjectiveFunction + Send + Sync + ?Sized + 'static,
 {
-    fn hessian_is_constant(&self) -> bool {
-        (**self).hessian_is_constant()
+    fn hessian_is_constant(&self) -> bool { (**self).hessian_is_constant() }
+    fn calc_loss(&self, y: &[f64], yhat: &[f64], sample_weight: Option<&[f64]>) -> Vec<f32> {
+        (**self).calc_loss(y, yhat, sample_weight)
+    }
+    fn calc_grad_hess(&self, y: &[f64], yhat: &[f64], sample_weight: Option<&[f64]>) -> (Vec<f32>, Option<Vec<f32>>) {
+        (**self).calc_grad_hess(y, yhat, sample_weight)
+    }
+    fn calc_init(&self, y: &[f64], sample_weight: Option<&[f64]>) -> f64 {
+        (**self).calc_init(y, sample_weight)
+    }
+    fn default_metric(&self) -> Metric { (**self).default_metric() }
+}
+
+
+/// A runtime-constructed objective that wraps closures or other `ObjectiveFunction` implementations.
+#[derive(Clone)]
+pub struct CustomObjective {
+    pub grad_hess: ObjFn,
+    pub loss: LossFn,
+    pub init: InitFn,
+    pub hessian_constant: bool,
+    pub metric: Metric,
+}
+
+impl CustomObjective {
+    /// Wrap an existing `ObjectiveFunction` implementation.
+    pub fn from<T>(obj: T) -> Self
+    where
+        T: ObjectiveFunction + Clone + 'static,
+    {
+        CustomObjective {
+            grad_hess: gradient_hessian_callables(obj.clone()),
+            loss:      loss_callables(obj.clone()),
+            init:      calc_init_callables(obj.clone()),
+            hessian_constant: obj.hessian_is_constant(),
+            metric:    obj.default_metric(),
+        }
     }
 
+    /// Construct by specifying each component closure manually.
+    pub fn new(
+        grad_hess: ObjFn,
+        loss: LossFn,
+        init: InitFn,
+        hessian_constant: bool,
+        metric: Metric,
+    ) -> Self {
+        CustomObjective { grad_hess, loss, init, hessian_constant, metric }
+    }
+}
+
+impl ObjectiveFunction for CustomObjective {
+    #[inline]
+    fn hessian_is_constant(&self) -> bool {
+        self.hessian_constant
+    }
+
+    #[inline]
     fn calc_loss(
         &self,
         y: &[f64],
         yhat: &[f64],
         sample_weight: Option<&[f64]>,
     ) -> Vec<f32> {
-        (**self).calc_loss(y, yhat, sample_weight)
+        (self.loss)(y, yhat, sample_weight)
     }
 
+    #[inline]
     fn calc_grad_hess(
         &self,
         y: &[f64],
         yhat: &[f64],
         sample_weight: Option<&[f64]>,
     ) -> (Vec<f32>, Option<Vec<f32>>) {
-        (**self).calc_grad_hess(y, yhat, sample_weight)
+        (self.grad_hess)(y, yhat, sample_weight)
     }
 
+    #[inline]
     fn calc_init(
         &self,
         y: &[f64],
         sample_weight: Option<&[f64]>,
     ) -> f64 {
-        (**self).calc_init(y, sample_weight)
+        (self.init)(y, sample_weight)
     }
 
+    #[inline]
     fn default_metric(&self) -> Metric {
-        (**self).default_metric()
+        self.metric.clone()
     }
 }
 
-// Custom objective
-// struct (experimental)
-#[derive(Clone)]
-pub struct CustomObjective {
-    pub grad_hess: ObjFn,
-    pub loss:      LossFn,
-    pub init:      InitFn,
-    pub hessian_constant: bool,
-    pub metric:    Metric,
-}
 
 #[cfg(test)]
 mod test {
