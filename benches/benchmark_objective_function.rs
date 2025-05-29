@@ -26,7 +26,7 @@ pub fn benchmark_logloss(c: &mut Criterion) {
             b.iter(||{
 
                 // instantiate objective function
-                let objective_function = Objective::LogLoss.instantiate();
+                let objective_function = Objective::LogLoss.as_function();
 
                 // calculate gradients
                 objective_function.calc_grad_hess(black_box(&y), black_box(&y_hat), black_box(None));
@@ -41,7 +41,7 @@ pub fn benchmark_logloss(c: &mut Criterion) {
         b.iter(||{
 
             // instantiate objective function
-            let objective_function = Objective::LogLoss.instantiate();
+            let objective_function = Objective::LogLoss.as_function();
 
             // calculate gradients
             objective_function.calc_grad_hess(black_box(&y), black_box(&y_hat), black_box(Some(&sample_weights)));
