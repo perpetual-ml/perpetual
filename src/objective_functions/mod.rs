@@ -55,19 +55,19 @@ pub trait ObjectiveFunction: Send + Sync {
 pub fn loss_callables<T>(instance: Arc<T>) -> LossFn
 where T: ObjectiveFunction + ?Sized + 'static,
 {
-    Arc::new(move |y, yhat, w| instance.calc_loss(y, yhat, w))
+    Arc::new(move |y, yhat, w| instance.clone().calc_loss(y, yhat, w))
 }
 
 pub fn gradient_hessian_callables<T>(instance: Arc<T>) -> ObjFn
 where T: ObjectiveFunction + ?Sized + 'static,
 {
-    Arc::new(move |y, yhat, w| instance.calc_grad_hess(y, yhat, w))
+    Arc::new(move |y, yhat, w| instance.clone().calc_grad_hess(y, yhat, w))
 }
 
 pub fn calc_init_callables<T>(instance: Arc<T>) -> InitFn
 where T: ObjectiveFunction + ?Sized + 'static,
 {
-    Arc::new(move |y, w| instance.calc_init(y, w))
+    Arc::new(move |y, w| instance.clone().calc_init(y, w))
 }
 
 
