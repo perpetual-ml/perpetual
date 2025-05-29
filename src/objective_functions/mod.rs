@@ -112,14 +112,14 @@ impl Objective {
         Objective::Custom(Arc::new(objective))
     }
 
-    pub fn as_function(self) -> Arc<dyn ObjectiveFunction> {
+    pub fn as_function(&self) -> Arc<dyn ObjectiveFunction> {
         match self {
             Objective::LogLoss => Arc::new(LogLoss::default()),
             Objective::SquaredLoss => Arc::new(SquaredLoss::default()),
-            Objective::QuantileLoss { quantile } => Arc::new(QuantileLoss { quantile }),
-            Objective::HuberLoss { delta } => Arc::new(HuberLoss { delta }),
-            Objective::AdaptiveHuberLoss { quantile } => Arc::new(AdaptiveHuberLoss { quantile }),
-            Objective::Custom(arc) => arc,
+            Objective::QuantileLoss { quantile } => Arc::new(QuantileLoss { quantile: *quantile }),
+            Objective::HuberLoss { delta } => Arc::new(HuberLoss { delta: *delta }),
+            Objective::AdaptiveHuberLoss { quantile } => Arc::new(AdaptiveHuberLoss { quantile: *quantile }),
+            Objective::Custom(arc) => arc.clone(),
         }
     }
 }

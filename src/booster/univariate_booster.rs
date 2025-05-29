@@ -202,11 +202,11 @@ impl UnivariateBooster {
         sample_weight: Option<&[f64]>,
     ) -> Result<(), PerpetualError> {
 
+        // initialize trees
         let start = Instant::now();
 
-        // initialize objective
-        // function
-        let objective_fn: Arc<dyn ObjectiveFunction> = self.cfg.objective.clone().as_function();
+        // initialize objective function
+        let objective_fn: Arc<dyn ObjectiveFunction> = self.cfg.objective.as_function();
 
         let n_threads_available = std::thread::available_parallelism().unwrap().get();
         let num_threads = match self.cfg.num_threads {
