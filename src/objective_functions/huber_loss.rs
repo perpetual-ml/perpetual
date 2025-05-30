@@ -12,7 +12,7 @@ pub struct HuberLoss {
 impl ObjectiveFunction for HuberLoss {
 
     #[inline]
-    fn calc_loss(&self, y: &[f64], yhat: &[f64], sample_weight: Option<&[f64]>) -> Vec<f32> {
+    fn loss(&self, y: &[f64], yhat: &[f64], sample_weight: Option<&[f64]>) -> Vec<f32> {
 
         let delta = self.delta.unwrap_or(1.0);
         match sample_weight {
@@ -49,7 +49,7 @@ impl ObjectiveFunction for HuberLoss {
     }
 
     #[inline]
-    fn calc_grad_hess(&self, y: &[f64], yhat: &[f64], sample_weight: Option<&[f64]>) -> (Vec<f32>, Option<Vec<f32>>) {
+    fn gradient(&self, y: &[f64], yhat: &[f64], sample_weight: Option<&[f64]>) -> (Vec<f32>, Option<Vec<f32>>) {
         
         let delta = self.delta.unwrap_or(1.0);
 
@@ -94,7 +94,7 @@ impl ObjectiveFunction for HuberLoss {
     }
 
     #[inline]
-    fn calc_init(&self, y: &[f64], sample_weight: Option<&[f64]>) -> f64 {
+    fn initial_value(&self, y: &[f64], sample_weight: Option<&[f64]>) -> f64 {
         
         let mut idxs = (0..y.len()).collect::<Vec<_>>();
         idxs.sort_by(|&i, &j| y[i].partial_cmp(&y[j]).unwrap());

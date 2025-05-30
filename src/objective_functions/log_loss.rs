@@ -10,7 +10,7 @@ pub struct LogLoss {}
 impl ObjectiveFunction for LogLoss {
 
     #[inline]
-    fn calc_loss(&self, y: &[f64], yhat: &[f64], sample_weight: Option<&[f64]>) -> Vec<f32> {
+    fn loss(&self, y: &[f64], yhat: &[f64], sample_weight: Option<&[f64]>) -> Vec<f32> {
 
         match sample_weight {
             Some(sample_weight) => y
@@ -34,7 +34,7 @@ impl ObjectiveFunction for LogLoss {
     }
     
     #[inline]
-    fn calc_init(&self, y: &[f64], sample_weight: Option<&[f64]>) -> f64 {
+    fn initial_value(&self, y: &[f64], sample_weight: Option<&[f64]>) -> f64 {
 
         match sample_weight {
             Some(sample_weight) => {
@@ -56,7 +56,7 @@ impl ObjectiveFunction for LogLoss {
     }
 
     #[inline]
-    fn calc_grad_hess(&self, y: &[f64], yhat: &[f64], sample_weight: Option<&[f64]>) -> (Vec<f32>, Option<Vec<f32>>) {
+    fn gradient(&self, y: &[f64], yhat: &[f64], sample_weight: Option<&[f64]>) -> (Vec<f32>, Option<Vec<f32>>) {
 
         match sample_weight {
             Some(sample_weight) => {

@@ -64,7 +64,7 @@ impl UnivariateBooster {
     ///      "SquaredLoss" to use Squared Error as the objective function,
     ///      "QuantileLoss" for quantile regression.
     /// * `budget` - budget to fit the model.
-    /// * `base_score` - The initial prediction value of the model. If set to None, it will be calculated based on the objective function at fit time.
+    /// * `base_score` - The initial_value prediction value of the model. If set to None, it will be calculated based on the objective function at fit time.
     /// * `max_bin` - Number of bins to calculate to partition the data. Setting this to
     ///     a smaller number, will result in faster training time, while potentially sacrificing
     ///     accuracy. If there are more bins, than unique values in a column, all unique values
@@ -220,7 +220,7 @@ impl UnivariateBooster {
         if self.cfg.reset.unwrap_or(true) || self.trees.len() == 0 {
             self.cfg.reset;
             if self.base_score.is_nan() {
-                self.base_score = objective_fn.calc_init(y, sample_weight);
+                self.base_score = objective_fn.initial_value(y, sample_weight);
             }
             yhat = vec![self.base_score; y.len()];
         } else {
@@ -231,10 +231,10 @@ impl UnivariateBooster {
 
         // calculate gradient
         // and hessian
-        // let (mut grad, mut hess) = calc_grad_hess(y, &yhat, sample_weight);
-        let (mut grad, mut hess) = objective_fn.calc_grad_hess(y, &yhat, sample_weight);
-        let mut loss = objective_fn.calc_loss(y, &yhat, sample_weight);
-        let loss_base = objective_fn.calc_loss(y, &vec![self.base_score; y.len()], sample_weight);
+        // let (mut grad, mut hess) = gradient(y, &yhat, sample_weight);
+        let (mut grad, mut hess) = objective_fn.gradient(y, &yhat, sample_weight);
+        let mut loss = objective_fn.loss(y, &yhat, sample_weight);
+        let loss_base = objective_fn.loss(y, &vec![self.base_score; y.len()], sample_weight);
         let loss_avg = loss_base.iter().sum::<f32>() / loss_base.len() as f32;
 
         let base = 10.0_f32;
@@ -407,8 +407,8 @@ impl UnivariateBooster {
                 n_low_loss_rounds = 0;
             }
 
-            (grad, hess) = objective_fn.calc_grad_hess(y, &yhat, sample_weight);
-            loss = objective_fn.calc_loss(y, &yhat, sample_weight);
+            (grad, hess) = objective_fn.gradient(y, &yhat, sample_weight);
+            loss = objective_fn.loss(y, &yhat, sample_weight);
 
             if verbose {
                 info!(

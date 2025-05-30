@@ -28,7 +28,7 @@ struct CustomSquaredLoss;
 impl perpetual::objective_functions::ObjectiveFunction for CustomSquaredLoss {
     fn hessian_is_constant(&self) -> bool { false }
 
-    fn calc_loss(&self, y: &[f64], yhat: &[f64], sample_weight: Option<&[f64]>) -> Vec<f32> {
+    fn loss(&self, y: &[f64], yhat: &[f64], sample_weight: Option<&[f64]>) -> Vec<f32> {
         y.iter()
             .zip(yhat)
             .enumerate()
@@ -43,7 +43,7 @@ impl perpetual::objective_functions::ObjectiveFunction for CustomSquaredLoss {
             .collect()
     }
 
-    fn calc_grad_hess(
+    fn gradient(
         &self,
         y: &[f64],
         yhat: &[f64],
@@ -65,7 +65,7 @@ impl perpetual::objective_functions::ObjectiveFunction for CustomSquaredLoss {
         (grad, Some(hess))
     }
 
-    fn calc_init(&self, y: &[f64], sample_weight: Option<&[f64]>) -> f64 {
+    fn initial_value(&self, y: &[f64], sample_weight: Option<&[f64]>) -> f64 {
         if let Some(w) = sample_weight {
             let sum_w: f64 = w.iter().sum();
             y.iter().zip(w).map(|(yi, wi)| yi * wi).sum::<f64>() / sum_w

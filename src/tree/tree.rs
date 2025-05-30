@@ -58,7 +58,7 @@ impl Tree {
         target_loss_decrement: Option<f32>,
         loss: &[f32],
         y: &[f64],
-        //calc_loss: crate::objective_functions::LossFn,
+        //loss: crate::objective_functions::LossFn,
         yhat: &[f64],
         sample_weight: Option<&[f64]>,
         is_const_hess: bool,
@@ -165,7 +165,7 @@ impl Tree {
                                 None => None,
                             };
                             let yhat_new = yhat[_i] + node.weight_value as f64;
-                            let loss_new = objective_function.calc_loss(&[y[_i]], &[yhat_new], s_w)[0];
+                            let loss_new = objective_function.loss(&[y[_i]], &[yhat_new], s_w)[0];
                             loss_decr_avg -= loss_decr[_i] / index_length;
                             loss_decr[_i] = loss[_i] - loss_new;
                             loss_decr_avg += loss_decr[_i] / index_length;

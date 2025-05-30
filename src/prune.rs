@@ -26,9 +26,9 @@ impl UnivariateBooster {
         let old_length = self.trees.len();
         let old_n_nodes: usize = self.trees.iter().map(|t| t.nodes.len()).sum();
 
-        let base_score = objective_fn.calc_init(y, sample_weight);
+        let base_score = objective_fn.initial_value(y, sample_weight);
         let yhat = vec![base_score; y.len()];
-        let init_losses = objective_fn.calc_loss(y, &yhat, sample_weight);
+        let init_losses = objective_fn.loss(y, &yhat, sample_weight);
         let init_loss = init_losses.iter().sum::<f32>() / init_losses.len() as f32;
 
         // generate loss calculator
@@ -66,7 +66,7 @@ impl Tree {
         &mut self,
         data: &Matrix<f64>,
         missing: &f64,
-        calc_loss: LossFn,
+        loss: LossFn,
         init_loss: f32,
         y: &[f64],
         sample_weight: Option<&[f64]>,
@@ -83,7 +83,7 @@ impl Tree {
                         data,
                         i,
                         missing,
-                        calc_loss.clone(),
+                        loss.clone(),
                         base_score,
                         &mut node_losses,
                         y,
@@ -97,7 +97,7 @@ impl Tree {
                         data,
                         i,
                         missing,
-                        calc_loss.clone(),
+                        loss.clone(),
                         base_score,
                         &mut node_losses,
                         y,
@@ -136,7 +136,7 @@ impl Tree {
         data: &Matrix<f64>,
         row: usize,
         missing: &f64,
-        calc_loss: LossFn,
+        loss: LossFn,
         base_score: f64,
         node_losses: &mut HashMap<usize, Vec<f32>>, 
         y: &[f64],
@@ -145,7 +145,7 @@ impl Tree {
         let mut idx = 0;
         loop {
             let node = &self.nodes[&idx];
-            let loss = calc_loss(&[y[row]], &[node.weight_value as f64 + base_score], sample_weight)[0];
+            let loss = loss(&[y[row]], &[node.weight_value as f64 + base_score], sample_weight)[0];
             node_losses.get_mut(&idx).unwrap().push(loss);
             if node.is_leaf {
                 break;
@@ -160,7 +160,7 @@ impl Tree {
         data: &Matrix<f64>,
         missing: &f64,
         //objective_function: &Arc<dyn ObjectiveFunction>,
-        calc_loss: &LossFn,
+        loss: &LossFn,
         init_loss: f32,
         y: &[f64],
         sample_weight: Option<&[f64]>,
@@ -172,7 +172,7 @@ impl Tree {
 
         for &i in &data.index {
             let (pred, nid) = self.predict_row_and_node_idx(data, i, missing);
-            let loss = (calc_loss)(&[y[i]], &[pred + base_score], sample_weight)[0];
+            let loss = (loss)(&[y[i]], &[pred + base_score], sample_weight)[0];
             node_losses.get_mut(&nid).unwrap().push(loss);
         }
 

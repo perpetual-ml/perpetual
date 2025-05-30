@@ -34,8 +34,8 @@ mod tests {
         let file = fs::read_to_string("resources/performance.csv").expect("Something went wrong reading the file");
         let y: Vec<f64> = file.lines().map(|x| x.parse::<f64>().unwrap()).collect();
         let yhat = vec![0.5; y.len()];
-        let (mut g, mut h) = objective_function.calc_grad_hess(&y, &yhat, None);
-        let loss = objective_function.calc_loss(&y, &yhat, None);
+        let (mut g, mut h) = objective_function.gradient(&y, &yhat, None);
+        let loss = objective_function.loss(&y, &yhat, None);
 
         let data = Matrix::new(&data_vec, 891, 5);
         let splitter = MissingImputerSplitter::new(0.3, true, ConstraintMap::new());
@@ -132,8 +132,8 @@ mod tests {
         let file = fs::read_to_string("resources/performance.csv").expect("Something went wrong reading the file");
         let y: Vec<f64> = file.lines().map(|x| x.parse::<f64>().unwrap()).collect();
         let yhat = vec![0.5; y.len()];
-        let (mut g, mut h) = objective_function.calc_grad_hess(&y, &yhat, None);
-        let loss = objective_function.calc_loss(&y, &yhat, None);
+        let (mut g, mut h) = objective_function.gradient(&y, &yhat, None);
+        let loss = objective_function.loss(&y, &yhat, None);
         println!("GRADIENT -- {:?}", g);
 
         let data_ = Matrix::new(&data_vec, 891, 5);
@@ -231,8 +231,8 @@ mod tests {
         let file = fs::read_to_string("resources/performance.csv").expect("Something went wrong reading the file");
         let y: Vec<f64> = file.lines().map(|x| x.parse::<f64>().unwrap()).collect();
         let yhat = vec![0.5; y.len()];
-        let (mut g, mut h) = objective_function.calc_grad_hess(&y, &yhat, None);
-        let loss = objective_function.calc_loss(&y, &yhat, None);
+        let (mut g, mut h) = objective_function.gradient(&y, &yhat, None);
+        let loss = objective_function.loss(&y, &yhat, None);
 
         let data = Matrix::new(&data_vec, 891, 5);
         let splitter = MissingImputerSplitter::new(0.3, true, ConstraintMap::new());
@@ -337,8 +337,8 @@ mod tests {
 
         let y_avg = y.iter().sum::<f64>() / y.len() as f64;
         let yhat = vec![y_avg; y.len()];
-        let (mut grad, mut hess) = objective_function.calc_grad_hess(&y, &yhat, None);
-        let loss = objective_function.calc_loss(&y, &yhat, None);
+        let (mut grad, mut hess) = objective_function.gradient(&y, &yhat, None);
+        let loss = objective_function.loss(&y, &yhat, None);
 
         let splitter = MissingImputerSplitter::new(0.3, true, ConstraintMap::new());
 

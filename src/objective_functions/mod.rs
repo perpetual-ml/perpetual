@@ -39,9 +39,9 @@ pub type InitialValueFn = Arc<dyn Fn(&[f64], Option<&[f64]>) -> f64 + Send + Syn
 /// 
 /// ## Traits:
 /// 
-/// * `fn calc_loss`:
-/// * `fn calc_grad_hess`:
-/// * `fn calc_init`:
+/// * `fn loss`:
+/// * `fn gradient`:
+/// * `fn initial_value`:
 /// * `fn contant_hessian`: 
 /// 
 /// ## Example:
@@ -50,11 +50,10 @@ pub type InitialValueFn = Arc<dyn Fn(&[f64], Option<&[f64]>) -> f64 + Send + Syn
 /// 
 pub trait ObjectiveFunction: Send + Sync {
     fn hessian_is_constant(&self) -> bool;
-    fn calc_loss(&self, y: &[f64], yhat: &[f64], sample_weight: Option<&[f64]>) -> Vec<f32>;
-    fn calc_grad_hess(&self, y: &[f64], yhat: &[f64], sample_weight: Option<&[f64]>) -> (Vec<f32>, Option<Vec<f32>>);
-    fn calc_init(&self, y: &[f64], sample_weight: Option<&[f64]>) -> f64;
+    fn loss(&self, y: &[f64], yhat: &[f64], sample_weight: Option<&[f64]>) -> Vec<f32>;
+    fn gradient(&self, y: &[f64], yhat: &[f64], sample_weight: Option<&[f64]>) -> (Vec<f32>, Option<Vec<f32>>);
+    fn initial_value(&self, y: &[f64], sample_weight: Option<&[f64]>) -> f64;
     fn default_metric(&self) -> Metric;
-
     fn constant_hessian(&self, weights_flag: bool) -> bool;
 }
 
@@ -67,19 +66,19 @@ pub trait ObjectiveFunction: Send + Sync {
 pub fn loss_callables<T>(instance: Arc<T>) -> LossFn
 where T: ObjectiveFunction + ?Sized + 'static,
 {
-    Arc::new(move |y, yhat, w| instance.clone().calc_loss(y, yhat, w))
+    Arc::new(move |y, yhat, w| instance.clone().loss(y, yhat, w))
 }
 
-pub fn gradient_hessian_callables<T>(instance: Arc<T>) -> ObjectiveFn
+pub fn gradient_callables<T>(instance: Arc<T>) -> ObjectiveFn
 where T: ObjectiveFunction + ?Sized + 'static,
 {
-    Arc::new(move |y, yhat, w| instance.clone().calc_grad_hess(y, yhat, w))
+    Arc::new(move |y, yhat, w| instance.clone().gradient(y, yhat, w))
 }
 
-pub fn calc_init_callables<T>(instance: Arc<T>) -> InitialValueFn
+pub fn initial_value_callables<T>(instance: Arc<T>) -> InitialValueFn
 where T: ObjectiveFunction + ?Sized + 'static,
 {
-    Arc::new(move |y, w| instance.clone().calc_init(y, w))
+    Arc::new(move |y, w| instance.clone().initial_value(y, w))
 }
 
 // define Objective enum
@@ -149,16 +148,16 @@ where
          (**self).hessian_is_constant() 
         }
 
-    fn calc_loss(&self, y: &[f64], yhat: &[f64], sample_weight: Option<&[f64]>) -> Vec<f32> {
-         (**self).calc_loss(y, yhat, sample_weight)
+    fn loss(&self, y: &[f64], yhat: &[f64], sample_weight: Option<&[f64]>) -> Vec<f32> {
+         (**self).loss(y, yhat, sample_weight)
         }
     
-    fn calc_grad_hess(&self, y: &[f64], yhat: &[f64], sample_weight: Option<&[f64]>) -> (Vec<f32>, Option<Vec<f32>>) {
-         (**self).calc_grad_hess(y, yhat, sample_weight) 
+    fn gradient(&self, y: &[f64], yhat: &[f64], sample_weight: Option<&[f64]>) -> (Vec<f32>, Option<Vec<f32>>) {
+         (**self).gradient(y, yhat, sample_weight) 
         }
     
-    fn calc_init(&self, y: &[f64], sample_weight: Option<&[f64]>) -> f64 {
-         (**self).calc_init(y, sample_weight) 
+    fn initial_value(&self, y: &[f64], sample_weight: Option<&[f64]>) -> f64 {
+         (**self).initial_value(y, sample_weight) 
         }
     
     fn default_metric(&self) -> Metric {
@@ -188,9 +187,9 @@ impl CustomObjective {
     {
         let shared: Arc<T> = Arc::new(obj);
         CustomObjective {
-            grad_hess: gradient_hessian_callables(shared.clone()),
+            grad_hess: gradient_callables(shared.clone()),
             loss:      loss_callables(shared.clone()),
-            init:      calc_init_callables(shared.clone()),
+            init:      initial_value_callables(shared.clone()),
             hessian_constant: shared.hessian_is_constant(),
             metric:    shared.default_metric(),
         }
@@ -212,11 +211,11 @@ mod test {
     // helper function for the 
     // tests
     fn sum_loss(obj: &Arc<dyn crate::objective_functions::ObjectiveFunction>, yhat: &[f64]) -> f32 {
-        obj.calc_loss(Y, yhat, None).iter().copied().sum()
+        obj.loss(Y, yhat, None).iter().copied().sum()
     }
 
     fn sum_grad(obj: &Arc<dyn crate::objective_functions::ObjectiveFunction>, yhat: &[f64]) -> f32 {
-        let (g, _) = obj.calc_grad_hess(Y, yhat, None);
+        let (g, _) = obj.gradient(Y, yhat, None);
         g.iter().copied().sum()
     }
     
@@ -236,32 +235,32 @@ mod test {
     #[test]
     fn test_logloss_init() {
         let objective_function = Objective::LogLoss.as_function();
-        assert_eq!(objective_function.calc_init(Y, None), 0.0);
+        assert_eq!(objective_function.initial_value(Y, None), 0.0);
 
         let all_ones = vec![1.0; 6];
-        assert_eq!(Objective::LogLoss.as_function().calc_init(&all_ones, None), f64::INFINITY);
+        assert_eq!(Objective::LogLoss.as_function().initial_value(&all_ones, None), f64::INFINITY);
 
         let all_zeros = vec![0.0; 6];
-        assert_eq!(Objective::LogLoss.as_function().calc_init(&all_zeros, None), f64::NEG_INFINITY);
+        assert_eq!(Objective::LogLoss.as_function().initial_value(&all_zeros, None), f64::NEG_INFINITY);
 
         let mixed = &[0.0, 0.0, 0.0, 0.0, 1.0, 1.0];
         let expected = f64::ln(2.0 / 4.0);
-        assert_eq!(Objective::LogLoss.as_function().calc_init(mixed, None), expected);
+        assert_eq!(Objective::LogLoss.as_function().initial_value(mixed, None), expected);
     }
 
     #[test]
     fn test_mse_init() {
         let objective_function = Objective::SquaredLoss.as_function();
-        assert_eq!(objective_function.calc_init(Y, None), 0.5);
+        assert_eq!(objective_function.initial_value(Y, None), 0.5);
 
         let all_ones = vec![1.0; 6];
-        assert_eq!(Objective::SquaredLoss.as_function().calc_init(&all_ones, None), 1.0);
+        assert_eq!(Objective::SquaredLoss.as_function().initial_value(&all_ones, None), 1.0);
 
         let all_minus = vec![-1.0; 6];
-        assert_eq!(Objective::SquaredLoss.as_function().calc_init(&all_minus, None), -1.0);
+        assert_eq!(Objective::SquaredLoss.as_function().initial_value(&all_minus, None), -1.0);
 
         let mixed = &[-1.0, -1.0, -1.0, 1.0, 1.0, 1.0];
-        assert_eq!(Objective::SquaredLoss.as_function().calc_init(mixed, None), 0.0);
+        assert_eq!(Objective::SquaredLoss.as_function().initial_value(mixed, None), 0.0);
     }
 
     #[test]
@@ -270,10 +269,10 @@ mod test {
         let y_vals = &[1.0, 2.0, 9.0, 3.2, 4.0];
 
         let objective_function_low = Objective::QuantileLoss { quantile: Some(0.1) }.as_function();
-        assert_eq!(objective_function_low.calc_init(y_vals, Some(weights)), 2.0);
+        assert_eq!(objective_function_low.initial_value(y_vals, Some(weights)), 2.0);
 
         let objective_function_high = Objective::QuantileLoss { quantile: Some(0.9) }.as_function();
-        assert_eq!(objective_function_high.calc_init(y_vals, Some(weights)), 9.0);
+        assert_eq!(objective_function_high.initial_value(y_vals, Some(weights)), 9.0);
     }
 
     #[test]

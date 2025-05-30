@@ -1846,7 +1846,7 @@ mod tests {
         let y: Vec<f64> = file.lines().map(|x| x.parse::<f64>().unwrap()).collect();
         let yhat = vec![0.5; y.len()];
 
-        let (grad, hess) = objective_function.calc_grad_hess(&y, &yhat, None);
+        let (grad, hess) = objective_function.gradient(&y, &yhat, None);
 
         let splitter = MissingImputerSplitter::new(0.3, true, ConstraintMap::new());
         let gradient_sum = grad.iter().sum();
@@ -2001,7 +2001,7 @@ mod tests {
 
         let y_test_avg = y_test.iter().sum::<f64>() / y_test.len() as f64;
         let yhat = vec![y_test_avg; y_test.len()];
-        let (grad, hess) = objective_function.calc_grad_hess(&y_test, &yhat, None);
+        let (grad, hess) = objective_function.gradient(&y_test, &yhat, None);
 
         let splitter = MissingImputerSplitter::new(0.3, false, ConstraintMap::new());
 
@@ -2086,7 +2086,7 @@ mod tests {
 
         let y_avg = y.iter().sum::<f64>() / y.len() as f64;
         let yhat = vec![y_avg; y.len()];
-        let (grad, hess) = objective_function.calc_grad_hess(&y, &yhat, None);
+        let (grad, hess) = objective_function.gradient(&y, &yhat, None);
 
         let splitter = MissingImputerSplitter::new(eta, false, ConstraintMap::new());
 
@@ -2199,7 +2199,7 @@ mod tests {
 
         let y_avg = y.iter().sum::<f64>() / y.len() as f64;
         let yhat = vec![y_avg; y.len()];
-        let (grad, hess) = objective_function.calc_grad_hess(&y, &yhat, None);
+        let (grad, hess) = objective_function.gradient(&y, &yhat, None);
 
         let splitter = MissingImputerSplitter::new(eta, false, ConstraintMap::new());
 

@@ -531,7 +531,7 @@ mod univariate_booster_test {
                 false // fails if true
             }
 
-            fn calc_loss(&self, y: &[f64], yhat: &[f64], sample_weight: Option<&[f64]>) -> Vec<f32> {
+            fn loss(&self, y: &[f64], yhat: &[f64], sample_weight: Option<&[f64]>) -> Vec<f32> {
                 y.iter()
                     .zip(yhat)
                     .enumerate()
@@ -546,7 +546,7 @@ mod univariate_booster_test {
                     .collect()
             }
 
-            fn calc_grad_hess(&self, y: &[f64], yhat: &[f64], sample_weight: Option<&[f64]>,) -> (Vec<f32>, Option<Vec<f32>>) {
+            fn gradient(&self, y: &[f64], yhat: &[f64], sample_weight: Option<&[f64]>,) -> (Vec<f32>, Option<Vec<f32>>) {
                 let grad: Vec<f32> = y
                     .iter()
                     .zip(yhat)
@@ -563,7 +563,7 @@ mod univariate_booster_test {
                 (grad, Some(hess))
             }
 
-            fn calc_init(&self, y: &[f64], sample_weight: Option<&[f64]>) -> f64 {
+            fn initial_value(&self, y: &[f64], sample_weight: Option<&[f64]>) -> f64 {
                 match sample_weight {
                     Some(w) => {
                         let sw: f64 = w.iter().sum();
