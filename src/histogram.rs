@@ -341,7 +341,7 @@ mod tests {
 
         let y_avg = y.iter().sum::<f64>() / y.len() as f64;
         let yhat = vec![y_avg; y.len()];
-        let (g, h, _) = objective_function.gradient(&y, &yhat, None);
+        let (g, h) = objective_function.gradient(&y, &yhat, None);
 
         let col = 0;
         let mut hist_feat_owned = FeatureHistogramOwned::empty_from_cuts(&b.cuts.get_col(col), false);
@@ -398,7 +398,7 @@ mod tests {
         let bdata = Matrix::new(&b.binned_data, data.rows, data.cols);
         let y: Vec<f64> = file.lines().map(|x| x.parse::<f64>().unwrap()).collect();
         let yhat = vec![0.5; y.len()];
-        let (g, h, _) = objective_function.gradient(&y, &yhat, None);
+        let (g, h) = objective_function.gradient(&y, &yhat, None);
 
         let col_index: Vec<usize> = (0..data.cols).collect();
         let mut hist_init_owned = NodeHistogramOwned::empty_from_cuts(&b.cuts, &col_index, true, false);
@@ -463,7 +463,7 @@ mod tests {
         let bdata = Matrix::new(&b.binned_data, data.rows, data.cols);
         let y: Vec<f64> = file.lines().map(|x| x.parse::<f64>().unwrap_or(f64::NAN)).collect();
         let yhat = vec![0.5; y.len()];
-        let (g, h, _) = objective_function.gradient(&y, &yhat, None);
+        let (g, h) = objective_function.gradient(&y, &yhat, None);
 
         let col_index: Vec<usize> = (0..data.cols).collect();
         let mut hist_init_owned = NodeHistogramOwned::empty_from_cuts(&b.cuts, &col_index, false, false);
@@ -522,7 +522,7 @@ mod tests {
         let bdata = Matrix::new(&b.binned_data, data.rows, data.cols);
         let y: Vec<f64> = file.lines().map(|x| x.parse::<f64>().unwrap_or(f64::NAN)).collect();
         let yhat = vec![0.5; y.len()];
-        let (g, h, _) = objective_function.gradient(&y, &yhat, None);
+        let (g, h) = objective_function.gradient(&y, &yhat, None);
 
         let col_index: Vec<usize> = (0..data.cols).collect();
 

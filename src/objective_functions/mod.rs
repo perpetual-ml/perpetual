@@ -25,7 +25,7 @@ use serde::{Deserialize, Serialize};
 use crate::metrics::Metric;
 
 // define types as smartpointers for thread safety
-pub type ObjectiveFn    = Arc<dyn Fn(&[f64], &[f64], Option<&[f64]>) -> (Vec<f32>, Option<Vec<f32>>, bool) + Send + Sync + 'static>;
+pub type ObjectiveFn    = Arc<dyn Fn(&[f64], &[f64], Option<&[f64]>) -> (Vec<f32>, Option<Vec<f32>>) + Send + Sync + 'static>;
 pub type LossFn         = Arc<dyn Fn(&[f64], &[f64], Option<&[f64]>) -> Vec<f32> + Send + Sync + 'static>;
 pub type InitialValueFn = Arc<dyn Fn(&[f64], Option<&[f64]>) -> f64 + Send + Sync + 'static>;
 
@@ -49,7 +49,7 @@ pub type InitialValueFn = Arc<dyn Fn(&[f64], Option<&[f64]>) -> f64 + Send + Syn
 /// 
 pub trait ObjectiveFunction: Send + Sync {
     fn loss(&self, y: &[f64], yhat: &[f64], sample_weight: Option<&[f64]>) -> Vec<f32>;
-    fn gradient(&self, y: &[f64], yhat: &[f64], sample_weight: Option<&[f64]>) -> (Vec<f32>, Option<Vec<f32>>, bool);
+    fn gradient(&self, y: &[f64], yhat: &[f64], sample_weight: Option<&[f64]>) -> (Vec<f32>, Option<Vec<f32>>);
     fn initial_value(&self, y: &[f64], sample_weight: Option<&[f64]>) -> f64;
     fn default_metric(&self) -> Metric;
 }
@@ -145,7 +145,7 @@ where
          (**self).loss(y, yhat, sample_weight)
         }
     
-    fn gradient(&self, y: &[f64], yhat: &[f64], sample_weight: Option<&[f64]>) -> (Vec<f32>, Option<Vec<f32>>, bool) {
+    fn gradient(&self, y: &[f64], yhat: &[f64], sample_weight: Option<&[f64]>) -> (Vec<f32>, Option<Vec<f32>>) {
          (**self).gradient(y, yhat, sample_weight) 
         }
     
@@ -202,7 +202,7 @@ mod test {
     }
 
     fn sum_grad(obj: &Arc<dyn crate::objective_functions::ObjectiveFunction>, yhat: &[f64]) -> f32 {
-        let (g, _, _) = obj.gradient(Y, yhat, None);
+        let (g, _) = obj.gradient(Y, yhat, None);
         g.iter().copied().sum()
     }
     

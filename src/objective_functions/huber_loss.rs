@@ -49,7 +49,7 @@ impl ObjectiveFunction for HuberLoss {
     }
 
     #[inline]
-    fn gradient(&self, y: &[f64], yhat: &[f64], sample_weight: Option<&[f64]>) -> (Vec<f32>, Option<Vec<f32>>, bool) {
+    fn gradient(&self, y: &[f64], yhat: &[f64], sample_weight: Option<&[f64]>) -> (Vec<f32>, Option<Vec<f32>>) {
         
         let delta = self.delta.unwrap_or(1.0);
 
@@ -72,7 +72,7 @@ impl ObjectiveFunction for HuberLoss {
                         (g as f32, h as f32)
                     })
                     .unzip();
-                (grad, Some(hess), false)
+                (grad, Some(hess))
             }
             None => {
                 let (grad, hess): (Vec<f32>, Vec<f32>) = y
@@ -87,7 +87,7 @@ impl ObjectiveFunction for HuberLoss {
                         (g as f32, h as f32)
                     })
                     .unzip();
-                (grad, Some(hess), false)
+                (grad, Some(hess))
             }
         }
 

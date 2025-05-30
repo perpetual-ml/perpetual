@@ -56,7 +56,7 @@ impl ObjectiveFunction for LogLoss {
     }
 
     #[inline]
-    fn gradient(&self, y: &[f64], yhat: &[f64], sample_weight: Option<&[f64]>) -> (Vec<f32>, Option<Vec<f32>>, bool) {
+    fn gradient(&self, y: &[f64], yhat: &[f64], sample_weight: Option<&[f64]>) -> (Vec<f32>, Option<Vec<f32>>) {
 
         match sample_weight {
             Some(sample_weight) => {
@@ -69,7 +69,7 @@ impl ObjectiveFunction for LogLoss {
                         (((yhat_ - *y_) * *w_) as f32, (yhat_ * (f64::ONE - yhat_) * *w_) as f32)
                     })
                     .unzip();
-                (g, Some(h), false)
+                (g, Some(h))
             }
             None => {
                 let (g, h) = y
@@ -80,7 +80,7 @@ impl ObjectiveFunction for LogLoss {
                         ((yhat_ - *y_) as f32, (yhat_ * (f64::ONE - yhat_)) as f32)
                     })
                     .unzip();
-                (g, Some(h), false)
+                (g, Some(h))
             }
         }
 

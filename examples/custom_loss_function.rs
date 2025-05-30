@@ -47,7 +47,7 @@ impl perpetual::objective_functions::ObjectiveFunction for CustomSquaredLoss {
         y: &[f64],
         yhat: &[f64],
         sample_weight: Option<&[f64]>,
-    ) -> (Vec<f32>, Option<Vec<f32>>, bool) {
+    ) -> (Vec<f32>, Option<Vec<f32>>) {
         let grad: Vec<f32> = y
             .iter()
             .zip(yhat)
@@ -61,7 +61,7 @@ impl perpetual::objective_functions::ObjectiveFunction for CustomSquaredLoss {
             })
             .collect();
         let hess = vec![2.0_f32; y.len()];
-        (grad, Some(hess), false)
+        (grad, Some(hess))
     }
 
     fn initial_value(&self, y: &[f64], sample_weight: Option<&[f64]>) -> f64 {
