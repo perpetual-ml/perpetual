@@ -77,6 +77,14 @@ impl perpetual::objective_functions::ObjectiveFunction for CustomSquaredLoss {
     fn default_metric(&self) -> Metric {
         Metric::RootMeanSquaredError
     }
+
+    fn constant_hessian(&self, weights_flag: bool) -> bool {
+        if weights_flag {
+            false
+        } else {
+            true
+        }
+    }
 }
 
 fn main() -> Result<(), Box<dyn Error>> {

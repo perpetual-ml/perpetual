@@ -149,4 +149,12 @@ impl ObjectiveFunction for AdaptiveHuberLoss {
         false
     }
 
+    fn constant_hessian(&self, weights_flag: bool) -> bool {
+        if weights_flag {
+            false
+        } else {
+            false
+        }
+    }
+
 }

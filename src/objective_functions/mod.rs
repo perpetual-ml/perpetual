@@ -1,5 +1,6 @@
 //! Objective Functions
-//!
+//! 
+//! Some text
 //! 
 //! 
 //! 
@@ -23,27 +24,38 @@ use std::sync::Arc;
 use serde::{Deserialize, Serialize};
 use crate::metrics::Metric;
 
-// define types as smartpointers
-// for thread safety
-//
-// NOTE: These can't be renamed without refactoring
-// a few other modules - so don't do it unless you
-// are ready to spend some time
-pub type ObjFn    = Arc<dyn Fn(&[f64], &[f64], Option<&[f64]>) -> (Vec<f32>, Option<Vec<f32>>) + Send + Sync + 'static>;
-pub type LossFn   = Arc<dyn Fn(&[f64], &[f64], Option<&[f64]>) -> Vec<f32> + Send + Sync + 'static>;
-pub type InitFn   = Arc<dyn Fn(&[f64], Option<&[f64]>) -> f64 + Send + Sync + 'static>;
+// define types as smartpointers for thread safety
+pub type ObjectiveFn    = Arc<dyn Fn(&[f64], &[f64], Option<&[f64]>) -> (Vec<f32>, Option<Vec<f32>>) + Send + Sync + 'static>;
+pub type LossFn         = Arc<dyn Fn(&[f64], &[f64], Option<&[f64]>) -> Vec<f32> + Send + Sync + 'static>;
+pub type InitialValueFn = Arc<dyn Fn(&[f64], Option<&[f64]>) -> f64 + Send + Sync + 'static>;
 
 // define traits for the objective
 // functions.
 //
 // The ObjectiveFunction controls the
 // logical flow downstream.
+/// Objective function traits
+/// 
+/// 
+/// ## Traits:
+/// 
+/// * `fn calc_loss`:
+/// * `fn calc_grad_hess`:
+/// * `fn calc_init`:
+/// * `fn contant_hessian`: 
+/// 
+/// ## Example:
+/// 
+/// 
+/// 
 pub trait ObjectiveFunction: Send + Sync {
     fn hessian_is_constant(&self) -> bool;
     fn calc_loss(&self, y: &[f64], yhat: &[f64], sample_weight: Option<&[f64]>) -> Vec<f32>;
     fn calc_grad_hess(&self, y: &[f64], yhat: &[f64], sample_weight: Option<&[f64]>) -> (Vec<f32>, Option<Vec<f32>>);
     fn calc_init(&self, y: &[f64], sample_weight: Option<&[f64]>) -> f64;
     fn default_metric(&self) -> Metric;
+
+    fn constant_hessian(&self, weights_flag: bool) -> bool;
 }
 
 
@@ -58,18 +70,17 @@ where T: ObjectiveFunction + ?Sized + 'static,
     Arc::new(move |y, yhat, w| instance.clone().calc_loss(y, yhat, w))
 }
 
-pub fn gradient_hessian_callables<T>(instance: Arc<T>) -> ObjFn
+pub fn gradient_hessian_callables<T>(instance: Arc<T>) -> ObjectiveFn
 where T: ObjectiveFunction + ?Sized + 'static,
 {
     Arc::new(move |y, yhat, w| instance.clone().calc_grad_hess(y, yhat, w))
 }
 
-pub fn calc_init_callables<T>(instance: Arc<T>) -> InitFn
+pub fn calc_init_callables<T>(instance: Arc<T>) -> InitialValueFn
 where T: ObjectiveFunction + ?Sized + 'static,
 {
     Arc::new(move |y, w| instance.clone().calc_init(y, w))
 }
-
 
 // define Objective enum
 // as before moving to smartpointers. The current
@@ -94,7 +105,9 @@ pub enum Objective {
     HuberLoss { delta: Option<f64> },
     AdaptiveHuberLoss { quantile: Option<f64> },
 
-    /// Runtime custom objective
+    /// Custom objective function
+    /// 
+    /// 
     #[serde(skip_serializing, skip_deserializing)]
     Custom(Arc<dyn ObjectiveFunction>),
 }
@@ -132,20 +145,38 @@ impl<T> ObjectiveFunction for Arc<T>
 where
     T: ObjectiveFunction + Send + Sync + ?Sized + 'static,
 {
-    fn hessian_is_constant(&self) -> bool { (**self).hessian_is_constant() }
-    fn calc_loss(&self, y: &[f64], yhat: &[f64], sample_weight: Option<&[f64]>) -> Vec<f32> { (**self).calc_loss(y, yhat, sample_weight) }
-    fn calc_grad_hess(&self, y: &[f64], yhat: &[f64], sample_weight: Option<&[f64]>) -> (Vec<f32>, Option<Vec<f32>>) { (**self).calc_grad_hess(y, yhat, sample_weight) }
-    fn calc_init(&self, y: &[f64], sample_weight: Option<&[f64]>) -> f64 { (**self).calc_init(y, sample_weight) }
-    fn default_metric(&self) -> Metric { (**self).default_metric() }
+    fn hessian_is_constant(&self) -> bool {
+         (**self).hessian_is_constant() 
+        }
+
+    fn calc_loss(&self, y: &[f64], yhat: &[f64], sample_weight: Option<&[f64]>) -> Vec<f32> {
+         (**self).calc_loss(y, yhat, sample_weight)
+        }
+    
+    fn calc_grad_hess(&self, y: &[f64], yhat: &[f64], sample_weight: Option<&[f64]>) -> (Vec<f32>, Option<Vec<f32>>) {
+         (**self).calc_grad_hess(y, yhat, sample_weight) 
+        }
+    
+    fn calc_init(&self, y: &[f64], sample_weight: Option<&[f64]>) -> f64 {
+         (**self).calc_init(y, sample_weight) 
+        }
+    
+    fn default_metric(&self) -> Metric {
+         (**self).default_metric() 
+        }
+    
+    fn constant_hessian(&self, weights_flag: bool) -> bool {
+        (**self).constant_hessian(weights_flag)
+    }
 }
 
 // Custom objective
 // struct (experimental)
 #[derive(Clone)]
 pub struct CustomObjective {
-    pub grad_hess: ObjFn,
+    pub grad_hess: ObjectiveFn,
     pub loss: LossFn,
-    pub init: InitFn,
+    pub init: InitialValueFn,
     pub hessian_constant: bool,
     pub metric: Metric,
 }

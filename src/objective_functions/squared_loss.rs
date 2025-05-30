@@ -81,4 +81,12 @@ impl ObjectiveFunction for SquaredLoss {
         true
     }
 
+    fn constant_hessian(&self, weights_flag: bool) -> bool {
+        if weights_flag {
+            false
+        } else {
+            true
+        }
+    }
+
 }
