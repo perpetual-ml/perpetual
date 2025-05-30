@@ -427,3 +427,120 @@ impl MultivariateBooster {
         self.metadata.get(key).cloned()
     }
 }
+
+
+
+#[cfg(test)]
+mod multivariate_booster_test {
+    
+    use crate::{utils::between, MultivariateBooster};
+    use polars::{
+        io::SerReader,
+        prelude::{CsvReadOptions, DataType},
+    };
+    use std::error::Error;
+    use crate::Matrix;
+    use crate::objective_functions::Objective;
+
+    #[test]
+    fn test_multi_output_booster() -> Result<(), Box<dyn Error>> {
+        let n_classes = 7;
+        let n_columns = 54;
+        let n_rows = 1000;
+        let max_bin = 10;
+
+        let mut features: Vec<&str> = [
+            "Elevation",
+            "Aspect",
+            "Slope",
+            "Horizontal_Distance_To_Hydrology",
+            "Vertical_Distance_To_Hydrology",
+            "Horizontal_Distance_To_Roadways",
+            "Hillshade_9am",
+            "Hillshade_Noon",
+            "Hillshade_3pm",
+            "Horizontal_Distance_To_Fire_Points",
+            "Wilderness_Area_0",
+            "Wilderness_Area_1",
+            "Wilderness_Area_2",
+            "Wilderness_Area_3",
+        ]
+        .to_vec();
+
+        let soil_types = (0..40).map(|i| format!("{}_{}", "Soil_Type", i)).collect::<Vec<_>>();
+        let s_types = soil_types.iter().map(|s| s.as_str()).collect::<Vec<_>>();
+        features.extend(s_types);
+
+        let mut features_and_target = features.clone();
+        features_and_target.push("Cover_Type");
+
+        let features_and_target_arc = features_and_target
+            .iter()
+            .map(|s| String::from(s.to_owned()))
+            .collect::<Vec<String>>()
+            .into();
+
+        let df_test = CsvReadOptions::default()
+            .with_has_header(true)
+            .with_columns(Some(features_and_target_arc))
+            .try_into_reader_with_file_path(Some("resources/cover_types_test.csv".into()))?
+            .finish()
+            .unwrap()
+            .head(Some(n_rows));
+
+        // Get data in column major format...
+        let id_vars_test: Vec<&str> = Vec::new();
+        let mdf_test = df_test.unpivot(&features, &id_vars_test)?;
+
+        let data_test = Vec::from_iter(
+            mdf_test
+                .select_at_idx(1)
+                .expect("Invalid column")
+                .f64()?
+                .into_iter()
+                .map(|v| v.unwrap_or(f64::NAN)),
+        );
+
+        let y_test = Vec::from_iter(
+            df_test
+                .column("Cover_Type")?
+                .cast(&DataType::Float64)?
+                .f64()?
+                .into_iter()
+                .map(|v| v.unwrap_or(f64::NAN)),
+        );
+
+        // Create Matrix from ndarray.
+        let data = Matrix::new(&data_test, y_test.len(), n_columns);
+
+        let mut y_vec: Vec<Vec<f64>> = Vec::new();
+        for i in 0..n_classes {
+            y_vec.push(
+                y_test
+                    .iter()
+                    .map(|y| if (*y as usize) == (i + 1) { 1.0 } else { 0.0 })
+                    .collect(),
+            );
+        }
+        let y_data = y_vec.into_iter().flatten().collect::<Vec<f64>>();
+        let y = Matrix::new(&y_data, y_test.len(), n_classes);
+
+        let mut booster = MultivariateBooster::default()
+            .set_objective(Objective::LogLoss)
+            .set_max_bin(max_bin)
+            .set_n_boosters(n_classes)
+            .set_budget(0.1)
+            .set_timeout(Some(60.0));
+
+        println!("The number of boosters: {:?}", booster.get_boosters().len());
+        assert!(booster.get_boosters().len() == n_classes);
+
+        booster.fit(&data, &y, None).unwrap();
+
+        let probas = booster.predict_proba(&data, true);
+
+        assert!(between(0.999, 1.001, probas[0..n_classes].iter().sum::<f64>() as f32));
+
+        Ok(())
+    }
+}
