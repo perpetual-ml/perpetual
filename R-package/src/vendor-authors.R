@@ -1,0 +1,10 @@
+if(!require('jsonlite')) install.packages('jsonlite', repos = 'https://cloud.r-project.org')
+metadata <- jsonlite::fromJSON(pipe("cargo metadata --format-version 1"))
+packages <- metadata$packages
+stopifnot(is.data.frame(packages))
+packages <- subset(packages, sapply(packages$authors, length) > 0 & name != 'myrustlib')
+authors <- vapply(packages$authors, function(x) paste(sub(" <.*>", "", x), collapse = ', '), character(1))
+lines <- sprintf(" - %s %s: %s", packages$name, packages$version, authors)
+dir.create('../../inst', showWarnings = FALSE)
+footer <- sprintf("\n(This file was auto-generated from 'cargo metadata' on %s)", Sys.Date())
+writeLines(c('Authors of vendored cargo crates', lines, footer), '../../inst/AUTHORS')

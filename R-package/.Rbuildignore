@@ -1,0 +1,6 @@
+^R-package\.Rproj$
+^\.Rproj\.user$
+^LICENSE\.md$
+
+# rust artifacts
+src/library/target/*
