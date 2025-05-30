@@ -26,7 +26,6 @@ use perpetual::objective_functions::{Objective};
 #[derive(Clone)]
 struct CustomSquaredLoss;
 impl perpetual::objective_functions::ObjectiveFunction for CustomSquaredLoss {
-    fn hessian_is_constant(&self) -> bool { false }
 
     fn loss(&self, y: &[f64], yhat: &[f64], sample_weight: Option<&[f64]>) -> Vec<f32> {
         y.iter()
@@ -78,13 +77,6 @@ impl perpetual::objective_functions::ObjectiveFunction for CustomSquaredLoss {
         Metric::RootMeanSquaredError
     }
 
-    fn constant_hessian(&self, weights_flag: bool) -> bool {
-        if weights_flag {
-            false
-        } else {
-            true
-        }
-    }
 }
 
 fn main() -> Result<(), Box<dyn Error>> {

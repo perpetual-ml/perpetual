@@ -527,10 +527,6 @@ mod univariate_booster_test {
         struct CustomSquaredLoss;
         impl ObjectiveFunction for CustomSquaredLoss {
 
-            fn hessian_is_constant(&self) -> bool {
-                false // fails if true
-            }
-
             fn loss(&self, y: &[f64], yhat: &[f64], sample_weight: Option<&[f64]>) -> Vec<f32> {
                 y.iter()
                     .zip(yhat)
@@ -577,13 +573,6 @@ mod univariate_booster_test {
                 Metric::RootMeanSquaredError
             }
 
-            fn constant_hessian(&self, weights_flag: bool) -> bool {
-                if weights_flag {
-                    false
-                } else {
-                    true
-                }
-            }
         }
 
 

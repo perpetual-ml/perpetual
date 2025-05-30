@@ -42,19 +42,16 @@ pub type InitialValueFn = Arc<dyn Fn(&[f64], Option<&[f64]>) -> f64 + Send + Syn
 /// * `fn loss`:
 /// * `fn gradient`:
 /// * `fn initial_value`:
-/// * `fn contant_hessian`: 
 /// 
 /// ## Example:
 /// 
 /// 
 /// 
 pub trait ObjectiveFunction: Send + Sync {
-    fn hessian_is_constant(&self) -> bool;
     fn loss(&self, y: &[f64], yhat: &[f64], sample_weight: Option<&[f64]>) -> Vec<f32>;
     fn gradient(&self, y: &[f64], yhat: &[f64], sample_weight: Option<&[f64]>) -> (Vec<f32>, Option<Vec<f32>>, bool);
     fn initial_value(&self, y: &[f64], sample_weight: Option<&[f64]>) -> f64;
     fn default_metric(&self) -> Metric;
-    fn constant_hessian(&self, weights_flag: bool) -> bool;
 }
 
 
@@ -144,10 +141,6 @@ impl<T> ObjectiveFunction for Arc<T>
 where
     T: ObjectiveFunction + Send + Sync + ?Sized + 'static,
 {
-    fn hessian_is_constant(&self) -> bool {
-         (**self).hessian_is_constant() 
-        }
-
     fn loss(&self, y: &[f64], yhat: &[f64], sample_weight: Option<&[f64]>) -> Vec<f32> {
          (**self).loss(y, yhat, sample_weight)
         }
@@ -163,10 +156,6 @@ where
     fn default_metric(&self) -> Metric {
          (**self).default_metric() 
         }
-    
-    fn constant_hessian(&self, weights_flag: bool) -> bool {
-        (**self).constant_hessian(weights_flag)
-    }
 }
 
 // Custom objective
@@ -176,7 +165,6 @@ pub struct CustomObjective {
     pub grad_hess: ObjectiveFn,
     pub loss: LossFn,
     pub init: InitialValueFn,
-    pub hessian_constant: bool,
     pub metric: Metric,
 }
 
@@ -190,7 +178,6 @@ impl CustomObjective {
             grad_hess: gradient_callables(shared.clone()),
             loss:      loss_callables(shared.clone()),
             init:      initial_value_callables(shared.clone()),
-            hessian_constant: shared.hessian_is_constant(),
             metric:    shared.default_metric(),
         }
     }

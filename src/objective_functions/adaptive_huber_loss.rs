@@ -147,16 +147,4 @@ impl ObjectiveFunction for AdaptiveHuberLoss {
         Metric::RootMeanSquaredError
     }
 
-    fn hessian_is_constant(&self) -> bool {
-        false
-    }
-
-    fn constant_hessian(&self, weights_flag: bool) -> bool {
-        if weights_flag {
-            false
-        } else {
-            false
-        }
-    }
-
 }

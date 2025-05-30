@@ -125,16 +125,4 @@ impl ObjectiveFunction for QuantileLoss {
     fn default_metric(&self) -> Metric {
         Metric::QuantileLoss
     }
-
-    fn hessian_is_constant(&self) -> bool {
-        true
-    }
-
-    fn constant_hessian(&self, weights_flag: bool) -> bool {
-        if weights_flag {
-            false
-        } else {
-            true
-        }
-    }
 }
