@@ -27,54 +27,66 @@ use perpetual::objective_functions::{Objective};
 struct CustomSquaredLoss;
 impl perpetual::objective_functions::ObjectiveFunction for CustomSquaredLoss {
 
+    #[inline]
     fn loss(&self, y: &[f64], yhat: &[f64], sample_weight: Option<&[f64]>) -> Vec<f32> {
-        y.iter()
-            .zip(yhat)
-            .enumerate()
-            .map(|(idx, (yi, yhi))| {
-                let diff = yhi - yi;
-                let loss = diff * diff;
-                match sample_weight {
-                    Some(w) => (loss * w[idx]) as f32,
-                    None => loss as f32,
-                }
-            })
-            .collect()
+            
+        match sample_weight {
+            Some(sample_weight) => y
+                .iter()
+                .zip(yhat)
+                .zip(sample_weight)
+                .map(|((y_, yhat_), w_)| {
+                    let s = *y_ - *yhat_;
+                    (s * s * *w_) as f32
+                })
+                .collect(),
+            None => y
+                .iter()
+                .zip(yhat)
+                .map(|(y_, yhat_)| {
+                    let s = *y_ - *yhat_;
+                    (s * s) as f32
+                })
+                .collect(),
+        }
+
     }
 
-    fn gradient(
-        &self,
-        y: &[f64],
-        yhat: &[f64],
-        sample_weight: Option<&[f64]>,
-    ) -> (Vec<f32>, Option<Vec<f32>>) {
-        let grad: Vec<f32> = y
-            .iter()
-            .zip(yhat)
-            .enumerate()
-            .map(|(idx, (yi, yhi))| {
-                let g = 2.0 * (yhi - yi);
-                match sample_weight {
-                    Some(w) => (g * w[idx]) as f32,
-                    None => g as f32,
-                }
-            })
-            .collect();
-        let hess = vec![2.0_f32; y.len()];
-        (grad, Some(hess))
+    #[inline]
+    fn gradient(&self, y: &[f64], yhat: &[f64], sample_weight: Option<&[f64]> ) -> (Vec<f32>, Option<Vec<f32>>) {
+
+        match sample_weight {
+            Some(sample_weight) => {
+                let (g, h) = y
+                    .iter()
+                    .zip(yhat)
+                    .zip(sample_weight)
+                    .map(|((y_, yhat_), w_)| (((yhat_ - *y_) * *w_) as f32, *w_ as f32))
+                    .unzip();
+                (g, Some(h))
+            }
+            None => (
+                y.iter().zip(yhat).map(|(y_, yhat_)| (yhat_ - *y_) as f32).collect(),
+                None
+            ),
+        }
+
     }
+
 
     fn initial_value(&self, y: &[f64], sample_weight: Option<&[f64]>) -> f64 {
+
         if let Some(w) = sample_weight {
             let sum_w: f64 = w.iter().sum();
             y.iter().zip(w).map(|(yi, wi)| yi * wi).sum::<f64>() / sum_w
         } else {
             y.iter().sum::<f64>() / y.len() as f64
         }
+        
     }
 
     fn default_metric(&self) -> Metric {
-        Metric::RootMeanSquaredError
+        Metric::RootMeanSquaredLogError
     }
 
 }
