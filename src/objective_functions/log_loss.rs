@@ -1,12 +1,15 @@
+//! Negative Logloss function
+//!
+//!
 use super::ObjectiveFunction;
 use crate::{data::FloatData, metrics::Metric, utils::fast_sum};
+use serde::{Deserialize, Serialize};
 
-#[derive(Default)]
+#[derive(Default, Debug, Deserialize, Serialize, Clone)]
 pub struct LogLoss {}
-
 impl ObjectiveFunction for LogLoss {
     #[inline]
-    fn calc_loss(y: &[f64], yhat: &[f64], sample_weight: Option<&[f64]>, _quantile: Option<f64>) -> Vec<f32> {
+    fn loss(&self, y: &[f64], yhat: &[f64], sample_weight: Option<&[f64]>) -> Vec<f32> {
         match sample_weight {
             Some(sample_weight) => y
                 .iter()
@@ -28,7 +31,8 @@ impl ObjectiveFunction for LogLoss {
         }
     }
 
-    fn calc_init(y: &[f64], sample_weight: Option<&[f64]>, _quantile: Option<f64>) -> f64 {
+    #[inline]
+    fn initial_value(&self, y: &[f64], sample_weight: Option<&[f64]>) -> f64 {
         match sample_weight {
             Some(sample_weight) => {
                 let mut ytot: f64 = 0.;
@@ -48,12 +52,7 @@ impl ObjectiveFunction for LogLoss {
     }
 
     #[inline]
-    fn calc_grad_hess(
-        y: &[f64],
-        yhat: &[f64],
-        sample_weight: Option<&[f64]>,
-        _quantile: Option<f64>,
-    ) -> (Vec<f32>, Option<Vec<f32>>) {
+    fn gradient(&self, y: &[f64], yhat: &[f64], sample_weight: Option<&[f64]>) -> (Vec<f32>, Option<Vec<f32>>) {
         match sample_weight {
             Some(sample_weight) => {
                 let (g, h) = y
@@ -81,7 +80,7 @@ impl ObjectiveFunction for LogLoss {
         }
     }
 
-    fn default_metric() -> Metric {
+    fn default_metric(&self) -> Metric {
         Metric::LogLoss
     }
 }

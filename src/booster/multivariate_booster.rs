@@ -1,15 +1,15 @@
 //! Multivariate Booster
-//! 
-//! 
+//!
+//!
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 
+use crate::booster::config::MissingNodeTreatment;
+use crate::booster::config::*;
 use crate::constraints::ConstraintMap;
 use crate::errors::PerpetualError;
 use crate::objective_functions::Objective;
 use crate::{Matrix, UnivariateBooster};
-use crate::booster::config::*;
-use crate::booster::config::MissingNodeTreatment;
 
 /// Perpetual Booster object
 #[derive(Clone, Serialize, Deserialize)]
@@ -38,7 +38,6 @@ impl Default for MultivariateBooster {
         }
     }
 }
-
 
 impl MultivariateBooster {
     /// Multi Output Booster object
@@ -136,7 +135,6 @@ impl MultivariateBooster {
             boosters,
             metadata: HashMap::new(),
         })
-        
     }
 
     pub fn reset(&mut self) {
@@ -187,12 +185,16 @@ impl MultivariateBooster {
     /// Set the objective on the booster.
     /// * `objective` - The objective type of the booster.
     pub fn set_objective(mut self, objective: Objective) -> Self {
-        self.cfg.objective = objective.clone();
+        let tree_objective = objective.clone();
+
         self.boosters = self
             .boosters
-            .iter()
-            .map(|b| b.clone().set_objective(objective.clone()))
+            .into_iter()
+            .map(|b| b.set_objective(tree_objective.clone()))
             .collect();
+
+        self.cfg.objective = objective;
+
         self
     }
 
@@ -424,9 +426,11 @@ impl MultivariateBooster {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::utils::between;
+mod multivariate_booster_test {
+
+    use crate::objective_functions::Objective;
+    use crate::Matrix;
+    use crate::{utils::between, MultivariateBooster};
     use polars::{
         io::SerReader,
         prelude::{CsvReadOptions, DataType},

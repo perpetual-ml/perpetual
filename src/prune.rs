@@ -1,52 +1,47 @@
-use crate::{
-    errors::PerpetualError,
-    node::{Node, NodeType},
-    objective_functions::{calc_init_callables, loss_callables},
-    tree::tree::Tree,
-    Matrix, UnivariateBooster,
-};
+use crate::objective_functions::{loss_callables, LossFn, ObjectiveFunction};
+use crate::{errors::PerpetualError, tree::tree::Tree, Matrix, UnivariateBooster};
 use std::collections::HashMap;
+use std::sync::Arc;
 
 impl UnivariateBooster {
     /// Remove trees which don't generalize with new data.
-    ///
-    /// * `data` -  Either a pandas DataFrame, or a 2 dimensional numpy array.
-    /// * `y` - Either a pandas Series, or a 1 dimensional numpy array.
-    /// * `sample_weight` - Instance weights to use when training the model.
     pub fn prune(
         &mut self,
         data: &Matrix<f64>,
         y: &[f64],
         sample_weight: Option<&[f64]>,
     ) -> Result<(), PerpetualError> {
-        let calc_loss = loss_callables(&self.cfg.objective);
+        // initialize objective function
+        let objective_fn: Arc<dyn ObjectiveFunction> = self.cfg.objective.as_function();
 
         let old_length = self.trees.len();
         let old_n_nodes: usize = self.trees.iter().map(|t| t.nodes.len()).sum();
 
-        let base_score = calc_init_callables(&self.cfg.objective)(y, sample_weight, self.cfg.quantile);
+        let base_score = objective_fn.initial_value(y, sample_weight);
         let yhat = vec![base_score; y.len()];
-        let init_losses = calc_loss(y, &yhat, sample_weight, self.cfg.quantile);
+        let init_losses = objective_fn.loss(y, &yhat, sample_weight);
         let init_loss = init_losses.iter().sum::<f32>() / init_losses.len() as f32;
 
-        self.trees.iter_mut().for_each(|t| {
-            t.prune_bottom_up(
+        // generate loss calculator
+        // from the objective function
+        let loss_fn: LossFn = loss_callables(objective_fn);
+
+        for tree in &mut self.trees {
+            tree.prune_bottom_up(
                 data,
                 &self.cfg.missing,
-                calc_loss,
+                &loss_fn,
                 init_loss,
                 y,
                 sample_weight,
-                self.cfg.quantile,
                 self.base_score,
-            )
-        });
+            );
+        }
 
         self.trees.retain(|t| t.nodes.len() > 1);
 
         let new_length = self.trees.len();
         let new_n_nodes: usize = self.trees.iter().map(|t| t.nodes.len()).sum();
-
         println!(
             "pruning: n_trees: {} -> {}, n_nodes: {} -> {}",
             old_length, new_length, old_n_nodes, new_n_nodes
@@ -56,55 +51,40 @@ impl UnivariateBooster {
     }
 }
 
-type LossFn = fn(&[f64], &[f64], Option<&[f64]>, Option<f64>) -> Vec<f32>;
-
 impl Tree {
+    /// Top-down prune using per-sample loss
     pub fn prune(
         &mut self,
         data: &Matrix<f64>,
         missing: &f64,
-        calc_loss: LossFn,
+        loss: LossFn,
         init_loss: f32,
         y: &[f64],
         sample_weight: Option<&[f64]>,
-        quantile: Option<f64>,
         base_score: f64,
     ) {
         let old_length = self.nodes.len();
-        // loss values for each node
-        let mut node_losses: HashMap<usize, Vec<f32>> =
-            self.nodes.iter().map(|(k, _v)| (k.clone(), Vec::new())).collect();
+        let mut node_losses: HashMap<usize, Vec<f32>> = self.nodes.keys().map(|&k| (k, Vec::new())).collect();
 
         match sample_weight {
             None => {
-                data.index.iter().for_each(|i| {
-                    self.predict_loss(
-                        data,
-                        *i,
-                        missing,
-                        calc_loss,
-                        base_score,
-                        quantile,
-                        &mut node_losses,
-                        y,
-                        None,
-                    );
-                });
+                for &i in &data.index {
+                    self.predict_loss(data, i, missing, loss.clone(), base_score, &mut node_losses, y, None);
+                }
             }
             Some(sw) => {
-                data.index.iter().for_each(|i| {
+                for &i in &data.index {
                     self.predict_loss(
                         data,
-                        *i,
+                        i,
                         missing,
-                        calc_loss,
+                        loss.clone(),
                         base_score,
-                        quantile,
                         &mut node_losses,
                         y,
-                        Some(&[sw[*i]]),
+                        Some(&[sw[i]]),
                     );
-                });
+                }
             }
         }
 
@@ -113,21 +93,17 @@ impl Tree {
             .map(|(k, v)| (k, (v.iter().sum::<f32>(), v.len())))
             .collect();
 
-        let mut node_idx = 0;
-        let mut unchecked_nodes = Vec::new();
-        unchecked_nodes.push(node_idx);
-        while !unchecked_nodes.is_empty() {
-            node_idx = unchecked_nodes.pop().unwrap();
-
-            let node = self.nodes.get(&node_idx).unwrap();
-            let (loss_sum, loss_count) = node_losses_tuple.get(&node_idx).unwrap();
-            let loss_improvement = init_loss - loss_sum / *loss_count as f32;
-
-            if loss_improvement > 0.0 && !node.is_leaf {
-                unchecked_nodes.push(node.left_child);
-                unchecked_nodes.push(node.right_child);
+        let mut unchecked = Vec::new();
+        unchecked.push(0);
+        while let Some(idx) = unchecked.pop() {
+            let node = &self.nodes[&idx];
+            let &(sum, cnt) = &node_losses_tuple[&idx];
+            let improvement = init_loss - sum / cnt as f32;
+            if improvement > 0.0 && !node.is_leaf {
+                unchecked.push(node.left_child);
+                unchecked.push(node.right_child);
             } else {
-                self.remove_children(node_idx);
+                self.remove_children(idx);
             }
         }
 
@@ -135,123 +111,86 @@ impl Tree {
         println!("Pruned nodes: {} -> {}", old_length, new_length);
     }
 
+    /// Compute loss at the leaf reached by row
     pub fn predict_loss(
         &self,
         data: &Matrix<f64>,
         row: usize,
         missing: &f64,
-        calc_loss: LossFn,
+        loss: LossFn,
         base_score: f64,
-        quantile: Option<f64>,
         node_losses: &mut HashMap<usize, Vec<f32>>,
         y: &[f64],
         sample_weight: Option<&[f64]>,
     ) {
-        let mut node_idx = 0;
+        let mut idx = 0;
         loop {
-            let node = self.nodes.get(&node_idx).unwrap();
-            let loss = calc_loss(
-                &[y[row]],
-                &[node.weight_value as f64 + base_score],
-                sample_weight,
-                quantile,
-            )[0];
-            let nl = node_losses.get_mut(&node_idx).unwrap();
-            nl.push(loss);
-            if !node.is_leaf {
-                node_idx = node.get_child_idx(data.get(row, node.split_feature), missing);
-            } else {
+            let node = &self.nodes[&idx];
+            let loss = loss(&[y[row]], &[node.weight_value as f64 + base_score], sample_weight)[0];
+            node_losses.get_mut(&idx).unwrap().push(loss);
+            if node.is_leaf {
                 break;
             }
+            idx = node.get_child_idx(data.get(row, node.split_feature), missing);
         }
     }
 
+    /// Bottom-up prune a single tree using loss evaluations
     pub fn prune_bottom_up(
         &mut self,
         data: &Matrix<f64>,
         missing: &f64,
-        calc_loss: LossFn,
+        //objective_function: &Arc<dyn ObjectiveFunction>,
+        loss: &LossFn,
         init_loss: f32,
         y: &[f64],
         sample_weight: Option<&[f64]>,
-        quantile: Option<f64>,
         base_score: f64,
     ) {
         let old_length = self.nodes.len();
-        // loss values for each node
-        let mut node_losses: HashMap<usize, Vec<f32>> =
-            self.nodes.iter().map(|(k, _v)| (k.clone(), Vec::new())).collect();
-        let mut parent_nodes = self
-            .nodes
-            .values()
-            .filter(
-                |x| match (self.nodes.get(&x.left_child), self.nodes.get(&x.right_child)) {
-                    (Some(left_child), Some(right_child)) => left_child.is_leaf && right_child.is_leaf,
-                    _ => false,
-                },
-            )
-            .map(|n| (n.num, n.node_type))
-            .collect::<Vec<_>>();
+        let mut node_losses: HashMap<usize, Vec<f32>> = self.nodes.keys().map(|&k| (k, Vec::new())).collect();
 
-        match sample_weight {
-            None => {
-                data.index.iter().for_each(|i| {
-                    let i_ = *i;
-                    let (pred, node_idx) = self.predict_row_and_node_idx(data, *i, missing);
-                    let loss = calc_loss(&[y[i_]], &[pred + base_score], None, quantile)[0];
-                    let nl = node_losses.get_mut(&node_idx).unwrap();
-                    nl.push(loss);
-                });
-            }
-            Some(sw) => {
-                data.index.iter().for_each(|i| {
-                    let i_ = *i;
-                    let (pred, node_idx) = self.predict_row_and_node_idx(data, *i, missing);
-                    let loss = calc_loss(&[y[i_]], &[pred + base_score], Some(&[sw[i_]]), quantile)[0];
-                    let nl = node_losses.get_mut(&node_idx).unwrap();
-                    nl.push(loss);
-                });
-            }
+        for &i in &data.index {
+            let (pred, nid) = self.predict_row_and_node_idx(data, i, missing);
+            let loss = (loss)(&[y[i]], &[pred + base_score], sample_weight)[0];
+            node_losses.get_mut(&nid).unwrap().push(loss);
         }
 
-        let mut node_losses_tuple: HashMap<usize, (f32, usize)> = node_losses
+        let mut parents: Vec<usize> = self
+            .nodes
+            .values()
+            .filter(|n| {
+                let l = self.nodes.get(&n.left_child);
+                let r = self.nodes.get(&n.right_child);
+                matches!((l, r), (Some(lc), Some(rc)) if lc.is_leaf && rc.is_leaf)
+            })
+            .map(|n| n.num)
+            .collect();
+
+        let mut stats: HashMap<usize, (f32, usize)> = node_losses
             .into_iter()
             .map(|(k, v)| (k, (v.iter().sum::<f32>(), v.len())))
             .collect();
 
-        while !parent_nodes.is_empty() {
-            let (node_num, node_type) = parent_nodes.pop().unwrap();
-            let node: &mut Node;
-            let sibling_node: &mut Node;
-            if node_num != 0 {
-                let sibling_num = if node_type == NodeType::Left {
-                    node_num + 1
-                } else {
-                    node_num - 1
-                };
-                let [node_opt, sibling_node_opt] = self.nodes.get_disjoint_mut([&node_num, &sibling_num]);
-                node = node_opt.unwrap();
-                sibling_node = sibling_node_opt.unwrap();
-            } else {
-                let [node_opt, sibling_node_opt] = self.nodes.get_disjoint_mut([&node_num, &1]);
-                node = node_opt.unwrap();
-                sibling_node = sibling_node_opt.unwrap();
-            }
-            let left_child = node.left_child;
-            let right_child = node.right_child;
-            let parent_node = node.parent_node;
-            let loss_sum = node_losses_tuple[&left_child].0 + node_losses_tuple[&right_child].0;
-            let loss_length = node_losses_tuple[&left_child].1 + node_losses_tuple[&right_child].1;
-            let child_loss_avg = loss_sum / loss_length as f32;
-            let loss_improvement = init_loss - child_loss_avg;
-            if loss_improvement < 0.0 {
-                node.is_leaf = true;
-                if sibling_node.is_leaf && node.num != 0 {
-                    parent_nodes.push((node.parent_node, self.nodes[&parent_node].node_type));
-                };
-                self.nodes.remove(&left_child);
-                self.nodes.remove(&right_child);
-                node_losses_tuple.insert(node_num, (loss_sum, loss_length));
+        while let Some(num) = parents.pop() {
+            let node = &self.nodes[&num];
+            let left = node.left_child;
+            let right = node.right_child;
+            let (sl, cl) = stats[&left];
+            let (sr, cr) = stats[&right];
+            let sum = sl + sr;
+            let cnt = cl + cr;
+            let avg = sum / cnt as f32;
+            let imp = init_loss - avg;
+            if imp < 0.0 {
+                let pnum = node.parent_node;
+                self.nodes.get_mut(&num).unwrap().is_leaf = true;
+                self.nodes.remove(&left);
+                self.nodes.remove(&right);
+                stats.insert(num, (sum, cnt));
+                if num != 0 && self.nodes[&pnum].is_leaf {
+                    parents.push(pnum);
+                }
             }
         }
 
@@ -259,15 +198,14 @@ impl Tree {
         println!("Pruned nodes: {} -> {}", old_length, new_length);
     }
 
-    pub fn predict_row_and_node_idx(&self, data: &Matrix<f64>, row: usize, missing: &f64) -> (f64, usize) {
-        let mut node_idx = 0;
+    fn predict_row_and_node_idx(&self, data: &Matrix<f64>, row: usize, missing: &f64) -> (f64, usize) {
+        let mut idx = 0;
         loop {
-            let node = &self.nodes.get(&node_idx).unwrap();
+            let node = &self.nodes[&idx];
             if node.is_leaf {
-                return (node.weight_value as f64, node_idx);
-            } else {
-                node_idx = node.get_child_idx(data.get(row, node.split_feature), missing);
+                return (node.weight_value as f64, idx);
             }
+            idx = node.get_child_idx(data.get(row, node.split_feature), missing);
         }
     }
 }

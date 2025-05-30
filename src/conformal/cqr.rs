@@ -1,4 +1,5 @@
-use crate::{errors::PerpetualError, objective_functions::Objective, utils::percentiles, Matrix, UnivariateBooster};
+use crate::objective_functions::Objective;
+use crate::{errors::PerpetualError, utils::percentiles, Matrix, UnivariateBooster};
 use std::collections::HashMap;
 
 pub type CalData<'a> = (Matrix<'a, f64>, &'a [f64], &'a [f64]); // (x_flat_data, rows, cols), y, alpha
@@ -17,15 +18,16 @@ impl UnivariateBooster {
 
         for alpha_ in alpha {
             let lower_quantile = Some(alpha_ / 2.0);
-            let mut model_lower = UnivariateBooster::default()
-                .set_objective(Objective::QuantileLoss)
-                .set_quantile(lower_quantile);
+            let mut model_lower = UnivariateBooster::default().set_objective(Objective::QuantileLoss {
+                quantile: lower_quantile,
+            });
             model_lower.fit(&data, &y, sample_weight)?;
 
             let upper_quantile = Some(1.0 - alpha_ / 2.0);
-            let mut model_upper = UnivariateBooster::default()
-                .set_objective(Objective::QuantileLoss)
-                .set_quantile(upper_quantile);
+            let mut model_upper = UnivariateBooster::default().set_objective(Objective::QuantileLoss {
+                quantile: upper_quantile,
+            });
+
             model_upper.fit(&data, &y, sample_weight)?;
 
             let y_cal_pred_lower = model_lower.predict(&x_cal, true);
@@ -63,10 +65,13 @@ impl UnivariateBooster {
     }
 }
 
+// Unit-tests
 #[cfg(test)]
 mod tests {
-    use super::*;
+
     use crate::objective_functions::Objective;
+    use crate::Matrix;
+    use crate::UnivariateBooster;
     use polars::io::SerReader;
     use polars::prelude::{CsvReadOptions, DataType};
     use std::error::Error;

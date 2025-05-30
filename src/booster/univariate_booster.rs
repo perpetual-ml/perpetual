@@ -1,10 +1,10 @@
 //! Univariate Booster
-//! 
-//! 
+//!
+//!
 
-use std::collections::{HashMap, HashSet};
 use crate::bin::Bin;
 use crate::binning::bin_matrix;
+use crate::booster::config::*;
 use crate::constants::{
     FREE_MEM_ALLOC_FACTOR, GENERALIZATION_THRESHOLD_RELAXED, ITER_LIMIT, MIN_COL_AMOUNT, N_NODES_ALLOC_MAX,
     N_NODES_ALLOC_MIN, STOPPING_ROUNDS,
@@ -13,10 +13,9 @@ use crate::constraints::ConstraintMap;
 use crate::data::Matrix;
 use crate::errors::PerpetualError;
 use crate::histogram::{update_cuts, NodeHistogram, NodeHistogramOwned};
-use crate::objective_functions::{calc_init_callables, gradient_hessian_callables, loss_callables, Objective};
+use crate::objective_functions::{Objective, ObjectiveFunction};
 use crate::splitter::{MissingBranchSplitter, MissingImputerSplitter, SplitInfo, SplitInfoSlice, Splitter};
 use crate::tree::tree::{Tree, TreeStopper};
-use crate::booster::config::*;
 use core::{f32, f64};
 use log::{info, warn};
 use rand::rngs::StdRng;
@@ -24,12 +23,13 @@ use rand::seq::IteratorRandom;
 use rand::SeedableRng;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
+use std::collections::{HashMap, HashSet};
+use std::mem;
+use std::sync::Arc;
 use std::time::Instant;
-use std::{mem};
 use sysinfo::System;
 
 type ImportanceFn = fn(&Tree, &mut HashMap<usize, (f32, usize)>);
-
 
 /// Perpetual Booster object
 #[derive(Clone, Serialize, Deserialize)]
@@ -63,7 +63,7 @@ impl UnivariateBooster {
     ///      "SquaredLoss" to use Squared Error as the objective function,
     ///      "QuantileLoss" for quantile regression.
     /// * `budget` - budget to fit the model.
-    /// * `base_score` - The initial prediction value of the model. If set to None, it will be calculated based on the objective function at fit time.
+    /// * `base_score` - The initial_value prediction value of the model. If set to None, it will be calculated based on the objective function at fit time.
     /// * `max_bin` - Number of bins to calculate to partition the data. Setting this to
     ///     a smaller number, will result in faster training time, while potentially sacrificing
     ///     accuracy. If there are more bins, than unique values in a column, all unique values
@@ -111,7 +111,6 @@ impl UnivariateBooster {
         memory_limit: Option<f32>,
         stopping_rounds: Option<usize>,
     ) -> Result<Self, PerpetualError> {
-
         let cfg = BoosterConfig {
             objective,
             budget,
@@ -148,7 +147,6 @@ impl UnivariateBooster {
         Ok(booster)
     }
 
-
     pub fn validate_parameters(&self) -> Result<(), PerpetualError> {
         Ok(())
     }
@@ -164,7 +162,8 @@ impl UnivariateBooster {
     /// * `sample_weight` - Instance weights to use when training the model.
     pub fn fit(&mut self, data: &Matrix<f64>, y: &[f64], sample_weight: Option<&[f64]>) -> Result<(), PerpetualError> {
         let constraints_map = self
-            .cfg.monotone_constraints
+            .cfg
+            .monotone_constraints
             .as_ref()
             .unwrap_or(&ConstraintMap::new())
             .to_owned();
@@ -196,7 +195,11 @@ impl UnivariateBooster {
         splitter: &T,
         sample_weight: Option<&[f64]>,
     ) -> Result<(), PerpetualError> {
+        // initialize trees
         let start = Instant::now();
+
+        // initialize objective function
+        let objective_fn: Arc<dyn ObjectiveFunction> = self.cfg.objective.as_function();
 
         let n_threads_available = std::thread::available_parallelism().unwrap().get();
         let num_threads = match self.cfg.num_threads {
@@ -208,26 +211,25 @@ impl UnivariateBooster {
             .build()
             .unwrap();
 
-        let calc_loss = loss_callables(&self.cfg.objective);
-
         // If reset, reset the trees. Otherwise continue training.
         let mut yhat;
         if self.cfg.reset.unwrap_or(true) || self.trees.len() == 0 {
             self.cfg.reset;
             if self.base_score.is_nan() {
-                self.base_score = calc_init_callables(&self.cfg.objective)(y, sample_weight, self.cfg.quantile);
+                self.base_score = objective_fn.initial_value(y, sample_weight);
             }
             yhat = vec![self.base_score; y.len()];
         } else {
             yhat = self.predict(data, true);
         }
 
-        let calc_grad_hess = gradient_hessian_callables(&self.cfg.objective);
-        let (mut grad, mut hess) = calc_grad_hess(y, &yhat, sample_weight, self.cfg.quantile);
+        // calculate gradient
+        // and hessian
+        // let (mut grad, mut hess) = gradient(y, &yhat, sample_weight);
+        let (mut grad, mut hess) = objective_fn.gradient(y, &yhat, sample_weight);
 
-        let mut loss = calc_loss(y, &yhat, sample_weight, self.cfg.quantile);
-
-        let loss_base = calc_loss(y, &vec![self.base_score; y.len()], sample_weight, self.cfg.quantile);
+        let mut loss = objective_fn.loss(y, &yhat, sample_weight);
+        let loss_base = objective_fn.loss(y, &vec![self.base_score; y.len()], sample_weight);
         let loss_avg = loss_base.iter().sum::<f32>() / loss_base.len() as f32;
 
         let base = 10.0_f32;
@@ -237,15 +239,7 @@ impl UnivariateBooster {
         let c = 1.0 / n - truncated_series_sum;
         let target_loss_decrement = c * base.powf(-self.cfg.budget) * loss_avg;
 
-        let is_const_hess = match sample_weight {
-            Some(_sample_weight) => false,
-            None => match &self.cfg.objective {
-                Objective::LogLoss => false,
-                Objective::AdaptiveHuberLoss => false,
-                Objective::HuberLoss => false,
-                _ => true,
-            },
-        };
+        let is_const_hess = hess.is_none();
 
         // Generate binned data
         //
@@ -359,6 +353,7 @@ impl UnivariateBooster {
 
             let mut tree = Tree::new();
             tree.fit(
+                &objective_fn,
                 &bdata,
                 data.index.to_owned(),
                 &col_index_fit,
@@ -369,10 +364,9 @@ impl UnivariateBooster {
                 tld,
                 &loss,
                 y,
-                calc_loss,
+                //objective_fn,
                 &yhat,
                 sample_weight,
-                self.cfg.quantile,
                 is_const_hess,
                 &mut hist_tree,
                 self.cfg.categorical_features.as_ref(),
@@ -404,8 +398,8 @@ impl UnivariateBooster {
                 n_low_loss_rounds = 0;
             }
 
-            (grad, hess) = calc_grad_hess(y, &yhat, sample_weight, self.cfg.quantile);
-            loss = calc_loss(y, &yhat, sample_weight, self.cfg.quantile);
+            (grad, hess) = objective_fn.gradient(y, &yhat, sample_weight);
+            loss = objective_fn.loss(y, &yhat, sample_weight);
 
             if verbose {
                 info!(
@@ -539,41 +533,22 @@ impl UnivariateBooster {
     }
 }
 
-// Unit-tests
 #[cfg(test)]
-mod tests {
-    use crate::utils::between;
+mod univariate_booster_test {
 
-    use super::*;
+    use crate::booster::config::*;
+    use crate::metrics::Metric;
+    use crate::objective_functions::Objective;
+    use crate::objective_functions::ObjectiveFunction;
+    use crate::utils::between;
+    use crate::{Matrix, UnivariateBooster};
     use approx::assert_relative_eq;
     use polars::io::SerReader;
     use polars::prelude::{CsvReadOptions, DataType};
+    use std::collections::HashSet;
     use std::error::Error;
     use std::fs;
     use std::sync::Arc;
-
-    #[test]
-    fn test_booster_fit_subsample() {
-        let file =
-            fs::read_to_string("resources/contiguous_with_missing.csv").expect("Something went wrong reading the file");
-        let data_vec: Vec<f64> = file.lines().map(|x| x.parse::<f64>().unwrap_or(f64::NAN)).collect();
-        let file = fs::read_to_string("resources/performance.csv").expect("Something went wrong reading the file");
-        let y: Vec<f64> = file.lines().map(|x| x.parse::<f64>().unwrap()).collect();
-
-        let data = Matrix::new(&data_vec, 891, 5);
-        let mut booster = UnivariateBooster::default()
-            .set_max_bin(300)
-            .set_base_score(0.5)
-            .set_budget(0.3);
-        booster.fit(&data, &y, None).unwrap();
-        let preds = booster.predict(&data, false);
-        let contribs = booster.predict_contributions(&data, ContributionsMethod::Average, false);
-        assert_eq!(contribs.len(), (data.cols + 1) * data.rows);
-        println!("{}", booster.trees[0]);
-        println!("{}", booster.trees[0].nodes.len());
-        println!("{}", booster.trees.last().unwrap().nodes.len());
-        println!("{:?}", &preds[0..10]);
-    }
 
     #[test]
     fn test_booster_fit() {
@@ -887,81 +862,26 @@ mod tests {
     }
 
     #[test]
-    fn test_adaptive_huber_loss() -> Result<(), Box<dyn Error>> {
-        let all_names = [
-            "MedInc".to_string(),
-            "HouseAge".to_string(),
-            "AveRooms".to_string(),
-            "AveBedrms".to_string(),
-            "Population".to_string(),
-            "AveOccup".to_string(),
-            "Latitude".to_string(),
-            "Longitude".to_string(),
-            "MedHouseVal".to_string(),
-        ];
+    fn test_booster_fit_subsample() {
+        let file =
+            fs::read_to_string("resources/contiguous_with_missing.csv").expect("Something went wrong reading the file");
+        let data_vec: Vec<f64> = file.lines().map(|x| x.parse::<f64>().unwrap_or(f64::NAN)).collect();
+        let file = fs::read_to_string("resources/performance.csv").expect("Something went wrong reading the file");
+        let y: Vec<f64> = file.lines().map(|x| x.parse::<f64>().unwrap()).collect();
 
-        let feature_names = [
-            "MedInc".to_string(),
-            "HouseAge".to_string(),
-            "AveRooms".to_string(),
-            "AveBedrms".to_string(),
-            "Population".to_string(),
-            "AveOccup".to_string(),
-            "Latitude".to_string(),
-            "Longitude".to_string(),
-        ];
-
-        let column_names_test = Arc::new(all_names.clone());
-
-        let df_test = CsvReadOptions::default()
-            .with_has_header(true)
-            .with_columns(Some(column_names_test))
-            .try_into_reader_with_file_path(Some("resources/cal_housing_test.csv".into()))?
-            .finish()
-            .unwrap();
-
-        // Get data in column major format...
-
-        let id_vars_test: Vec<&str> = Vec::new();
-        let mdf_test = df_test.unpivot(feature_names, &id_vars_test)?;
-
-        let data_test = Vec::from_iter(
-            mdf_test
-                .select_at_idx(1)
-                .expect("Invalid column")
-                .f64()?
-                .into_iter()
-                .map(|v| v.unwrap_or(f64::NAN)),
-        );
-
-        let y_test = Vec::from_iter(
-            df_test
-                .column("MedHouseVal")?
-                .cast(&DataType::Float64)?
-                .f64()?
-                .into_iter()
-                .map(|v| v.unwrap_or(f64::NAN)),
-        );
-
-        // Create Matrix from ndarray.
-        let matrix_test = Matrix::new(&data_test, y_test.len(), 8);
-
-        // Create booster.
-        // To provide parameters generate a default booster, and then use
-        // the relevant `set_` methods for any parameters you would like to
-        // adjust.
-        let mut model = UnivariateBooster::default()
-            .set_objective(Objective::AdaptiveHuberLoss)
-            .set_max_bin(10)
-            .set_budget(0.1);
-
-        model.fit(&matrix_test, &y_test, None)?;
-
-        let trees = model.get_prediction_trees();
-        println!("trees = {}", trees.len());
-        assert_eq!(trees.len(), 31);
-
-        Ok(())
+        let data = Matrix::new(&data_vec, 891, 5);
+        let mut booster = UnivariateBooster::default()
+            .set_max_bin(300)
+            .set_base_score(0.5)
+            .set_budget(0.3);
+        booster.fit(&data, &y, None).unwrap();
+        let preds = booster.predict(&data, false);
+        let contribs = booster.predict_contributions(&data, ContributionsMethod::Average, false);
+        assert_eq!(contribs.len(), (data.cols + 1) * data.rows);
+        println!("{}", booster.trees[0]);
+        println!("{}", booster.trees[0].nodes.len());
+        println!("{}", booster.trees.last().unwrap().nodes.len());
+        println!("{:?}", &preds[0..10]);
     }
 
     #[test]
@@ -1029,7 +949,7 @@ mod tests {
         // the relevant `set_` methods for any parameters you would like to
         // adjust.
         let mut model = UnivariateBooster::default()
-            .set_objective(Objective::HuberLoss)
+            .set_objective(Objective::HuberLoss { delta: Some(1.0) })
             .set_max_bin(10)
             .set_budget(0.1);
 
@@ -1038,6 +958,216 @@ mod tests {
         let trees = model.get_prediction_trees();
         println!("trees = {}", trees.len());
         assert_eq!(trees.len(), 45);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_adaptive_huber_loss() -> Result<(), Box<dyn Error>> {
+        let all_names = [
+            "MedInc".to_string(),
+            "HouseAge".to_string(),
+            "AveRooms".to_string(),
+            "AveBedrms".to_string(),
+            "Population".to_string(),
+            "AveOccup".to_string(),
+            "Latitude".to_string(),
+            "Longitude".to_string(),
+            "MedHouseVal".to_string(),
+        ];
+
+        let feature_names = [
+            "MedInc".to_string(),
+            "HouseAge".to_string(),
+            "AveRooms".to_string(),
+            "AveBedrms".to_string(),
+            "Population".to_string(),
+            "AveOccup".to_string(),
+            "Latitude".to_string(),
+            "Longitude".to_string(),
+        ];
+
+        let column_names_test = Arc::new(all_names.clone());
+
+        let df_test = CsvReadOptions::default()
+            .with_has_header(true)
+            .with_columns(Some(column_names_test))
+            .try_into_reader_with_file_path(Some("resources/cal_housing_test.csv".into()))?
+            .finish()
+            .unwrap();
+
+        // Get data in column major format...
+
+        let id_vars_test: Vec<&str> = Vec::new();
+        let mdf_test = df_test.unpivot(feature_names, &id_vars_test)?;
+
+        let data_test = Vec::from_iter(
+            mdf_test
+                .select_at_idx(1)
+                .expect("Invalid column")
+                .f64()?
+                .into_iter()
+                .map(|v| v.unwrap_or(f64::NAN)),
+        );
+
+        let y_test = Vec::from_iter(
+            df_test
+                .column("MedHouseVal")?
+                .cast(&DataType::Float64)?
+                .f64()?
+                .into_iter()
+                .map(|v| v.unwrap_or(f64::NAN)),
+        );
+
+        // Create Matrix from ndarray.
+        let matrix_test = Matrix::new(&data_test, y_test.len(), 8);
+
+        // Create booster.
+        // To provide parameters generate a default booster, and then use
+        // the relevant `set_` methods for any parameters you would like to
+        // adjust.
+        let mut model = UnivariateBooster::default()
+            .set_objective(Objective::AdaptiveHuberLoss { quantile: Some(0.5) })
+            .set_max_bin(10)
+            .set_budget(0.1);
+
+        model.fit(&matrix_test, &y_test, None)?;
+
+        let trees = model.get_prediction_trees();
+        println!("trees = {}", trees.len());
+        assert_eq!(trees.len(), 31);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_custom_objective_function() -> Result<(), Box<dyn Error>> {
+        // define objective function
+        #[derive(Clone)]
+        struct CustomSquaredLoss;
+        impl ObjectiveFunction for CustomSquaredLoss {
+            fn loss(&self, y: &[f64], yhat: &[f64], sample_weight: Option<&[f64]>) -> Vec<f32> {
+                y.iter()
+                    .zip(yhat)
+                    .enumerate()
+                    .map(|(idx, (y_i, yhat_i))| {
+                        let diff = y_i - yhat_i;
+                        let l = diff * diff;
+                        match sample_weight {
+                            Some(w) => (l * w[idx]) as f32,
+                            None => l as f32,
+                        }
+                    })
+                    .collect()
+            }
+
+            fn gradient(&self, y: &[f64], yhat: &[f64], sample_weight: Option<&[f64]>) -> (Vec<f32>, Option<Vec<f32>>) {
+                let grad: Vec<f32> = y
+                    .iter()
+                    .zip(yhat)
+                    .enumerate()
+                    .map(|(idx, (y_i, yhat_i))| {
+                        let g = yhat_i - y_i;
+                        match sample_weight {
+                            Some(w) => (g * w[idx]) as f32,
+                            None => g as f32,
+                        }
+                    })
+                    .collect();
+                let hess = vec![2.0_f32; y.len()];
+                (grad, Some(hess))
+            }
+
+            fn initial_value(&self, y: &[f64], sample_weight: Option<&[f64]>) -> f64 {
+                match sample_weight {
+                    Some(w) => {
+                        let sw: f64 = w.iter().sum();
+                        y.iter().enumerate().map(|(i, y_i)| y_i * w[i]).sum::<f64>() / sw
+                    }
+                    None => y.iter().sum::<f64>() / y.len() as f64,
+                }
+            }
+
+            fn default_metric(&self) -> Metric {
+                Metric::RootMeanSquaredError
+            }
+        }
+
+        let all_names = [
+            "MedInc".to_string(),
+            "HouseAge".to_string(),
+            "AveRooms".to_string(),
+            "AveBedrms".to_string(),
+            "Population".to_string(),
+            "AveOccup".to_string(),
+            "Latitude".to_string(),
+            "Longitude".to_string(),
+            "MedHouseVal".to_string(),
+        ];
+
+        let feature_names = [
+            "MedInc".to_string(),
+            "HouseAge".to_string(),
+            "AveRooms".to_string(),
+            "AveBedrms".to_string(),
+            "Population".to_string(),
+            "AveOccup".to_string(),
+            "Latitude".to_string(),
+            "Longitude".to_string(),
+        ];
+
+        let df = CsvReadOptions::default()
+            .with_has_header(true)
+            .with_columns(Some(Arc::new(all_names.clone())))
+            .try_into_reader_with_file_path(Some("resources/cal_housing_test.csv".into()))?
+            .finish()?;
+
+        let id_vars: Vec<&str> = Vec::new();
+        let mdf = df.unpivot(feature_names.to_vec(), &id_vars)?;
+
+        let data: Vec<f64> = mdf
+            .select_at_idx(1)
+            .expect("Invalid column")
+            .f64()? // Returns Result<Float64Chunked>
+            .into_iter()
+            .map(|v| v.unwrap_or(f64::NAN))
+            .collect();
+
+        let y: Vec<f64> = df
+            .column("MedHouseVal")?
+            .cast(&DataType::Float64)?
+            .f64()? // Returns Result<Float64Chunked>
+            .into_iter()
+            .map(|v| v.unwrap_or(f64::NAN))
+            .collect();
+
+        let matrix = Matrix::new(&data, y.len(), 8);
+
+        // define booster with custom loss
+        // function
+        let mut custom_booster = UnivariateBooster::default()
+            .set_objective(Objective::function(CustomSquaredLoss))
+            .set_max_bin(1)
+            .set_budget(0.1)
+            .set_stopping_rounds(Some(1));
+
+        // define booster with builting
+        // squared loss
+        let mut booster = UnivariateBooster::default()
+            .set_objective(Objective::SquaredLoss)
+            .set_max_bin(1)
+            .set_budget(0.1)
+            .set_stopping_rounds(Some(1));
+
+        // fit
+        booster.fit(&matrix, &y, None)?;
+        custom_booster.fit(&matrix, &y, None)?;
+
+        // // predict values
+        let custom_prediction = custom_booster.predict(&matrix, false);
+        let booster_prediction = booster.predict(&matrix, false);
+
+        assert_relative_eq!(custom_prediction[..5], booster_prediction[..5], max_relative = 1e-6);
 
         Ok(())
     }

@@ -1,12 +1,15 @@
+//! Squared Loss function
+//!
+//!
 use super::ObjectiveFunction;
 use crate::{metrics::Metric, utils::fast_sum};
+use serde::{Deserialize, Serialize};
 
-#[derive(Default)]
+#[derive(Default, Debug, Deserialize, Serialize, Clone)]
 pub struct SquaredLoss {}
-
 impl ObjectiveFunction for SquaredLoss {
     #[inline]
-    fn calc_loss(y: &[f64], yhat: &[f64], sample_weight: Option<&[f64]>, _quantile: Option<f64>) -> Vec<f32> {
+    fn loss(&self, y: &[f64], yhat: &[f64], sample_weight: Option<&[f64]>) -> Vec<f32> {
         match sample_weight {
             Some(sample_weight) => y
                 .iter()
@@ -28,28 +31,8 @@ impl ObjectiveFunction for SquaredLoss {
         }
     }
 
-    fn calc_init(y: &[f64], sample_weight: Option<&[f64]>, _quantile: Option<f64>) -> f64 {
-        match sample_weight {
-            Some(sample_weight) => {
-                let mut ytot: f64 = 0.;
-                let mut ntot: f64 = 0.;
-                for i in 0..y.len() {
-                    ytot += sample_weight[i] * y[i];
-                    ntot += sample_weight[i];
-                }
-                ytot / ntot
-            }
-            None => fast_sum(y) / y.len() as f64,
-        }
-    }
-
     #[inline]
-    fn calc_grad_hess(
-        y: &[f64],
-        yhat: &[f64],
-        sample_weight: Option<&[f64]>,
-        _quantile: Option<f64>,
-    ) -> (Vec<f32>, Option<Vec<f32>>) {
+    fn gradient(&self, y: &[f64], yhat: &[f64], sample_weight: Option<&[f64]>) -> (Vec<f32>, Option<Vec<f32>>) {
         match sample_weight {
             Some(sample_weight) => {
                 let (g, h) = y
@@ -67,7 +50,23 @@ impl ObjectiveFunction for SquaredLoss {
         }
     }
 
-    fn default_metric() -> Metric {
+    #[inline]
+    fn initial_value(&self, y: &[f64], sample_weight: Option<&[f64]>) -> f64 {
+        match sample_weight {
+            Some(sample_weight) => {
+                let mut ytot: f64 = 0.;
+                let mut ntot: f64 = 0.;
+                for i in 0..y.len() {
+                    ytot += sample_weight[i] * y[i];
+                    ntot += sample_weight[i];
+                }
+                ytot / ntot
+            }
+            None => fast_sum(y) / y.len() as f64,
+        }
+    }
+
+    fn default_metric(&self) -> Metric {
         Metric::RootMeanSquaredLogError
     }
 }

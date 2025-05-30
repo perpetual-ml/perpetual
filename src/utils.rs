@@ -185,7 +185,7 @@ pub fn odds(v: f64) -> f64 {
 }
 
 /// Calculate the weight of a given node, given the sum
-/// of the gradients, and the hessians in a node.
+/// of the gradient, and the hessians in a node.
 #[inline]
 pub fn weight(gradient_sum: f32, hessian_sum: f32) -> f32 {
     -gradient_sum / (hessian_sum + 1.0)

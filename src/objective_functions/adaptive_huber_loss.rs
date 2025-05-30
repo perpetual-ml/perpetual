@@ -1,14 +1,21 @@
+//! Adaptive Huber Loss function
+//!
+//!
 use super::ObjectiveFunction;
 use crate::metrics::Metric;
+use serde::{Deserialize, Serialize};
 
 /// Adaptive Huber Loss
-#[derive(Default)]
-pub struct AdaptiveHuberLoss {}
+#[derive(Default, Debug, Deserialize, Serialize, Clone)]
+pub struct AdaptiveHuberLoss {
+    pub quantile: Option<f64>,
+}
 impl ObjectiveFunction for AdaptiveHuberLoss {
-    fn calc_loss(y: &[f64], yhat: &[f64], sample_weight: Option<&[f64]>, quantile: Option<f64>) -> Vec<f32> {
+    #[inline]
+    fn loss(&self, y: &[f64], yhat: &[f64], sample_weight: Option<&[f64]>) -> Vec<f32> {
         // default alpha: 0.5
         // if not passed explicitly
-        let alpha = quantile.unwrap_or(0.5);
+        let alpha = self.quantile.unwrap_or(0.5);
         let n = y.len();
 
         let mut abs_res = y
@@ -54,15 +61,11 @@ impl ObjectiveFunction for AdaptiveHuberLoss {
         }
     }
 
-    fn calc_grad_hess(
-        y: &[f64],
-        yhat: &[f64],
-        sample_weight: Option<&[f64]>,
-        quantile: Option<f64>,
-    ) -> (Vec<f32>, Option<Vec<f32>>) {
+    #[inline]
+    fn gradient(&self, y: &[f64], yhat: &[f64], sample_weight: Option<&[f64]>) -> (Vec<f32>, Option<Vec<f32>>) {
         // default alpha: 0.5
         // if not passed explicitly
-        let alpha = quantile.unwrap_or(0.5);
+        let alpha = self.quantile.unwrap_or(0.5);
         let n = y.len();
 
         let mut abs_res = y
@@ -93,6 +96,7 @@ impl ObjectiveFunction for AdaptiveHuberLoss {
                         (g as f32, h as f32)
                     })
                     .unzip();
+
                 (grad, Some(hess))
             }
             None => {
@@ -108,12 +112,13 @@ impl ObjectiveFunction for AdaptiveHuberLoss {
                         (g as f32, h as f32)
                     })
                     .unzip();
+
                 (grad, Some(hess))
             }
         }
     }
 
-    fn calc_init(y: &[f64], sample_weight: Option<&[f64]>, _quantile: Option<f64>) -> f64 {
+    fn initial_value(&self, y: &[f64], sample_weight: Option<&[f64]>) -> f64 {
         let mut idxs = (0..y.len()).collect::<Vec<_>>();
         idxs.sort_by(|&i, &j| y[i].partial_cmp(&y[j]).unwrap());
 
@@ -134,7 +139,7 @@ impl ObjectiveFunction for AdaptiveHuberLoss {
         median
     }
 
-    fn default_metric() -> Metric {
+    fn default_metric(&self) -> Metric {
         Metric::RootMeanSquaredError
     }
 }

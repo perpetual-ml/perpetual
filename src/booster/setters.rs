@@ -1,5 +1,6 @@
 use crate::booster::config::MissingNodeTreatment;
-use crate::{constraints::ConstraintMap, objective_functions::Objective, UnivariateBooster};
+use crate::objective_functions::Objective;
+use crate::{constraints::ConstraintMap, UnivariateBooster};
 use std::collections::HashSet;
 
 impl UnivariateBooster {

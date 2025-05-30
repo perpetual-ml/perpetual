@@ -1,17 +1,16 @@
 //! Booster configurations
-//! 
+//!
 //! Booster specific configurations.
-//! 
-//! 
-//! 
+//!
+//!
+//!
+use crate::constraints::ConstraintMap;
+use crate::errors::PerpetualError;
+use crate::objective_functions::Objective;
+use serde::{de::DeserializeOwned, Deserialize, Deserializer, Serialize};
+use std::collections::HashSet;
 use std::fs;
 use std::path::Path;
-use crate::errors::PerpetualError;
-use serde::{Deserialize, Deserializer, Serialize, de::DeserializeOwned};
-use std::collections::{HashMap, HashSet};
-use crate::UnivariateBooster;
-use crate::constraints::ConstraintMap;
-use crate::objective_functions::{Objective};
 
 // Common configuration
 // across implementations
@@ -64,9 +63,9 @@ pub enum MissingNodeTreatment {
 }
 
 // Common functions
-fn default_cal_models() -> HashMap<String, [(UnivariateBooster, f64); 2]> {
-    HashMap::new()
-}
+// fn default_cal_models() -> HashMap<String, [(UnivariateBooster, f64); 2]> {
+//     HashMap::new()
+// }
 fn default_budget() -> f32 {
     0.5
 }
@@ -215,13 +214,11 @@ impl Default for BoosterConfig {
 
 /// IO
 pub trait BoosterIO: Serialize + DeserializeOwned + Sized {
-    
     /// Save a booster as a json object to a file.
     ///
     /// * `path` - Path to save booster.
     fn save_booster<P: AsRef<Path>>(&self, path: P) -> Result<(), PerpetualError> {
-        fs::write(path, self.json_dump()?)
-            .map_err(|e| PerpetualError::UnableToWrite(e.to_string()))
+        fs::write(path, self.json_dump()?).map_err(|e| PerpetualError::UnableToWrite(e.to_string()))
     }
 
     /// Dump a booster as a json object
@@ -233,16 +230,14 @@ pub trait BoosterIO: Serialize + DeserializeOwned + Sized {
     ///
     /// * `json_str` - String object, which can be serialized to json.
     fn from_json(json_str: &str) -> Result<Self, PerpetualError> {
-        serde_json::from_str::<Self>(json_str)
-            .map_err(|e| PerpetualError::UnableToRead(e.to_string()))
+        serde_json::from_str::<Self>(json_str).map_err(|e| PerpetualError::UnableToRead(e.to_string()))
     }
 
     /// Load a booster from a path to a json booster object.
     ///
     /// * `path` - Path to load booster from.
     fn load_booster<P: AsRef<Path>>(path: P) -> Result<Self, PerpetualError> {
-        let json_str = fs::read_to_string(path)
-            .map_err(|e| PerpetualError::UnableToRead(e.to_string()))?;
+        let json_str = fs::read_to_string(path).map_err(|e| PerpetualError::UnableToRead(e.to_string()))?;
         Self::from_json(&json_str)
     }
 }

@@ -1,13 +1,11 @@
 //! Predictions
-//! 
-//! 
+//!
+//!
 
 use crate::booster::config::ContributionsMethod;
+use crate::objective_functions::Objective;
 use crate::MultivariateBooster;
-use crate::{
-    objective_functions::Objective, shapley::predict_contributions_row_shapley, tree::tree::Tree, utils::odds, Matrix,
-    UnivariateBooster,
-};
+use crate::{shapley::predict_contributions_row_shapley, tree::tree::Tree, utils::odds, Matrix, UnivariateBooster};
 use rayon::prelude::*;
 use std::collections::{HashMap, HashSet};
 
@@ -19,7 +17,10 @@ impl UnivariateBooster {
     pub fn predict(&self, data: &Matrix<f64>, parallel: bool) -> Vec<f64> {
         let mut init_preds = vec![self.base_score; data.rows];
         self.get_prediction_trees().iter().for_each(|tree| {
-            for (p_, val) in init_preds.iter_mut().zip(tree.predict(data, parallel, &self.cfg.missing)) {
+            for (p_, val) in init_preds
+                .iter_mut()
+                .zip(tree.predict(data, parallel, &self.cfg.missing))
+            {
                 *p_ += val;
             }
         });
@@ -218,7 +219,6 @@ impl UnivariateBooster {
 }
 
 impl MultivariateBooster {
-
     /// Generate predictions on data using the multi-output booster.
     ///
     /// * `data` -  Either a Polars or Pandas DataFrame, or a 2 dimensional Numpy array.
@@ -256,5 +256,4 @@ impl MultivariateBooster {
     pub fn predict_nodes(&self, data: &Matrix<f64>, parallel: bool) -> Vec<Vec<Vec<HashSet<usize>>>> {
         self.boosters.iter().map(|b| b.predict_nodes(data, parallel)).collect()
     }
-    
 }
