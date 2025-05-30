@@ -6,13 +6,11 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Default, Debug, Deserialize, Serialize, Clone)]
 pub struct QuantileLoss {
-    pub quantile: Option<f64>
+    pub quantile: Option<f64>,
 }
 impl ObjectiveFunction for QuantileLoss {
-
     #[inline]
     fn loss(&self, y: &[f64], yhat: &[f64], sample_weight: Option<&[f64]>) -> Vec<f32> {
-
         match sample_weight {
             Some(sample_weight) => y
                 .iter()
@@ -36,12 +34,10 @@ impl ObjectiveFunction for QuantileLoss {
                 })
                 .collect(),
         }
-
     }
 
     #[inline]
     fn gradient(&self, y: &[f64], yhat: &[f64], sample_weight: Option<&[f64]>) -> (Vec<f32>, Option<Vec<f32>>) {
-
         match sample_weight {
             Some(sample_weight) => {
                 let (g, h) = y
@@ -79,12 +75,10 @@ impl ObjectiveFunction for QuantileLoss {
                 (g, None)
             }
         }
-
     }
 
     #[inline]
     fn initial_value(&self, y: &[f64], sample_weight: Option<&[f64]>) -> f64 {
-
         match sample_weight {
             Some(sample_weight) => {
                 let mut indices = (0..y.len()).collect::<Vec<_>>();
@@ -119,7 +113,6 @@ impl ObjectiveFunction for QuantileLoss {
                 init_value
             }
         }
-
     }
 
     fn default_metric(&self) -> Metric {

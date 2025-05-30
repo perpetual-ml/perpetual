@@ -71,7 +71,6 @@ pub fn tree_partial_dependence(
     }
 }
 
-
 #[cfg(test)]
 mod tests {
 
@@ -80,14 +79,13 @@ mod tests {
     use crate::constraints::ConstraintMap;
     use crate::data::Matrix;
     use crate::histogram::{NodeHistogram, NodeHistogramOwned};
-    use crate::objective_functions::{ObjectiveFunction, Objective};
+    use crate::objective_functions::{Objective, ObjectiveFunction};
     use crate::splitter::{MissingImputerSplitter, SplitInfo, SplitInfoSlice};
     use crate::tree::tree::Tree;
     use std::fs;
 
     #[test]
     fn test_partial_dependence() {
-
         // instantiate objective function
         let objective_function = Objective::LogLoss.as_function();
 

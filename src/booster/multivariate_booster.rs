@@ -1,15 +1,15 @@
 //! Multivariate Booster
-//! 
-//! 
+//!
+//!
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 
+use crate::booster::config::MissingNodeTreatment;
+use crate::booster::config::*;
 use crate::constraints::ConstraintMap;
 use crate::errors::PerpetualError;
+use crate::objective_functions::Objective;
 use crate::{Matrix, UnivariateBooster};
-use crate::booster::config::*;
-use crate::booster::config::MissingNodeTreatment;
-use crate::objective_functions::{Objective};
 
 /// Perpetual Booster object
 #[derive(Clone, Serialize, Deserialize)]
@@ -38,7 +38,6 @@ impl Default for MultivariateBooster {
         }
     }
 }
-
 
 impl MultivariateBooster {
     /// Multi Output Booster object
@@ -116,7 +115,7 @@ impl MultivariateBooster {
             timeout,
             iteration_limit,
             memory_limit,
-            stopping_rounds
+            stopping_rounds,
         };
 
         // Base booster template that child boosters will clone.
@@ -136,7 +135,6 @@ impl MultivariateBooster {
             boosters,
             metadata: HashMap::new(),
         })
-        
     }
 
     pub fn reset(&mut self) {
@@ -186,8 +184,7 @@ impl MultivariateBooster {
 
     /// Set the objective on the booster.
     /// * `objective` - The objective type of the booster.
-   pub fn set_objective(mut self, objective: Objective) -> Self {
-
+    pub fn set_objective(mut self, objective: Objective) -> Self {
         let tree_objective = objective.clone();
 
         self.boosters = self
@@ -428,19 +425,17 @@ impl MultivariateBooster {
     }
 }
 
-
-
 #[cfg(test)]
 mod multivariate_booster_test {
-    
+
+    use crate::objective_functions::Objective;
+    use crate::Matrix;
     use crate::{utils::between, MultivariateBooster};
     use polars::{
         io::SerReader,
         prelude::{CsvReadOptions, DataType},
     };
     use std::error::Error;
-    use crate::Matrix;
-    use crate::objective_functions::Objective;
 
     #[test]
     fn test_multi_output_booster() -> Result<(), Box<dyn Error>> {

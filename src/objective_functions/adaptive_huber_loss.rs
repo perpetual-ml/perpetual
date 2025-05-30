@@ -1,6 +1,6 @@
 //! Adaptive Huber Loss function
-//! 
-//! 
+//!
+//!
 use super::ObjectiveFunction;
 use crate::metrics::Metric;
 use serde::{Deserialize, Serialize};
@@ -8,10 +8,9 @@ use serde::{Deserialize, Serialize};
 /// Adaptive Huber Loss
 #[derive(Default, Debug, Deserialize, Serialize, Clone)]
 pub struct AdaptiveHuberLoss {
-    pub quantile: Option<f64>
+    pub quantile: Option<f64>,
 }
 impl ObjectiveFunction for AdaptiveHuberLoss {
-
     #[inline]
     fn loss(&self, y: &[f64], yhat: &[f64], sample_weight: Option<&[f64]>) -> Vec<f32> {
         // default alpha: 0.5
@@ -64,7 +63,6 @@ impl ObjectiveFunction for AdaptiveHuberLoss {
 
     #[inline]
     fn gradient(&self, y: &[f64], yhat: &[f64], sample_weight: Option<&[f64]>) -> (Vec<f32>, Option<Vec<f32>>) {
-
         // default alpha: 0.5
         // if not passed explicitly
         let alpha = self.quantile.unwrap_or(0.5);
@@ -118,11 +116,9 @@ impl ObjectiveFunction for AdaptiveHuberLoss {
                 (grad, Some(hess))
             }
         }
-
     }
 
     fn initial_value(&self, y: &[f64], sample_weight: Option<&[f64]>) -> f64 {
-
         let mut idxs = (0..y.len()).collect::<Vec<_>>();
         idxs.sort_by(|&i, &j| y[i].partial_cmp(&y[j]).unwrap());
 
@@ -146,5 +142,4 @@ impl ObjectiveFunction for AdaptiveHuberLoss {
     fn default_metric(&self) -> Metric {
         Metric::RootMeanSquaredError
     }
-
 }

@@ -1,14 +1,6 @@
-use crate::{
-    errors::PerpetualError,
-    tree::tree::Tree,
-    Matrix, UnivariateBooster,
-};
+use crate::objective_functions::{loss_callables, LossFn, ObjectiveFunction};
+use crate::{errors::PerpetualError, tree::tree::Tree, Matrix, UnivariateBooster};
 use std::collections::HashMap;
-use crate::objective_functions::{
-    loss_callables,
-    LossFn,
-    ObjectiveFunction
-};
 use std::sync::Arc;
 
 impl UnivariateBooster {
@@ -19,7 +11,6 @@ impl UnivariateBooster {
         y: &[f64],
         sample_weight: Option<&[f64]>,
     ) -> Result<(), PerpetualError> {
-
         // initialize objective function
         let objective_fn: Arc<dyn ObjectiveFunction> = self.cfg.objective.as_function();
 
@@ -34,7 +25,7 @@ impl UnivariateBooster {
         // generate loss calculator
         // from the objective function
         let loss_fn: LossFn = loss_callables(objective_fn);
-        
+
         for tree in &mut self.trees {
             tree.prune_bottom_up(
                 data,
@@ -73,22 +64,12 @@ impl Tree {
         base_score: f64,
     ) {
         let old_length = self.nodes.len();
-        let mut node_losses: HashMap<usize, Vec<f32>> =
-            self.nodes.keys().map(|&k| (k, Vec::new())).collect();
+        let mut node_losses: HashMap<usize, Vec<f32>> = self.nodes.keys().map(|&k| (k, Vec::new())).collect();
 
         match sample_weight {
             None => {
                 for &i in &data.index {
-                    self.predict_loss(
-                        data,
-                        i,
-                        missing,
-                        loss.clone(),
-                        base_score,
-                        &mut node_losses,
-                        y,
-                        None,
-                    );
+                    self.predict_loss(data, i, missing, loss.clone(), base_score, &mut node_losses, y, None);
                 }
             }
             Some(sw) => {
@@ -138,7 +119,7 @@ impl Tree {
         missing: &f64,
         loss: LossFn,
         base_score: f64,
-        node_losses: &mut HashMap<usize, Vec<f32>>, 
+        node_losses: &mut HashMap<usize, Vec<f32>>,
         y: &[f64],
         sample_weight: Option<&[f64]>,
     ) {
@@ -167,8 +148,7 @@ impl Tree {
         base_score: f64,
     ) {
         let old_length = self.nodes.len();
-        let mut node_losses: HashMap<usize, Vec<f32>> =
-            self.nodes.keys().map(|&k| (k, Vec::new())).collect();
+        let mut node_losses: HashMap<usize, Vec<f32>> = self.nodes.keys().map(|&k| (k, Vec::new())).collect();
 
         for &i in &data.index {
             let (pred, nid) = self.predict_row_and_node_idx(data, i, missing);
@@ -229,7 +209,6 @@ impl Tree {
         }
     }
 }
-
 
 #[cfg(test)]
 mod tests {

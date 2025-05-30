@@ -1,10 +1,10 @@
 //! Univariate Booster
-//! 
-//! 
+//!
+//!
 
-use std::collections::{HashMap, HashSet};
 use crate::bin::Bin;
 use crate::binning::bin_matrix;
+use crate::booster::config::*;
 use crate::constants::{
     FREE_MEM_ALLOC_FACTOR, GENERALIZATION_THRESHOLD_RELAXED, ITER_LIMIT, MIN_COL_AMOUNT, N_NODES_ALLOC_MAX,
     N_NODES_ALLOC_MIN, STOPPING_ROUNDS,
@@ -13,9 +13,9 @@ use crate::constraints::ConstraintMap;
 use crate::data::Matrix;
 use crate::errors::PerpetualError;
 use crate::histogram::{update_cuts, NodeHistogram, NodeHistogramOwned};
+use crate::objective_functions::{Objective, ObjectiveFunction};
 use crate::splitter::{MissingBranchSplitter, MissingImputerSplitter, SplitInfo, SplitInfoSlice, Splitter};
 use crate::tree::tree::{Tree, TreeStopper};
-use crate::booster::config::*;
 use core::{f32, f64};
 use log::{info, warn};
 use rand::rngs::StdRng;
@@ -23,14 +23,13 @@ use rand::seq::IteratorRandom;
 use rand::SeedableRng;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
-use std::time::Instant;
-use std::{mem};
-use sysinfo::System;
-use crate::objective_functions::{ObjectiveFunction, Objective};
+use std::collections::{HashMap, HashSet};
+use std::mem;
 use std::sync::Arc;
+use std::time::Instant;
+use sysinfo::System;
 
 type ImportanceFn = fn(&Tree, &mut HashMap<usize, (f32, usize)>);
-
 
 /// Perpetual Booster object
 #[derive(Clone, Serialize, Deserialize)]
@@ -112,7 +111,6 @@ impl UnivariateBooster {
         memory_limit: Option<f32>,
         stopping_rounds: Option<usize>,
     ) -> Result<Self, PerpetualError> {
-
         let cfg = BoosterConfig {
             objective,
             budget,
@@ -133,7 +131,7 @@ impl UnivariateBooster {
             timeout,
             iteration_limit,
             memory_limit,
-            stopping_rounds
+            stopping_rounds,
         };
 
         let booster = UnivariateBooster {
@@ -149,7 +147,6 @@ impl UnivariateBooster {
         Ok(booster)
     }
 
-
     pub fn validate_parameters(&self) -> Result<(), PerpetualError> {
         Ok(())
     }
@@ -164,9 +161,9 @@ impl UnivariateBooster {
     /// * `y` - Either a Polars or Pandas Series, or a 1 dimensional Numpy array.
     /// * `sample_weight` - Instance weights to use when training the model.
     pub fn fit(&mut self, data: &Matrix<f64>, y: &[f64], sample_weight: Option<&[f64]>) -> Result<(), PerpetualError> {
-        
         let constraints_map = self
-            .cfg.monotone_constraints
+            .cfg
+            .monotone_constraints
             .as_ref()
             .unwrap_or(&ConstraintMap::new())
             .to_owned();
@@ -198,7 +195,6 @@ impl UnivariateBooster {
         splitter: &T,
         sample_weight: Option<&[f64]>,
     ) -> Result<(), PerpetualError> {
-
         // initialize trees
         let start = Instant::now();
 
@@ -227,8 +223,6 @@ impl UnivariateBooster {
             yhat = self.predict(data, true);
         }
 
-        
-
         // calculate gradient
         // and hessian
         // let (mut grad, mut hess) = gradient(y, &yhat, sample_weight);
@@ -244,7 +238,6 @@ impl UnivariateBooster {
         let truncated_series_sum = reciprocals_of_powers - (1.0 + 1.0 / n);
         let c = 1.0 / n - truncated_series_sum;
         let target_loss_decrement = c * base.powf(-self.cfg.budget) * loss_avg;
-
 
         let is_const_hess = hess.is_none();
 
@@ -542,23 +535,22 @@ impl UnivariateBooster {
 
 #[cfg(test)]
 mod univariate_booster_test {
-    
-    use std::error::Error;
-    use std::sync::Arc;
+
+    use crate::booster::config::*;
+    use crate::metrics::Metric;
+    use crate::objective_functions::Objective;
+    use crate::objective_functions::ObjectiveFunction;
+    use crate::utils::between;
+    use crate::{Matrix, UnivariateBooster};
+    use approx::assert_relative_eq;
     use polars::io::SerReader;
     use polars::prelude::{CsvReadOptions, DataType};
-    use crate::{Matrix, UnivariateBooster};
-    use crate::objective_functions::Objective;
-    use crate::booster::config::*;
     use std::collections::HashSet;
-    use crate::utils::between;
-    use approx::{assert_relative_eq};
+    use std::error::Error;
     use std::fs;
-    use crate::objective_functions::ObjectiveFunction;
-    use crate::metrics::Metric;
+    use std::sync::Arc;
 
-
-     #[test]
+    #[test]
     fn test_booster_fit() {
         let file =
             fs::read_to_string("resources/contiguous_with_missing.csv").expect("Something went wrong reading the file");
@@ -892,7 +884,7 @@ mod univariate_booster_test {
         println!("{:?}", &preds[0..10]);
     }
 
-     #[test]
+    #[test]
     fn test_huber_loss() -> Result<(), Box<dyn Error>> {
         let all_names = [
             "MedInc".to_string(),
@@ -970,7 +962,7 @@ mod univariate_booster_test {
         Ok(())
     }
 
-     #[test]
+    #[test]
     fn test_adaptive_huber_loss() -> Result<(), Box<dyn Error>> {
         let all_names = [
             "MedInc".to_string(),
@@ -1035,7 +1027,7 @@ mod univariate_booster_test {
         // the relevant `set_` methods for any parameters you would like to
         // adjust.
         let mut model = UnivariateBooster::default()
-            .set_objective(Objective::AdaptiveHuberLoss { quantile: Some(0.5) } )
+            .set_objective(Objective::AdaptiveHuberLoss { quantile: Some(0.5) })
             .set_max_bin(10)
             .set_budget(0.1);
 
@@ -1050,12 +1042,10 @@ mod univariate_booster_test {
 
     #[test]
     fn test_custom_objective_function() -> Result<(), Box<dyn Error>> {
-
         // define objective function
         #[derive(Clone)]
         struct CustomSquaredLoss;
         impl ObjectiveFunction for CustomSquaredLoss {
-
             fn loss(&self, y: &[f64], yhat: &[f64], sample_weight: Option<&[f64]>) -> Vec<f32> {
                 y.iter()
                     .zip(yhat)
@@ -1071,7 +1061,7 @@ mod univariate_booster_test {
                     .collect()
             }
 
-            fn gradient(&self, y: &[f64], yhat: &[f64], sample_weight: Option<&[f64]>,) -> (Vec<f32>, Option<Vec<f32>>) {
+            fn gradient(&self, y: &[f64], yhat: &[f64], sample_weight: Option<&[f64]>) -> (Vec<f32>, Option<Vec<f32>>) {
                 let grad: Vec<f32> = y
                     .iter()
                     .zip(yhat)
@@ -1101,20 +1091,18 @@ mod univariate_booster_test {
             fn default_metric(&self) -> Metric {
                 Metric::RootMeanSquaredError
             }
-
         }
 
-
-         let all_names = [
-        "MedInc".to_string(),
-        "HouseAge".to_string(),
-        "AveRooms".to_string(),
-        "AveBedrms".to_string(),
-        "Population".to_string(),
-        "AveOccup".to_string(),
-        "Latitude".to_string(),
-        "Longitude".to_string(),
-        "MedHouseVal".to_string(),
+        let all_names = [
+            "MedInc".to_string(),
+            "HouseAge".to_string(),
+            "AveRooms".to_string(),
+            "AveBedrms".to_string(),
+            "Population".to_string(),
+            "AveOccup".to_string(),
+            "Latitude".to_string(),
+            "Longitude".to_string(),
+            "MedHouseVal".to_string(),
         ];
 
         let feature_names = [
@@ -1134,7 +1122,6 @@ mod univariate_booster_test {
             .try_into_reader_with_file_path(Some("resources/cal_housing_test.csv".into()))?
             .finish()?;
 
-        
         let id_vars: Vec<&str> = Vec::new();
         let mdf = df.unpivot(feature_names.to_vec(), &id_vars)?;
 
@@ -1156,21 +1143,21 @@ mod univariate_booster_test {
 
         let matrix = Matrix::new(&data, y.len(), 8);
 
-        // define booster with custom loss 
+        // define booster with custom loss
         // function
         let mut custom_booster = UnivariateBooster::default()
-        .set_objective(Objective::function(CustomSquaredLoss))
-        .set_max_bin(1)
-        .set_budget(0.1)
-        .set_stopping_rounds(Some(1));
+            .set_objective(Objective::function(CustomSquaredLoss))
+            .set_max_bin(1)
+            .set_budget(0.1)
+            .set_stopping_rounds(Some(1));
 
         // define booster with builting
         // squared loss
         let mut booster = UnivariateBooster::default()
-        .set_objective(Objective::SquaredLoss)
-        .set_max_bin(1)
-        .set_budget(0.1)
-        .set_stopping_rounds(Some(1));
+            .set_objective(Objective::SquaredLoss)
+            .set_max_bin(1)
+            .set_budget(0.1)
+            .set_stopping_rounds(Some(1));
 
         // fit
         booster.fit(&matrix, &y, None)?;
@@ -1184,5 +1171,4 @@ mod univariate_booster_test {
 
         Ok(())
     }
-
 }

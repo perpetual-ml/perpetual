@@ -1814,7 +1814,6 @@ fn evaluate_branch_split_var_hess(
     ))
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1822,7 +1821,7 @@ mod tests {
     use crate::data::Matrix;
     use crate::histogram::NodeHistogramOwned;
     use crate::node::SplittableNode;
-    use crate::objective_functions::{ObjectiveFunction, Objective};
+    use crate::objective_functions::{Objective, ObjectiveFunction};
     use crate::tree::tree::create_root_node;
     use crate::utils::gain;
     use crate::utils::weight;
@@ -1832,7 +1831,6 @@ mod tests {
 
     #[test]
     fn test_data_split() {
-
         // instantiate objective function
         let objective_function = Objective::LogLoss.as_function();
 
@@ -1938,7 +1936,6 @@ mod tests {
 
     #[test]
     fn test_cal_housing() -> Result<(), Box<dyn Error>> {
-
         // instantiate objective function
         let objective_function = Objective::SquaredLoss.as_function();
 
@@ -2065,7 +2062,6 @@ mod tests {
 
     #[test]
     fn test_categorical() -> Result<(), Box<dyn Error>> {
-
         // instantiate objective function
         let objective_function = Objective::LogLoss.as_function();
 
@@ -2180,7 +2176,6 @@ mod tests {
 
     #[test]
     fn test_gbm_categorical_sensory() -> Result<(), Box<dyn Error>> {
-
         // instantiate objective function
         let objective_function = Objective::SquaredLoss.as_function();
 

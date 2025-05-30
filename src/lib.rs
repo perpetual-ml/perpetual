@@ -5,7 +5,6 @@ mod partial_dependence;
 mod shapley;
 
 // Modules
-pub mod objective_functions;
 pub mod bin;
 pub mod binning;
 pub mod booster;
@@ -17,6 +16,7 @@ pub mod errors;
 pub mod grower;
 pub mod histogram;
 pub mod metrics;
+pub mod objective_functions;
 pub mod prune;
 pub mod sampler;
 pub mod splitter;
@@ -24,6 +24,6 @@ pub mod tree;
 pub mod utils;
 
 // Individual classes, and functions
-pub use booster::univariate_booster::UnivariateBooster;
 pub use booster::multivariate_booster::MultivariateBooster;
+pub use booster::univariate_booster::UnivariateBooster;
 pub use data::Matrix;

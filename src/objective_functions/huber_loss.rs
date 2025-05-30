@@ -7,13 +7,11 @@ use serde::{Deserialize, Serialize};
 /// Huber Loss
 #[derive(Default, Debug, Deserialize, Serialize, Clone)]
 pub struct HuberLoss {
-    pub delta: Option<f64>
+    pub delta: Option<f64>,
 }
 impl ObjectiveFunction for HuberLoss {
-
     #[inline]
     fn loss(&self, y: &[f64], yhat: &[f64], sample_weight: Option<&[f64]>) -> Vec<f32> {
-
         let delta = self.delta.unwrap_or(1.0);
         match sample_weight {
             Some(weights) => y
@@ -50,7 +48,6 @@ impl ObjectiveFunction for HuberLoss {
 
     #[inline]
     fn gradient(&self, y: &[f64], yhat: &[f64], sample_weight: Option<&[f64]>) -> (Vec<f32>, Option<Vec<f32>>) {
-        
         let delta = self.delta.unwrap_or(1.0);
 
         match sample_weight {
@@ -90,12 +87,10 @@ impl ObjectiveFunction for HuberLoss {
                 (grad, Some(hess))
             }
         }
-
     }
 
     #[inline]
     fn initial_value(&self, y: &[f64], sample_weight: Option<&[f64]>) -> f64 {
-        
         let mut idxs = (0..y.len()).collect::<Vec<_>>();
         idxs.sort_by(|&i, &j| y[i].partial_cmp(&y[j]).unwrap());
 
@@ -113,11 +108,9 @@ impl ObjectiveFunction for HuberLoss {
             .unwrap_or(y[idxs[y.len() / 2]]);
 
         median
-
     }
 
     fn default_metric(&self) -> Metric {
         Metric::RootMeanSquaredError
     }
-
 }

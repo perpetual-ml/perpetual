@@ -72,4 +72,3 @@ pub fn roc_auc_score(y: &[f64], yhat: &[f64], sample_weight: &[f64]) -> f64 {
 
     auc / (tp * fp)
 }
-

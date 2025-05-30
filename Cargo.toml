@@ -35,12 +35,3 @@ polars = "0.41"
 reqwest = { version = "0.12.14", features = ["blocking"] }
 csv = "1.3.1"
 chrono = "0.4.40"
-
-[[bench]]
-name    = "benchmark_booster"
-harness = false
-
-[[bench]]
-name    = "benchmark_objective_function"
-harness = false
-

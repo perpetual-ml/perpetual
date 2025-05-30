@@ -1,5 +1,5 @@
 //! Conformal
-//! 
-//! 
+//!
+//!
 
 pub mod cqr;

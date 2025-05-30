@@ -310,14 +310,13 @@ pub fn update_histogram(
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use crate::binning::bin_matrix;
     use crate::histogram::{
         update_histogram, FeatureHistogram, FeatureHistogramOwned, NodeHistogram, NodeHistogramOwned,
     };
-    use crate::objective_functions::{ObjectiveFunction, Objective};
+    use crate::objective_functions::{Objective, ObjectiveFunction};
     use crate::Matrix;
     use approx::assert_relative_eq;
     use std::collections::HashSet;
@@ -325,7 +324,6 @@ mod tests {
 
     #[test]
     fn test_simple_histogram() {
-
         // instantiate objective function
         let objective_function = Objective::LogLoss.as_function();
 
@@ -384,7 +382,6 @@ mod tests {
 
     #[test]
     fn test_single_histogram() {
-
         // instantiate objective function
         let objective_function = Objective::LogLoss.as_function();
 
@@ -437,7 +434,6 @@ mod tests {
 
     #[test]
     fn test_histogram_categorical() {
-
         // instantiate objective function
         let objective_function = Objective::LogLoss.as_function();
 
@@ -503,7 +499,6 @@ mod tests {
 
     #[test]
     fn test_histogram_parallel() {
-
         // instantiate objective function
         let objective_function = Objective::LogLoss.as_function();
 

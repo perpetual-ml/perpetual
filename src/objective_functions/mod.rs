@@ -1,9 +1,9 @@
 //! Objective Functions
-//! 
+//!
 //! Some text
-//! 
-//! 
-//! 
+//!
+//!
+//!
 
 // import modules
 mod adaptive_huber_loss;
@@ -20,13 +20,14 @@ pub use quantile_loss::QuantileLoss;
 pub use squared_loss::SquaredLoss;
 
 // crates
-use std::sync::Arc;
-use serde::{Deserialize, Serialize};
 use crate::metrics::Metric;
+use serde::{Deserialize, Serialize};
+use std::sync::Arc;
 
 // define types as smartpointers for thread safety
-pub type ObjectiveFn    = Arc<dyn Fn(&[f64], &[f64], Option<&[f64]>) -> (Vec<f32>, Option<Vec<f32>>) + Send + Sync + 'static>;
-pub type LossFn         = Arc<dyn Fn(&[f64], &[f64], Option<&[f64]>) -> Vec<f32> + Send + Sync + 'static>;
+pub type ObjectiveFn =
+    Arc<dyn Fn(&[f64], &[f64], Option<&[f64]>) -> (Vec<f32>, Option<Vec<f32>>) + Send + Sync + 'static>;
+pub type LossFn = Arc<dyn Fn(&[f64], &[f64], Option<&[f64]>) -> Vec<f32> + Send + Sync + 'static>;
 pub type InitialValueFn = Arc<dyn Fn(&[f64], Option<&[f64]>) -> f64 + Send + Sync + 'static>;
 
 // define traits for the objective
@@ -35,18 +36,18 @@ pub type InitialValueFn = Arc<dyn Fn(&[f64], Option<&[f64]>) -> f64 + Send + Syn
 // The ObjectiveFunction controls the
 // logical flow downstream.
 /// Objective function traits
-/// 
-/// 
+///
+///
 /// ## Traits:
-/// 
+///
 /// * `fn loss`:
 /// * `fn gradient`:
 /// * `fn initial_value`:
-/// 
+///
 /// ## Example:
-/// 
-/// 
-/// 
+///
+///
+///
 pub trait ObjectiveFunction: Send + Sync {
     fn loss(&self, y: &[f64], yhat: &[f64], sample_weight: Option<&[f64]>) -> Vec<f32>;
     fn gradient(&self, y: &[f64], yhat: &[f64], sample_weight: Option<&[f64]>) -> (Vec<f32>, Option<Vec<f32>>);
@@ -54,26 +55,28 @@ pub trait ObjectiveFunction: Send + Sync {
     fn default_metric(&self) -> Metric;
 }
 
-
 // define dispatches for each
 // function in ObjectiveFunction
 //
 // These functions are called downstrean
 // *after* instantiation
 pub fn loss_callables<T>(instance: Arc<T>) -> LossFn
-where T: ObjectiveFunction + ?Sized + 'static,
+where
+    T: ObjectiveFunction + ?Sized + 'static,
 {
     Arc::new(move |y, yhat, w| instance.clone().loss(y, yhat, w))
 }
 
 pub fn gradient_callables<T>(instance: Arc<T>) -> ObjectiveFn
-where T: ObjectiveFunction + ?Sized + 'static,
+where
+    T: ObjectiveFunction + ?Sized + 'static,
 {
     Arc::new(move |y, yhat, w| instance.clone().gradient(y, yhat, w))
 }
 
 pub fn initial_value_callables<T>(instance: Arc<T>) -> InitialValueFn
-where T: ObjectiveFunction + ?Sized + 'static,
+where
+    T: ObjectiveFunction + ?Sized + 'static,
 {
     Arc::new(move |y, w| instance.clone().initial_value(y, w))
 }
@@ -86,7 +89,7 @@ where T: ObjectiveFunction + ?Sized + 'static,
 // for the old implementation.
 //
 // NOTE: *maybe* it is a good idea
-// to pass values directly instead of 
+// to pass values directly instead of
 // Option<f64>
 //
 // TODO: test at some point
@@ -97,13 +100,19 @@ where T: ObjectiveFunction + ?Sized + 'static,
 pub enum Objective {
     LogLoss,
     SquaredLoss,
-    QuantileLoss { quantile: Option<f64> },
-    HuberLoss { delta: Option<f64> },
-    AdaptiveHuberLoss { quantile: Option<f64> },
+    QuantileLoss {
+        quantile: Option<f64>,
+    },
+    HuberLoss {
+        delta: Option<f64>,
+    },
+    AdaptiveHuberLoss {
+        quantile: Option<f64>,
+    },
 
     /// Custom objective function
-    /// 
-    /// 
+    ///
+    ///
     #[serde(skip_serializing, skip_deserializing)]
     Custom(Arc<dyn ObjectiveFunction>),
 }
@@ -112,7 +121,6 @@ pub enum Objective {
 // possible to pass parameters
 // without foo::bar{} structure
 impl Objective {
-    
     // custom function instantiation
     pub fn function<T>(objective: T) -> Self
     where
@@ -142,20 +150,20 @@ where
     T: ObjectiveFunction + Send + Sync + ?Sized + 'static,
 {
     fn loss(&self, y: &[f64], yhat: &[f64], sample_weight: Option<&[f64]>) -> Vec<f32> {
-         (**self).loss(y, yhat, sample_weight)
-        }
-    
+        (**self).loss(y, yhat, sample_weight)
+    }
+
     fn gradient(&self, y: &[f64], yhat: &[f64], sample_weight: Option<&[f64]>) -> (Vec<f32>, Option<Vec<f32>>) {
-         (**self).gradient(y, yhat, sample_weight) 
-        }
-    
+        (**self).gradient(y, yhat, sample_weight)
+    }
+
     fn initial_value(&self, y: &[f64], sample_weight: Option<&[f64]>) -> f64 {
-         (**self).initial_value(y, sample_weight) 
-        }
-    
+        (**self).initial_value(y, sample_weight)
+    }
+
     fn default_metric(&self) -> Metric {
-         (**self).default_metric() 
-        }
+        (**self).default_metric()
+    }
 }
 
 // Custom objective
@@ -176,9 +184,9 @@ impl CustomObjective {
         let shared: Arc<T> = Arc::new(obj);
         CustomObjective {
             grad_hess: gradient_callables(shared.clone()),
-            loss:      loss_callables(shared.clone()),
-            init:      initial_value_callables(shared.clone()),
-            metric:    shared.default_metric(),
+            loss: loss_callables(shared.clone()),
+            init: initial_value_callables(shared.clone()),
+            metric: shared.default_metric(),
         }
     }
 }
@@ -186,8 +194,8 @@ impl CustomObjective {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::objective_functions::Objective;
     use crate::objective_functions::Arc;
+    use crate::objective_functions::Objective;
 
     // Common data used
     // across tests
@@ -195,7 +203,7 @@ mod test {
     static YHAT1: &[f64] = &[-1.0, -1.0, -1.0, 1.0, 1.0, 1.0];
     static YHAT2: &[f64] = &[0.0, 0.0, -1.0, 1.0, 0.0, 1.0];
 
-    // helper function for the 
+    // helper function for the
     // tests
     fn sum_loss(obj: &Arc<dyn crate::objective_functions::ObjectiveFunction>, yhat: &[f64]) -> f32 {
         obj.loss(Y, yhat, None).iter().copied().sum()
@@ -205,7 +213,7 @@ mod test {
         let (g, _) = obj.gradient(Y, yhat, None);
         g.iter().copied().sum()
     }
-    
+
     // actual tests
     #[test]
     fn test_logloss_loss() {
@@ -225,10 +233,16 @@ mod test {
         assert_eq!(objective_function.initial_value(Y, None), 0.0);
 
         let all_ones = vec![1.0; 6];
-        assert_eq!(Objective::LogLoss.as_function().initial_value(&all_ones, None), f64::INFINITY);
+        assert_eq!(
+            Objective::LogLoss.as_function().initial_value(&all_ones, None),
+            f64::INFINITY
+        );
 
         let all_zeros = vec![0.0; 6];
-        assert_eq!(Objective::LogLoss.as_function().initial_value(&all_zeros, None), f64::NEG_INFINITY);
+        assert_eq!(
+            Objective::LogLoss.as_function().initial_value(&all_zeros, None),
+            f64::NEG_INFINITY
+        );
 
         let mixed = &[0.0, 0.0, 0.0, 0.0, 1.0, 1.0];
         let expected = f64::ln(2.0 / 4.0);
@@ -244,7 +258,10 @@ mod test {
         assert_eq!(Objective::SquaredLoss.as_function().initial_value(&all_ones, None), 1.0);
 
         let all_minus = vec![-1.0; 6];
-        assert_eq!(Objective::SquaredLoss.as_function().initial_value(&all_minus, None), -1.0);
+        assert_eq!(
+            Objective::SquaredLoss.as_function().initial_value(&all_minus, None),
+            -1.0
+        );
 
         let mixed = &[-1.0, -1.0, -1.0, 1.0, 1.0, 1.0];
         assert_eq!(Objective::SquaredLoss.as_function().initial_value(mixed, None), 0.0);
@@ -275,5 +292,4 @@ mod test {
         assert!(sum_loss(&objective_function, YHAT1) > sum_loss(&objective_function, YHAT2));
         assert!(sum_grad(&objective_function, YHAT1) < sum_grad(&objective_function, YHAT2));
     }
-
 }

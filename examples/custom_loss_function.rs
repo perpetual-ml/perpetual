@@ -16,9 +16,9 @@ use std::sync::Arc;
 use polars::io::SerReader;
 use polars::prelude::{CsvReadOptions, DataType};
 
-use perpetual::{Matrix, UnivariateBooster};
 use perpetual::metrics::Metric;
-use perpetual::objective_functions::{Objective};
+use perpetual::objective_functions::Objective;
+use perpetual::{Matrix, UnivariateBooster};
 
 //-----------------//
 // Define function //
@@ -26,10 +26,8 @@ use perpetual::objective_functions::{Objective};
 #[derive(Clone)]
 struct CustomSquaredLoss;
 impl perpetual::objective_functions::ObjectiveFunction for CustomSquaredLoss {
-
     #[inline]
     fn loss(&self, y: &[f64], yhat: &[f64], sample_weight: Option<&[f64]>) -> Vec<f32> {
-            
         match sample_weight {
             Some(sample_weight) => y
                 .iter()
@@ -49,12 +47,10 @@ impl perpetual::objective_functions::ObjectiveFunction for CustomSquaredLoss {
                 })
                 .collect(),
         }
-
     }
 
     #[inline]
-    fn gradient(&self, y: &[f64], yhat: &[f64], sample_weight: Option<&[f64]> ) -> (Vec<f32>, Option<Vec<f32>>) {
-
+    fn gradient(&self, y: &[f64], yhat: &[f64], sample_weight: Option<&[f64]>) -> (Vec<f32>, Option<Vec<f32>>) {
         match sample_weight {
             Some(sample_weight) => {
                 let (g, h) = y
@@ -67,32 +63,26 @@ impl perpetual::objective_functions::ObjectiveFunction for CustomSquaredLoss {
             }
             None => (
                 y.iter().zip(yhat).map(|(y_, yhat_)| (yhat_ - *y_) as f32).collect(),
-                None
+                None,
             ),
         }
-
     }
 
-
     fn initial_value(&self, y: &[f64], sample_weight: Option<&[f64]>) -> f64 {
-
         if let Some(w) = sample_weight {
             let sum_w: f64 = w.iter().sum();
             y.iter().zip(w).map(|(yi, wi)| yi * wi).sum::<f64>() / sum_w
         } else {
             y.iter().sum::<f64>() / y.len() as f64
         }
-        
     }
 
     fn default_metric(&self) -> Metric {
         Metric::RootMeanSquaredLogError
     }
-
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
-
     //----------------------//
     // 1. Build dataset     //
     //----------------------//
@@ -126,7 +116,6 @@ fn main() -> Result<(), Box<dyn Error>> {
         .try_into_reader_with_file_path(Some("resources/cal_housing_test.csv".into()))?
         .finish()?;
 
-    
     let id_vars: Vec<&str> = Vec::new();
     let mdf = df.unpivot(feature_names.to_vec(), &id_vars)?;
 
@@ -152,9 +141,9 @@ fn main() -> Result<(), Box<dyn Error>> {
     // 2. Build booster w/ custom objective //
     //--------------------------------------//
     let mut booster = UnivariateBooster::default()
-    .set_objective(Objective::function(CustomSquaredLoss))
-    .set_max_bin(10)
-    .set_budget(0.1);
+        .set_objective(Objective::function(CustomSquaredLoss))
+        .set_max_bin(10)
+        .set_budget(0.1);
 
     //-------------------//
     // 3. Fit and report //
@@ -168,5 +157,4 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("First 5 predictions: {:?}", &preds[..5]);
 
     Ok(())
-    
 }

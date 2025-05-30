@@ -1,6 +1,6 @@
 //! Squared Loss function
-//! 
-//! 
+//!
+//!
 use super::ObjectiveFunction;
 use crate::{metrics::Metric, utils::fast_sum};
 use serde::{Deserialize, Serialize};
@@ -8,10 +8,8 @@ use serde::{Deserialize, Serialize};
 #[derive(Default, Debug, Deserialize, Serialize, Clone)]
 pub struct SquaredLoss {}
 impl ObjectiveFunction for SquaredLoss {
-
     #[inline]
     fn loss(&self, y: &[f64], yhat: &[f64], sample_weight: Option<&[f64]>) -> Vec<f32> {
-            
         match sample_weight {
             Some(sample_weight) => y
                 .iter()
@@ -31,12 +29,10 @@ impl ObjectiveFunction for SquaredLoss {
                 })
                 .collect(),
         }
-
     }
 
     #[inline]
-    fn gradient(&self, y: &[f64], yhat: &[f64], sample_weight: Option<&[f64]> ) -> (Vec<f32>, Option<Vec<f32>>) {
-
+    fn gradient(&self, y: &[f64], yhat: &[f64], sample_weight: Option<&[f64]>) -> (Vec<f32>, Option<Vec<f32>>) {
         match sample_weight {
             Some(sample_weight) => {
                 let (g, h) = y
@@ -49,15 +45,13 @@ impl ObjectiveFunction for SquaredLoss {
             }
             None => (
                 y.iter().zip(yhat).map(|(y_, yhat_)| (yhat_ - *y_) as f32).collect(),
-                None
+                None,
             ),
         }
-
     }
 
     #[inline]
     fn initial_value(&self, y: &[f64], sample_weight: Option<&[f64]>) -> f64 {
-
         match sample_weight {
             Some(sample_weight) => {
                 let mut ytot: f64 = 0.;
@@ -70,11 +64,9 @@ impl ObjectiveFunction for SquaredLoss {
             }
             None => fast_sum(y) / y.len() as f64,
         }
-
     }
 
     fn default_metric(&self) -> Metric {
         Metric::RootMeanSquaredLogError
     }
-
 }

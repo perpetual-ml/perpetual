@@ -2,6 +2,7 @@ use crate::data::Matrix;
 use crate::grower::Grower;
 use crate::histogram::{update_histogram, NodeHistogram};
 use crate::node::{Node, NodeType, SplittableNode};
+use crate::objective_functions::ObjectiveFunction;
 use crate::partial_dependence::tree_partial_dependence;
 use crate::splitter::{SplitInfoSlice, Splitter};
 use crate::utils::{fast_f64_sum, gain, gain_const_hess, weight, weight_const_hess};
@@ -10,7 +11,6 @@ use serde::{Deserialize, Serialize};
 use std::cmp::max;
 use std::collections::{BinaryHeap, HashMap, HashSet};
 use std::fmt::{self, Display};
-use crate::objective_functions::{ObjectiveFunction};
 use std::sync::Arc;
 
 #[derive(Deserialize, Serialize, Clone, PartialEq, Debug)]
@@ -67,11 +67,9 @@ impl Tree {
         split_info_slice: &SplitInfoSlice,
         n_nodes_alloc: usize,
     ) {
-
         let mut n_nodes = 1;
         self.n_leaves = 1;
 
-        
         let root_hist = unsafe { hist_tree.get_unchecked_mut(0) };
         update_histogram(
             root_hist,
@@ -338,31 +336,28 @@ pub fn create_root_node(index: &[usize], grad: &[f32], hess: Option<&[f32]>) -> 
     )
 }
 
-
 // Unit-testing
 #[cfg(test)]
 mod tests {
-    
+
     use crate::binning::bin_matrix;
     use crate::constraints::{Constraint, ConstraintMap};
     use crate::histogram::NodeHistogramOwned;
     use crate::objective_functions::{Objective, ObjectiveFunction};
     use crate::splitter::{MissingImputerSplitter, SplitInfo};
     use crate::utils::precision_round;
-    
+
     use std::error::Error;
     use std::fs;
-    
-    
-    use crate::Matrix;
+
+    use crate::histogram::NodeHistogram;
     use crate::splitter::SplitInfoSlice;
     use crate::tree::tree::Tree;
-    use crate::histogram::NodeHistogram;
+    use crate::Matrix;
     use std::collections::HashSet;
 
     #[test]
     fn test_tree_fit() {
-
         // instantiate objective function
         let objective_function = Objective::LogLoss.as_function();
 
@@ -460,7 +455,6 @@ mod tests {
 
     #[test]
     fn test_tree_fit_monotone() {
-
         // instantiate objective function
         let objective_function = Objective::LogLoss.as_function();
 
@@ -560,7 +554,6 @@ mod tests {
 
     #[test]
     fn test_tree_fit_lossguide() {
-
         // instantiate objective function
         let objective_function = Objective::LogLoss.as_function();
 
@@ -571,7 +564,7 @@ mod tests {
         let y: Vec<f64> = file.lines().map(|x| x.parse::<f64>().unwrap()).collect();
         let yhat = vec![0.5; y.len()];
         let (mut g, mut h) = objective_function.gradient(&y, &yhat, None);
-        let is_const_hess= h.is_none();
+        let is_const_hess = h.is_none();
         let loss = objective_function.loss(&y, &yhat, None);
 
         let data = Matrix::new(&data_vec, 891, 5);
@@ -659,10 +652,9 @@ mod tests {
 
     #[test]
     fn test_tree_categorical() -> Result<(), Box<dyn Error>> {
-
         // instantiate objective function
         let objective_function = Objective::LogLoss.as_function();
-        
+
         let n_bins = 256;
         let n_rows = 712;
         let n_columns = 13;
