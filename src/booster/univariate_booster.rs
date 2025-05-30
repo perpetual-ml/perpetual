@@ -232,7 +232,7 @@ impl UnivariateBooster {
         // calculate gradient
         // and hessian
         // let (mut grad, mut hess) = gradient(y, &yhat, sample_weight);
-        let (mut grad, mut hess) = objective_fn.gradient(y, &yhat, sample_weight);
+        let (mut grad, mut hess, mut is_const_hess) = objective_fn.gradient(y, &yhat, sample_weight);
         let mut loss = objective_fn.loss(y, &yhat, sample_weight);
         let loss_base = objective_fn.loss(y, &vec![self.base_score; y.len()], sample_weight);
         let loss_avg = loss_base.iter().sum::<f32>() / loss_base.len() as f32;
@@ -245,10 +245,10 @@ impl UnivariateBooster {
         let target_loss_decrement = c * base.powf(-self.cfg.budget) * loss_avg;
 
                 
-        let is_const_hess = match sample_weight {
-            Some(_) => false,
-            None => objective_fn.hessian_is_constant(),
-        };
+        // let is_const_hess = match sample_weight {
+        //     Some(_) => false,
+        //     None => objective_fn.hessian_is_constant(),
+        // };
 
         // Generate binned data
         //
@@ -407,7 +407,7 @@ impl UnivariateBooster {
                 n_low_loss_rounds = 0;
             }
 
-            (grad, hess) = objective_fn.gradient(y, &yhat, sample_weight);
+            (grad, hess, _) = objective_fn.gradient(y, &yhat, sample_weight);
             loss = objective_fn.loss(y, &yhat, sample_weight);
 
             if verbose {

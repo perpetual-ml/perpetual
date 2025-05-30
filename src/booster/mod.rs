@@ -546,7 +546,7 @@ mod univariate_booster_test {
                     .collect()
             }
 
-            fn gradient(&self, y: &[f64], yhat: &[f64], sample_weight: Option<&[f64]>,) -> (Vec<f32>, Option<Vec<f32>>) {
+            fn gradient(&self, y: &[f64], yhat: &[f64], sample_weight: Option<&[f64]>,) -> (Vec<f32>, Option<Vec<f32>>, bool) {
                 let grad: Vec<f32> = y
                     .iter()
                     .zip(yhat)
@@ -560,7 +560,7 @@ mod univariate_booster_test {
                     })
                     .collect();
                 let hess = vec![2.0_f32; y.len()];
-                (grad, Some(hess))
+                (grad, Some(hess), true)
             }
 
             fn initial_value(&self, y: &[f64], sample_weight: Option<&[f64]>) -> f64 {

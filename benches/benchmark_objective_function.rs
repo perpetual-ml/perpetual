@@ -29,7 +29,7 @@ pub fn benchmark_logloss(c: &mut Criterion) {
                 let objective_function = Objective::LogLoss.as_function();
 
                 // calculate gradients
-                objective_function.calc_grad_hess(black_box(&y), black_box(&y_hat), black_box(None));
+                objective_function.gradient(black_box(&y), black_box(&y_hat), black_box(None));
 
             });
         });
@@ -44,7 +44,7 @@ pub fn benchmark_logloss(c: &mut Criterion) {
             let objective_function = Objective::LogLoss.as_function();
 
             // calculate gradients
-            objective_function.calc_grad_hess(black_box(&y), black_box(&y_hat), black_box(Some(&sample_weights)));
+            objective_function.gradient(black_box(&y), black_box(&y_hat), black_box(Some(&sample_weights)));
 
         });
     });

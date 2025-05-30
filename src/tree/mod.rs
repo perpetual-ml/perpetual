@@ -34,7 +34,7 @@ mod tests {
         let file = fs::read_to_string("resources/performance.csv").expect("Something went wrong reading the file");
         let y: Vec<f64> = file.lines().map(|x| x.parse::<f64>().unwrap()).collect();
         let yhat = vec![0.5; y.len()];
-        let (mut g, mut h) = objective_function.gradient(&y, &yhat, None);
+        let (mut g, mut h, _) = objective_function.gradient(&y, &yhat, None);
         let loss = objective_function.loss(&y, &yhat, None);
 
         let data = Matrix::new(&data_vec, 891, 5);
@@ -132,7 +132,7 @@ mod tests {
         let file = fs::read_to_string("resources/performance.csv").expect("Something went wrong reading the file");
         let y: Vec<f64> = file.lines().map(|x| x.parse::<f64>().unwrap()).collect();
         let yhat = vec![0.5; y.len()];
-        let (mut g, mut h) = objective_function.gradient(&y, &yhat, None);
+        let (mut g, mut h, mut is_const_hess) = objective_function.gradient(&y, &yhat, None);
         let loss = objective_function.loss(&y, &yhat, None);
         println!("GRADIENT -- {:?}", g);
 
@@ -145,7 +145,7 @@ mod tests {
         let b = bin_matrix(&data, None, 100, f64::NAN, None).unwrap();
         let bdata = Matrix::new(&b.binned_data, data.rows, data.cols);
         let col_index: Vec<usize> = (0..data.cols).collect();
-        let is_const_hess = false;
+        //let is_const_hess = false;
 
         let n_nodes_alloc = 100;
 
@@ -231,7 +231,7 @@ mod tests {
         let file = fs::read_to_string("resources/performance.csv").expect("Something went wrong reading the file");
         let y: Vec<f64> = file.lines().map(|x| x.parse::<f64>().unwrap()).collect();
         let yhat = vec![0.5; y.len()];
-        let (mut g, mut h) = objective_function.gradient(&y, &yhat, None);
+        let (mut g, mut h, is_const_hess) = objective_function.gradient(&y, &yhat, None);
         let loss = objective_function.loss(&y, &yhat, None);
 
         let data = Matrix::new(&data_vec, 891, 5);
@@ -241,7 +241,7 @@ mod tests {
         let b = bin_matrix(&data, None, 300, f64::NAN, None).unwrap();
         let bdata = Matrix::new(&b.binned_data, data.rows, data.cols);
         let col_index: Vec<usize> = (0..data.cols).collect();
-        let is_const_hess = false;
+        //let is_const_hess = false;
 
         let n_nodes_alloc = 100;
 
@@ -337,7 +337,7 @@ mod tests {
 
         let y_avg = y.iter().sum::<f64>() / y.len() as f64;
         let yhat = vec![y_avg; y.len()];
-        let (mut grad, mut hess) = objective_function.gradient(&y, &yhat, None);
+        let (mut grad, mut hess, is_const_hess) = objective_function.gradient(&y, &yhat, None);
         let loss = objective_function.loss(&y, &yhat, None);
 
         let splitter = MissingImputerSplitter::new(0.3, true, ConstraintMap::new());
@@ -347,7 +347,7 @@ mod tests {
         let b = bin_matrix(&data, None, n_bins, f64::NAN, Some(&cat_index)).unwrap();
         let bdata = Matrix::new(&b.binned_data, data.rows, data.cols);
         let col_index: Vec<usize> = (0..data.cols).collect();
-        let is_const_hess = false;
+        //let is_const_hess = false;
 
         let n_nodes_alloc = 100;
 

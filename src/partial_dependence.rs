@@ -99,7 +99,7 @@ mod tests {
         let file = fs::read_to_string("resources/performance.csv").expect("Something went wrong reading the file");
         let y: Vec<f64> = file.lines().map(|x| x.parse::<f64>().unwrap()).collect();
         let yhat = vec![0.5; y.len()];
-        let (mut g, mut h) = objective_function.gradient(&y, &yhat, None);
+        let (mut g, mut h, _) = objective_function.gradient(&y, &yhat, None);
         let loss = objective_function.loss(&y, &yhat, None);
 
         let data = Matrix::new(&data_vec, 891, 5);
