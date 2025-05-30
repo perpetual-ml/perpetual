@@ -158,15 +158,13 @@ impl UnivariateBooster {
         self.trees = Vec::new();
     }
 
-    
-
-
     /// Fit the gradient booster on a provided dataset.
     ///
     /// * `data` -  Either a Polars or Pandas DataFrame, or a 2 dimensional Numpy array.
     /// * `y` - Either a Polars or Pandas Series, or a 1 dimensional Numpy array.
     /// * `sample_weight` - Instance weights to use when training the model.
     pub fn fit(&mut self, data: &Matrix<f64>, y: &[f64], sample_weight: Option<&[f64]>) -> Result<(), PerpetualError> {
+        
         let constraints_map = self
             .cfg.monotone_constraints
             .as_ref()
