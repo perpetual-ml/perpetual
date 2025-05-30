@@ -40,7 +40,7 @@ impl ObjectiveFunction for QuantileLoss {
     }
 
     #[inline]
-    fn gradient(&self, y: &[f64], yhat: &[f64], sample_weight: Option<&[f64]>) -> (Vec<f32>, Option<Vec<f32>>) {
+    fn gradient(&self, y: &[f64], yhat: &[f64], sample_weight: Option<&[f64]>) -> (Vec<f32>, Option<Vec<f32>>, bool) {
 
         match sample_weight {
             Some(sample_weight) => {
@@ -59,7 +59,7 @@ impl ObjectiveFunction for QuantileLoss {
                         (g as f32, *w_ as f32)
                     })
                     .unzip();
-                (g, Some(h))
+                (g, Some(h), false)
             }
             None => {
                 let g = y
@@ -76,7 +76,7 @@ impl ObjectiveFunction for QuantileLoss {
                         g as f32
                     })
                     .collect();
-                (g, None)
+                (g, None, true)
             }
         }
 

@@ -63,7 +63,7 @@ impl ObjectiveFunction for AdaptiveHuberLoss {
     }
 
     #[inline]
-    fn gradient(&self, y: &[f64], yhat: &[f64], sample_weight: Option<&[f64]>) -> (Vec<f32>, Option<Vec<f32>>) {
+    fn gradient(&self, y: &[f64], yhat: &[f64], sample_weight: Option<&[f64]>) -> (Vec<f32>, Option<Vec<f32>>, bool) {
 
         // default alpha: 0.5
         // if not passed explicitly
@@ -98,7 +98,8 @@ impl ObjectiveFunction for AdaptiveHuberLoss {
                         (g as f32, h as f32)
                     })
                     .unzip();
-                (grad, Some(hess))
+
+                (grad, Some(hess), false)
             }
             None => {
                 let (grad, hess): (Vec<f32>, Vec<f32>) = y
@@ -113,7 +114,8 @@ impl ObjectiveFunction for AdaptiveHuberLoss {
                         (g as f32, h as f32)
                     })
                     .unzip();
-                (grad, Some(hess))
+
+                (grad, Some(hess), false)
             }
         }
 

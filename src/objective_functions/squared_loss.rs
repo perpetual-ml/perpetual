@@ -35,7 +35,7 @@ impl ObjectiveFunction for SquaredLoss {
     }
 
     #[inline]
-    fn gradient(&self, y: &[f64], yhat: &[f64], sample_weight: Option<&[f64]> ) -> (Vec<f32>, Option<Vec<f32>>) {
+    fn gradient(&self, y: &[f64], yhat: &[f64], sample_weight: Option<&[f64]> ) -> (Vec<f32>, Option<Vec<f32>>, bool) {
 
         match sample_weight {
             Some(sample_weight) => {
@@ -45,11 +45,12 @@ impl ObjectiveFunction for SquaredLoss {
                     .zip(sample_weight)
                     .map(|((y_, yhat_), w_)| (((yhat_ - *y_) * *w_) as f32, *w_ as f32))
                     .unzip();
-                (g, Some(h))
+                (g, Some(h), false)
             }
             None => (
                 y.iter().zip(yhat).map(|(y_, yhat_)| (yhat_ - *y_) as f32).collect(),
                 None,
+                true
             ),
         }
 
