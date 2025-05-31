@@ -1,5 +1,9 @@
 .Rproj.user
 *.tar.gz
 
+# ignore sandbox
+sandbox/**/
+src/library/src/main.rs
+
 # rust artifacts
 src/library/target/*

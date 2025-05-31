@@ -1,75 +1,163 @@
-use rand::distr::{Uniform};
-use rand::prelude::*;
-use rand::SeedableRng;
-use rand::rngs::StdRng;
+//! Rust and C bindings for R
+//!
+//! ## Description
+//! All base functionality are wrapped in pointers and can be passed between functions. The C-bindings
+//! are found in 'perpetual.h' and the R bindings are in wrappers.c
+//!
 use perpetual::Matrix;
-use perpetual::UnivariateBooster;
+use perpetual::PerpetualBooster;
 use perpetual::objective_functions::*;
 
-pub fn wrapper_dgp(n_samples: usize, n_features: usize) -> (Vec<f64>, Vec<f64>) {
-    
-    // reproducible seed
-    let mut rng = StdRng::seed_from_u64(1903);
+// Opaque pointer
+#[repr(C)]
+pub struct OpaquePointer {
+    _private: [u8; 0],
+}
 
-    // feature distributions
-    let feature_distribution = Uniform::new(0.0, 1.0);
-    let noise_distribution = Uniform::new(-1.0, 1.0);
-    let weight_distrubtion = Uniform::new(-1.0, 1.0);
+/// Engine
+///
+/// Builds a Perpetual::default() model and returns a
+/// opaque pointer that that can be modified elsewhere.
+///
+/// ## TODO:
+///
+/// * Allow for passing objective functions
+/// * Allow for passing custom objective functions
+///
+/// ## NOTE:
+///
+/// It currently only uses SquaredLoss
+#[unsafe(no_mangle)]
+pub extern "C" fn engine() -> *mut OpaquePointer {
+    // initialize the model
+    let mut model: PerpetualBooster = PerpetualBooster::default().set_objective(Objective::SquaredLoss);
 
-    // construct matrix-like
-    // objects
-    let mut feature_space: Vec<Vec<f64>> = vec![Vec::with_capacity(n_samples); n_features];
-    let mut target_variable: Vec<f64> = Vec::with_capacity(n_samples);
+    // 4.4 Box the model on the heap and cast to the opaque type
+    let boxed_model = Box::new(model);
+    let raw_ptr: *mut PerpetualBooster = Box::into_raw(boxed_model);
+    raw_ptr as *mut OpaquePointer
+}
 
-    // generate random weights for the linear model
-    let weights: Vec<f64> = (0..n_features)
-        .map(|_| rng.sample(weight_distrubtion.unwrap()))
-        .collect();
+/// Tune
+///
+/// Sets the tuning parameters of the booster.
+///
+/// ## Parameters
+///
+/// * `budget`: `f32` the buget parameter `set_budget()`
+/// * `max_bin`: `u16` the maximum numner of bins `set_max_bin()`
+///
+/// ## TODO:
+///
+/// * Expand number of parameters passable
+#[unsafe(no_mangle)]
+pub extern "C" fn tune(model_ptr: *mut OpaquePointer, budget: f32, max_bin: u16) {
+    // recast pointer
+    // let booster_ptr = model_ptr as *mut PerpetualBooster;
+    let model: &PerpetualBooster = unsafe { &*(model_ptr as *mut PerpetualBooster) };
 
+    model.clone().set_budget(budget).set_max_bin(max_bin);
 
-    for _ in 0..n_samples {
+    // unsafe {
+    //     if let Some(model) = booster_ptr.as_mut() {
+    //         booster.clone().set_budget(budget).set_max_bin(max_bin);
+    //     } else {
+    //         eprintln!("Tune reciev null pointer")
+    //     }
+    // }
+}
 
-        let mut x_sample = Vec::with_capacity(n_features);
-        for j in 0..n_features {
-            let v = rng.sample(feature_distribution.unwrap());
-            feature_space[j].push(v);
-            x_sample.push(v);
-        }
-
-        // linear model + uniform noise
-        let linear: f64 = x_sample
-            .iter()
-            .zip(weights.iter())
-            .map(|(x, w)| x * w)
-            .sum();
-        let y = linear + rng.sample(noise_distribution.unwrap());
-        target_variable.push(y);
+/// Train
+///
+/// ## Parameters
+/// * `x_vector`: A `Vec<f64>` of flattened features
+/// * `y_vector`: A `Vec<f64>` of flattened targets
+/// * `w_vector`: A `Option<Vec<f64>>` of flattened sample weights
+/// * `x_cols`: A usize corresponding the the number of features in preflattened X
+///
+#[unsafe(no_mangle)]
+pub extern "C" fn train(
+    model_ptr: *mut OpaquePointer,
+    x_vector: Vec<f64>,
+    y_vector: Vec<f64>,
+    w_vector: Option<Vec<f64>>,
+    x_cols: usize,
+) -> *mut OpaquePointer {
+    // TODO: Throw error message
+    if model_ptr.is_null() {
+        return std::ptr::null_mut();
     }
 
-    // flatten into column-major
-    let mut data = Vec::with_capacity(n_samples * n_features);
-    for col in feature_space {
-        data.extend(col);
+    let booster_raw: *mut PerpetualBooster = model_ptr as *mut PerpetualBooster;
+
+    unsafe {
+        let booster_ref: &mut PerpetualBooster = &mut *booster_raw;
+
+        let matrix = Matrix::new(&x_vector, x_vector.len(), x_cols);
+        let w_slice: Option<&[f64]> = w_vector.as_ref().map(|v| v.as_slice());
+
+        booster_ref.fit(&matrix, &y_vector, w_slice);
     }
 
-    (data, target_variable)
+    model_ptr
+}
 
+/// Predict
+/// 
+/// ## Parameters
+/// * `x_vector`: A `Vec<f64>` of flattened features
+/// * `w_vector`: A `Option<Vec<f64>>` of flattened sample weights
+/// * `x_cols`: A usize corresponding the the number of features in preflattened X
+/// 
+/// ## NOTE:
+/// 
+/// It is probably a better idea to implement it as
+/// `predict_numeric`, `predict_tree` etc.
+/// - Or maybe an enum?
+#[unsafe(no_mangle)]
+pub extern "C" fn predict(
+    model_ptr: *mut OpaquePointer,
+    x_vector: Vec<f64>,
+    x_cols: usize) -> *mut f64 {
+
+    // TODO: Throw error message
+    if model_ptr.is_null() {
+        return std::ptr::null_mut();
+    }
+
+    let model: &PerpetualBooster = unsafe { &*(model_ptr as *mut PerpetualBooster) };
+
+
+    let matrix = Matrix::new(&x_vector, x_vector.len(), x_cols);
+
+    let preds: Vec<f64> = model.predict(&matrix, false);
+
+    let mut boxed_slice = preds.into_boxed_slice();
+    let ptr_to_data = boxed_slice.as_mut_ptr();
+    std::mem::forget(boxed_slice);
+
+    ptr_to_data
+}
+
+// Clear memory
+#[unsafe(no_mangle)]
+pub extern "C" fn free_perpetual_booster(model_ptr: *mut OpaquePointer) {
+    if model_ptr.is_null() {
+        return;
+    }
+    unsafe {
+        Box::from_raw(model_ptr as *mut PerpetualBooster);
+    }
 }
 
 
 #[unsafe(no_mangle)]
-pub extern "C" fn wrapper_univariate(n_samples: usize, n_features: usize) {
-    // prepare data
-    let (data, y) = wrapper_dgp(n_samples, n_features);
-    let matrix = Matrix::new(&data, n_samples, n_features);
-
-    let mut model = UnivariateBooster::default()
-        .set_objective(Objective::LogLoss)
-        .set_budget(0.5);
-
-    let _ = model.fit(&matrix, &y, None);
-
-    println!("Model prediction: {:?} ...", &model.predict(&matrix, true)[0..10]);
-
-
+pub extern "C" fn free_predictions(ptr: *mut f64, length: usize) {
+    if ptr.is_null() {
+        return;
+    }
+    unsafe {
+        let slice = std::slice::from_raw_parts_mut(ptr, length);
+        Box::from_raw(slice as *mut [f64]);
+    }
 }
