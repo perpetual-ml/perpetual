@@ -26,7 +26,8 @@ jobs:
       - name: Get current version
         id: get_version
         run: |
-          VERSION=$(grep -oP 'version = "\K[^"]+' Cargo.toml)
+          # Extract version and remove any trailing newlines/carriage returns
+          VERSION=$(grep -oP 'version = "\K[^"]+' Cargo.toml | tr -d '\n' | tr -d '\r')
           # Corrected syntax for setting GitHub Actions output variable
           echo "CURRENT_VERSION=$VERSION" >> "$GITHUB_OUTPUT"
 
@@ -38,7 +39,7 @@ jobs:
           IFS='.' read -r MAJOR MINOR PATCH_PRERELEASE <<< "$CURRENT_VERSION"
 
           # Remove any existing pre-release identifier (e.g., -dev.X) from PATCH
-          PATCH=$(echo $PATCH_PRERELEASE | sed 's/-.*//')
+          PATCH=$(echo "$PATCH_PRERELEASE" | sed 's/-.*//') # Added quotes for robustness
 
           # Get the latest dev version number from existing tags
           # This assumes tags are like vX.Y.Z-dev.N
@@ -74,6 +75,6 @@ jobs:
       - name: Create Git Tag
         run: |
           TAG_NAME="v${{ steps.generate_dev_version.outputs.NEW_DEV_VERSION }}"
-          git tag $TAG_NAME
-          git push origin $TAG_NAME
+          git tag "$TAG_NAME" # Added quotes for robustness
+          git push origin "$TAG_NAME" # Added quotes for robustness
           echo "Created and pushed tag: $TAG_NAME"
