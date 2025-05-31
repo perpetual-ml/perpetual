@@ -1,0 +1,77 @@
+name: Dev Release
+
+on:
+  push:
+    branches:
+      - development
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Needed for git history and tags
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+
+      - name: Install cargo-edit
+        run: cargo install cargo-edit --features vendored-openssl
+
+      - name: Get current version
+        id: get_version
+        run: |
+          VERSION=$(grep -oP 'version = "\K[^"]+' Cargo.toml)
+          echo "CURRENT_VERSION=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Generate new dev version
+        id: generate_dev_version
+        run: |
+          CURRENT_VERSION="${{ steps.get_version.outputs.CURRENT_VERSION }}"
+          # Extract major, minor, patch
+          IFS='.' read -r MAJOR MINOR PATCH_PRERELEASE <<< "$CURRENT_VERSION"
+
+          # Remove any existing pre-release identifier (e.g., -dev.X) from PATCH
+          PATCH=$(echo $PATCH_PRERELEASE | sed 's/-.*//')
+
+          # Get the latest dev version number from existing tags
+          # This assumes tags are like vX.Y.Z-dev.N
+          LATEST_DEV_TAG=$(git tag -l "v$MAJOR.$MINOR.$PATCH-dev.*" --sort=-v:refname | head -n 1)
+          DEV_VERSION_NUM=0
+          if [[ "$LATEST_DEV_TAG" =~ -dev\.([0-9]+)$ ]]; then
+            DEV_VERSION_NUM=$((BASH_REMATCH[1] + 1))
+          fi
+
+          NEW_DEV_VERSION="${MAJOR}.${MINOR}.${PATCH}-dev.${DEV_VERSION_NUM}"
+          echo "NEW_DEV_VERSION=$NEW_DEV_VERSION" >> $GITHUB_OUTPUT
+          echo "Generated new dev version: $NEW_DEV_VERSION"
+
+      - name: Update Cargo.toml version
+        run: |
+          cargo set-version ${{ steps.generate_dev_version.outputs.NEW_DEV_VERSION }}
+          echo "Updated Cargo.toml to version: ${{ steps.generate_dev_version.outputs.NEW_DEV_VERSION }}"
+
+      - name: Commit and push Cargo.toml changes
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email github-actions[bot]@users.noreply.github.com
+          git add Cargo.toml
+          git commit -m "Bump to dev version: ${{ steps.generate_dev_version.outputs.NEW_DEV_VERSION }}" || echo "No changes to commit"
+          git push
+
+      - name: Publish to crates.io
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+        run: |
+          cargo publish --token $CARGO_REGISTRY_TOKEN
+
+      - name: Create Git Tag
+        run: |
+          TAG_NAME="v${{ steps.generate_dev_version.outputs.NEW_DEV_VERSION }}"
+          git tag $TAG_NAME
+          git push origin $TAG_NAME
+          echo "Created and pushed tag: $TAG_NAME"
