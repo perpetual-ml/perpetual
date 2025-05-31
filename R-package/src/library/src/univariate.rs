@@ -22,9 +22,27 @@ pub struct OpaquePointer {
 ///
 /// It currently only uses SquaredLoss
 #[unsafe(no_mangle)]
-pub extern "C" fn engine() -> *mut OpaquePointer {
+pub extern "C" fn engine(
+    objective_code: i32,
+    param_value: f64
+) -> *mut OpaquePointer {
+
+    // objective function enums
+    let objective_function: Objective = match objective_code {
+        0 => Objective::LogLoss,
+        1 => Objective::SquaredLoss,
+        2 => Objective::QuantileLoss { quantile: Some(param_value) },
+        3 => Objective::HuberLoss { delta: Some(param_value) },
+        4 => Objective::AdaptiveHuberLoss { quantile: Some(param_value) },
+        _ => {
+            // Unexpected code; return null to indicate failure.
+            return std::ptr::null_mut();
+        }
+    };
+
     // initialize the model
-    let mut model: UnivariateBooster = UnivariateBooster::default().set_objective(Objective::SquaredLoss);
+    let mut model: UnivariateBooster = UnivariateBooster::default()
+    .set_objective(objective_function);
 
     // 4.4 Box the model on the heap and cast to the opaque type
     let boxed_model = Box::new(model);
