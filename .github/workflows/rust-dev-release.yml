@@ -79,11 +79,11 @@ jobs:
           git commit -m "Bump to dev version: ${{ steps.generate_dev_version.outputs.NEW_DEV_VERSION }}" || echo "No changes to commit"
           git push
 
-      - name: Publish to crates.io
+      - name: Publish Crate
         env:
-          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+          CRATES_TOKEN: ${{ secrets.CRATES_TOKEN }} # Changed to CRATES_TOKEN as requested
         run: |
-          cargo publish --token $CARGO_REGISTRY_TOKEN
+          cargo publish --token "$CRATES_TOKEN" --allow-dirty # Added --allow-dirty and quotes for robustness
 
       - name: Create Git Tag
         run: |
