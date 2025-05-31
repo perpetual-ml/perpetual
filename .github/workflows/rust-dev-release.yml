@@ -36,21 +36,33 @@ jobs:
         id: generate_dev_version
         run: |
           CURRENT_VERSION="${{ steps.get_version.outputs.CURRENT_VERSION }}"
-          # Extract major, minor, patch
-          IFS='.' read -r MAJOR MINOR PATCH_PRERELEASE <<< "$CURRENT_VERSION"
+          echo "Current version from Cargo.toml: $CURRENT_VERSION"
 
-          # Remove any existing pre-release identifier (e.g., -dev.X) from PATCH
-          PATCH=$(echo "$PATCH_PRERELEASE" | sed 's/-.*//') # Added quotes for robustness
+          # Check if the current version is already a pre-release (e.g., 0.9.3-dev.X)
+          if [[ "$CURRENT_VERSION" =~ -dev\.([0-9]+)$ ]]; then
+            # It's already a dev version, increment the dev counter
+            MAJOR_MINOR_PATCH_BASE=$(echo "$CURRENT_VERSION" | sed 's/-dev\..*//')
+            DEV_NUM=$((BASH_REMATCH[1] + 1))
+            NEW_DEV_VERSION="${MAJOR_MINOR_PATCH_BASE}-dev.${DEV_NUM}"
+            echo "Incrementing existing dev version to: $NEW_DEV_VERSION"
+          else
+            # It's a stable version (e.g., 0.9.3)
+            # Increment the patch version for the base of the new dev release
+            IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT_VERSION"
+            NEXT_PATCH=$((PATCH + 1))
+            BASE_VERSION="${MAJOR}.${MINOR}.${NEXT_PATCH}"
 
-          # Get the latest dev version number from existing tags
-          # This assumes tags are like vX.Y.Z-dev.N
-          LATEST_DEV_TAG=$(git tag -l "v$MAJOR.$MINOR.$PATCH-dev.*" --sort=-v:refname | head -n 1)
-          DEV_VERSION_NUM=0
-          if [[ "$LATEST_DEV_TAG" =~ -dev\.([0-9]+)$ ]]; then
-            DEV_VERSION_NUM=$((BASH_REMATCH[1] + 1))
+            # Get the latest dev version number for this *new* base version from existing tags
+            # This handles cases where v0.9.4-dev.X might already exist
+            LATEST_DEV_TAG=$(git tag -l "v${BASE_VERSION}-dev.*" --sort=-v:refname | head -n 1)
+            DEV_VERSION_NUM=0
+            if [[ "$LATEST_DEV_TAG" =~ -dev\.([0-9]+)$ ]]; then
+              DEV_VERSION_NUM=$((BASH_REMATCH[1] + 1))
+            fi
+            NEW_DEV_VERSION="${BASE_VERSION}-dev.${DEV_VERSION_NUM}"
+            echo "Starting new dev cycle from stable version. New dev version: $NEW_DEV_VERSION"
           fi
 
-          NEW_DEV_VERSION="${MAJOR}.${MINOR}.${PATCH}-dev.${DEV_VERSION_NUM}"
           echo "NEW_DEV_VERSION=$NEW_DEV_VERSION" >> "$GITHUB_OUTPUT"
           echo "Generated new dev version: $NEW_DEV_VERSION"
 
