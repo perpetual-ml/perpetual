@@ -20,7 +20,8 @@ jobs:
           toolchain: stable
 
       - name: Install cargo-edit
-        run: cargo install cargo-edit --features vendored-openssl
+        # Removed '--features vendored-openssl' as it's no longer supported by cargo-edit
+        run: cargo install cargo-edit
 
       - name: Get current version
         id: get_version
