@@ -26,9 +26,10 @@ jobs:
       - name: Get current version
         id: get_version
         run: |
-          # Extract version and remove any trailing newlines/carriage returns
-          VERSION=$(grep -oP 'version = "\K[^"]+' Cargo.toml | tr -d '\n' | tr -d '\r')
-          # Corrected syntax for setting GitHub Actions output variable
+          # Use awk to precisely extract the version from the [package] section
+          # This ensures we get "0.9.3" and not a concatenated string.
+          VERSION=$(awk '/^\[package\]/{p=1} p && /^version = "/{print $3; exit}' Cargo.toml | tr -d '"' | tr -d '\n' | tr -d '\r')
+          echo "Extracted CURRENT_VERSION: $VERSION" # Added for debugging
           echo "CURRENT_VERSION=$VERSION" >> "$GITHUB_OUTPUT"
 
       - name: Generate new dev version
