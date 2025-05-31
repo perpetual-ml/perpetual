@@ -1,4 +1,5 @@
 .Rproj.user
+*.tar.gz
 
 # rust artifacts
 src/library/target/*

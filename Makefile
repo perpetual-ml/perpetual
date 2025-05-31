@@ -46,3 +46,18 @@ test: ## Test the project and all its implementations
 fmt: ## Format the project using cargo
 	@rustup component add rustfmt 2> /dev/null
 	cargo fmt
+
+## R-package development
+package_name     := perpetual
+package_version  := $(shell grep "^Version:" R-package/DESCRIPTION | sed "s/Version: //")
+tarball_location := $(package_name)_$(package_version).tar.gz
+
+r-build: ## Build and install R package
+	cd R-package && R CMD build .
+	cd R-package && R CMD INSTALL "$(tarball_location)"
+
+r-build-cargo: ## Clean and rebuild R-package/src
+	cd R-package/src/library && cargo clean && cargo build --release
+
+r-build-c: ## Build perpetual.h in R-package
+	cd R-package/src/library && cbindgen --lang c --output perpetual.h 
