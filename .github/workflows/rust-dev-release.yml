@@ -27,7 +27,8 @@ jobs:
         id: get_version
         run: |
           VERSION=$(grep -oP 'version = "\K[^"]+' Cargo.toml)
-          echo "CURRENT_VERSION=$VERSION" >> $GITHUB_OUTPUT
+          # Corrected syntax for setting GitHub Actions output variable
+          echo "CURRENT_VERSION=$VERSION" >> "$GITHUB_OUTPUT"
 
       - name: Generate new dev version
         id: generate_dev_version
@@ -48,7 +49,7 @@ jobs:
           fi
 
           NEW_DEV_VERSION="${MAJOR}.${MINOR}.${PATCH}-dev.${DEV_VERSION_NUM}"
-          echo "NEW_DEV_VERSION=$NEW_DEV_VERSION" >> $GITHUB_OUTPUT
+          echo "NEW_DEV_VERSION=$NEW_DEV_VERSION" >> "$GITHUB_OUTPUT"
           echo "Generated new dev version: $NEW_DEV_VERSION"
 
       - name: Update Cargo.toml version
