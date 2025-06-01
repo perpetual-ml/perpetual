@@ -5,5 +5,8 @@
 //! are found in 'perpetual.h' and the R bindings are in wrappers.c
 //!
 //! 
-mod univariate;
+pub mod univariate;
+pub mod objective_function;
+
 pub use univariate::*;
+pub use objective_function::*;
