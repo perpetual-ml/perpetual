@@ -1,6 +1,9 @@
+// custom objective
+use crate::objective_function::{get_global_objective, register_custom_objective};
 use perpetual::Matrix;
 use perpetual::UnivariateBooster;
 use perpetual::objective_functions::*;
+
 
 // Opaque pointer
 #[repr(C)]
@@ -17,26 +20,34 @@ pub struct OpaquePointer {
 ///
 /// * Allow for passing objective functions
 /// * Allow for passing custom objective functions
-///
-/// ## NOTE:
-///
-/// It currently only uses SquaredLoss
+/// 
+/// This has not been tested yet
 #[unsafe(no_mangle)]
 pub extern "C" fn engine(
     objective_code: i32,
     param_value: f64
 ) -> *mut OpaquePointer {
 
-    // objective function enums
-    let objective_function: Objective = match objective_code {
-        0 => Objective::LogLoss,
-        1 => Objective::SquaredLoss,
-        2 => Objective::QuantileLoss { quantile: Some(param_value) },
-        3 => Objective::HuberLoss { delta: Some(param_value) },
-        4 => Objective::AdaptiveHuberLoss { quantile: Some(param_value) },
-        _ => {
-            // Unexpected code; return null to indicate failure.
-            return std::ptr::null_mut();
+    let objective_function: Objective = if objective_code == -1 {
+        match get_global_objective() {
+            Some(arc_obj) => Objective::Custom(arc_obj),
+            None => {
+                // TODO: return error code
+                return std::ptr::null_mut();
+            }
+        }
+    } else {
+        
+        match objective_code {
+            0 => Objective::LogLoss,
+            1 => Objective::SquaredLoss,
+            2 => Objective::QuantileLoss { quantile: Some(param_value) },
+            3 => Objective::HuberLoss { delta: Some(param_value) },
+            4 => Objective::AdaptiveHuberLoss { quantile: Some(param_value) },
+            _ => {
+                // Invalid code; return null
+                return std::ptr::null_mut();
+            }
         }
     };
 
@@ -105,7 +116,7 @@ pub extern "C" fn train(
     unsafe {
         let booster_ref: &mut UnivariateBooster = &mut *booster_raw;
 
-        let matrix = Matrix::new(&x_vector, x_vector.len(), x_cols);
+        let matrix = Matrix::new(&x_vector, y_vector.len(), x_cols);
         let w_slice: Option<&[f64]> = w_vector.as_ref().map(|v| v.as_slice());
 
         booster_ref.fit(&matrix, &y_vector, w_slice);
@@ -140,7 +151,7 @@ pub extern "C" fn predict(
     let model: &UnivariateBooster = unsafe { &*(model_ptr as *mut UnivariateBooster) };
 
 
-    let matrix = Matrix::new(&x_vector, x_vector.len(), x_cols);
+    let matrix = Matrix::new(&x_vector, x_vector.len() / x_cols, x_cols);
 
     let preds: Vec<f64> = model.predict(&matrix, false);
 
