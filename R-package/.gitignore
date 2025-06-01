@@ -2,7 +2,7 @@
 *.tar.gz
 
 # ignore sandbox
-sandbox/**/
+sandbox/
 src/library/src/main.rs
 
 # rust artifacts
