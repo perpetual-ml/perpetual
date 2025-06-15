@@ -1,4 +1,4 @@
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
+use criterion::{criterion_group, criterion_main, Criterion};
 use perpetual::binning::bin_matrix;
 use perpetual::constraints::ConstraintMap;
 use perpetual::data::Matrix;
@@ -9,6 +9,7 @@ use perpetual::tree::tree::Tree;
 use perpetual::utils::{fast_f64_sum, fast_sum, naive_sum};
 use perpetual::PerpetualBooster;
 use std::fs;
+use std::hint::black_box;
 use std::time::Duration;
 
 pub fn tree_benchmarks(c: &mut Criterion) {

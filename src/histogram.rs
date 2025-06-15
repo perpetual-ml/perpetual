@@ -298,7 +298,6 @@ pub fn update_histogram(
             });
         } else {
             col_index.iter().enumerate().for_each(|(i, col)| {
-                println!("i: {:?}, col: {:?}", i, col);
                 hist.data.get_unchecked(i).update(
                     data.get_col(*col),
                     &sorted_grad,
