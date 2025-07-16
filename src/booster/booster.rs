@@ -44,7 +44,7 @@ pub enum ContributionsMethod {
 }
 
 /// Method to calculate variable importance.
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub enum ImportanceMethod {
     /// The number of times a feature is used to split the data across all trees.
     Weight,
@@ -664,7 +664,7 @@ impl PerpetualBooster {
     /// Calculate feature importance measure for the features
     /// in the model.
     /// - `method`: variable importance method to use.
-    /// - `n_features`: The number of features to calculate the importance for.
+    /// - `normalize`: whether to normalize the importance values with the sum.
     pub fn calculate_feature_importance(&self, method: ImportanceMethod, normalize: bool) -> HashMap<usize, f32> {
         let (average, importance_fn): (bool, ImportanceFn) = match method {
             ImportanceMethod::Weight => (false, Tree::calculate_importance_weight),
