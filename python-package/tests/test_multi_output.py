@@ -20,3 +20,7 @@ def test_multi_output():
     assert np.allclose(np.sum(proba_test, axis=1), np.ones(proba_test.shape[0]))
     assert np.allclose(proba_test.shape, (len(X_test), len(np.unique(y_test))))
     assert set(y_test) == set(pred_test)
+
+    feat_imp = model.calculate_feature_importance()
+    assert isinstance(feat_imp, dict)
+    assert np.allclose(np.sum(list(feat_imp.values())), 1.0)
