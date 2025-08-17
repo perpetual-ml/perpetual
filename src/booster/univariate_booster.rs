@@ -1201,6 +1201,8 @@ mod univariate_booster_test {
             .try_into_reader_with_file_path(Some("resources/goodreads.csv".into()))?
             .finish()?;
 
+        println!("{:?}", features.head(Some(5)));
+
         let y: Vec<f64> = CsvReadOptions::default()
             .with_has_header(true)
             .with_infer_schema_length(Some(10000))
@@ -1212,6 +1214,8 @@ mod univariate_booster_test {
             .into_iter()
             .map(|v| v.unwrap_or(f64::NAN))
             .collect();
+
+        println!("{:?}", y.len());
 
         let mut group_map: HashMap<(i64, String), u64> = HashMap::new();
         let mut current_group_id = 0;
@@ -1233,6 +1237,8 @@ mod univariate_booster_test {
             })
             .collect();
 
+        println!("{:?}", groups.len());
+
         // Count items per group
         let mut group_counts: HashMap<u64, u64> = HashMap::new();
         for group_id in &groups {
@@ -1242,6 +1248,8 @@ mod univariate_booster_test {
         let group_counts_vec: Vec<u64> = (0..current_group_id)
             .map(|id| group_counts.get(&id).cloned().unwrap_or(0))
             .collect();
+
+        println!("{:?}", group_counts_vec.len());
 
         let all_feature_names = [
             "year".to_string(),
@@ -1258,24 +1266,36 @@ mod univariate_booster_test {
             "ratings".to_string(),
         ];
 
-        let cols_to_drop = ["year".to_string(), "category".to_string(), "variable".to_string()];
+        let cols_to_drop = [
+            "year".to_string(),
+            "category".to_string(),
+            "variable".to_string(),
+            "value".to_string(),
+        ];
 
         // Unpivot features
-        let id_vars: Vec<&str> = Vec::new();
+        let id_vars: Vec<&str> = vec!["year", "category"];
         let mdf = features
             .clone()
             .unpivot(&id_vars, &all_feature_names)?
             .drop_many(&cols_to_drop);
 
+        println!("{:?}", mdf.head(Some(5)));
+
         let data: Vec<f64> = mdf
-            .select_at_idx(1)
-            .expect("Invalid column")
-            .f64()?
-            .into_iter()
-            .map(|v| v.unwrap_or(f64::NAN))
+            .get_columns()
+            .iter()
+            .filter_map(|col| if col.dtype().is_numeric() { col.f64().ok() } else { None })
+            .flat_map(|ca| ca.into_iter().map(|opt_val| opt_val.unwrap_or(0.0)))
             .collect();
 
-        let matrix = Matrix::new(&data, y.len(), all_feature_names.len() - 2);
+        println!("{:?}", data.len());
+        println!("{:?}", y.len());
+        println!("{:?}", group_counts_vec.len());
+
+        let num_cols = all_feature_names.len() - 2;
+
+        let matrix = Matrix::new(&data, y.len(), num_cols);
 
         let mut booster = UnivariateBooster::default()
             .set_objective(Objective::ListNetLoss)
