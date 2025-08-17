@@ -322,5 +322,37 @@ mod test {
         assert!(sum_grad(&objective_function, YHAT1) < sum_grad(&objective_function, YHAT2));
     }
 
-    // TODO: add test for ranking loss
+    static Y_RANK: &[f64] = &[1.0, 2.0, 3.0, 1.0, 2.0, 3.0];
+    static YHAT1_RANK: &[f64] = &[1.0, 2.0, 3.0, 1.0, 2.0, 3.0];
+    static YHAT2_RANK: &[f64] = &[3.0, 2.0, 1.0, 3.0, 2.0, 1.0];
+    static YHAT3_RANK: &[f64] = &[4.0, 5.0, 6.0, 4.0, 5.0, 6.0]; // NOTE: should be the
+                                                                 // same as YHAT1_RANK
+    static GROUP: &[u64] = &[3, 3];
+
+    fn sum_loss_rank(obj: &Arc<dyn crate::objective_functions::ObjectiveFunction>, yhat: &[f64]) -> f32 {
+        obj.loss(Y_RANK, yhat, None, Some(GROUP)).iter().copied().sum()
+    }
+
+    fn sum_grad_rank(obj: &Arc<dyn crate::objective_functions::ObjectiveFunction>, yhat: &[f64]) -> f32 {
+        let (g, _) = obj.gradient(Y_RANK, yhat, None, Some(GROUP));
+        g.iter().map(|x| x.abs()).sum()
+    }
+
+    #[test]
+    fn test_listnet_loss_and_grad() {
+        let objective_function = Objective::ListNetLoss.as_function();
+        let good_loss_sum = sum_loss_rank(&objective_function, YHAT1_RANK);
+        let bad_loss_sum = sum_loss_rank(&objective_function, YHAT2_RANK);
+        let also_good_loss_sum = sum_loss_rank(&objective_function, YHAT3_RANK);
+
+        let good_grad_sum = sum_grad_rank(&objective_function, YHAT1_RANK);
+        let bad_grad_sum = sum_grad_rank(&objective_function, YHAT2_RANK);
+        let also_good_grad_sum = sum_grad_rank(&objective_function, YHAT3_RANK);
+
+        assert!(good_loss_sum < bad_loss_sum);
+        assert!(good_grad_sum < bad_grad_sum);
+
+        assert!(good_loss_sum == also_good_loss_sum);
+        assert!(good_grad_sum == also_good_grad_sum);
+    }
 }
