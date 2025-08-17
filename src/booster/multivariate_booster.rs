@@ -148,9 +148,10 @@ impl MultivariateBooster {
         data: &Matrix<f64>,
         y: &Matrix<f64>,
         sample_weight: Option<&[f64]>,
+        group: Option<&[u64]>,
     ) -> Result<(), PerpetualError> {
         for i in 0..self.n_boosters {
-            let _ = self.boosters[i].fit(data, y.get_col(i), sample_weight);
+            let _ = self.boosters[i].fit(data, y.get_col(i), sample_weight, group);
         }
         Ok(())
     }
@@ -160,9 +161,10 @@ impl MultivariateBooster {
         data: &Matrix<f64>,
         y: &Matrix<f64>,
         sample_weight: Option<&[f64]>,
+        group: Option<&[u64]>,
     ) -> Result<(), PerpetualError> {
         for i in 0..self.n_boosters {
-            let _ = self.boosters[i].prune(data, y.get_col(i), sample_weight);
+            let _ = self.boosters[i].prune(data, y.get_col(i), sample_weight, group);
         }
         Ok(())
     }
@@ -530,7 +532,7 @@ mod multivariate_booster_test {
         println!("The number of boosters: {:?}", booster.get_boosters().len());
         assert!(booster.get_boosters().len() == n_classes);
 
-        booster.fit(&data, &y, None).unwrap();
+        booster.fit(&data, &y, None, None).unwrap();
 
         let probas = booster.predict_proba(&data, true);
 

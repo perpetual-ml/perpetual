@@ -1,4 +1,5 @@
 pub mod classification;
+pub mod ranking;
 pub mod regression;
 
 use crate::data::FloatData;
@@ -41,6 +42,22 @@ pub enum Metric {
     RootMeanSquaredLogError,
     RootMeanSquaredError,
     QuantileLoss,
+    NDCG { k: Option<u64> },
+}
+
+fn get_parse_error(s: &str) -> PerpetualError {
+    PerpetualError::ParseString(
+        s.to_string(),
+        "Metric".to_string(),
+        items_to_strings(vec![
+            "AUC",
+            "LogLoss",
+            "RootMeanSquaredLogError",
+            "RootMeanSquaredError",
+            "NDCG",
+            "NDCG@k",
+        ]),
+    )
 }
 
 impl FromStr for Metric {
@@ -52,17 +69,15 @@ impl FromStr for Metric {
             "LogLoss" => Ok(Metric::LogLoss),
             "RootMeanSquaredLogError" => Ok(Metric::RootMeanSquaredLogError),
             "RootMeanSquaredError" => Ok(Metric::RootMeanSquaredError),
+            "NDCG" => Ok(Metric::NDCG { k: None }),
 
-            _ => Err(PerpetualError::ParseString(
-                s.to_string(),
-                "Metric".to_string(),
-                items_to_strings(vec![
-                    "AUC",
-                    "LogLoss",
-                    "RootMeanSquaredLogError",
-                    "RootMeanSquaredError",
-                ]),
-            )),
+            _ if s.starts_with("NDCG@") => {
+                let k_str = &s["NDCG@".len()..];
+                let k = k_str.parse().map_err(|_| get_parse_error(s))?;
+                Ok(Metric::NDCG { k: Some(k) })
+            }
+
+            _ => Err(get_parse_error(s)),
         }
     }
 }
@@ -89,10 +104,23 @@ pub fn metric_callables(metric_type: &Metric) -> (MetricFn, bool) {
             regression::QuantileLossMetric::calculate_metric,
             regression::QuantileLossMetric::maximize(),
         ),
+
+        Metric::NDCG { k: _k } => {
+            // TODO: if you want this, you need to Box the function I think
+            //
+            // let metric = ranking::NDCGMetric::new(*k);
+            // (
+            //     move |y, yhat, w, a| metric.calculate_metric(y, yhat, w, a),
+            //     ranking::NDCGMetric::maximize(),
+            //  )
+            let _ = ranking::NDCGMetric::calculate_metric;
+            todo!()
+        }
     }
 }
 
 pub trait EvaluationMetric {
+    // TODO: Add group parameter here (or handle in a different way?)
     fn calculate_metric(y: &[f64], yhat: &[f64], sample_weight: &[f64], alpha: Option<f32>) -> f64;
     fn maximize() -> bool;
 }
@@ -100,6 +128,7 @@ pub trait EvaluationMetric {
 #[cfg(test)]
 mod tests {
     use crate::metrics::classification::*;
+    use crate::metrics::ranking::*;
     use crate::metrics::regression::*;
     use crate::utils::precision_round;
     #[test]

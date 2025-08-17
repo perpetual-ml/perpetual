@@ -160,7 +160,14 @@ impl UnivariateBooster {
     /// * `data` -  Either a Polars or Pandas DataFrame, or a 2 dimensional Numpy array.
     /// * `y` - Either a Polars or Pandas Series, or a 1 dimensional Numpy array.
     /// * `sample_weight` - Instance weights to use when training the model.
-    pub fn fit(&mut self, data: &Matrix<f64>, y: &[f64], sample_weight: Option<&[f64]>) -> Result<(), PerpetualError> {
+    /// * `group` - Group labels to use when training a model that uses a ranking objective.
+    pub fn fit(
+        &mut self,
+        data: &Matrix<f64>,
+        y: &[f64],
+        sample_weight: Option<&[f64]>,
+        group: Option<&[u64]>,
+    ) -> Result<(), PerpetualError> {
         let constraints_map = self
             .cfg
             .monotone_constraints
@@ -179,10 +186,10 @@ impl UnivariateBooster {
                 self.cfg.missing_node_treatment,
                 self.cfg.force_children_to_bound_parent,
             );
-            self.fit_trees(data, y, &splitter, sample_weight)?;
+            self.fit_trees(data, y, &splitter, sample_weight, group)?;
         } else {
             let splitter = MissingImputerSplitter::new(self.eta, self.cfg.allow_missing_splits, constraints_map);
-            self.fit_trees(data, y, &splitter, sample_weight)?;
+            self.fit_trees(data, y, &splitter, sample_weight, group)?;
         };
 
         Ok(())
@@ -194,6 +201,7 @@ impl UnivariateBooster {
         y: &[f64],
         splitter: &T,
         sample_weight: Option<&[f64]>,
+        group: Option<&[u64]>,
     ) -> Result<(), PerpetualError> {
         // initialize trees
         let start = Instant::now();
@@ -216,7 +224,7 @@ impl UnivariateBooster {
         if self.cfg.reset.unwrap_or(true) || self.trees.len() == 0 {
             self.cfg.reset;
             if self.base_score.is_nan() {
-                self.base_score = objective_fn.initial_value(y, sample_weight);
+                self.base_score = objective_fn.initial_value(y, sample_weight, group);
             }
             yhat = vec![self.base_score; y.len()];
         } else {
@@ -226,10 +234,10 @@ impl UnivariateBooster {
         // calculate gradient
         // and hessian
         // let (mut grad, mut hess) = gradient(y, &yhat, sample_weight);
-        let (mut grad, mut hess) = objective_fn.gradient(y, &yhat, sample_weight);
+        let (mut grad, mut hess) = objective_fn.gradient(y, &yhat, sample_weight, group);
 
-        let mut loss = objective_fn.loss(y, &yhat, sample_weight);
-        let loss_base = objective_fn.loss(y, &vec![self.base_score; y.len()], sample_weight);
+        let mut loss = objective_fn.loss(y, &yhat, sample_weight, group);
+        let loss_base = objective_fn.loss(y, &vec![self.base_score; y.len()], sample_weight, group);
         let loss_avg = loss_base.iter().sum::<f32>() / loss_base.len() as f32;
 
         let base = 10.0_f32;
@@ -367,6 +375,7 @@ impl UnivariateBooster {
                 //objective_fn,
                 &yhat,
                 sample_weight,
+                group,
                 is_const_hess,
                 &mut hist_tree,
                 self.cfg.categorical_features.as_ref(),
@@ -398,8 +407,8 @@ impl UnivariateBooster {
                 n_low_loss_rounds = 0;
             }
 
-            (grad, hess) = objective_fn.gradient(y, &yhat, sample_weight);
-            loss = objective_fn.loss(y, &yhat, sample_weight);
+            (grad, hess) = objective_fn.gradient(y, &yhat, sample_weight, group);
+            loss = objective_fn.loss(y, &yhat, sample_weight, group);
 
             if verbose {
                 info!(
@@ -562,7 +571,7 @@ mod univariate_booster_test {
 
         let mut booster = UnivariateBooster::default().set_budget(0.3);
 
-        booster.fit(&data, &y, None).unwrap();
+        booster.fit(&data, &y, None, None).unwrap();
         let preds = booster.predict(&data, false);
         let contribs = booster.predict_contributions(&data, ContributionsMethod::Average, false);
         assert_eq!(contribs.len(), (data.cols + 1) * data.rows);
@@ -587,7 +596,7 @@ mod univariate_booster_test {
             .set_max_bin(300)
             .set_budget(0.3);
 
-        booster.fit(&data, &y, None).unwrap();
+        booster.fit(&data, &y, None, None).unwrap();
         let preds = booster.predict(&data, false);
         let contribs = booster.predict_contributions(&data, ContributionsMethod::Average, false);
         assert_eq!(contribs.len(), (data.cols + 1) * data.rows);
@@ -613,7 +622,7 @@ mod univariate_booster_test {
             .set_base_score(0.5)
             .set_budget(0.3);
 
-        booster.fit(&data, &y, None).unwrap();
+        booster.fit(&data, &y, None, None).unwrap();
         let preds = booster.predict(&data, true);
 
         booster.save_booster("resources/model64.json").unwrap();
@@ -645,7 +654,7 @@ mod univariate_booster_test {
             .set_budget(0.1)
             .set_categorical_features(Some(cat_index));
 
-        booster.fit(&data, &y, None).unwrap();
+        booster.fit(&data, &y, None, None).unwrap();
 
         let file = fs::read_to_string("resources/titanic_train_y.csv").expect("Something went wrong reading the file");
         let y: Vec<f64> = file.lines().map(|x| x.parse::<f64>().unwrap()).collect();
@@ -668,6 +677,8 @@ mod univariate_booster_test {
 
         Ok(())
     }
+
+    // TODO: add test_gbm_ranking
 
     #[test]
     fn test_gbm_parallel() -> Result<(), Box<dyn Error>> {
@@ -770,8 +781,8 @@ mod univariate_booster_test {
             .set_num_threads(Some(2))
             .set_budget(0.1);
 
-        model1.fit(&matrix_test, &y_test, None)?;
-        model2.fit(&matrix_test, &y_test, None)?;
+        model1.fit(&matrix_test, &y_test, None, None)?;
+        model2.fit(&matrix_test, &y_test, None, None)?;
 
         let trees1 = model1.get_prediction_trees();
         let trees2 = model2.get_prediction_trees();
@@ -825,7 +836,7 @@ mod univariate_booster_test {
             .set_memory_limit(Some(0.00003))
             .set_budget(1.0);
 
-        booster.fit(&data, &y, None).unwrap();
+        booster.fit(&data, &y, None, None).unwrap();
 
         let split_features_test = vec![6, 6, 6, 1, 6, 1, 6, 9, 1, 6];
         let split_gains_test = vec![
@@ -874,7 +885,7 @@ mod univariate_booster_test {
             .set_max_bin(300)
             .set_base_score(0.5)
             .set_budget(0.3);
-        booster.fit(&data, &y, None).unwrap();
+        booster.fit(&data, &y, None, None).unwrap();
         let preds = booster.predict(&data, false);
         let contribs = booster.predict_contributions(&data, ContributionsMethod::Average, false);
         assert_eq!(contribs.len(), (data.cols + 1) * data.rows);
@@ -953,7 +964,7 @@ mod univariate_booster_test {
             .set_max_bin(10)
             .set_budget(0.1);
 
-        model.fit(&matrix_test, &y_test, None)?;
+        model.fit(&matrix_test, &y_test, None, None)?;
 
         let trees = model.get_prediction_trees();
         println!("trees = {}", trees.len());
@@ -1031,7 +1042,7 @@ mod univariate_booster_test {
             .set_max_bin(10)
             .set_budget(0.1);
 
-        model.fit(&matrix_test, &y_test, None)?;
+        model.fit(&matrix_test, &y_test, None, None)?;
 
         let trees = model.get_prediction_trees();
         println!("trees = {}", trees.len());
@@ -1046,7 +1057,7 @@ mod univariate_booster_test {
         #[derive(Clone)]
         struct CustomSquaredLoss;
         impl ObjectiveFunction for CustomSquaredLoss {
-            fn loss(&self, y: &[f64], yhat: &[f64], sample_weight: Option<&[f64]>) -> Vec<f32> {
+            fn loss(&self, y: &[f64], yhat: &[f64], sample_weight: Option<&[f64]>, _group: Option<&[u64]>) -> Vec<f32> {
                 y.iter()
                     .zip(yhat)
                     .enumerate()
@@ -1061,7 +1072,13 @@ mod univariate_booster_test {
                     .collect()
             }
 
-            fn gradient(&self, y: &[f64], yhat: &[f64], sample_weight: Option<&[f64]>) -> (Vec<f32>, Option<Vec<f32>>) {
+            fn gradient(
+                &self,
+                y: &[f64],
+                yhat: &[f64],
+                sample_weight: Option<&[f64]>,
+                _group: Option<&[u64]>,
+            ) -> (Vec<f32>, Option<Vec<f32>>) {
                 let grad: Vec<f32> = y
                     .iter()
                     .zip(yhat)
@@ -1078,7 +1095,7 @@ mod univariate_booster_test {
                 (grad, Some(hess))
             }
 
-            fn initial_value(&self, y: &[f64], sample_weight: Option<&[f64]>) -> f64 {
+            fn initial_value(&self, y: &[f64], sample_weight: Option<&[f64]>, _group: Option<&[u64]>) -> f64 {
                 match sample_weight {
                     Some(w) => {
                         let sw: f64 = w.iter().sum();
@@ -1160,8 +1177,8 @@ mod univariate_booster_test {
             .set_stopping_rounds(Some(1));
 
         // fit
-        booster.fit(&matrix, &y, None)?;
-        custom_booster.fit(&matrix, &y, None)?;
+        booster.fit(&matrix, &y, None, None)?;
+        custom_booster.fit(&matrix, &y, None, None)?;
 
         // // predict values
         let custom_prediction = custom_booster.predict(&matrix, false);

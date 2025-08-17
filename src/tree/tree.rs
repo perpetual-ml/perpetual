@@ -61,6 +61,7 @@ impl Tree {
         //loss: crate::objective_functions::LossFn,
         yhat: &[f64],
         sample_weight: Option<&[f64]>,
+        group: Option<&[u64]>,
         is_const_hess: bool,
         mut hist_tree: &mut [NodeHistogram],
         cat_index: Option<&HashSet<usize>>,
@@ -162,8 +163,17 @@ impl Tree {
                                 }
                                 None => None,
                             };
+                            // TODO: is the behaviour we want here?
+                            let gr: Vec<u64>;
+                            let g = match group {
+                                Some(group) => {
+                                    gr = vec![group[_i]];
+                                    Some(&gr[..])
+                                }
+                                None => None,
+                            };
                             let yhat_new = yhat[_i] + node.weight_value as f64;
-                            let loss_new = objective_function.loss(&[y[_i]], &[yhat_new], s_w)[0];
+                            let loss_new = objective_function.loss(&[y[_i]], &[yhat_new], s_w, g)[0];
                             loss_decr_avg -= loss_decr[_i] / index_length;
                             loss_decr[_i] = loss[_i] - loss_new;
                             loss_decr_avg += loss_decr[_i] / index_length;
@@ -367,8 +377,8 @@ mod tests {
         let file = fs::read_to_string("resources/performance.csv").expect("Something went wrong reading the file");
         let y: Vec<f64> = file.lines().map(|x| x.parse::<f64>().unwrap()).collect();
         let yhat = vec![0.5; y.len()];
-        let (mut g, mut h) = objective_function.gradient(&y, &yhat, None);
-        let loss = objective_function.loss(&y, &yhat, None);
+        let (mut g, mut h) = objective_function.gradient(&y, &yhat, None, None);
+        let loss = objective_function.loss(&y, &yhat, None, None);
 
         let data = Matrix::new(&data_vec, 891, 5);
         let splitter = MissingImputerSplitter::new(0.3, true, ConstraintMap::new());
@@ -409,6 +419,7 @@ mod tests {
             &y,
             //loss_fn.clone(),
             &yhat,
+            None,
             None,
             is_const_hess,
             &mut hist_tree,
@@ -464,8 +475,8 @@ mod tests {
         let file = fs::read_to_string("resources/performance.csv").expect("Something went wrong reading the file");
         let y: Vec<f64> = file.lines().map(|x| x.parse::<f64>().unwrap()).collect();
         let yhat = vec![0.5; y.len()];
-        let (mut g, mut h) = objective_function.gradient(&y, &yhat, None);
-        let loss = objective_function.loss(&y, &yhat, None);
+        let (mut g, mut h) = objective_function.gradient(&y, &yhat, None, None);
+        let loss = objective_function.loss(&y, &yhat, None, None);
         let is_const_hess = h.is_none();
         println!("GRADIENT -- {:?}", g);
 
@@ -510,6 +521,7 @@ mod tests {
             &y,
             //loss_fn.clone(),
             &yhat,
+            None,
             None,
             is_const_hess,
             &mut hist_tree,
@@ -563,9 +575,9 @@ mod tests {
         let file = fs::read_to_string("resources/performance.csv").expect("Something went wrong reading the file");
         let y: Vec<f64> = file.lines().map(|x| x.parse::<f64>().unwrap()).collect();
         let yhat = vec![0.5; y.len()];
-        let (mut g, mut h) = objective_function.gradient(&y, &yhat, None);
+        let (mut g, mut h) = objective_function.gradient(&y, &yhat, None, None);
         let is_const_hess = h.is_none();
-        let loss = objective_function.loss(&y, &yhat, None);
+        let loss = objective_function.loss(&y, &yhat, None, None);
 
         let data = Matrix::new(&data_vec, 891, 5);
         let splitter = MissingImputerSplitter::new(0.3, true, ConstraintMap::new());
@@ -606,6 +618,7 @@ mod tests {
             &y,
             //loss_fn.clone(),
             &yhat,
+            None,
             None,
             is_const_hess,
             &mut hist_tree,
@@ -669,9 +682,9 @@ mod tests {
 
         let y_avg = y.iter().sum::<f64>() / y.len() as f64;
         let yhat = vec![y_avg; y.len()];
-        let (mut grad, mut hess) = objective_function.gradient(&y, &yhat, None);
+        let (mut grad, mut hess) = objective_function.gradient(&y, &yhat, None, None);
         let is_const_hess = hess.is_none();
-        let loss = objective_function.loss(&y, &yhat, None);
+        let loss = objective_function.loss(&y, &yhat, None, None);
 
         let splitter = MissingImputerSplitter::new(0.3, true, ConstraintMap::new());
 
@@ -713,6 +726,7 @@ mod tests {
             &y,
             //loss_fn.clone(),
             &yhat,
+            None,
             None,
             false,
             &mut hist_tree,

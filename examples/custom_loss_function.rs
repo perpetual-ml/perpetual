@@ -27,7 +27,7 @@ use perpetual::{Matrix, UnivariateBooster};
 struct CustomSquaredLoss;
 impl perpetual::objective_functions::ObjectiveFunction for CustomSquaredLoss {
     #[inline]
-    fn loss(&self, y: &[f64], yhat: &[f64], sample_weight: Option<&[f64]>) -> Vec<f32> {
+    fn loss(&self, y: &[f64], yhat: &[f64], sample_weight: Option<&[f64]>, _group: Option<&[u64]>) -> Vec<f32> {
         match sample_weight {
             Some(sample_weight) => y
                 .iter()
@@ -50,7 +50,13 @@ impl perpetual::objective_functions::ObjectiveFunction for CustomSquaredLoss {
     }
 
     #[inline]
-    fn gradient(&self, y: &[f64], yhat: &[f64], sample_weight: Option<&[f64]>) -> (Vec<f32>, Option<Vec<f32>>) {
+    fn gradient(
+        &self,
+        y: &[f64],
+        yhat: &[f64],
+        sample_weight: Option<&[f64]>,
+        _group: Option<&[u64]>,
+    ) -> (Vec<f32>, Option<Vec<f32>>) {
         match sample_weight {
             Some(sample_weight) => {
                 let (g, h) = y
@@ -68,7 +74,7 @@ impl perpetual::objective_functions::ObjectiveFunction for CustomSquaredLoss {
         }
     }
 
-    fn initial_value(&self, y: &[f64], sample_weight: Option<&[f64]>) -> f64 {
+    fn initial_value(&self, y: &[f64], sample_weight: Option<&[f64]>, _group: Option<&[u64]>) -> f64 {
         if let Some(w) = sample_weight {
             let sum_w: f64 = w.iter().sum();
             y.iter().zip(w).map(|(yi, wi)| yi * wi).sum::<f64>() / sum_w
@@ -148,7 +154,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     //-------------------//
     // 3. Fit and report //
     //-------------------//
-    booster.fit(&matrix, &y, None)?;
+    booster.fit(&matrix, &y, None, None)?;
 
     let n_trees = booster.get_prediction_trees().len();
     println!("Model trained with {n_trees} trees (budget = {})", booster.cfg.budget);

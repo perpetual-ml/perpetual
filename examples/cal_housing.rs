@@ -124,7 +124,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         .set_budget(*budget);
 
     let now = SystemTime::now();
-    model.fit(&matrix_train, &y_train, None)?;
+    model.fit(&matrix_train, &y_train, None, None)?;
     println!("now.elapsed: {:?}", now.elapsed().unwrap().as_secs_f32());
 
     let trees = model.get_prediction_trees();
