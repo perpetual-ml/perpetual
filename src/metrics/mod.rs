@@ -4,11 +4,12 @@ pub mod regression;
 
 use crate::data::FloatData;
 use crate::errors::PerpetualError;
+use crate::metrics::ranking::GainScheme;
 use crate::utils::items_to_strings;
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 
-pub type MetricFn = fn(&[f64], &[f64], &[f64], Option<f32>) -> f64;
+pub type MetricFn = fn(&[f64], &[f64], &[f64], &[u64], Option<f32>) -> f64;
 
 /// Compare to metric values, determining if b is better.
 /// If one of them is NaN favor the non NaN value.
@@ -42,7 +43,7 @@ pub enum Metric {
     RootMeanSquaredLogError,
     RootMeanSquaredError,
     QuantileLoss,
-    NDCG { k: Option<u64> },
+    NDCG { k: Option<u64>, gain: GainScheme },
 }
 
 fn get_parse_error(s: &str) -> PerpetualError {
@@ -69,12 +70,20 @@ impl FromStr for Metric {
             "LogLoss" => Ok(Metric::LogLoss),
             "RootMeanSquaredLogError" => Ok(Metric::RootMeanSquaredLogError),
             "RootMeanSquaredError" => Ok(Metric::RootMeanSquaredError),
-            "NDCG" => Ok(Metric::NDCG { k: None }),
+
+            // TODO: also parse gain scheme?
+            "NDCG" => Ok(Metric::NDCG {
+                k: None,
+                gain: GainScheme::Burges,
+            }),
 
             _ if s.starts_with("NDCG@") => {
                 let k_str = &s["NDCG@".len()..];
                 let k = k_str.parse().map_err(|_| get_parse_error(s))?;
-                Ok(Metric::NDCG { k: Some(k) })
+                Ok(Metric::NDCG {
+                    k: Some(k),
+                    gain: GainScheme::Burges,
+                })
             }
 
             _ => Err(get_parse_error(s)),
@@ -105,23 +114,12 @@ pub fn metric_callables(metric_type: &Metric) -> (MetricFn, bool) {
             regression::QuantileLossMetric::maximize(),
         ),
 
-        Metric::NDCG { k: _k } => {
-            // TODO: if you want this, you need to Box the function I think
-            //
-            // let metric = ranking::NDCGMetric::new(*k);
-            // (
-            //     move |y, yhat, w, a| metric.calculate_metric(y, yhat, w, a),
-            //     ranking::NDCGMetric::maximize(),
-            //  )
-            let _ = ranking::NDCGMetric::calculate_metric;
-            todo!()
-        }
+        Metric::NDCG { k: _k, gain: _gain } => (ranking::NDCGMetric::calculate_metric, ranking::NDCGMetric::maximize()),
     }
 }
 
 pub trait EvaluationMetric {
-    // TODO: Add group parameter here (or handle in a different way?)
-    fn calculate_metric(y: &[f64], yhat: &[f64], sample_weight: &[f64], alpha: Option<f32>) -> f64;
+    fn calculate_metric(y: &[f64], yhat: &[f64], sample_weight: &[f64], group: &[u64], alpha: Option<f32>) -> f64;
     fn maximize() -> bool;
 }
 
@@ -204,5 +202,65 @@ mod tests {
         let yhat: Vec<f64> = vec![0.25, 0.75];
         let auc_score = roc_auc_score(&y, &yhat, &sample_weight);
         assert!(auc_score.is_nan());
+    }
+
+    #[test]
+    fn test_ndcg_perfect_ranking() {
+        let y = vec![3.0, 2.0, 1.0, 0.0];
+        let yhat = vec![1.0, 0.8, 0.6, 0.4];
+        let weights = vec![1.0; 4];
+        let group = vec![4];
+
+        let ndcg = ndcg_at_k_metric(&y, &yhat, &weights, &group, None, &GainScheme::Burges);
+        assert!((ndcg - 1.0).abs() < 1e-10);
+
+        let ndcg = ndcg_at_k_metric(&y, &yhat, &weights, &group, None, &GainScheme::Jarvelin);
+        assert!((ndcg - 1.0).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_ndcg_reversed_ranking() {
+        let y = vec![3.0, 2.0, 1.0, 0.0];
+        let yhat = vec![0.4, 0.6, 0.8, 1.0];
+        let weights = vec![1.0; 4];
+        let group = vec![4];
+
+        let ndcg = ndcg_at_k_metric(&y, &yhat, &weights, &group, None, &GainScheme::Burges);
+        assert!(ndcg < 1.0 && ndcg >= 0.0);
+
+        let ndcg = ndcg_at_k_metric(&y, &yhat, &weights, &group, None, &GainScheme::Jarvelin);
+        assert!(ndcg < 1.0 && ndcg >= 0.0);
+    }
+
+    #[test]
+    fn test_ndcg_at_k() {
+        let y = vec![3.0, 2.0, 1.0, 0.0, 1.0];
+        let yhat = vec![1.0, 0.8, 0.6, 0.4, 0.2];
+        let weights = vec![1.0; 5];
+        let group = vec![5];
+
+        let ndcg_full = ndcg_at_k_metric(&y, &yhat, &weights, &group, None, &GainScheme::Burges);
+        let ndcg_at_3 = ndcg_at_k_metric(&y, &yhat, &weights, &group, Some(3), &GainScheme::Burges);
+
+        assert!((ndcg_full - ndcg_at_3).abs() > 1e-10);
+
+        let ndcg_full = ndcg_at_k_metric(&y, &yhat, &weights, &group, None, &GainScheme::Jarvelin);
+        let ndcg_at_3 = ndcg_at_k_metric(&y, &yhat, &weights, &group, Some(3), &GainScheme::Jarvelin);
+
+        assert!((ndcg_full - ndcg_at_3).abs() > 1e-10);
+    }
+
+    #[test]
+    fn test_multiple_groups() {
+        let y = vec![2.0, 1.0, 3.0, 1.0, 0.0];
+        let yhat = vec![0.8, 0.6, 1.0, 0.4, 0.2];
+        let weights = vec![1.0; 5];
+        let group = vec![2, 3];
+
+        let ndcg = ndcg_at_k_metric(&y, &yhat, &weights, &group, None, &GainScheme::Burges);
+        assert!(ndcg >= 0.0 && ndcg <= 1.0);
+
+        let ndcg = ndcg_at_k_metric(&y, &yhat, &weights, &group, None, &GainScheme::Jarvelin);
+        assert!(ndcg >= 0.0 && ndcg <= 1.0);
     }
 }

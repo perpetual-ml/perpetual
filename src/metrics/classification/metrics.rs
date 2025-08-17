@@ -2,7 +2,7 @@ use crate::metrics::*;
 
 pub struct LogLossMetric {}
 impl EvaluationMetric for LogLossMetric {
-    fn calculate_metric(y: &[f64], yhat: &[f64], sample_weight: &[f64], _alpha: Option<f32>) -> f64 {
+    fn calculate_metric(y: &[f64], yhat: &[f64], sample_weight: &[f64], group: &[u64], _alpha: Option<f32>) -> f64 {
         log_loss(y, yhat, sample_weight)
     }
     fn maximize() -> bool {
@@ -12,7 +12,7 @@ impl EvaluationMetric for LogLossMetric {
 
 pub struct AUCMetric {}
 impl EvaluationMetric for AUCMetric {
-    fn calculate_metric(y: &[f64], yhat: &[f64], sample_weight: &[f64], _alpha: Option<f32>) -> f64 {
+    fn calculate_metric(y: &[f64], yhat: &[f64], sample_weight: &[f64], group: &[u64], _alpha: Option<f32>) -> f64 {
         roc_auc_score(y, yhat, sample_weight)
     }
     fn maximize() -> bool {

@@ -2,7 +2,7 @@ use crate::metrics::*;
 
 pub struct QuantileLossMetric {}
 impl EvaluationMetric for QuantileLossMetric {
-    fn calculate_metric(y: &[f64], yhat: &[f64], sample_weight: &[f64], alpha: Option<f32>) -> f64 {
+    fn calculate_metric(y: &[f64], yhat: &[f64], sample_weight: &[f64], _group: &[u64], alpha: Option<f32>) -> f64 {
         quantile_loss(y, yhat, sample_weight, alpha)
     }
     fn maximize() -> bool {
@@ -12,7 +12,7 @@ impl EvaluationMetric for QuantileLossMetric {
 
 pub struct RootMeanSquaredLogErrorMetric {}
 impl EvaluationMetric for RootMeanSquaredLogErrorMetric {
-    fn calculate_metric(y: &[f64], yhat: &[f64], sample_weight: &[f64], _alpha: Option<f32>) -> f64 {
+    fn calculate_metric(y: &[f64], yhat: &[f64], sample_weight: &[f64], _group: &[u64], _alpha: Option<f32>) -> f64 {
         root_mean_squared_log_error(y, yhat, sample_weight)
     }
     fn maximize() -> bool {
@@ -22,7 +22,7 @@ impl EvaluationMetric for RootMeanSquaredLogErrorMetric {
 
 pub struct RootMeanSquaredErrorMetric {}
 impl EvaluationMetric for RootMeanSquaredErrorMetric {
-    fn calculate_metric(y: &[f64], yhat: &[f64], sample_weight: &[f64], _alpha: Option<f32>) -> f64 {
+    fn calculate_metric(y: &[f64], yhat: &[f64], sample_weight: &[f64], _group: &[u64], _alpha: Option<f32>) -> f64 {
         root_mean_squared_error(y, yhat, sample_weight)
     }
     fn maximize() -> bool {
