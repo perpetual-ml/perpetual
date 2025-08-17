@@ -553,7 +553,7 @@ mod univariate_booster_test {
     use crate::{Matrix, UnivariateBooster};
     use approx::assert_relative_eq;
     use polars::io::SerReader;
-    use polars::prelude::{CsvReadOptions, DataType};
+    use polars::prelude::*;
     use std::collections::HashSet;
     use std::error::Error;
     use std::fs;
@@ -1185,6 +1185,114 @@ mod univariate_booster_test {
         let booster_prediction = booster.predict(&matrix, false);
 
         assert_relative_eq!(custom_prediction[..5], booster_prediction[..5], max_relative = 1e-6);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_listnet_loss() -> Result<(), Box<dyn std::error::Error>> {
+        use polars::prelude::*;
+        use std::collections::HashMap;
+
+        // Read CSV using Polars
+        let features = CsvReadOptions::default()
+            .with_has_header(true)
+            .with_infer_schema_length(Some(10000))
+            .try_into_reader_with_file_path(Some("resources/goodreads.csv".into()))?
+            .finish()?;
+
+        let y: Vec<f64> = CsvReadOptions::default()
+            .with_has_header(true)
+            .with_infer_schema_length(Some(10000))
+            .try_into_reader_with_file_path(Some("resources/goodreads_y.csv".into()))?
+            .finish()?
+            .column("rank")?
+            .cast(&DataType::Float64)?
+            .f64()?
+            .into_iter()
+            .map(|v| v.unwrap_or(f64::NAN))
+            .collect();
+
+        let mut group_map: HashMap<(i64, String), u64> = HashMap::new();
+        let mut current_group_id = 0;
+
+        let years = features.column("year")?.i64()?;
+
+        let categories = features.column("category")?.str()?;
+
+        let groups: Vec<u64> = years
+            .into_iter()
+            .zip(categories.into_iter())
+            .map(|(year, category)| {
+                let key = (year.unwrap(), category.unwrap().to_string());
+                *group_map.entry(key).or_insert_with(|| {
+                    let new_id = current_group_id;
+                    current_group_id += 1;
+                    new_id
+                })
+            })
+            .collect();
+
+        // Count items per group
+        let mut group_counts: HashMap<u64, u64> = HashMap::new();
+        for group_id in &groups {
+            *group_counts.entry(*group_id).or_default() += 1;
+        }
+
+        let group_counts_vec: Vec<u64> = (0..current_group_id)
+            .map(|id| group_counts.get(&id).cloned().unwrap_or(0))
+            .collect();
+
+        let all_feature_names = [
+            "year".to_string(),
+            "category".to_string(),
+            "avg_rating".to_string(),
+            "pages".to_string(),
+            "publisher".to_string(),
+            "published".to_string(),
+            "5stars".to_string(),
+            "4stars".to_string(),
+            "3stars".to_string(),
+            "2stars".to_string(),
+            "1stars".to_string(),
+            "ratings".to_string(),
+        ];
+
+        let cols_to_drop = ["year".to_string(), "category".to_string(), "variable".to_string()];
+
+        // Unpivot features
+        let id_vars: Vec<&str> = Vec::new();
+        let mdf = features
+            .clone()
+            .unpivot(&id_vars, &all_feature_names)?
+            .drop_many(&cols_to_drop);
+
+        let data: Vec<f64> = mdf
+            .select_at_idx(1)
+            .expect("Invalid column")
+            .f64()?
+            .into_iter()
+            .map(|v| v.unwrap_or(f64::NAN))
+            .collect();
+
+        let matrix = Matrix::new(&data, y.len(), all_feature_names.len() - 2);
+
+        let mut booster = UnivariateBooster::default()
+            .set_objective(Objective::ListNetLoss)
+            .set_budget(0.1);
+
+        let objective_fn = booster.cfg.objective.as_function();
+        let initial_loss = objective_fn.initial_value(&y, None, Some(&group_counts_vec));
+
+        booster.fit(&matrix, &y, None, Some(&group_counts_vec))?;
+
+        let final_yhat = booster.predict(&matrix, true);
+        let final_loss: f32 = objective_fn
+            .loss(&y, &final_yhat, None, Some(&group_counts_vec))
+            .iter()
+            .sum();
+
+        assert!(final_loss < initial_loss as f32);
 
         Ok(())
     }
