@@ -19,7 +19,7 @@ fn compute_softmax_inplace(input: &[f64], output: &mut [f32]) {
     let max_val = input.iter().fold(f64::NEG_INFINITY, |a, &b| a.max(b));
     let mut sum = 0.0f32;
 
-    // First pass: compute exp and suxp trick?
+    // First pass: compute exp and sum
     for (i, &val) in input.iter().enumerate() {
         let exp_val = ((val - max_val) as f32).exp();
         output[i] = exp_val;
