@@ -1,7 +1,7 @@
 use crate::metrics::*;
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Copy, Deserialize, Serialize)]
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, Eq, PartialEq)]
 pub enum GainScheme {
     Jarvelin,
     Burges,
@@ -147,6 +147,7 @@ pub fn ndcg_at_k_metric(
     if total_weight > 0.0 {
         total_ndcg / total_weight
     } else {
+        // TODO: I dont know what would be logical/optimal here
         0.0
     }
 }

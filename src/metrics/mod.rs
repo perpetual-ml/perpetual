@@ -114,6 +114,7 @@ pub fn metric_callables(metric_type: &Metric) -> (MetricFn, bool) {
             regression::QuantileLossMetric::maximize(),
         ),
 
+        // TODO: decide if and/or how to do this
         Metric::NDCG { k: _k, gain: _gain } => (ranking::NDCGMetric::calculate_metric, ranking::NDCGMetric::maximize()),
     }
 }
@@ -125,10 +126,12 @@ pub trait EvaluationMetric {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
     use crate::metrics::classification::*;
     use crate::metrics::ranking::*;
     use crate::metrics::regression::*;
     use crate::utils::precision_round;
+
     #[test]
     fn test_root_mean_squared_log_error() {
         let y = vec![1., 3., 4., 5., 2., 4., 6.];
@@ -262,5 +265,41 @@ mod tests {
 
         let ndcg = ndcg_at_k_metric(&y, &yhat, &weights, &group, None, &GainScheme::Jarvelin);
         assert!(ndcg >= 0.0 && ndcg <= 1.0);
+    }
+
+    #[test]
+    fn test_ndcg_parsing_no_k() {
+        let metric = Metric::from_str("NDCG").unwrap();
+        match metric {
+            Metric::NDCG { k, gain } => {
+                assert_eq!(k, None);
+                assert_eq!(gain, GainScheme::Burges);
+            }
+            _ => panic!("Expected Metric::NDCG"),
+        }
+    }
+
+    #[test]
+    fn test_ndcg_parsing_with_k() {
+        let metric = Metric::from_str("NDCG@10").unwrap();
+        match metric {
+            Metric::NDCG { k, gain } => {
+                assert_eq!(k, Some(10));
+                assert_eq!(gain, GainScheme::Burges);
+            }
+            _ => panic!("Expected Metric::NDCG"),
+        }
+    }
+
+    #[test]
+    fn test_ndcg_parsing_invalid_k() {
+        let result = Metric::from_str("NDCG@foo");
+        assert!(result.is_err(), "Expected error for invalid k");
+    }
+
+    #[test]
+    fn test_ndcg_parsing_invalid_format() {
+        let result = Metric::from_str("NDCG@@10");
+        assert!(result.is_err(), "Expected error for invalid format");
     }
 }
