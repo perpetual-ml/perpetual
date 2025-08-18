@@ -1195,34 +1195,20 @@ mod univariate_booster_test {
         use std::collections::HashMap;
 
         // Read CSV using Polars
-        let features = CsvReadOptions::default()
+        let data = CsvReadOptions::default()
             .with_has_header(true)
             .with_infer_schema_length(Some(10000))
             .try_into_reader_with_file_path(Some("resources/goodreads.csv".into()))?
             .finish()?;
 
-        println!("{:?}", features.head(Some(5)));
-
-        let y: Vec<f64> = CsvReadOptions::default()
-            .with_has_header(true)
-            .with_infer_schema_length(Some(10000))
-            .try_into_reader_with_file_path(Some("resources/goodreads_y.csv".into()))?
-            .finish()?
-            .column("rank")?
-            .cast(&DataType::Float64)?
-            .f64()?
-            .into_iter()
-            .map(|v| v.unwrap_or(f64::NAN))
-            .collect();
-
-        println!("{:?}", y.len());
+        println!("{:?}", data.head(Some(5)));
 
         let mut group_map: HashMap<(i64, String), u64> = HashMap::new();
         let mut current_group_id = 0;
 
-        let years = features.column("year")?.i64()?;
+        let years = data.column("year")?.i64()?;
 
-        let categories = features.column("category")?.str()?;
+        let categories = data.column("category")?.str()?;
 
         let groups: Vec<u64> = years
             .into_iter()
@@ -1264,38 +1250,53 @@ mod univariate_booster_test {
             "2stars".to_string(),
             "1stars".to_string(),
             "ratings".to_string(),
+            "rank".to_string(),
         ];
+
+        let id_vars: Vec<&str> = vec!["year", "category"];
+        let mdf = data.clone().unpivot(&id_vars, &all_feature_names)?;
+
+        println!("{:?}", mdf.head(Some(5)));
 
         let cols_to_drop = [
             "year".to_string(),
             "category".to_string(),
             "variable".to_string(),
             "value".to_string(),
+            "rank".to_string(),
         ];
-
-        // Unpivot features
-        let id_vars: Vec<&str> = vec!["year", "category"];
-        let mdf = features
-            .clone()
-            .unpivot(&id_vars, &all_feature_names)?
-            .drop_many(&cols_to_drop);
 
         println!("{:?}", mdf.head(Some(5)));
 
-        let data: Vec<f64> = mdf
+        let features = mdf.drop_many(&cols_to_drop);
+
+        println!("{:?}", features.head(Some(5)));
+
+        let y: Vec<f64> = mdf
+            .column("rank")?
+            .i64()?
+            .into_iter()
+            .map(|v| v.unwrap())
+            .map(|v| v as f64)
+            .collect();
+
+        let flat_features: Vec<f64> = features
             .get_columns()
             .iter()
             .filter_map(|col| if col.dtype().is_numeric() { col.f64().ok() } else { None })
             .flat_map(|ca| ca.into_iter().map(|opt_val| opt_val.unwrap_or(0.0)))
             .collect();
 
-        println!("{:?}", data.len());
-        println!("{:?}", y.len());
-        println!("{:?}", group_counts_vec.len());
+        println!("Number of features: {:?}", flat_features.len());
+        println!("Number of y: {:?}", y.len());
+        println!("Number of groups: {:?}", group_counts_vec.len());
+        println!("Sum of groups: {:?}", group_counts_vec.iter().sum::<u64>());
 
-        let num_cols = all_feature_names.len() - 2;
+        let num_cols = all_feature_names.len() - 3;
 
-        let matrix = Matrix::new(&data, y.len(), num_cols);
+        println!("Number of columns: {:?}", num_cols);
+
+        let matrix = Matrix::new(&flat_features, y.len(), num_cols);
 
         let mut booster = UnivariateBooster::default()
             .set_objective(Objective::ListNetLoss)
