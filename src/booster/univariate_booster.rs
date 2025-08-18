@@ -1238,12 +1238,10 @@ mod univariate_booster_test {
         println!("{:?}", group_counts_vec.len());
 
         let all_feature_names = [
-            "year".to_string(),
-            "category".to_string(),
             "avg_rating".to_string(),
             "pages".to_string(),
-            "publisher".to_string(),
-            "published".to_string(),
+            // "publisher".to_string(),
+            // "published".to_string(),
             "5stars".to_string(),
             "4stars".to_string(),
             "3stars".to_string(),
@@ -1253,24 +1251,19 @@ mod univariate_booster_test {
             "rank".to_string(),
         ];
 
-        let id_vars: Vec<&str> = vec!["year", "category"];
-        let mdf = data.clone().unpivot(&id_vars, &all_feature_names)?;
+        let mdf = data.clone().select(all_feature_names.clone())?;
 
         println!("{:?}", mdf.head(Some(5)));
 
-        let cols_to_drop = [
-            "year".to_string(),
-            "category".to_string(),
-            "variable".to_string(),
-            "value".to_string(),
-            "rank".to_string(),
-        ];
+        let cols_to_drop = ["rank".to_string()];
 
         println!("{:?}", mdf.head(Some(5)));
 
         let features = mdf.drop_many(&cols_to_drop);
 
         println!("{:?}", features.head(Some(5)));
+
+        println!("Shape of features: {:?}, {:?}", features.height(), features.width());
 
         let y: Vec<f64> = mdf
             .column("rank")?
@@ -1280,11 +1273,29 @@ mod univariate_booster_test {
             .map(|v| v as f64)
             .collect();
 
-        let flat_features: Vec<f64> = features
+        println!("Shape of y: {}", y.len());
+
+        let numeric_columns: Vec<Vec<f64>> = features
             .get_columns()
             .iter()
-            .filter_map(|col| if col.dtype().is_numeric() { col.f64().ok() } else { None })
-            .flat_map(|ca| ca.into_iter().map(|opt_val| opt_val.unwrap_or(0.0)))
+            .filter_map(|col| {
+                if col.dtype().is_numeric() {
+                    // Try f64 first, then i64
+                    if let Ok(f64_col) = col.f64() {
+                        Some(f64_col.into_iter().map(|v| v.unwrap_or(0.0)).collect())
+                    } else if let Ok(i64_col) = col.i64() {
+                        Some(i64_col.into_iter().map(|v| v.unwrap_or(0) as f64).collect())
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        let flat_features: Vec<f64> = (0..features.height())
+            .flat_map(|row_idx| numeric_columns.iter().map(move |col| col[row_idx]))
             .collect();
 
         println!("Number of features: {:?}", flat_features.len());
@@ -1292,7 +1303,7 @@ mod univariate_booster_test {
         println!("Number of groups: {:?}", group_counts_vec.len());
         println!("Sum of groups: {:?}", group_counts_vec.iter().sum::<u64>());
 
-        let num_cols = all_feature_names.len() - 3;
+        let num_cols = all_feature_names.len() - 1;
 
         println!("Number of columns: {:?}", num_cols);
 
