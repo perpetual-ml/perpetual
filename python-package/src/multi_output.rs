@@ -1,9 +1,9 @@
 use crate::utils::int_map_to_constraint_map;
 use crate::utils::to_value_error;
 use numpy::{IntoPyArray, PyArray1, PyReadonlyArray1};
+use perpetual_rs::booster::config::BoosterIO;
 use perpetual_rs::booster::config::MissingNodeTreatment;
 use perpetual_rs::booster::multivariate_booster::MultivariateBooster as CrateMultiOutputBooster;
-use perpetual_rs::booster::config::BoosterIO;
 use perpetual_rs::constraints::Constraint;
 use perpetual_rs::data::Matrix;
 use perpetual_rs::objective_functions::Objective;
@@ -228,6 +228,7 @@ impl MultiOutputBooster {
         cols: usize,
         y: PyReadonlyArray1<f64>,
         sample_weight: Option<PyReadonlyArray1<f64>>,
+        group: Option<PyReadonlyArray1<u64>>,
     ) -> PyResult<()> {
         let flat_data = flat_data.as_slice()?;
         let data = Matrix::new(flat_data, rows, cols);
@@ -242,8 +243,15 @@ impl MultiOutputBooster {
             }
             None => None,
         };
+        let group_ = match group.as_ref() {
+            Some(gr) => {
+                let gr_slice = gr.as_slice()?;
+                Some(gr_slice)
+            }
+            None => None,
+        };
 
-        match self.booster.fit(&data, &y_data, sample_weight_) {
+        match self.booster.fit(&data, &y_data, sample_weight_, group_) {
             Ok(m) => Ok(m),
             Err(e) => Err(PyValueError::new_err(e.to_string())),
         }?;
@@ -258,6 +266,7 @@ impl MultiOutputBooster {
         cols: usize,
         y: PyReadonlyArray1<f64>,
         sample_weight: Option<PyReadonlyArray1<f64>>,
+        group: Option<PyReadonlyArray1<u64>>,
     ) -> PyResult<()> {
         let flat_data = flat_data.as_slice()?;
         let data = Matrix::new(flat_data, rows, cols);
@@ -272,8 +281,15 @@ impl MultiOutputBooster {
             }
             None => None,
         };
+        let group_ = match group.as_ref() {
+            Some(gr) => {
+                let gr_slice = gr.as_slice()?;
+                Some(gr_slice)
+            }
+            None => None,
+        };
 
-        match self.booster.prune(&data, &y_data, sample_weight_) {
+        match self.booster.prune(&data, &y_data, sample_weight_, group_) {
             Ok(m) => Ok(m),
             Err(e) => Err(PyValueError::new_err(e.to_string())),
         }?;
@@ -380,7 +396,8 @@ impl MultiOutputBooster {
         ))?;
         let monotone_constraints_: HashMap<usize, i8> = self
             .booster
-            .cfg.monotone_constraints
+            .cfg
+            .monotone_constraints
             .as_ref()
             .unwrap_or(&HashMap::new())
             .iter()
@@ -397,7 +414,10 @@ impl MultiOutputBooster {
         let key_vals: Vec<(&str, PyObject)> = vec![
             ("objective", objective_.to_object(py)),
             ("num_threads", self.booster.cfg.num_threads.to_object(py)),
-            ("allow_missing_splits", self.booster.cfg.allow_missing_splits.to_object(py)),
+            (
+                "allow_missing_splits",
+                self.booster.cfg.allow_missing_splits.to_object(py),
+            ),
             ("monotone_constraints", monotone_constraints_.to_object(py)),
             ("missing", self.booster.cfg.missing.to_object(py)),
             (
@@ -416,7 +436,10 @@ impl MultiOutputBooster {
             ),
             ("quantile", self.booster.cfg.quantile.to_object(py)),
             ("reset", self.booster.cfg.reset.to_object(py)),
-            ("categorical_features", self.booster.cfg.categorical_features.to_object(py)),
+            (
+                "categorical_features",
+                self.booster.cfg.categorical_features.to_object(py),
+            ),
             ("timeout", self.booster.cfg.timeout.to_object(py)),
             ("iteration_limit", self.booster.cfg.iteration_limit.to_object(py)),
             ("memory_limit", self.booster.cfg.memory_limit.to_object(py)),
