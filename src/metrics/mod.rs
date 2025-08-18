@@ -4,7 +4,7 @@ pub mod regression;
 
 use crate::data::FloatData;
 use crate::errors::PerpetualError;
-use crate::metrics::ranking::GainScheme;
+pub use crate::metrics::ranking::GainScheme;
 use crate::utils::items_to_strings;
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;

@@ -546,7 +546,7 @@ impl UnivariateBooster {
 mod univariate_booster_test {
 
     use crate::booster::config::*;
-    use crate::metrics::Metric;
+    use crate::metrics::{ranking::ndcg_at_k_metric, GainScheme, Metric};
     use crate::objective_functions::Objective;
     use crate::objective_functions::ObjectiveFunction;
     use crate::utils::between;
@@ -554,6 +554,8 @@ mod univariate_booster_test {
     use approx::assert_relative_eq;
     use polars::io::SerReader;
     use polars::prelude::*;
+    use rand::Rng;
+    use std::collections::HashMap;
     use std::collections::HashSet;
     use std::error::Error;
     use std::fs;
@@ -677,8 +679,6 @@ mod univariate_booster_test {
 
         Ok(())
     }
-
-    // TODO: add test_gbm_ranking
 
     #[test]
     fn test_gbm_parallel() -> Result<(), Box<dyn Error>> {
@@ -1191,9 +1191,6 @@ mod univariate_booster_test {
 
     #[test]
     fn test_listnet_loss() -> Result<(), Box<dyn std::error::Error>> {
-        use polars::prelude::*;
-        use std::collections::HashMap;
-
         // Read CSV using Polars
         let data = CsvReadOptions::default()
             .with_has_header(true)
@@ -1294,17 +1291,43 @@ mod univariate_booster_test {
             .set_budget(0.1);
 
         let objective_fn = booster.cfg.objective.as_function();
-        let initial_loss = objective_fn.initial_value(&y, None, Some(&group_counts_vec));
 
         booster.fit(&matrix, &y, None, Some(&group_counts_vec))?;
 
         let final_yhat = booster.predict(&matrix, true);
-        let final_loss: f32 = objective_fn
+        let _final_loss: f32 = objective_fn
             .loss(&y, &final_yhat, None, Some(&group_counts_vec))
             .iter()
             .sum();
 
-        assert!(final_loss < initial_loss as f32);
+        let sample_weight = vec![1.0; y.len()];
+        let final_ndcg = ndcg_at_k_metric(
+            &y,
+            &final_yhat,
+            &sample_weight,
+            &group_counts_vec,
+            None,
+            &GainScheme::Burges,
+        );
+
+        // TODO: set seed
+        let mut rng = rand::rng();
+        let random_guesses: Vec<f64> = (0..y.len())
+            .map(|_| rng.random::<f64>()) // generates f64 in [0, 1)
+            .collect();
+        let random_ndcg = ndcg_at_k_metric(
+            &y,
+            &random_guesses,
+            &sample_weight,
+            &group_counts_vec,
+            None,
+            &GainScheme::Burges,
+        );
+
+        println!("Final NDCG: {}", final_ndcg);
+        println!("Random NDCG: {}", random_ndcg);
+
+        assert!(final_ndcg > random_ndcg);
 
         Ok(())
     }
