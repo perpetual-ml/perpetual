@@ -1251,12 +1251,20 @@ mod univariate_booster_test {
 
         let features = mdf.drop_many(&cols_to_drop);
 
+        let max_rank = mdf
+            .column("rank")?
+            .i64()?
+            .into_iter()
+            .map(|v| v.unwrap())
+            .max()
+            .unwrap();
+
         let y: Vec<f64> = mdf
             .column("rank")?
             .i64()?
             .into_iter()
             .map(|v| v.unwrap())
-            .map(|v| v as f64)
+            .map(|v| (max_rank - v) as f64) // Relevance
             .collect();
 
         let numeric_columns: Vec<Vec<f64>> = features
@@ -1310,7 +1318,7 @@ mod univariate_booster_test {
             &GainScheme::Burges,
         );
 
-        // TODO: set seed
+        // TODO: set seed?
         let mut rng = rand::rng();
         let random_guesses: Vec<f64> = (0..y.len())
             .map(|_| rng.random::<f64>()) // generates f64 in [0, 1)
@@ -1323,9 +1331,6 @@ mod univariate_booster_test {
             None,
             &GainScheme::Burges,
         );
-
-        println!("Final NDCG: {}", final_ndcg);
-        println!("Random NDCG: {}", random_ndcg);
 
         assert!(final_ndcg > random_ndcg);
 
