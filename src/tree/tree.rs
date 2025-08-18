@@ -164,10 +164,12 @@ impl Tree {
                                 None => None,
                             };
                             // TODO: is the behaviour we want here?
+                            // Currently the loss will always give back f32::INFINITY for a group
+                            // of 1 member
                             let gr: Vec<u64>;
                             let g = match group {
                                 Some(group) => {
-                                    gr = vec![group[_i]];
+                                    gr = vec![1];
                                     Some(&gr[..])
                                 }
                                 None => None,

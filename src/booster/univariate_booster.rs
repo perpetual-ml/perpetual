@@ -1225,7 +1225,6 @@ mod univariate_booster_test {
 
         println!("{:?}", groups.len());
 
-        // Count items per group
         let mut group_counts: HashMap<u64, u64> = HashMap::new();
         for group_id in &groups {
             *group_counts.entry(*group_id).or_default() += 1;
@@ -1240,8 +1239,6 @@ mod univariate_booster_test {
         let all_feature_names = [
             "avg_rating".to_string(),
             "pages".to_string(),
-            // "publisher".to_string(),
-            // "published".to_string(),
             "5stars".to_string(),
             "4stars".to_string(),
             "3stars".to_string(),
@@ -1253,17 +1250,9 @@ mod univariate_booster_test {
 
         let mdf = data.clone().select(all_feature_names.clone())?;
 
-        println!("{:?}", mdf.head(Some(5)));
-
         let cols_to_drop = ["rank".to_string()];
 
-        println!("{:?}", mdf.head(Some(5)));
-
         let features = mdf.drop_many(&cols_to_drop);
-
-        println!("{:?}", features.head(Some(5)));
-
-        println!("Shape of features: {:?}, {:?}", features.height(), features.width());
 
         let y: Vec<f64> = mdf
             .column("rank")?
@@ -1272,8 +1261,6 @@ mod univariate_booster_test {
             .map(|v| v.unwrap())
             .map(|v| v as f64)
             .collect();
-
-        println!("Shape of y: {}", y.len());
 
         let numeric_columns: Vec<Vec<f64>> = features
             .get_columns()
@@ -1298,14 +1285,7 @@ mod univariate_booster_test {
             .flat_map(|row_idx| numeric_columns.iter().map(move |col| col[row_idx]))
             .collect();
 
-        println!("Number of features: {:?}", flat_features.len());
-        println!("Number of y: {:?}", y.len());
-        println!("Number of groups: {:?}", group_counts_vec.len());
-        println!("Sum of groups: {:?}", group_counts_vec.iter().sum::<u64>());
-
         let num_cols = all_feature_names.len() - 1;
-
-        println!("Number of columns: {:?}", num_cols);
 
         let matrix = Matrix::new(&flat_features, y.len(), num_cols);
 

@@ -9,6 +9,9 @@ use serde::{Deserialize, Serialize};
 #[derive(Default, Debug, Deserialize, Serialize, Clone)]
 pub struct ListNetLoss {}
 
+const LOSS_FOR_SINGLE_GROUP: f32 = f32::INFINITY;
+const EPSILON: f32 = 1e-15;
+
 #[inline]
 fn compute_softmax_inplace(input: &[f64], output: &mut [f32]) {
     debug_assert_eq!(input.len(), output.len());
@@ -16,8 +19,7 @@ fn compute_softmax_inplace(input: &[f64], output: &mut [f32]) {
     let max_val = input.iter().fold(f64::NEG_INFINITY, |a, &b| a.max(b));
     let mut sum = 0.0f32;
 
-    // First pass: compute exp and sum
-    // TODO: for stability do log sum exp trick?
+    // First pass: compute exp and suxp trick?
     for (i, &val) in input.iter().enumerate() {
         let exp_val = ((val - max_val) as f32).exp();
         output[i] = exp_val;
@@ -42,7 +44,7 @@ fn compute_listnet_loss(softmax_y: &[f32], softmax_yhat: &[f32], weights: Option
             .zip(w)
             .map(|((p_y, p_yhat), weight)| {
                 if *p_y > 0.0 {
-                    -p_y * p_yhat.ln() * (*weight as f32)
+                    -p_y * p_yhat.max(EPSILON).ln() * (*weight as f32)
                 } else {
                     0.0
                 }
@@ -51,7 +53,13 @@ fn compute_listnet_loss(softmax_y: &[f32], softmax_yhat: &[f32], weights: Option
         None => softmax_y
             .iter()
             .zip(softmax_yhat)
-            .map(|(p_y, p_yhat)| if *p_y > 0.0 { -p_y * p_yhat.ln() } else { 0.0 })
+            .map(|(p_y, p_yhat)| {
+                if *p_y > 0.0 {
+                    -p_y * p_yhat.max(EPSILON).ln()
+                } else {
+                    0.0
+                }
+            })
             .sum(),
     }
 }
@@ -92,6 +100,9 @@ fn compute_group_hessian(softmax_yhat: &[f32], weights: Option<&[f64]>, output: 
 impl ObjectiveFunction for ListNetLoss {
     #[inline]
     fn loss(&self, y: &[f64], yhat: &[f64], sample_weight: Option<&[f64]>, group: Option<&[u64]>) -> Vec<f32> {
+        if y.len() < 2 {
+            return vec![LOSS_FOR_SINGLE_GROUP; y.len()];
+        }
         let mut losses = vec![0.0f32; y.len()];
 
         if let Some(group_sizes) = group {
@@ -140,6 +151,10 @@ impl ObjectiveFunction for ListNetLoss {
         sample_weight: Option<&[f64]>,
         group: Option<&[u64]>,
     ) -> (Vec<f32>, Option<Vec<f32>>) {
+        if y.len() < 2 {
+            return (vec![0.0f32; y.len()], None);
+        }
+
         let mut gradients = vec![0.0f32; y.len()];
         let mut hessians = vec![0.0f32; y.len()];
 
@@ -182,7 +197,8 @@ impl ObjectiveFunction for ListNetLoss {
 
     #[inline]
     fn initial_value(&self, _y: &[f64], _sample_weight: Option<&[f64]>, _group: Option<&[u64]>) -> f64 {
-        0.0
+        // TODO: I dont know what would be logical/optimal here
+        f64::INFINITY
     }
 
     fn default_metric(&self) -> Metric {
