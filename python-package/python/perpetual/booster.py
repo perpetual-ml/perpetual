@@ -252,7 +252,7 @@ class PerpetualBooster:
         if group is None:
             group_ = None
         else:
-            group_, _ = convert_input_array(group, self.objective, is_int = True)
+            group_, _ = convert_input_array(group, self.objective, is_int=True)
 
         # Convert the monotone constraints into the form needed
         # by the rust code.
