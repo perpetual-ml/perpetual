@@ -1,16 +1,18 @@
-import json
 import inspect
+import json
 import warnings
-from typing_extensions import Self
 from typing import Any, Dict, Iterable, List, Optional, Set, Tuple, Union, cast
 
 import numpy as np
-
-from perpetual.perpetual import PerpetualBooster as CratePerpetualBooster  # type: ignore
-from perpetual.perpetual import MultiOutputBooster as CrateMultiOutputBooster  # type: ignore
+from perpetual.data import Node
+from perpetual.perpetual import (
+    MultiOutputBooster as CrateMultiOutputBooster,  # type: ignore
+)
+from perpetual.perpetual import (
+    PerpetualBooster as CratePerpetualBooster,  # type: ignore
+)
 from perpetual.serialize import BaseSerializer, ObjectSerializer
 from perpetual.types import BoosterType, MultiOutputBoosterType
-from perpetual.data import Node
 from perpetual.utils import (
     CONTRIBUTION_METHODS,
     convert_input_array,
@@ -18,6 +20,7 @@ from perpetual.utils import (
     transform_input_frame,
     type_df,
 )
+from typing_extensions import Self
 
 
 class PerpetualBooster:
@@ -68,6 +71,7 @@ class PerpetualBooster:
                 "QuantileLoss" to use quantile error (regression),
                 "HuberLoss" to use huber error (regression),
                 "AdaptiveHuberLoss" to use adaptive huber error (regression).
+                "ListNetLoss" to use ListNet loss (ranking).
                 Defaults to "LogLoss".
             budget (float, optional): a positive number for fitting budget. Increasing this number will more
                 likely result in more boosting rounds and more increased predictive power.
@@ -210,7 +214,7 @@ class PerpetualBooster:
         )
         self.booster = cast(BoosterType, booster)
 
-    def fit(self, X, y, sample_weight=None) -> Self:
+    def fit(self, X, y, sample_weight=None, group=None) -> Self:
         """Fit the gradient booster on a provided dataset.
 
         Args:
@@ -220,11 +224,19 @@ class PerpetualBooster:
             sample_weight (Union[ArrayLike, None], optional): Instance weights to use when
                 training the model. If None is passed, a weight of 1 will be used for every record.
                 Defaults to None.
+            group (Union[ArrayLike, None], optional): Group lengths to use for a ranking objective.
+                If None is passes, all items are assumed to be in the same group.
+                Defaults to None.
         """
 
-        features_, flat_data, rows, cols, categorical_features_, cat_mapping = (
-            convert_input_frame(X, self.categorical_features, self.max_cat)
-        )
+        (
+            features_,
+            flat_data,
+            rows,
+            cols,
+            categorical_features_,
+            cat_mapping,
+        ) = convert_input_frame(X, self.categorical_features, self.max_cat)
         self.n_features_ = cols
         self.cat_mapping = cat_mapping
         self.feature_names_in_ = features_
@@ -236,6 +248,11 @@ class PerpetualBooster:
             sample_weight_ = None
         else:
             sample_weight_, _ = convert_input_array(sample_weight, self.objective)
+
+        if group is None:
+            group_ = None
+        else:
+            group_, _ = convert_input_array(group, self.objective, is_int=True)
 
         # Convert the monotone constraints into the form needed
         # by the rust code.
@@ -308,11 +325,12 @@ class PerpetualBooster:
             cols=cols,
             y=y_,
             sample_weight=sample_weight_,  # type: ignore
+            group=group_,
         )
 
         return self
 
-    def prune(self, X, y, sample_weight=None) -> Self:
+    def prune(self, X, y, sample_weight=None, group=None) -> Self:
         """Prune the gradient booster on a provided dataset.
 
         Args:
@@ -321,6 +339,9 @@ class PerpetualBooster:
                 or a 1 or 2 dimensional Numpy array.
             sample_weight (Union[ArrayLike, None], optional): Instance weights to use when
                 training the model. If None is passed, a weight of 1 will be used for every record.
+                Defaults to None.
+            group (Union[ArrayLike, None], optional): Group lengths to use for a ranking objective.
+                If None is passes, all items are assumed to be in the same group.
                 Defaults to None.
         """
 
@@ -333,18 +354,24 @@ class PerpetualBooster:
         else:
             sample_weight_, _ = convert_input_array(sample_weight, self.objective)
 
+        if group is None:
+            group_ = None
+        else:
+            group_, _ = convert_input_array(group, self.objective, is_int=True)
+
         self.booster.prune(
             flat_data=flat_data,
             rows=rows,
             cols=cols,
             y=y_,
             sample_weight=sample_weight_,  # type: ignore
+            group=group_,
         )
 
         return self
 
     def calibrate(
-        self, X_train, y_train, X_cal, y_cal, alpha, sample_weight=None
+        self, X_train, y_train, X_cal, y_cal, alpha, sample_weight=None, group=None
     ) -> Self:
         """Calibrate the gradient booster on a provided dataset.
 
@@ -360,6 +387,9 @@ class PerpetualBooster:
                 alpha is the complement of the target coverage level.
             sample_weight (Union[ArrayLike, None], optional): Instance weights to use when
                 training the model. If None is passed, a weight of 1 will be used for every record.
+                Defaults to None.
+            group (Union[ArrayLike, None], optional): Group lengths to use for a ranking objective.
+                If None is passes, all items are assumed to be in the same group.
                 Defaults to None.
         """
 
@@ -391,6 +421,7 @@ class PerpetualBooster:
             y_cal=y_cal_,
             alpha=np.array(alpha),
             sample_weight=sample_weight_,  # type: ignore
+            group=group,
         )
 
         return self

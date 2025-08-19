@@ -12,6 +12,7 @@ impl UnivariateBooster {
         data: &Matrix<f64>,
         y: &[f64],
         sample_weight: Option<&[f64]>,
+        group: Option<&[u64]>,
         data_cal: CalData,
     ) -> Result<(), PerpetualError> {
         let (x_cal, y_cal, alpha) = data_cal;
@@ -21,14 +22,14 @@ impl UnivariateBooster {
             let mut model_lower = UnivariateBooster::default().set_objective(Objective::QuantileLoss {
                 quantile: lower_quantile,
             });
-            model_lower.fit(&data, &y, sample_weight)?;
+            model_lower.fit(&data, &y, sample_weight, group)?;
 
             let upper_quantile = Some(1.0 - alpha_ / 2.0);
             let mut model_upper = UnivariateBooster::default().set_objective(Objective::QuantileLoss {
                 quantile: upper_quantile,
             });
 
-            model_upper.fit(&data, &y, sample_weight)?;
+            model_upper.fit(&data, &y, sample_weight, group)?;
 
             let y_cal_pred_lower = model_lower.predict(&x_cal, true);
             let y_cal_pred_upper = model_upper.predict(&x_cal, true);
@@ -168,12 +169,12 @@ mod tests {
             .set_max_bin(10)
             .set_budget(0.1);
 
-        model.fit(&matrix_train, &y_train, None)?;
+        model.fit(&matrix_train, &y_train, None, None)?;
 
         let alpha = vec![0.1];
         let data_cal = (matrix_test, y_test.as_slice(), alpha.as_slice());
 
-        model.calibrate(&matrix_train, &y_train, None, data_cal)?;
+        model.calibrate(&matrix_train, &y_train, None, None, data_cal)?;
 
         let matrix_test = Matrix::new(&data_test, y_test.len(), 8);
         let _intervals = model.predict_intervals(&matrix_test, true);

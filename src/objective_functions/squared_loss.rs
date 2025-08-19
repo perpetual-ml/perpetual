@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 pub struct SquaredLoss {}
 impl ObjectiveFunction for SquaredLoss {
     #[inline]
-    fn loss(&self, y: &[f64], yhat: &[f64], sample_weight: Option<&[f64]>) -> Vec<f32> {
+    fn loss(&self, y: &[f64], yhat: &[f64], sample_weight: Option<&[f64]>, _group: Option<&[u64]>) -> Vec<f32> {
         match sample_weight {
             Some(sample_weight) => y
                 .iter()
@@ -32,7 +32,13 @@ impl ObjectiveFunction for SquaredLoss {
     }
 
     #[inline]
-    fn gradient(&self, y: &[f64], yhat: &[f64], sample_weight: Option<&[f64]>) -> (Vec<f32>, Option<Vec<f32>>) {
+    fn gradient(
+        &self,
+        y: &[f64],
+        yhat: &[f64],
+        sample_weight: Option<&[f64]>,
+        _group: Option<&[u64]>,
+    ) -> (Vec<f32>, Option<Vec<f32>>) {
         match sample_weight {
             Some(sample_weight) => {
                 let (g, h) = y
@@ -51,7 +57,7 @@ impl ObjectiveFunction for SquaredLoss {
     }
 
     #[inline]
-    fn initial_value(&self, y: &[f64], sample_weight: Option<&[f64]>) -> f64 {
+    fn initial_value(&self, y: &[f64], sample_weight: Option<&[f64]>, _group: Option<&[u64]>) -> f64 {
         match sample_weight {
             Some(sample_weight) => {
                 let mut ytot: f64 = 0.;

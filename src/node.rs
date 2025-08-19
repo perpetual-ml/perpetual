@@ -125,6 +125,7 @@ pub enum NodeType {
 }
 
 impl SplittableNode {
+    #[allow(clippy::too_many_arguments)]
     pub fn from_node_info(
         num: usize,
         depth: usize,

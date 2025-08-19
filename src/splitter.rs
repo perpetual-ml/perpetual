@@ -1844,7 +1844,7 @@ mod tests {
         let y: Vec<f64> = file.lines().map(|x| x.parse::<f64>().unwrap()).collect();
         let yhat = vec![0.5; y.len()];
 
-        let (grad, hess) = objective_function.gradient(&y, &yhat, None);
+        let (grad, hess) = objective_function.gradient(&y, &yhat, None, None);
 
         let splitter = MissingImputerSplitter::new(0.3, true, ConstraintMap::new());
         let gradient_sum = grad.iter().sum();
@@ -1998,7 +1998,7 @@ mod tests {
 
         let y_test_avg = y_test.iter().sum::<f64>() / y_test.len() as f64;
         let yhat = vec![y_test_avg; y_test.len()];
-        let (grad, hess) = objective_function.gradient(&y_test, &yhat, None);
+        let (grad, hess) = objective_function.gradient(&y_test, &yhat, None, None);
 
         let splitter = MissingImputerSplitter::new(0.3, false, ConstraintMap::new());
 
@@ -2082,7 +2082,7 @@ mod tests {
 
         let y_avg = y.iter().sum::<f64>() / y.len() as f64;
         let yhat = vec![y_avg; y.len()];
-        let (grad, hess) = objective_function.gradient(&y, &yhat, None);
+        let (grad, hess) = objective_function.gradient(&y, &yhat, None, None);
 
         let splitter = MissingImputerSplitter::new(eta, false, ConstraintMap::new());
 
@@ -2174,6 +2174,8 @@ mod tests {
         Ok(())
     }
 
+    // TODO: add test_ranking
+
     #[test]
     fn test_gbm_categorical_sensory() -> Result<(), Box<dyn Error>> {
         // instantiate objective function
@@ -2194,7 +2196,7 @@ mod tests {
 
         let y_avg = y.iter().sum::<f64>() / y.len() as f64;
         let yhat = vec![y_avg; y.len()];
-        let (grad, hess) = objective_function.gradient(&y, &yhat, None);
+        let (grad, hess) = objective_function.gradient(&y, &yhat, None, None);
 
         let splitter = MissingImputerSplitter::new(eta, false, ConstraintMap::new());
 
