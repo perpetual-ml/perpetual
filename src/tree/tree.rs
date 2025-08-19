@@ -149,36 +149,47 @@ impl Tree {
                 self.n_leaves += n_new_nodes;
                 n_nodes += n_new_nodes;
 
+                let mut y_buffer = None;
+
                 for n in new_nodes {
                     let node = n.as_node(splitter.get_eta());
+                    let node_indices = &index[n.start_idx..n.stop_idx];
 
                     if let Some(_tld) = target_loss_decrement {
-                        for i in index[n.start_idx..n.stop_idx].iter() {
-                            let _i = *i;
-                            let s_weight: Vec<f64>;
-                            let s_w = match sample_weight {
-                                Some(sample_weight) => {
-                                    s_weight = vec![sample_weight[_i]];
-                                    Some(&s_weight[..])
-                                }
-                                None => None,
-                            };
-                            // TODO: is the behaviour we want here?
-                            // Currently the loss will always give back f32::INFINITY for a group
-                            // of 1 member
-                            let gr: Vec<u64>;
-                            let g = match group {
-                                Some(group) => {
-                                    gr = vec![1];
-                                    Some(&gr[..])
-                                }
-                                None => None,
-                            };
-                            let yhat_new = yhat[_i] + node.weight_value as f64;
-                            let loss_new = objective_function.loss(&[y[_i]], &[yhat_new], s_w, g)[0];
-                            loss_decr_avg -= loss_decr[_i] / index_length;
-                            loss_decr[_i] = loss[_i] - loss_new;
-                            loss_decr_avg += loss_decr[_i] / index_length;
+                        if group.is_some() {
+                            // TODO: this could be more efficient. e.g. if all the nodes indices are
+                            // in the same group. Currently we compute the loss for all the indices
+                            let y_hat_new = y_buffer.get_or_insert_with(|| vec![0.0; y.len()]);
+                            y_hat_new.copy_from_slice(&yhat);
+
+                            for &i in node_indices {
+                                y_hat_new[i] += node.weight_value as f64;
+                            }
+
+                            let loss_new = objective_function.loss(&y, &y_hat_new, sample_weight, group);
+                            for &i in node_indices {
+                                loss_decr_avg -= loss_decr[i] / index_length;
+                                loss_decr[i] = loss[i] - loss_new[i];
+                                loss_decr_avg += loss_decr[i] / index_length;
+                            }
+                        } else {
+                            for i in node_indices.iter() {
+                                let _i = *i;
+                                let s_weight: Vec<f64>;
+                                let s_w = match sample_weight {
+                                    Some(sample_weight) => {
+                                        s_weight = vec![sample_weight[_i]];
+                                        Some(&s_weight[..])
+                                    }
+                                    None => None,
+                                };
+
+                                let yhat_new = yhat[_i] + node.weight_value as f64;
+                                let loss_new = objective_function.loss(&[y[_i]], &[yhat_new], s_w, None)[0];
+                                loss_decr_avg -= loss_decr[_i] / index_length;
+                                loss_decr[_i] = loss[_i] - loss_new;
+                                loss_decr_avg += loss_decr[_i] / index_length;
+                            }
                         }
                     }
 
