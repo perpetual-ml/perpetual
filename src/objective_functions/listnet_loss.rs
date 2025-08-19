@@ -197,8 +197,7 @@ impl ObjectiveFunction for ListNetLoss {
 
     #[inline]
     fn initial_value(&self, _y: &[f64], _sample_weight: Option<&[f64]>, _group: Option<&[u64]>) -> f64 {
-        // TODO: I dont know what would be logical/optimal here
-        f64::INFINITY
+        0.0
     }
 
     fn default_metric(&self) -> Metric {
