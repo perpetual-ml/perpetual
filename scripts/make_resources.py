@@ -100,3 +100,13 @@ if __name__ == "__main__":
     features_, sensory_flat, rows, cols, categorical_features_, cat_mapping = convert_input_frame(X, "auto", 1000)
     pd.Series(sensory_flat).to_csv("resources/sensory_flat.csv", index=False, header=False)
     pd.Series(y).to_csv("resources/sensory_y.csv", index=False, header=False)
+
+    # https://www.openml.org/search?type=data&id=43493&sort=runs&status=active
+    df = fetch_openml(data_id=43493)
+    cols_to_drop = ["title", "authors", "votes"]
+    data = df.data.drop(columns=cols_to_drop)
+
+    data["category"] = data["category"].astype("category")
+    data["published"] = data["published"].astype("category")
+
+    data.to_csv("resources/goodreads.csv", index=False, header=True)
