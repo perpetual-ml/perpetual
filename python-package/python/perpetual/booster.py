@@ -71,6 +71,7 @@ class PerpetualBooster:
                 "QuantileLoss" to use quantile error (regression),
                 "HuberLoss" to use huber error (regression),
                 "AdaptiveHuberLoss" to use adaptive huber error (regression).
+                "ListNetLoss" to use ListNet loss (ranking).
                 Defaults to "LogLoss".
             budget (float, optional): a positive number for fitting budget. Increasing this number will more
                 likely result in more boosting rounds and more increased predictive power.
