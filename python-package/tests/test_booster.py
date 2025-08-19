@@ -10,6 +10,8 @@ import numpy as np
 import pandas as pd
 from sklearn.base import clone
 from sklearn.model_selection import train_test_split
+from sklearn.metrics import ndcg_score
+import random
 
 from perpetual import PerpetualBooster
 
@@ -762,4 +764,34 @@ def test_ranking(X_y_g):
     assert len(y) == sum(group)
 
     model = PerpetualBooster(objective="ListNetLoss")
-    model.fit(X, y, group)
+    model.fit(X, y, group=group)
+
+    random.seed(42)
+    random_relevance = [random.random() for _ in range(len(y))]
+
+    yhat = model.predict(X)
+
+    assert np.isnan(yhat).sum() == 0
+    assert np.isinf(yhat).sum() == 0
+
+    start = 0
+    end = 0
+    model_ndcgs = []
+    random_ndcgs = []
+    for group_length in group:
+        end += group_length
+        real_y = y[start:end]
+        model_y = yhat[start:end]
+        random_y = random_relevance[start:end]
+
+        k = 10
+
+        model_ndcg = ndcg_score([real_y], [model_y], k=k)
+        random_ndcg = ndcg_score([real_y], [random_y], k=k)
+
+        model_ndcgs.append(model_ndcg)
+        random_ndcgs.append(random_ndcg)
+
+        start = end
+
+    assert np.mean(model_ndcgs) > np.mean(random_ndcgs)

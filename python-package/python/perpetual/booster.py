@@ -248,6 +248,11 @@ class PerpetualBooster:
         else:
             sample_weight_, _ = convert_input_array(sample_weight, self.objective)
 
+        if group is None:
+            group_ = None
+        else:
+            group_, _ = convert_input_array(group, self.objective, is_int = True)
+
         # Convert the monotone constraints into the form needed
         # by the rust code.
         crate_mc = self._standardize_monotonicity_map(X)
@@ -319,7 +324,7 @@ class PerpetualBooster:
             cols=cols,
             y=y_,
             sample_weight=sample_weight_,  # type: ignore
-            group=group,
+            group=group_,
         )
 
         return self
@@ -348,13 +353,18 @@ class PerpetualBooster:
         else:
             sample_weight_, _ = convert_input_array(sample_weight, self.objective)
 
+        if group is None:
+            group_ = None
+        else:
+            group_, _ = convert_input_array(group, self.objective, is_int=True)
+
         self.booster.prune(
             flat_data=flat_data,
             rows=rows,
             cols=cols,
             y=y_,
             sample_weight=sample_weight_,  # type: ignore
-            group=group,
+            group=group_,
         )
 
         return self
