@@ -1,7 +1,7 @@
 import logging
-import numpy as np
 from typing import Dict, Iterable, List, Optional, Tuple
 
+import numpy as np
 
 logger = logging.getLogger(__name__)
 
@@ -32,7 +32,7 @@ def type_series(y):
         return ""
 
 
-def convert_input_array(x, objective, is_target=False) -> np.ndarray:
+def convert_input_array(x, objective, is_target=False, is_int=False) -> np.ndarray:
     classes_ = []
 
     if type(x).__module__.split(".")[0] == "numpy":
@@ -55,7 +55,10 @@ def convert_input_array(x, objective, is_target=False) -> np.ndarray:
         if len(classes_) > 2:
             x_ = np.squeeze(np.eye(len(classes_))[x_index])
 
-    if not np.issubdtype(x_.dtype, "float64"):
+    if is_int and not np.issubdtype(x_.dtype, "uint64"):
+        x_ = x_.astype(dtype="uint64", copy=False)
+
+    if not is_int and not np.issubdtype(x_.dtype, "float64"):
         x_ = x_.astype(dtype="float64", copy=False)
 
     if len(x_.shape) == 2:
