@@ -26,6 +26,39 @@ def X_y() -> Tuple[pd.DataFrame, pd.Series]:
     return X, y
 
 
+@pytest.fixture
+def X_y_g() -> Tuple[pd.DataFrame, pd.Series, pd.Series]:
+    df = pd.read_csv("../resources/goodreads.csv")
+
+    df["group"] = df["year"].astype(str) + "_" + df["category"]
+
+    df = df.sort_values("group")
+
+    composite_groups = df["group"]
+    group_ids, _unique_groups = pd.factorize(composite_groups)
+
+    group_lengths = pd.Series(group_ids).value_counts().sort_index()
+
+    feature_cols = [
+        "avg_rating",
+        "pages",
+        "5stars",
+        "4stars",
+        "3stars",
+        "2stars",
+        "1stars",
+        "ratings",
+    ]
+    target_col = "rank"
+
+    X = df[feature_cols]
+
+    rank = df[target_col]
+    y = rank.max() - rank
+
+    return X, y, group_lengths
+
+
 def test_booster_max_cat():
     df = pd.read_csv("../resources/titanic.csv")
     X = df.drop(columns="survived").reset_index(drop=True)
@@ -722,3 +755,11 @@ def test_pruning():
     model = PerpetualBooster()
     model.fit(X_train, y_train)
     model.prune(X_cal, y_cal)
+
+
+def test_ranking(X_y_g):
+    X, y, group = X_y_g
+    assert len(y) == sum(group)
+
+    model = PerpetualBooster(objective="ListNetLoss")
+    model.fit(X, y, group)
