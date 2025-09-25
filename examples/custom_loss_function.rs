@@ -16,9 +16,9 @@ use std::sync::Arc;
 use polars::io::SerReader;
 use polars::prelude::{CsvReadOptions, DataType};
 
-use perpetual::metrics::Metric;
+use perpetual::metrics::evaluation::Metric;
 use perpetual::objective_functions::Objective;
-use perpetual::{Matrix, UnivariateBooster};
+use perpetual::{Matrix, PerpetualBooster};
 
 //-----------------//
 // Define function //
@@ -146,8 +146,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     //--------------------------------------//
     // 2. Build booster w/ custom objective //
     //--------------------------------------//
-    let mut booster = UnivariateBooster::default()
-        .set_objective(Objective::function(CustomSquaredLoss))
+    let mut booster = PerpetualBooster::default()
+        .set_objective(Objective::Custom(Arc::new(CustomSquaredLoss)))
         .set_max_bin(10)
         .set_budget(0.1);
 

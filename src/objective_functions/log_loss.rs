@@ -1,12 +1,14 @@
 //! Negative Logloss function
 //!
 //!
-use super::ObjectiveFunction;
-use crate::{data::FloatData, metrics::Metric, utils::fast_sum};
+// Update the import path to match the actual location of ObjectiveFunction
+use crate::objective_functions::ObjectiveFunction;
+use crate::{data::FloatData, metrics::evaluation::Metric, utils::fast_sum};
 use serde::{Deserialize, Serialize};
 
 #[derive(Default, Debug, Deserialize, Serialize, Clone)]
 pub struct LogLoss {}
+
 impl ObjectiveFunction for LogLoss {
     #[inline]
     fn loss(&self, y: &[f64], yhat: &[f64], sample_weight: Option<&[f64]>, _group: Option<&[u64]>) -> Vec<f32> {

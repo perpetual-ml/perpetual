@@ -1,9 +1,9 @@
 use crate::booster::config::MissingNodeTreatment;
-use crate::objective_functions::Objective;
-use crate::{constraints::ConstraintMap, UnivariateBooster};
+use crate::objective_functions::objective::Objective;
+use crate::{constraints::ConstraintMap, PerpetualBooster};
 use std::collections::HashSet;
 
-impl UnivariateBooster {
+impl PerpetualBooster {
     // Set methods for paramters
 
     /// Set the objective on the booster.
@@ -73,8 +73,7 @@ impl UnivariateBooster {
     }
 
     /// Set create missing value of the booster
-    /// * `create_missing_branch` - Bool specifying if missing should get it's own
-    /// branch.
+    /// * `create_missing_branch` - Bool specifying if missing should get it's own branch.
     pub fn set_create_missing_branch(mut self, create_missing_branch: bool) -> Self {
         self.cfg.create_missing_branch = create_missing_branch;
         self
@@ -82,9 +81,7 @@ impl UnivariateBooster {
 
     /// Set the features where whose missing nodes should
     /// always be terminated.
-    /// * `terminate_missing_features` - Hashset of the feature indices for the
-    /// features that should always terminate the missing node, if create_missing_branch
-    /// is true.
+    /// * `terminate_missing_features` - Hashset of the feature indices for the features that should always terminate the missing node, if create_missing_branch is true.
     pub fn set_terminate_missing_features(mut self, terminate_missing_features: HashSet<usize>) -> Self {
         self.cfg.terminate_missing_features = terminate_missing_features;
         self

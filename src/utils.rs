@@ -302,8 +302,7 @@ pub fn naive_sum<T: FloatData<T>>(values: &[T]) -> T {
 ///   
 /// * `v` - A Vector of which to find percentiles for.
 /// * `sample_weight` - Sample weights for the instances of the vector.
-/// * `percentiles` - Percentiles to look for in the data. This should be
-///     values from 0 to 1, and in sorted order.
+/// * `percentiles` - Percentiles to look for in the data. This should be values from 0 to 1, and in sorted order.
 pub fn percentiles<T>(v: &[T], sample_weight: &[T], percentiles: &[T]) -> Vec<T>
 where
     T: FloatData<T>,
@@ -384,9 +383,9 @@ pub fn map_bin<T: FloatData<T>>(x: &[T], v: &T, missing: &T) -> Option<u16> {
 /// * `index` - The index values to sort.
 /// * `feature` - The feature vector to use to sort the index by.
 /// * `split_value` - the split value to use to pivot on.
-/// * `missing_right` - Should missing values go to the left, or
-///    to the right of the split value.
+/// * `missing_right` - Should missing values go to the left, or to the right of the split value.
 #[inline]
+#[allow(clippy::too_many_arguments)]
 pub fn pivot_on_split(
     start: usize,
     stop: usize,
@@ -407,25 +406,23 @@ pub fn pivot_on_split(
     let mut rv = None;
 
     for i in 0..length {
-        loop {
-            match missing_compare(&split_value, feature[index[i]], missing_right, left_cats) {
-                Ordering::Less | Ordering::Equal => {
-                    if last_idx <= i {
-                        rv = Some(i);
-                        break;
-                    }
-                    index.swap(i, last_idx);
-                    g.swap(i, last_idx);
-                    h.swap(i, last_idx);
-                    if last_idx == 0 {
-                        rv = Some(0);
-                        break;
-                    }
-                    last_idx -= 1;
-                }
-                Ordering::Greater => break,
+        while let Ordering::Less | Ordering::Equal =
+            missing_compare(&split_value, feature[index[i]], missing_right, left_cats)
+        {
+            if last_idx <= i {
+                rv = Some(i);
+                break;
             }
+            index.swap(i, last_idx);
+            g.swap(i, last_idx);
+            h.swap(i, last_idx);
+            if last_idx == 0 {
+                rv = Some(0);
+                break;
+            }
+            last_idx -= 1;
         }
+
         if i >= last_idx {
             break;
         }
@@ -437,6 +434,7 @@ pub fn pivot_on_split(
 }
 
 #[inline]
+#[allow(clippy::too_many_arguments)]
 pub fn pivot_on_split_const_hess(
     start: usize,
     stop: usize,
@@ -455,23 +453,20 @@ pub fn pivot_on_split_const_hess(
     let mut rv = None;
 
     for i in 0..length {
-        loop {
-            match missing_compare(&split_value, feature[index[i]], missing_right, left_cats) {
-                Ordering::Less | Ordering::Equal => {
-                    if last_idx <= i {
-                        rv = Some(i);
-                        break;
-                    }
-                    index.swap(i, last_idx);
-                    g.swap(i, last_idx);
-                    if last_idx == 0 {
-                        rv = Some(0);
-                        break;
-                    }
-                    last_idx -= 1;
-                }
-                Ordering::Greater => break,
+        while let Ordering::Less | Ordering::Equal =
+            missing_compare(&split_value, feature[index[i]], missing_right, left_cats)
+        {
+            if last_idx <= i {
+                rv = Some(i);
+                break;
             }
+            index.swap(i, last_idx);
+            g.swap(i, last_idx);
+            if last_idx == 0 {
+                rv = Some(0);
+                break;
+            }
+            last_idx -= 1;
         }
         if i >= last_idx {
             break;
@@ -500,6 +495,7 @@ pub fn pivot_on_split_const_hess(
 /// * `feature` - The feature vector to use to sort the index by.
 /// * `split_value` - the split value to use to pivot on.
 #[inline]
+#[allow(clippy::too_many_arguments)]
 pub fn pivot_on_split_exclude_missing(
     start: usize,
     stop: usize,

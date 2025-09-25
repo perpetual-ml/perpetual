@@ -1,7 +1,6 @@
 //! Huber Loss function
 
-use super::ObjectiveFunction;
-use crate::metrics::Metric;
+use crate::{metrics::evaluation::Metric, objective_functions::objective::ObjectiveFunction};
 use serde::{Deserialize, Serialize};
 
 /// Huber Loss
@@ -9,6 +8,7 @@ use serde::{Deserialize, Serialize};
 pub struct HuberLoss {
     pub delta: Option<f64>,
 }
+
 impl ObjectiveFunction for HuberLoss {
     #[inline]
     fn loss(&self, y: &[f64], yhat: &[f64], sample_weight: Option<&[f64]>, _group: Option<&[u64]>) -> Vec<f32> {

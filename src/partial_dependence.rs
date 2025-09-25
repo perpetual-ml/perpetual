@@ -1,12 +1,4 @@
-use crate::{tree::tree::Tree, utils::is_missing};
-
-/// Partial Dependence Calculator
-// struct PDCalculator {
-//     partial_dependence: f32,
-//     base_score: f64,
-//     tree_prediction: f64,
-
-// }
+use crate::{decision_tree::tree::Tree, utils::is_missing};
 
 fn get_node_cover(tree: &Tree, node_idx: usize) -> f32 {
     tree.nodes[&node_idx].hessian_sum
@@ -78,16 +70,16 @@ mod tests {
     use crate::binning::bin_matrix;
     use crate::constraints::ConstraintMap;
     use crate::data::Matrix;
+    use crate::decision_tree::tree::Tree;
     use crate::histogram::{NodeHistogram, NodeHistogramOwned};
-    use crate::objective_functions::{Objective, ObjectiveFunction};
+    use crate::objective_functions::objective::{Objective, ObjectiveFunction};
     use crate::splitter::{MissingImputerSplitter, SplitInfo, SplitInfoSlice};
-    use crate::tree::tree::Tree;
     use std::fs;
 
     #[test]
     fn test_partial_dependence() {
         // instantiate objective function
-        let objective_function = Objective::LogLoss.as_function();
+        let objective_function = Objective::LogLoss;
 
         let is_const_hess = false;
 
@@ -122,7 +114,7 @@ mod tests {
         let pool = rayon::ThreadPoolBuilder::new().num_threads(2).build().unwrap();
 
         let mut split_info_vec: Vec<SplitInfo> = (0..col_index.len()).map(|_| SplitInfo::default()).collect();
-        let split_info_slice = SplitInfoSlice::new(&mut split_info_vec);
+        let mut split_info_slice = SplitInfoSlice::new(&mut split_info_vec);
 
         tree.fit(
             &objective_function,
@@ -143,7 +135,7 @@ mod tests {
             false,
             &mut hist_tree,
             None,
-            &split_info_slice,
+            &mut split_info_slice,
             n_nodes_alloc,
         );
 

@@ -3,7 +3,7 @@ use crate::utils::to_value_error;
 use numpy::{IntoPyArray, PyArray1, PyReadonlyArray1};
 use perpetual_rs::booster::config::BoosterIO;
 use perpetual_rs::booster::config::MissingNodeTreatment;
-use perpetual_rs::booster::multivariate_booster::MultivariateBooster as CrateMultiOutputBooster;
+use perpetual_rs::booster::multi_output::MultiOutputBooster as CrateMultiOutputBooster;
 use perpetual_rs::constraints::Constraint;
 use perpetual_rs::data::Matrix;
 use perpetual_rs::objective_functions::Objective;

@@ -7,7 +7,7 @@
 // use perpetual::splitter::{MissingImputerSplitter, SplitInfo, SplitInfoSlice};
 // use perpetual::tree::tree::Tree;
 // use perpetual::utils::{fast_f64_sum, fast_sum, naive_sum};
-// use perpetual::{UnivariateBooster};
+// use perpetual::{PerpetualBooster};
 // use std::fs;
 // use std::time::Duration;
 
@@ -144,17 +144,17 @@
 //     // booster_train.sampling_mode(SamplingMode::Linear);
 //     booster_train.bench_function("train_booster_default", |b| {
 //         b.iter(|| {
-//             let mut booster = UnivariateBooster::default().set_budget(0.3);
+//             let mut booster = PerpetualBooster::default().set_budget(0.3);
 //             booster.fit(black_box(&data), black_box(&y), black_box(None)).unwrap();
 //         })
 //     });
 //     booster_train.bench_function("train_booster_with_column_sampling", |b| {
 //         b.iter(|| {
-//             let mut booster = UnivariateBooster::default().set_budget(0.3);
+//             let mut booster = PerpetualBooster::default().set_budget(0.3);
 //             booster.fit(black_box(&data), black_box(&y), black_box(None)).unwrap();
 //         })
 //     });
-//     let mut booster = UnivariateBooster::default().set_budget(0.1);
+//     let mut booster = PerpetualBooster::default().set_budget(0.1);
 //     booster.fit(&data, &y, None).unwrap();
 //     booster_train.bench_function("Predict Booster", |b| {
 //         b.iter(|| booster.predict(black_box(&data), false))

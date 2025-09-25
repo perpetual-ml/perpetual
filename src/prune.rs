@@ -1,9 +1,9 @@
-use crate::objective_functions::{loss_callables, LossFn, ObjectiveFunction};
-use crate::{errors::PerpetualError, tree::tree::Tree, Matrix, UnivariateBooster};
+use crate::objective_functions::objective::ObjectiveFunction;
+use crate::objective_functions::Objective;
+use crate::{decision_tree::tree::Tree, errors::PerpetualError, Matrix, PerpetualBooster};
 use std::collections::HashMap;
-use std::sync::Arc;
 
-impl UnivariateBooster {
+impl PerpetualBooster {
     /// Remove trees which don't generalize with new data.
     pub fn prune(
         &mut self,
@@ -13,7 +13,7 @@ impl UnivariateBooster {
         group: Option<&[u64]>,
     ) -> Result<(), PerpetualError> {
         // initialize objective function
-        let objective_fn: Arc<dyn ObjectiveFunction> = self.cfg.objective.as_function();
+        let objective_fn = &self.cfg.objective;
 
         let old_length = self.trees.len();
         let old_n_nodes: usize = self.trees.iter().map(|t| t.nodes.len()).sum();
@@ -23,15 +23,11 @@ impl UnivariateBooster {
         let init_losses = objective_fn.loss(y, &yhat, sample_weight, group);
         let init_loss = init_losses.iter().sum::<f32>() / init_losses.len() as f32;
 
-        // generate loss calculator
-        // from the objective function
-        let loss_fn: LossFn = loss_callables(objective_fn);
-
         for tree in &mut self.trees {
             tree.prune_bottom_up(
                 data,
                 &self.cfg.missing,
-                &loss_fn,
+                objective_fn,
                 init_loss,
                 y,
                 sample_weight,
@@ -60,7 +56,7 @@ impl Tree {
         &mut self,
         data: &Matrix<f64>,
         missing: &f64,
-        loss: LossFn,
+        objective_fn: &Objective,
         init_loss: f32,
         y: &[f64],
         sample_weight: Option<&[f64]>,
@@ -70,18 +66,18 @@ impl Tree {
         let old_length = self.nodes.len();
         let mut node_losses: HashMap<usize, Vec<f32>> = self.nodes.keys().map(|&k| (k, Vec::new())).collect();
 
-        let sw = match sample_weight {
-            Some(sw) => Some(&sw[..]),
-            None => None,
-        };
-
-        let gr = match group {
-            Some(gr) => Some(&gr[..]),
-            None => None,
-        };
-
         for &i in &data.index {
-            self.predict_loss(data, i, missing, loss.clone(), base_score, &mut node_losses, y, sw, gr);
+            self.predict_loss(
+                data,
+                i,
+                missing,
+                objective_fn,
+                base_score,
+                &mut node_losses,
+                y,
+                sample_weight,
+                group,
+            );
         }
 
         let node_losses_tuple: HashMap<usize, (f32, usize)> = node_losses
@@ -108,12 +104,13 @@ impl Tree {
     }
 
     /// Compute loss at the leaf reached by row
+    #[allow(clippy::too_many_arguments)]
     pub fn predict_loss(
         &self,
         data: &Matrix<f64>,
         row: usize,
         missing: &f64,
-        loss: LossFn,
+        objective_fn: &Objective,
         base_score: f64,
         node_losses: &mut HashMap<usize, Vec<f32>>,
         y: &[f64],
@@ -123,7 +120,7 @@ impl Tree {
         let mut idx = 0;
         loop {
             let node = &self.nodes[&idx];
-            let loss = loss(
+            let loss = objective_fn.loss(
                 &[y[row]],
                 &[node.weight_value as f64 + base_score],
                 sample_weight,
@@ -138,12 +135,12 @@ impl Tree {
     }
 
     /// Bottom-up prune a single tree using loss evaluations
+    #[allow(clippy::too_many_arguments)]
     pub fn prune_bottom_up(
         &mut self,
         data: &Matrix<f64>,
         missing: &f64,
-        //objective_function: &Arc<dyn ObjectiveFunction>,
-        loss: &LossFn,
+        objective_fn: &Objective,
         init_loss: f32,
         y: &[f64],
         sample_weight: Option<&[f64]>,
@@ -155,7 +152,7 @@ impl Tree {
 
         for &i in &data.index {
             let (pred, nid) = self.predict_row_and_node_idx(data, i, missing);
-            let loss = (loss)(&[y[i]], &[pred + base_score], sample_weight, group)[0];
+            let loss = objective_fn.loss(&[y[i]], &[pred + base_score], sample_weight, group)[0];
             node_losses.get_mut(&nid).unwrap().push(loss);
         }
 
@@ -216,7 +213,7 @@ impl Tree {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::objective_functions::Objective;
+    use crate::objective_functions::objective::Objective;
     use polars::io::SerReader;
     use polars::prelude::{CsvReadOptions, DataType};
     use std::error::Error;
@@ -308,7 +305,7 @@ mod tests {
         let matrix_train = Matrix::new(&data_train, y_train.len(), 8);
         let matrix_test = Matrix::new(&data_test, y_test.len(), 8);
 
-        let mut model = UnivariateBooster::default()
+        let mut model = PerpetualBooster::default()
             .set_objective(Objective::SquaredLoss)
             .set_max_bin(10)
             .set_budget(0.1);

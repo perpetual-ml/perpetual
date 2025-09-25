@@ -3,9 +3,9 @@ use crate::booster::config::MissingNodeTreatment;
 use crate::constants::GENERALIZATION_THRESHOLD;
 use crate::constraints::{Constraint, ConstraintMap};
 use crate::data::{FloatData, Matrix};
+use crate::decision_tree::tree::Tree;
 use crate::histogram::{update_histogram, FeatureHistogram, NodeHistogram};
 use crate::node::{NodeType, SplittableNode};
-use crate::tree::tree::Tree;
 use crate::utils::{
     between, bound_to_parent, constrained_weight, constrained_weight_const_hess, cull_gain, gain_given_weight,
     gain_given_weight_const_hess, pivot_on_split, pivot_on_split_const_hess, pivot_on_split_exclude_missing,
@@ -83,11 +83,23 @@ impl<'a> SplitInfoSlice<'a> {
         let ptr = data as *mut [SplitInfo] as *const [UnsafeCell<SplitInfo>];
         Self { data: unsafe { &*ptr } }
     }
+    /// # Safety
+    ///
+    /// Calling this function is **safe** if and only if `i` is a valid index for the internal data.
+    #[allow(clippy::mut_from_ref)]
     pub unsafe fn get_mut(&self, i: usize) -> &mut SplitInfo {
         let split_info = self.data[i].get().as_mut().unwrap();
         split_info
     }
-    pub unsafe fn best_split_info(&self) -> &mut SplitInfo {
+    /// # Safety
+    ///
+    /// Calling this function is **unsafe**. The caller must ensure that the internal
+    /// `self.data` is not empty. If `self.data` is empty, this function will panic
+    /// due to the `unwrap()` calls.
+    ///
+    /// The returned `&mut SplitInfo` is a mutable reference to an element within the internal
+    /// data. The caller must not move, drop, or invalidate this reference.
+    pub unsafe fn best_split_info(&mut self) -> &mut SplitInfo {
         let split_info = self
             .data
             .iter()
@@ -159,6 +171,7 @@ pub trait Splitter {
     fn clean_up_splits(&self, _tree: &mut Tree) {}
 
     /// Find the best possible split, considering all feature histograms.
+    #[allow(clippy::too_many_arguments)]
     fn best_split(
         &self,
         node: &SplittableNode,
@@ -167,7 +180,7 @@ pub trait Splitter {
         hist_tree: &[NodeHistogram],
         pool: &ThreadPool,
         cat_index: Option<&HashSet<usize>>,
-        split_info_slice: &SplitInfoSlice,
+        split_info_slice: &mut SplitInfoSlice,
     ) {
         let allow_missing_splits = self.get_allow_missing_splits();
         let constraint_map = self.get_constraint_map();
@@ -203,7 +216,7 @@ pub trait Splitter {
             });
         } else {
             for (feature, feat_idx) in col_index.iter().zip(feature_index.iter()) {
-                let constraint = self.get_constraint(&feature);
+                let constraint = self.get_constraint(feature);
                 best_feature_split(
                     node,
                     *feat_idx,
@@ -255,7 +268,7 @@ pub trait Splitter {
         is_const_hess: bool,
         hist_tree: &[NodeHistogram],
         cat_index: Option<&HashSet<usize>>,
-        split_info_slice: &SplitInfoSlice,
+        split_info_slice: &mut SplitInfoSlice,
     ) -> Vec<SplittableNode> {
         self.best_split(
             node,
@@ -402,7 +415,7 @@ impl Splitter for MissingBranchSplitter {
         split_info: &mut SplitInfo,
         n_nodes: &usize,
         node: &mut SplittableNode,
-        mut index: &mut [usize],
+        index: &mut [usize],
         col_index: &[usize],
         data: &Matrix<u16>,
         grad: &mut [f32],
@@ -420,13 +433,13 @@ impl Splitter for MissingBranchSplitter {
         // Missing all falls to the bottom.
         let mut missing_split_idx: usize;
         let mut split_idx: usize;
-        if hess.is_some() {
+        if let Some(hess_val) = &mut hess {
             (missing_split_idx, split_idx) = pivot_on_split_exclude_missing(
                 node.start_idx,
                 node.stop_idx,
-                &mut index,
+                index,
                 grad,
-                &mut hess.as_mut().unwrap(),
+                hess_val,
                 data.get_col(split_info.split_feature),
                 split_info.split_bin,
                 &split_info.left_cats,
@@ -435,7 +448,7 @@ impl Splitter for MissingBranchSplitter {
             (missing_split_idx, split_idx) = pivot_on_split_exclude_missing_const_hess(
                 node.start_idx,
                 node.stop_idx,
-                &mut index,
+                index,
                 grad,
                 data.get_col(split_info.split_feature),
                 split_info.split_bin,
@@ -443,7 +456,7 @@ impl Splitter for MissingBranchSplitter {
             );
         }
 
-        node.update_children(missing_child, left_child, right_child, &split_info);
+        node.update_children(missing_child, left_child, right_child, split_info);
 
         let (mut missing_is_leaf, missing_info) = match split_info.missing_node {
             MissingInfo::Branch(ref mut i) => {
@@ -501,7 +514,7 @@ impl Splitter for MissingBranchSplitter {
                     data,
                     grad,
                     hess.as_deref(),
-                    &index,
+                    index,
                     col_index,
                     pool,
                     true,
@@ -516,7 +529,7 @@ impl Splitter for MissingBranchSplitter {
                     data,
                     grad,
                     hess.as_deref(),
-                    &index,
+                    index,
                     col_index,
                     pool,
                     true,
@@ -534,7 +547,7 @@ impl Splitter for MissingBranchSplitter {
                 data,
                 grad,
                 hess.as_deref(),
-                &index,
+                index,
                 col_index,
                 pool,
                 true,
@@ -547,7 +560,7 @@ impl Splitter for MissingBranchSplitter {
                 data,
                 grad,
                 hess.as_deref(),
-                &index,
+                index,
                 col_index,
                 pool,
                 true,
@@ -562,7 +575,7 @@ impl Splitter for MissingBranchSplitter {
                 data,
                 grad,
                 hess.as_deref(),
-                &index,
+                index,
                 col_index,
                 pool,
                 true,
@@ -575,7 +588,7 @@ impl Splitter for MissingBranchSplitter {
                 data,
                 grad,
                 hess.as_deref(),
-                &index,
+                index,
                 col_index,
                 pool,
                 true,
@@ -591,7 +604,7 @@ impl Splitter for MissingBranchSplitter {
                 data,
                 grad,
                 hess.as_deref(),
-                &index,
+                index,
                 col_index,
                 pool,
                 true,
@@ -604,7 +617,7 @@ impl Splitter for MissingBranchSplitter {
                 data,
                 grad,
                 hess.as_deref(),
-                &index,
+                index,
                 col_index,
                 pool,
                 true,
@@ -617,7 +630,7 @@ impl Splitter for MissingBranchSplitter {
             node.depth + 1,
             node.start_idx,
             missing_split_idx,
-            &missing_info,
+            missing_info,
             split_info.generalization,
             NodeType::Missing,
             node.num,
@@ -729,29 +742,32 @@ impl Splitter for MissingImputerSplitter {
         //
         // This function mutates index by swapping indices based on split bin
         let mut split_idx: usize;
-        if hess.is_none() {
-            split_idx = pivot_on_split_const_hess(
-                node.start_idx,
-                node.stop_idx,
-                index,
-                grad,
-                data.get_col(split_info.split_feature),
-                split_info.split_bin,
-                missing_right,
-                &split_info.left_cats,
-            );
-        } else {
-            split_idx = pivot_on_split(
-                node.start_idx,
-                node.stop_idx,
-                index,
-                grad,
-                &mut hess.as_mut().unwrap(),
-                data.get_col(split_info.split_feature),
-                split_info.split_bin,
-                missing_right,
-                &split_info.left_cats,
-            );
+        match hess {
+            Some(ref mut hess_val) => {
+                split_idx = pivot_on_split(
+                    node.start_idx,
+                    node.stop_idx,
+                    index,
+                    grad,
+                    hess_val,
+                    data.get_col(split_info.split_feature),
+                    split_info.split_bin,
+                    missing_right,
+                    &split_info.left_cats,
+                );
+            }
+            None => {
+                split_idx = pivot_on_split_const_hess(
+                    node.start_idx,
+                    node.stop_idx,
+                    index,
+                    grad,
+                    data.get_col(split_info.split_feature),
+                    split_info.split_bin,
+                    missing_right,
+                    &split_info.left_cats,
+                );
+            }
         }
 
         // Calculate histograms
@@ -798,7 +814,7 @@ impl Splitter for MissingImputerSplitter {
         }
 
         let missing_child = if missing_right { right_child } else { left_child };
-        node.update_children(missing_child, left_child, right_child, &split_info);
+        node.update_children(missing_child, left_child, right_child, split_info);
 
         let left_node = SplittableNode::from_node_info(
             left_child,
@@ -849,6 +865,7 @@ pub fn best_feature_split_callables(is_const_hess: bool) -> BestFeatureSplitFn {
 /// The feat_idx is the index of the feature in the histogram data.
 /// The feature is the index of the actual feature in the data.
 #[inline]
+#[allow(clippy::too_many_arguments)]
 fn best_feature_split_const_hess(
     node: &SplittableNode,
     feat_idx: usize,
@@ -1046,7 +1063,7 @@ fn best_feature_split_const_hess(
         // If split gain is NaN, one of the sides is empty, do not allow this split.
         let split_gain = if split_gain.is_nan() { 0.0 } else { split_gain };
 
-        if (max_gain.is_none() || split_gain > max_gain.unwrap()) && (!generalization.is_none() || node.num == 0) {
+        if (max_gain.is_none() || split_gain > max_gain.unwrap()) && (generalization.is_some() || node.num == 0) {
             max_gain = Some(split_gain);
 
             let mut left_cats: HashSet<usize> = HashSet::new();
@@ -1077,6 +1094,7 @@ fn best_feature_split_const_hess(
 /// The feat_idx is the index of the feature in the histogram data.
 /// The feature is the index of the actual feature in the data.
 #[inline]
+#[allow(clippy::too_many_arguments)]
 fn best_feature_split_var_hess(
     node: &SplittableNode,
     feat_idx: usize,
@@ -1589,6 +1607,7 @@ fn evaluate_impute_split_var_hess(
 }
 
 #[inline]
+#[allow(clippy::too_many_arguments)]
 fn evaluate_branch_split_const_hess(
     left_gradient: f32,
     _left_hessian: f32,
@@ -1703,6 +1722,7 @@ fn evaluate_branch_split_const_hess(
 }
 
 #[inline]
+#[allow(clippy::too_many_arguments)]
 fn evaluate_branch_split_var_hess(
     left_gradient: f32,
     left_hessian: f32,
@@ -1819,10 +1839,10 @@ mod tests {
     use super::*;
     use crate::binning::bin_matrix;
     use crate::data::Matrix;
+    use crate::decision_tree::tree::create_root_node;
     use crate::histogram::NodeHistogramOwned;
     use crate::node::SplittableNode;
-    use crate::objective_functions::{Objective, ObjectiveFunction};
-    use crate::tree::tree::create_root_node;
+    use crate::objective_functions::objective::{Objective, ObjectiveFunction};
     use crate::utils::gain;
     use crate::utils::weight;
     use polars::prelude::*;
@@ -1832,7 +1852,7 @@ mod tests {
     #[test]
     fn test_data_split() {
         // instantiate objective function
-        let objective_function = Objective::LogLoss.as_function();
+        let objective_function = Objective::LogLoss;
 
         let is_const_hess = false;
         let num_threads = 2;
@@ -1910,7 +1930,7 @@ mod tests {
         );
 
         let mut split_info_vec: Vec<SplitInfo> = (0..col_index.len()).map(|_| SplitInfo::default()).collect();
-        let split_info_slice = SplitInfoSlice::new(&mut split_info_vec);
+        let mut split_info_slice = SplitInfoSlice::new(&mut split_info_vec);
         splitter.best_split(
             &mut n,
             &col_index,
@@ -1918,7 +1938,7 @@ mod tests {
             &mut hist_tree,
             &pool,
             None,
-            &split_info_slice,
+            &mut split_info_slice,
         );
         let s = unsafe { split_info_slice.best_split_info() };
         println!("{:?}", s);
@@ -1937,7 +1957,7 @@ mod tests {
     #[test]
     fn test_cal_housing() -> Result<(), Box<dyn Error>> {
         // instantiate objective function
-        let objective_function = Objective::SquaredLoss.as_function();
+        let objective_function = Objective::SquaredLoss;
 
         let n_bins = 256;
         let n_cols = 8;
@@ -2040,7 +2060,7 @@ mod tests {
         let mut n = create_root_node(&index, &grad, hess.as_deref());
 
         let mut split_info_vec: Vec<SplitInfo> = (0..col_index.len()).map(|_| SplitInfo::default()).collect();
-        let split_info_slice = SplitInfoSlice::new(&mut split_info_vec);
+        let mut split_info_slice = SplitInfoSlice::new(&mut split_info_vec);
         splitter.best_split(
             &mut n,
             &col_index,
@@ -2048,7 +2068,7 @@ mod tests {
             &mut hist_tree,
             &pool,
             None,
-            &split_info_slice,
+            &mut split_info_slice,
         );
         let s = unsafe { split_info_slice.best_split_info() };
         println!("{:?}", s);
@@ -2063,7 +2083,7 @@ mod tests {
     #[test]
     fn test_categorical() -> Result<(), Box<dyn Error>> {
         // instantiate objective function
-        let objective_function = Objective::LogLoss.as_function();
+        let objective_function = Objective::LogLoss;
 
         let n_bins = 256;
         let n_rows = 712;
@@ -2145,7 +2165,8 @@ mod tests {
         );
 
         let mut split_info_vec: Vec<SplitInfo> = (0..col_index.len()).map(|_| SplitInfo::default()).collect();
-        let split_info_slice = SplitInfoSlice::new(&mut split_info_vec);
+        let mut split_info_slice = SplitInfoSlice::new(&mut split_info_vec);
+
         splitter.best_split(
             &mut n,
             &col_index,
@@ -2153,7 +2174,7 @@ mod tests {
             &mut hist_tree,
             &pool,
             Some(&cat_index),
-            &split_info_slice,
+            &mut split_info_slice,
         );
         let s = unsafe { split_info_slice.best_split_info() };
 
@@ -2179,7 +2200,7 @@ mod tests {
     #[test]
     fn test_gbm_categorical_sensory() -> Result<(), Box<dyn Error>> {
         // instantiate objective function
-        let objective_function = Objective::SquaredLoss.as_function();
+        let objective_function = Objective::SquaredLoss;
 
         let n_bins = 256;
         let n_cols = 11;
@@ -2234,7 +2255,7 @@ mod tests {
         let mut n = create_root_node(&index, &grad, hess.as_deref());
 
         let mut split_info_vec: Vec<SplitInfo> = (0..col_index.len()).map(|_| SplitInfo::default()).collect();
-        let split_info_slice = SplitInfoSlice::new(&mut split_info_vec);
+        let mut split_info_slice = SplitInfoSlice::new(&mut split_info_vec);
         splitter.best_split(
             &mut n,
             &col_index,
@@ -2242,16 +2263,17 @@ mod tests {
             &mut hist_tree,
             &pool,
             Some(&cat_index),
-            &split_info_slice,
+            &mut split_info_slice,
         );
-        let s = unsafe { split_info_slice.best_split_info() };
-
-        n.update_children(1, 1, 2, &s);
 
         println!("split_info_slice:");
         for s_data in split_info_slice.data.iter() {
             println!("{:?}", unsafe { &s_data.get().as_ref().unwrap() });
         }
+
+        let s = unsafe { split_info_slice.best_split_info() };
+
+        n.update_children(1, 1, 2, &s);
 
         println!("split info:");
         println!("{:?}", s);

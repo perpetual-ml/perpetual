@@ -6,7 +6,7 @@
 //!
 use crate::constraints::ConstraintMap;
 use crate::errors::PerpetualError;
-use crate::objective_functions::Objective;
+use crate::objective_functions::objective::Objective;
 use serde::{de::DeserializeOwned, Deserialize, Deserializer, Serialize};
 use std::collections::HashSet;
 use std::fs;
@@ -63,7 +63,7 @@ pub enum MissingNodeTreatment {
 }
 
 // Common functions
-// fn default_cal_models() -> HashMap<String, [(UnivariateBooster, f64); 2]> {
+// fn default_cal_models() -> HashMap<String, [(PerpetualBooster, f64); 2]> {
 //     HashMap::new()
 // }
 fn default_budget() -> f32 {

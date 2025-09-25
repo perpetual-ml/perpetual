@@ -9,7 +9,7 @@
 
 // cargo flamegraph --example cover_types
 
-use perpetual::{objective_functions::Objective, Matrix, UnivariateBooster};
+use perpetual::{objective_functions::Objective, Matrix, PerpetualBooster};
 use polars::prelude::*;
 use std::env;
 use std::error::Error;
@@ -141,7 +141,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     for i in 1..8 {
         println!();
 
-        let mut model = UnivariateBooster::default()
+        let mut model = PerpetualBooster::default()
             .set_objective(Objective::LogLoss)
             .set_budget(*budget);
 

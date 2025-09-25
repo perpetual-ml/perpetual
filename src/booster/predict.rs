@@ -3,13 +3,15 @@
 //!
 
 use crate::booster::config::ContributionsMethod;
-use crate::objective_functions::Objective;
-use crate::MultivariateBooster;
-use crate::{shapley::predict_contributions_row_shapley, tree::tree::Tree, utils::odds, Matrix, UnivariateBooster};
+use crate::objective_functions::objective::Objective;
+use crate::MultiOutputBooster;
+use crate::{
+    decision_tree::tree::Tree, shapley::predict_contributions_row_shapley, utils::odds, Matrix, PerpetualBooster,
+};
 use rayon::prelude::*;
 use std::collections::{HashMap, HashSet};
 
-impl UnivariateBooster {
+impl PerpetualBooster {
     /// Generate predictions on data using the gradient booster.
     ///
     /// * `data` -  Either a Polars or Pandas DataFrame, or a 2 dimensional Numpy array.
@@ -218,7 +220,7 @@ impl UnivariateBooster {
     }
 }
 
-impl MultivariateBooster {
+impl MultiOutputBooster {
     /// Generate predictions on data using the multi-output booster.
     ///
     /// * `data` -  Either a Polars or Pandas DataFrame, or a 2 dimensional Numpy array.
@@ -226,9 +228,7 @@ impl MultivariateBooster {
     pub fn predict(&self, data: &Matrix<f64>, parallel: bool) -> Vec<f64> {
         self.boosters
             .iter()
-            .map(|b| b.predict(data, parallel))
-            .into_iter()
-            .flatten()
+            .flat_map(|b| b.predict(data, parallel))
             .collect::<Vec<f64>>()
     }
 

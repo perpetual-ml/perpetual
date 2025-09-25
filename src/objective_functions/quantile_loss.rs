@@ -1,13 +1,13 @@
 //! Quantile Loss function
 
-use super::ObjectiveFunction;
-use crate::metrics::Metric;
+use crate::{metrics::evaluation::Metric, objective_functions::objective::ObjectiveFunction};
 use serde::{Deserialize, Serialize};
 
 #[derive(Default, Debug, Deserialize, Serialize, Clone)]
 pub struct QuantileLoss {
     pub quantile: Option<f64>,
 }
+
 impl ObjectiveFunction for QuantileLoss {
     #[inline]
     fn loss(&self, y: &[f64], yhat: &[f64], sample_weight: Option<&[f64]>, _group: Option<&[u64]>) -> Vec<f32> {
@@ -56,7 +56,7 @@ impl ObjectiveFunction for QuantileLoss {
                         let g = if delta >= 0.0 {
                             (1.0 - _quantile) * w_
                         } else {
-                            -1.0 * _quantile * w_
+                            -_quantile * w_
                         };
                         (g as f32, *w_ as f32)
                     })
@@ -70,11 +70,7 @@ impl ObjectiveFunction for QuantileLoss {
                     .map(|(y_, yhat_)| {
                         let _quantile = self.quantile.unwrap();
                         let delta = yhat_ - *y_;
-                        let g = if delta >= 0.0 {
-                            1.0 - _quantile
-                        } else {
-                            -1.0 * _quantile
-                        };
+                        let g = if delta >= 0.0 { 1.0 - _quantile } else { -_quantile };
                         g as f32
                     })
                     .collect();
@@ -90,7 +86,7 @@ impl ObjectiveFunction for QuantileLoss {
                 let mut indices = (0..y.len()).collect::<Vec<_>>();
                 indices.sort_by(|&a, &b| y[a].total_cmp(&y[b]));
                 let w_tot: f64 = sample_weight.iter().sum();
-                let w_target = w_tot * self.quantile.unwrap() as f64;
+                let w_target = w_tot * self.quantile.unwrap();
                 let mut w_cum = 0.0_f64;
                 let mut init_value = f64::NAN;
                 for i in indices {
@@ -106,7 +102,7 @@ impl ObjectiveFunction for QuantileLoss {
                 let mut indices = (0..y.len()).collect::<Vec<_>>();
                 indices.sort_by(|&a, &b| y[a].total_cmp(&y[b]));
                 let w_tot: f64 = y.len() as f64;
-                let w_target = w_tot * self.quantile.unwrap() as f64;
+                let w_target = w_tot * self.quantile.unwrap();
                 let mut w_cum = 0.0_f64;
                 let mut init_value = f64::NAN;
                 for i in indices {

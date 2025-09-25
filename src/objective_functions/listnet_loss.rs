@@ -1,9 +1,8 @@
 //! ListNet Loss function
 //!
 //!
-use super::ObjectiveFunction;
 use crate::metrics::ranking::GainScheme;
-use crate::metrics::Metric;
+use crate::{metrics::evaluation::Metric, objective_functions::objective::ObjectiveFunction};
 use serde::{Deserialize, Serialize};
 
 #[derive(Default, Debug, Deserialize, Serialize, Clone)]

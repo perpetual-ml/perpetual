@@ -1,4 +1,4 @@
-//! Multivariate Booster
+//! MultiOutputBooster
 //!
 //!
 use serde::{Deserialize, Serialize};
@@ -8,26 +8,27 @@ use crate::booster::config::MissingNodeTreatment;
 use crate::booster::config::*;
 use crate::constraints::ConstraintMap;
 use crate::errors::PerpetualError;
-use crate::objective_functions::Objective;
-use crate::{Matrix, UnivariateBooster};
+use crate::objective_functions::objective::Objective;
+use crate::{Matrix, PerpetualBooster};
 
 /// Perpetual Booster object
 #[derive(Clone, Serialize, Deserialize)]
-pub struct MultivariateBooster {
+pub struct MultiOutputBooster {
     pub n_boosters: usize,
     pub cfg: BoosterConfig,
-    pub boosters: Vec<UnivariateBooster>,
+    pub boosters: Vec<PerpetualBooster>,
     metadata: HashMap<String, String>,
 }
 
-impl Default for MultivariateBooster {
+impl Default for MultiOutputBooster {
     fn default() -> Self {
         let cfg = BoosterConfig::default();
         let n_boosters = 1;
         let boosters = vec![{
-            let mut p = UnivariateBooster::default();
-            p.cfg = cfg.clone();
-            p
+            PerpetualBooster {
+                cfg: cfg.clone(),
+                ..Default::default()
+            }
         }];
 
         Self {
@@ -39,26 +40,29 @@ impl Default for MultivariateBooster {
     }
 }
 
-impl MultivariateBooster {
+impl MultiOutputBooster {
     /// Multi Output Booster object
     ///
     /// * `objective` - The name of objective function used to optimize. Valid options are:
-    ///      "LogLoss" to use logistic loss as the objective function,
-    ///      "SquaredLoss" to use Squared Error as the objective function,
-    ///      "QuantileLoss" for quantile regression.
+    ///   "LogLoss" to use logistic loss as the objective function,
+    ///   "SquaredLoss" to use Squared Error as the objective function,
+    ///   "QuantileLoss" for quantile regression.
+    ///   "AdaptiveHuberLoss" for adaptive huber loss regression.
+    ///   "HuberLoss" for huber loss regression.
+    ///   "ListNetLoss" for listnet loss ranking.
     /// * `budget` - budget to fit the model.
     /// * `max_bin` - Number of bins to calculate to partition the data. Setting this to
-    ///     a smaller number, will result in faster training time, while potentially sacrificing
-    ///     accuracy. If there are more bins, than unique values in a column, all unique values
-    ///     will be used.
+    ///   a smaller number, will result in faster training time, while potentially sacrificing
+    ///   accuracy. If there are more bins, than unique values in a column, all unique values
+    ///   will be used.
     /// * `num_threads` - Number of threads to be used during training
     /// * `monotone_constraints` - Constraints that are used to enforce a specific relationship
-    ///     between the training features and the target variable.
+    ///   between the training features and the target variable.
     /// * `force_children_to_bound_parent` - force_children_to_bound_parent.
     /// * `missing` - Value to consider missing.
     /// * `allow_missing_splits` - Should the algorithm allow splits that completed seperate out missing
-    ///     and non-missing values, in the case where `create_missing_branch` is false. When `create_missing_branch`
-    ///     is true, setting this to true will result in the missin branch being further split.
+    ///   and non-missing values, in the case where `create_missing_branch` is false. When `create_missing_branch`
+    ///   is true, setting this to true will result in the missin branch being further split.
     /// * `create_missing_branch` - Should missing be split out it's own separate branch?
     /// * `missing_node_treatment` - specify how missing nodes should be handled during training.
     /// * `log_iterations` - Setting to a value (N) other than zero will result in information being logged about ever N iterations.
@@ -120,16 +124,17 @@ impl MultivariateBooster {
 
         // Base booster template that child boosters will clone.
         let template_booster = {
-            let mut b = UnivariateBooster::default();
-            b.cfg = cfg.clone();
-            b
+            PerpetualBooster {
+                cfg: cfg.clone(),
+                ..Default::default()
+            }
         };
         template_booster.validate_parameters()?;
 
         // Assemble the wrapper with `n_boosters` copies.
         let boosters = vec![template_booster; n_boosters.max(1)];
 
-        Ok(MultivariateBooster {
+        Ok(MultiOutputBooster {
             n_boosters: n_boosters.max(1),
             cfg,
             boosters,
@@ -170,7 +175,7 @@ impl MultivariateBooster {
     }
 
     /// Get the boosters
-    pub fn get_boosters(&self) -> &[UnivariateBooster] {
+    pub fn get_boosters(&self) -> &[PerpetualBooster] {
         &self.boosters
     }
 
@@ -280,7 +285,7 @@ impl MultivariateBooster {
 
     /// Set create missing value of the booster
     /// * `create_missing_branch` - Bool specifying if missing should get it's own
-    /// branch.
+    ///   branch.
     pub fn set_create_missing_branch(mut self, create_missing_branch: bool) -> Self {
         self.cfg.create_missing_branch = create_missing_branch;
         self.boosters = self
@@ -293,9 +298,7 @@ impl MultivariateBooster {
 
     /// Set the features where whose missing nodes should
     /// always be terminated.
-    /// * `terminate_missing_features` - Hashset of the feature indices for the
-    /// features that should always terminate the missing node, if create_missing_branch
-    /// is true.
+    /// * `terminate_missing_features` - Hashset of the feature indices for the features that should always terminate the missing node, if create_missing_branch is true.
     pub fn set_terminate_missing_features(mut self, terminate_missing_features: HashSet<usize>) -> Self {
         self.cfg.terminate_missing_features = terminate_missing_features.clone();
         self.boosters = self
@@ -316,7 +319,7 @@ impl MultivariateBooster {
         self.boosters = self
             .boosters
             .iter()
-            .map(|b| b.clone().set_missing_node_treatment(missing_node_treatment.clone()))
+            .map(|b| b.clone().set_missing_node_treatment(missing_node_treatment))
             .collect();
         self
     }
@@ -428,11 +431,11 @@ impl MultivariateBooster {
 }
 
 #[cfg(test)]
-mod multivariate_booster_test {
+mod multi_output_booster_test {
 
-    use crate::objective_functions::Objective;
+    use crate::objective_functions::objective::Objective;
     use crate::Matrix;
-    use crate::{utils::between, MultivariateBooster};
+    use crate::{utils::between, MultiOutputBooster};
     use polars::{
         io::SerReader,
         prelude::{CsvReadOptions, DataType},
@@ -522,7 +525,7 @@ mod multivariate_booster_test {
         let y_data = y_vec.into_iter().flatten().collect::<Vec<f64>>();
         let y = Matrix::new(&y_data, y_test.len(), n_classes);
 
-        let mut booster = MultivariateBooster::default()
+        let mut booster = MultiOutputBooster::default()
             .set_objective(Objective::LogLoss)
             .set_max_bin(max_bin)
             .set_n_boosters(n_classes)

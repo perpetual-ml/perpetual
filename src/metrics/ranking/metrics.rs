@@ -1,4 +1,4 @@
-use crate::metrics::*;
+use crate::metrics::evaluation::EvaluationMetric;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Copy, Deserialize, Serialize, Eq, PartialEq)]
@@ -20,12 +20,33 @@ impl NDCGMetric {
 
 impl EvaluationMetric for NDCGMetric {
     fn calculate_metric(y: &[f64], yhat: &[f64], sample_weight: &[f64], group: &[u64], _alpha: Option<f32>) -> f64 {
-        // TODO: find way to handle k and gain scheme, either include in trait like alpha or add to struct and box
-        // the metric functions
-        ndcg_at_k_metric(y, yhat, sample_weight, group, None, &GainScheme::Burges)
+        // Use self.k and self.gain instead of hardcoded values
+        // Note: This requires changing the trait to accept &self, or you can implement a method on NDCGMetric itself.
+        // For demonstration, let's add a method to NDCGMetric:
+        // You need an instance of NDCGMetric to call the method with &self
+        let metric = NDCGMetric {
+            k: None,
+            gain: GainScheme::Burges,
+        };
+        metric.calculate_metric_with_params(y, yhat, sample_weight, group, None, &GainScheme::Burges)
     }
     fn maximize() -> bool {
         true
+    }
+}
+
+// Add a method to use the struct fields
+impl NDCGMetric {
+    pub fn calculate_metric_with_params(
+        &self,
+        y: &[f64],
+        yhat: &[f64],
+        sample_weight: &[f64],
+        group: &[u64],
+        _alpha: Option<f32>,
+        _default_gain: &GainScheme,
+    ) -> f64 {
+        ndcg_at_k_metric(y, yhat, sample_weight, group, self.k, &self.gain)
     }
 }
 

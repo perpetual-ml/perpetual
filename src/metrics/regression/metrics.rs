@@ -1,4 +1,4 @@
-use crate::metrics::*;
+use crate::metrics::evaluation::EvaluationMetric;
 
 pub struct QuantileLossMetric {}
 impl EvaluationMetric for QuantileLossMetric {

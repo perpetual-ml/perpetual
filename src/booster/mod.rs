@@ -1,8 +1,8 @@
 // public modules
 pub mod config;
-pub mod multivariate_booster;
+pub mod core;
+pub mod multi_output;
 pub mod predict;
-pub mod univariate_booster;
 
 // private modules
 mod setters;

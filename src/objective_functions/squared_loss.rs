@@ -1,12 +1,12 @@
 //! Squared Loss function
 //!
 //!
-use super::ObjectiveFunction;
-use crate::{metrics::Metric, utils::fast_sum};
+use crate::{metrics::evaluation::Metric, objective_functions::objective::ObjectiveFunction, utils::fast_sum};
 use serde::{Deserialize, Serialize};
 
 #[derive(Default, Debug, Deserialize, Serialize, Clone)]
 pub struct SquaredLoss {}
+
 impl ObjectiveFunction for SquaredLoss {
     #[inline]
     fn loss(&self, y: &[f64], yhat: &[f64], sample_weight: Option<&[f64]>, _group: Option<&[u64]>) -> Vec<f32> {

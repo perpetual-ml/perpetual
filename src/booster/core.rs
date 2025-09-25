@@ -1,7 +1,3 @@
-//! Univariate Booster
-//!
-//!
-
 use crate::bin::Bin;
 use crate::binning::bin_matrix;
 use crate::booster::config::*;
@@ -11,11 +7,11 @@ use crate::constants::{
 };
 use crate::constraints::ConstraintMap;
 use crate::data::Matrix;
+use crate::decision_tree::tree::{Tree, TreeStopper};
 use crate::errors::PerpetualError;
 use crate::histogram::{update_cuts, NodeHistogram, NodeHistogramOwned};
-use crate::objective_functions::{Objective, ObjectiveFunction};
+use crate::objective_functions::objective::{Objective, ObjectiveFunction};
 use crate::splitter::{MissingBranchSplitter, MissingImputerSplitter, SplitInfo, SplitInfoSlice, Splitter};
-use crate::tree::tree::{Tree, TreeStopper};
 use core::{f32, f64};
 use log::{info, warn};
 use rand::rngs::StdRng;
@@ -25,7 +21,6 @@ use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::mem;
-use std::sync::Arc;
 use std::time::Instant;
 use sysinfo::System;
 
@@ -33,18 +28,18 @@ type ImportanceFn = fn(&Tree, &mut HashMap<usize, (f32, usize)>);
 
 /// Perpetual Booster object
 #[derive(Clone, Serialize, Deserialize)]
-pub struct UnivariateBooster {
+pub struct PerpetualBooster {
     pub cfg: BoosterConfig,
     pub base_score: f64,
     pub eta: f32,
     pub trees: Vec<Tree>,
-    pub cal_models: HashMap<String, [(UnivariateBooster, f64); 2]>,
+    pub cal_models: HashMap<String, [(PerpetualBooster, f64); 2]>,
     pub metadata: HashMap<String, String>,
 }
 
-impl Default for UnivariateBooster {
+impl Default for PerpetualBooster {
     fn default() -> Self {
-        UnivariateBooster {
+        PerpetualBooster {
             cfg: BoosterConfig::default(),
             base_score: f64::NAN,
             eta: f32::NAN,
@@ -55,27 +50,30 @@ impl Default for UnivariateBooster {
     }
 }
 
-impl UnivariateBooster {
+impl PerpetualBooster {
     /// Perpetual Booster object
     ///
     /// * `objective` - The name of objective function used to optimize. Valid options are:
-    ///      "LogLoss" to use logistic loss as the objective function,
-    ///      "SquaredLoss" to use Squared Error as the objective function,
-    ///      "QuantileLoss" for quantile regression.
+    ///   "LogLoss" to use logistic loss as the objective function,
+    ///   "SquaredLoss" to use Squared Error as the objective function,
+    ///   "QuantileLoss" for quantile regression.
+    ///   "AdaptiveHuberLoss" for adaptive huber loss regression.
+    ///   "HuberLoss" for huber loss regression.
+    ///   "ListNetLoss" for listnet loss ranking.
     /// * `budget` - budget to fit the model.
     /// * `base_score` - The initial_value prediction value of the model. If set to None, it will be calculated based on the objective function at fit time.
     /// * `max_bin` - Number of bins to calculate to partition the data. Setting this to
-    ///     a smaller number, will result in faster training time, while potentially sacrificing
-    ///     accuracy. If there are more bins, than unique values in a column, all unique values
-    ///     will be used.
+    ///   a smaller number, will result in faster training time, while potentially sacrificing
+    ///   accuracy. If there are more bins, than unique values in a column, all unique values
+    ///   will be used.
     /// * `num_threads` - Number of threads to use during training
     /// * `monotone_constraints` - Constraints that are used to enforce a specific relationship
-    ///     between the training features and the target variable.
+    ///   between the training features and the target variable.
     /// * `force_children_to_bound_parent` - force_children_to_bound_parent.
     /// * `missing` - Value to consider missing.
     /// * `allow_missing_splits` - Should the algorithm allow splits that completed seperate out missing
-    ///     and non-missing values, in the case where `create_missing_branch` is false. When `create_missing_branch`
-    ///     is true, setting this to true will result in the missing branch being further split.
+    ///   and non-missing values, in the case where `create_missing_branch` is false. When `create_missing_branch`
+    ///   is true, setting this to true will result in the missing branch being further split.
     /// * `create_missing_branch` - Should missing be split out its own separate branch?
     /// * `missing_node_treatment` - specify how missing nodes should be handled during training.
     /// * `log_iterations` - Setting to a value (N) other than zero will result in information being logged about ever N iterations.
@@ -134,7 +132,7 @@ impl UnivariateBooster {
             stopping_rounds,
         };
 
-        let booster = UnivariateBooster {
+        let booster = PerpetualBooster {
             cfg,
             base_score,
             eta: f32::NAN,
@@ -207,7 +205,7 @@ impl UnivariateBooster {
         let start = Instant::now();
 
         // initialize objective function
-        let objective_fn: Arc<dyn ObjectiveFunction> = self.cfg.objective.as_function();
+        let objective_fn = &self.cfg.objective;
 
         let n_threads_available = std::thread::available_parallelism().unwrap().get();
         let num_threads = match self.cfg.num_threads {
@@ -221,8 +219,7 @@ impl UnivariateBooster {
 
         // If reset, reset the trees. Otherwise continue training.
         let mut yhat;
-        if self.cfg.reset.unwrap_or(true) || self.trees.len() == 0 {
-            self.cfg.reset;
+        if self.cfg.reset.unwrap_or(true) || self.trees.is_empty() {
             if self.base_score.is_nan() {
                 self.base_score = objective_fn.initial_value(y, sample_weight, group);
             }
@@ -231,8 +228,7 @@ impl UnivariateBooster {
             yhat = self.predict(data, true);
         }
 
-        // calculate gradient
-        // and hessian
+        // calculate gradient and hessian
         // let (mut grad, mut hess) = gradient(y, &yhat, sample_weight);
         let (mut grad, mut hess) = objective_fn.gradient(y, &yhat, sample_weight, group);
 
@@ -263,7 +259,7 @@ impl UnivariateBooster {
         let bdata = Matrix::new(&binned_data.binned_data, data.rows, data.cols);
 
         let col_index: Vec<usize> = (0..data.cols).collect();
-        let mut stopping = 0 as usize;
+        let mut stopping = 0;
         let mut n_low_loss_rounds = 0;
 
         let mut rng = StdRng::seed_from_u64(self.cfg.seed);
@@ -279,15 +275,14 @@ impl UnivariateBooster {
             .clamp(usize::min(MIN_COL_AMOUNT, col_index.len()), col_index.len());
 
         let mem_bin = mem::size_of::<Bin>();
-        let mem_hist: usize;
-        if col_amount == col_index.len() {
-            mem_hist = mem_bin * binned_data.nunique.iter().sum::<usize>();
+        let mem_hist: usize = if col_amount == col_index.len() {
+            mem_bin * binned_data.nunique.iter().sum::<usize>()
         } else {
-            mem_hist = mem_bin * self.cfg.max_bin as usize * col_amount;
-        }
+            mem_bin * self.cfg.max_bin as usize * col_amount
+        };
         let sys = System::new_all();
         let mem_available = match self.cfg.memory_limit {
-            Some(mem_limit) => mem_limit * (1e9 as f32),
+            Some(mem_limit) => mem_limit * 1e9_f32,
             None => match sys.cgroup_limits() {
                 Some(limits) => limits.free_memory as f32,
                 None => sys.available_memory() as f32,
@@ -313,13 +308,10 @@ impl UnivariateBooster {
                 .collect();
         }
 
-        let mut hist_tree: Vec<NodeHistogram> = hist_tree_owned
-            .iter_mut()
-            .map(|node_hist| NodeHistogram::from_owned(node_hist))
-            .collect();
+        let mut hist_tree: Vec<NodeHistogram> = hist_tree_owned.iter_mut().map(NodeHistogram::from_owned).collect();
 
         let mut split_info_vec: Vec<SplitInfo> = (0..col_amount).map(|_| SplitInfo::default()).collect();
-        let split_info_slice = SplitInfoSlice::new(&mut split_info_vec);
+        let mut split_info_slice = SplitInfoSlice::new(&mut split_info_vec);
 
         for i in 0..self.cfg.iteration_limit.unwrap_or(ITER_LIMIT) {
             let verbose = if self.cfg.log_iterations == 0 {
@@ -361,10 +353,10 @@ impl UnivariateBooster {
 
             let mut tree = Tree::new();
             tree.fit(
-                &objective_fn,
+                objective_fn,
                 &bdata,
                 data.index.to_owned(),
-                &col_index_fit,
+                col_index_fit,
                 &mut grad,
                 hess.as_deref_mut(),
                 splitter,
@@ -379,7 +371,7 @@ impl UnivariateBooster {
                 is_const_hess,
                 &mut hist_tree,
                 self.cfg.categorical_features.as_ref(),
-                &split_info_slice,
+                &mut split_info_slice,
                 n_nodes_alloc,
             );
 
@@ -462,7 +454,7 @@ impl UnivariateBooster {
     /// * `budget` - A positive number for fitting budget.
     pub fn set_eta(&mut self, budget: f32) {
         let budget = f32::max(0.0, budget);
-        let power = budget * -1.0;
+        let power = -budget;
         let base = 10_f32;
         self.eta = base.powf(power);
     }
@@ -543,18 +535,19 @@ impl UnivariateBooster {
 }
 
 #[cfg(test)]
-mod univariate_booster_test {
+mod perpetual_booster_test {
 
     use crate::booster::config::*;
-    use crate::metrics::{ranking::ndcg_at_k_metric, GainScheme, Metric};
-    use crate::objective_functions::Objective;
-    use crate::objective_functions::ObjectiveFunction;
+    use crate::metrics::evaluation::Metric;
+    use crate::metrics::ranking::{ndcg_at_k_metric, GainScheme};
+    use crate::objective_functions::objective::{Objective, ObjectiveFunction};
     use crate::utils::between;
-    use crate::{Matrix, UnivariateBooster};
+    use crate::{Matrix, PerpetualBooster};
     use approx::assert_relative_eq;
     use polars::io::SerReader;
     use polars::prelude::*;
     use rand::Rng;
+    use serde::{Deserialize, Serialize};
     use std::collections::HashMap;
     use std::collections::HashSet;
     use std::error::Error;
@@ -571,7 +564,7 @@ mod univariate_booster_test {
 
         let data = Matrix::new(&data_vec, 891, 5);
 
-        let mut booster = UnivariateBooster::default().set_budget(0.3);
+        let mut booster = PerpetualBooster::default().set_budget(0.3);
 
         booster.fit(&data, &y, None, None).unwrap();
         let preds = booster.predict(&data, false);
@@ -593,7 +586,7 @@ mod univariate_booster_test {
 
         let data = Matrix::new(&data_vec, 891, 5);
 
-        let mut booster = UnivariateBooster::default()
+        let mut booster = PerpetualBooster::default()
             .set_objective(Objective::SquaredLoss)
             .set_max_bin(300)
             .set_budget(0.3);
@@ -619,7 +612,7 @@ mod univariate_booster_test {
         let y: Vec<f64> = file.lines().map(|x| x.parse::<f64>().unwrap()).collect();
 
         //let data = Matrix::new(data.get_col(1), 891, 1);
-        let mut booster = UnivariateBooster::default()
+        let mut booster = PerpetualBooster::default()
             .set_max_bin(300)
             .set_base_score(0.5)
             .set_budget(0.3);
@@ -628,13 +621,13 @@ mod univariate_booster_test {
         let preds = booster.predict(&data, true);
 
         booster.save_booster("resources/model64.json").unwrap();
-        let booster2 = UnivariateBooster::load_booster("resources/model64.json").unwrap();
+        let booster2 = PerpetualBooster::load_booster("resources/model64.json").unwrap();
         assert_eq!(booster2.predict(&data, true)[0..10], preds[0..10]);
 
         // Test with non-NAN missing.
         booster.cfg.missing = 0.0;
         booster.save_booster("resources/modelmissing.json").unwrap();
-        let booster3 = UnivariateBooster::load_booster("resources/modelmissing.json").unwrap();
+        let booster3 = PerpetualBooster::load_booster("resources/modelmissing.json").unwrap();
         assert_eq!(booster3.cfg.missing, 0.);
         assert_eq!(booster3.cfg.missing, booster.cfg.missing);
     }
@@ -652,7 +645,7 @@ mod univariate_booster_test {
 
         let cat_index = HashSet::from([0, 3, 4, 6, 7, 8, 10, 11]);
 
-        let mut booster = UnivariateBooster::default()
+        let mut booster = PerpetualBooster::default()
             .set_budget(0.1)
             .set_categorical_features(Some(cat_index));
 
@@ -770,12 +763,12 @@ mod univariate_booster_test {
         // To provide parameters generate a default booster, and then use
         // the relevant `set_` methods for any parameters you would like to
         // adjust.
-        let mut model1 = UnivariateBooster::default()
+        let mut model1 = PerpetualBooster::default()
             .set_objective(Objective::SquaredLoss)
             .set_max_bin(10)
             .set_num_threads(Some(1))
             .set_budget(0.1);
-        let mut model2 = UnivariateBooster::default()
+        let mut model2 = PerpetualBooster::default()
             .set_objective(Objective::SquaredLoss)
             .set_max_bin(10)
             .set_num_threads(Some(2))
@@ -828,7 +821,7 @@ mod univariate_booster_test {
 
         let cat_index = HashSet::from([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
 
-        let mut booster = UnivariateBooster::default()
+        let mut booster = PerpetualBooster::default()
             .set_log_iterations(1)
             .set_objective(Objective::SquaredLoss)
             .set_categorical_features(Some(cat_index))
@@ -881,7 +874,7 @@ mod univariate_booster_test {
         let y: Vec<f64> = file.lines().map(|x| x.parse::<f64>().unwrap()).collect();
 
         let data = Matrix::new(&data_vec, 891, 5);
-        let mut booster = UnivariateBooster::default()
+        let mut booster = PerpetualBooster::default()
             .set_max_bin(300)
             .set_base_score(0.5)
             .set_budget(0.3);
@@ -959,7 +952,7 @@ mod univariate_booster_test {
         // To provide parameters generate a default booster, and then use
         // the relevant `set_` methods for any parameters you would like to
         // adjust.
-        let mut model = UnivariateBooster::default()
+        let mut model = PerpetualBooster::default()
             .set_objective(Objective::HuberLoss { delta: Some(1.0) })
             .set_max_bin(10)
             .set_budget(0.1);
@@ -1037,7 +1030,7 @@ mod univariate_booster_test {
         // To provide parameters generate a default booster, and then use
         // the relevant `set_` methods for any parameters you would like to
         // adjust.
-        let mut model = UnivariateBooster::default()
+        let mut model = PerpetualBooster::default()
             .set_objective(Objective::AdaptiveHuberLoss { quantile: Some(0.5) })
             .set_max_bin(10)
             .set_budget(0.1);
@@ -1053,9 +1046,11 @@ mod univariate_booster_test {
 
     #[test]
     fn test_custom_objective_function() -> Result<(), Box<dyn Error>> {
+        // cargo test booster::booster::perpetual_booster_test::test_custom_objective_function
         // define objective function
-        #[derive(Clone)]
+        #[derive(Clone, Serialize, Deserialize)]
         struct CustomSquaredLoss;
+
         impl ObjectiveFunction for CustomSquaredLoss {
             fn loss(&self, y: &[f64], yhat: &[f64], sample_weight: Option<&[f64]>, _group: Option<&[u64]>) -> Vec<f32> {
                 y.iter()
@@ -1091,8 +1086,8 @@ mod univariate_booster_test {
                         }
                     })
                     .collect();
-                let hess = vec![2.0_f32; y.len()];
-                (grad, Some(hess))
+                // let hess = vec![1.0_f32; y.len()];
+                (grad, None)
             }
 
             fn initial_value(&self, y: &[f64], sample_weight: Option<&[f64]>, _group: Option<&[u64]>) -> f64 {
@@ -1160,21 +1155,17 @@ mod univariate_booster_test {
 
         let matrix = Matrix::new(&data, y.len(), 8);
 
-        // define booster with custom loss
-        // function
-        let mut custom_booster = UnivariateBooster::default()
-            .set_objective(Objective::function(CustomSquaredLoss))
-            .set_max_bin(1)
-            .set_budget(0.1)
-            .set_stopping_rounds(Some(1));
+        // define booster with custom loss function
+        let mut custom_booster = PerpetualBooster::default()
+            .set_objective(Objective::Custom(Arc::new(CustomSquaredLoss)))
+            .set_max_bin(100)
+            .set_budget(0.5);
 
-        // define booster with builting
-        // squared loss
-        let mut booster = UnivariateBooster::default()
+        // define booster with built-in squared loss
+        let mut booster = PerpetualBooster::default()
             .set_objective(Objective::SquaredLoss)
-            .set_max_bin(1)
-            .set_budget(0.1)
-            .set_stopping_rounds(Some(1));
+            .set_max_bin(100)
+            .set_budget(0.5);
 
         // fit
         booster.fit(&matrix, &y, None, None)?;
@@ -1294,13 +1285,13 @@ mod univariate_booster_test {
 
         let matrix = Matrix::new(&flat_features, y.len(), num_cols);
 
-        let mut booster = UnivariateBooster::default()
+        let mut booster = PerpetualBooster::default()
             .set_objective(Objective::ListNetLoss)
             .set_budget(0.1);
 
-        let objective_fn = booster.cfg.objective.as_function();
-
         booster.fit(&matrix, &y, None, Some(&group_counts_vec))?;
+
+        let objective_fn = &booster.cfg.objective;
 
         let final_yhat = booster.predict(&matrix, true);
         let _final_loss: f32 = objective_fn
