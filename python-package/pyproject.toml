@@ -15,7 +15,10 @@ keywords = [
   "gradient boosted decision tree",
   "gradient boosting machine"
 ]
-authors = [{ name = "Mutlu Simsek" }]
+authors = [
+  { name = "Mutlu Simsek", email = "mutlusims3k@gmail.com" },
+  { name = "Serkan Korkmaz", email = "serkor1@duck.com" },
+]
 dependencies = ["numpy", "typing-extensions"]
 requires-python = ">=3.9"
 classifiers = [

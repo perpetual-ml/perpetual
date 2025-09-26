@@ -2,7 +2,7 @@
 name = "py-perpetual"
 version = "0.10.0"
 edition = "2021"
-authors = ["Mutlu Simsek <msimsek@perpetual-ml.com>"]
+authors = ["Mutlu Simsek <msimsek@perpetual-ml.com>", "Serkan Korkmaz <serkor1@duck.com>]
 homepage = "https://perpetual-ml.com"
 description = "A self-generalizing gradient boosting machine that doesn't need hyperparameter optimization"
 license-file = "LICENSE"
