@@ -18,6 +18,7 @@ keywords = [
 authors = [
   { name = "Mutlu Simsek", email = "mutlusims3k@gmail.com" },
   { name = "Serkan Korkmaz", email = "serkor1@duck.com" },
+  { name = "Pieter Pel", email = "pelpieter@gmail.com" },
 ]
 dependencies = ["numpy", "typing-extensions"]
 requires-python = ">=3.9"
