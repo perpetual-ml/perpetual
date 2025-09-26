@@ -1,6 +1,7 @@
 import inspect
 import json
 import warnings
+from types import FunctionType
 from typing import Any, Dict, Iterable, List, Optional, Set, Tuple, Union, cast
 
 import numpy as np
@@ -40,7 +41,9 @@ class PerpetualBooster:
     def __init__(
         self,
         *,
-        objective: str = "LogLoss",
+        objective: Union[
+            str, Tuple[FunctionType, FunctionType, FunctionType]
+        ] = "LogLoss",
         budget: float = 0.5,
         num_threads: Optional[int] = None,
         monotone_constraints: Union[Dict[Any, int], None] = None,
@@ -72,6 +75,9 @@ class PerpetualBooster:
                 "HuberLoss" to use huber error (regression),
                 "AdaptiveHuberLoss" to use adaptive huber error (regression).
                 "ListNetLoss" to use ListNet loss (ranking).
+                custom objective in the form of (grad, hess, init)
+                where grad and hess are functions that take (y, pred, sample_weight, group) and return the gradient and hessian
+                init is a function that takes (y, sample_weight, group) and returns the initial prediction value.
                 Defaults to "LogLoss".
             budget (float, optional): a positive number for fitting budget. Increasing this number will more
                 likely result in more boosting rounds and more increased predictive power.
@@ -169,7 +175,16 @@ class PerpetualBooster:
             {} if monotone_constraints is None else monotone_constraints
         )
 
-        self.objective = objective
+        if isinstance(objective, str):
+            self.objective = objective
+            self.loss = None
+            self.grad = None
+            self.init = None
+        else:
+            self.objective = None
+            self.loss = objective[0]
+            self.grad = objective[1]
+            self.init = objective[2]
         self.budget = budget
         self.num_threads = num_threads
         self.monotone_constraints = monotone_constraints_
@@ -211,6 +226,9 @@ class PerpetualBooster:
             iteration_limit=self.iteration_limit,
             memory_limit=self.memory_limit,
             stopping_rounds=self.stopping_rounds,
+            loss=self.loss,
+            grad=self.grad,
+            init=self.init,
         )
         self.booster = cast(BoosterType, booster)
 
@@ -282,6 +300,9 @@ class PerpetualBooster:
                 iteration_limit=self.iteration_limit,
                 memory_limit=self.memory_limit,
                 stopping_rounds=self.stopping_rounds,
+                loss=self.loss,
+                grad=self.grad,
+                init=self.init,
             )
             self.booster = cast(BoosterType, booster)
         else:
@@ -306,6 +327,9 @@ class PerpetualBooster:
                 iteration_limit=self.iteration_limit,
                 memory_limit=self.memory_limit,
                 stopping_rounds=self.stopping_rounds,
+                loss=self.loss,
+                grad=self.grad,
+                init=self.init,
             )
             self.booster = cast(MultiOutputBoosterType, booster)
 

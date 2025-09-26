@@ -1,19 +1,18 @@
 from __future__ import annotations
 
-import json
-import pytest
-import warnings
 import itertools
+import json
+import random
+import warnings
 from typing import Tuple
 
 import numpy as np
 import pandas as pd
-from sklearn.base import clone
-from sklearn.model_selection import train_test_split
-from sklearn.metrics import ndcg_score
-import random
-
+import pytest
 from perpetual import PerpetualBooster
+from sklearn.base import clone
+from sklearn.metrics import ndcg_score
+from sklearn.model_selection import train_test_split
 
 
 def loggodds_to_odds(v):
@@ -795,3 +794,32 @@ def test_ranking(X_y_g):
         start = end
 
     assert np.mean(model_ndcgs) > np.mean(random_ndcgs)
+
+
+def test_custom_objective():
+
+    X_train = pd.read_csv("../resources/cal_housing_train.csv", index_col=False)
+    y_train = X_train.pop("MedHouseVal").to_numpy()
+
+    X_test = pd.read_csv("../resources/cal_housing_test.csv", index_col=False)
+    X_test.pop("MedHouseVal").to_numpy()
+
+    model_regular_loss = PerpetualBooster(objective="SquaredLoss")
+    model_regular_loss.fit(X_train, y_train)
+
+    def loss(y, pred, weight, group):
+        return (y - pred) ** 2
+
+    def gradient(y, pred, weight, group):
+        return (pred - y), None
+
+    def initial_value(y, weight, group):
+        return np.mean(y)
+
+    model_custom_loss = PerpetualBooster(objective=(loss, gradient, initial_value))
+    model_custom_loss.fit(X_train, y_train)
+
+    pred_regular = model_regular_loss.predict(X_test)
+    pred_custom = model_custom_loss.predict(X_test)
+
+    assert np.allclose(pred_regular, pred_custom)

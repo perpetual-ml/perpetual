@@ -35,7 +35,7 @@ pub enum ContributionsMethod {
 }
 
 /// Method to calculate variable importance.
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub enum ImportanceMethod {
     /// The number of times a feature is used to split the data across all trees.
     Weight,

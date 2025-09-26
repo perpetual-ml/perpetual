@@ -32,8 +32,7 @@ init: venv ## Initialise local resources for testing the software
 	    cd .. && \
 	    uv pip install pandas seaborn && \
 	    python scripts/make_resources.py
-	@rm "python-package/README.md"
-	@rm "python-package/LICENSE"
+
 	@echo "Installing pre-commit hooks..."
 	@source $(VENV_ACTIVATE) && \
 	    uv pip install pre-commit && \
@@ -57,10 +56,22 @@ lint: ## Lint the project using cargo
 	cargo clippy
 
 
-py-test: venv ## Test the projects Python implementation
+py-test-sh: venv ## Test the projects Python implementation
 	@echo "Running Python tests..."
 	@source $(VENV_ACTIVATE) && \
 	    bash scripts/run-python-tests.sh
+
+
+py-test-ps: venv ## Test the projects Python implementation
+	@echo "Running Python tests..."
+	@source $(VENV_ACTIVATE) && \
+	    powershell.exe -ExecutionPolicy Bypass -File scripts/run-python-tests.ps1
+
+
+py-test-ps-single: venv ## Test the projects Python implementation
+	@echo "Running Python tests..."
+	@source $(VENV_ACTIVATE) && \
+	    powershell.exe -ExecutionPolicy Bypass -File scripts/run-single-python-test.ps1
 
 
 rust-test: ## Test the projects Rust implementation

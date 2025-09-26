@@ -60,6 +60,7 @@ impl PerpetualBooster {
     ///   "AdaptiveHuberLoss" for adaptive huber loss regression.
     ///   "HuberLoss" for huber loss regression.
     ///   "ListNetLoss" for listnet loss ranking.
+    ///   or a custom objective function that implements the ObjectiveFunction trait.
     /// * `budget` - budget to fit the model.
     /// * `base_score` - The initial_value prediction value of the model. If set to None, it will be calculated based on the objective function at fit time.
     /// * `max_bin` - Number of bins to calculate to partition the data. Setting this to
@@ -487,7 +488,7 @@ impl PerpetualBooster {
     /// Calculate feature importance measure for the features
     /// in the model.
     /// - `method`: variable importance method to use.
-    /// - `n_features`: The number of features to calculate the importance for.
+    /// - `normalize`: whether to normalize the importance values with the sum.
     pub fn calculate_feature_importance(&self, method: ImportanceMethod, normalize: bool) -> HashMap<usize, f32> {
         let (average, importance_fn): (bool, ImportanceFn) = match method {
             ImportanceMethod::Weight => (false, Tree::calculate_importance_weight),

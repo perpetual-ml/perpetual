@@ -428,6 +428,37 @@ impl MultiOutputBooster {
     pub fn get_metadata(&self, key: &String) -> Option<String> {
         self.metadata.get(key).cloned()
     }
+
+    /// Given a value, return the partial dependence value of that value for that
+    /// feature in the model.
+    ///
+    /// * `feature` - The index of the feature.
+    /// * `value` - The value for which to calculate the partial dependence.
+    pub fn value_partial_dependence(&self, feature: usize, value: f64) -> f64 {
+        self.boosters
+            .iter()
+            .map(|b| b.value_partial_dependence(feature, value))
+            .sum::<f64>()
+            / self.n_boosters as f64
+    }
+
+    /// Calculate feature importance measure for the features
+    /// in the model.
+    /// - `method`: variable importance method to use.
+    /// - `normalize`: whether to normalize the importance values with the sum.
+    pub fn calculate_feature_importance(&self, method: ImportanceMethod, normalize: bool) -> HashMap<usize, f32> {
+        let cumulative_importance = self.boosters.iter().fold(HashMap::new(), |mut acc, booster| {
+            let importance = booster.calculate_feature_importance(method.clone(), normalize);
+            for (feature, value) in importance {
+                *acc.entry(feature).or_insert(0.0) += value;
+            }
+            acc
+        });
+        cumulative_importance
+            .into_iter()
+            .map(|(k, v)| (k, v / self.n_boosters as f32))
+            .collect()
+    }
 }
 
 #[cfg(test)]

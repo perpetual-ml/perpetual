@@ -1,6 +1,8 @@
+use crate::custom_objective::CustomObjective;
 use crate::utils::int_map_to_constraint_map;
 use crate::utils::to_value_error;
-use numpy::{IntoPyArray, PyArray1, PyReadonlyArray1};
+use numpy::IntoPyArray;
+use numpy::{PyArray1, PyReadonlyArray1};
 use perpetual_rs::booster::config::BoosterIO;
 use perpetual_rs::booster::config::MissingNodeTreatment;
 use perpetual_rs::booster::multi_output::MultiOutputBooster as CrateMultiOutputBooster;
@@ -11,7 +13,9 @@ use pyo3::exceptions::{PyKeyError, PyValueError};
 use pyo3::prelude::*;
 use pyo3::types::IntoPyDict;
 use pyo3::types::PyType;
+use pyo3::IntoPyObjectExt;
 use std::collections::{HashMap, HashSet};
+use std::sync::Arc;
 
 #[pyclass(subclass)]
 pub struct MultiOutputBooster {
@@ -43,10 +47,13 @@ impl MultiOutputBooster {
         iteration_limit,
         memory_limit,
         stopping_rounds,
+        loss,
+        grad,
+        init,
     ))]
-    pub fn new(
+    pub fn new<'py>(
         n_boosters: usize,
-        objective: &str,
+        objective: Option<&str>,
         budget: f32,
         max_bin: u16,
         num_threads: Option<usize>,
@@ -65,8 +72,18 @@ impl MultiOutputBooster {
         iteration_limit: Option<usize>,
         memory_limit: Option<f32>,
         stopping_rounds: Option<usize>,
+        loss: Option<Bound<'py, PyAny>>,
+        grad: Option<Bound<'py, PyAny>>,
+        init: Option<Bound<'py, PyAny>>,
     ) -> PyResult<Self> {
-        let objective_ = to_value_error(serde_plain::from_str(objective))?;
+        let objective_ = match objective {
+            Some(obj) => to_value_error(serde_plain::from_str(obj))?,
+            None => Objective::Custom(Arc::new(CustomObjective {
+                loss: loss.unwrap().to_owned().into(),
+                grad: grad.unwrap().to_owned().into(),
+                init: init.unwrap().to_owned().into(),
+            })),
+        };
         let missing_node_treatment_ = to_value_error(serde_plain::from_str(missing_node_treatment))?;
         let monotone_constraints_ = int_map_to_constraint_map(monotone_constraints)?;
 
@@ -207,7 +224,7 @@ impl MultiOutputBooster {
             .iter()
             .map(|b| b.base_score)
             .collect::<Vec<_>>()
-            .into_pyarray_bound(py))
+            .into_pyarray(py))
     }
 
     #[getter]
@@ -218,7 +235,7 @@ impl MultiOutputBooster {
             .iter()
             .map(|b| b.get_prediction_trees().len())
             .collect::<Vec<_>>()
-            .into_pyarray_bound(py))
+            .into_pyarray(py))
     }
 
     pub fn fit(
@@ -308,7 +325,7 @@ impl MultiOutputBooster {
         let flat_data = flat_data.as_slice()?;
         let data = Matrix::new(flat_data, rows, cols);
         let parallel = parallel.unwrap_or(true);
-        Ok(self.booster.predict(&data, parallel).into_pyarray_bound(py))
+        Ok(self.booster.predict(&data, parallel).into_pyarray(py))
     }
 
     pub fn predict_proba<'py>(
@@ -322,7 +339,7 @@ impl MultiOutputBooster {
         let flat_data = flat_data.as_slice()?;
         let data = Matrix::new(flat_data, rows, cols);
         let parallel = parallel.unwrap_or(true);
-        Ok(self.booster.predict_proba(&data, parallel).into_pyarray_bound(py))
+        Ok(self.booster.predict_proba(&data, parallel).into_pyarray(py))
     }
 
     pub fn predict_nodes<'py>(
@@ -332,14 +349,23 @@ impl MultiOutputBooster {
         rows: usize,
         cols: usize,
         parallel: Option<bool>,
-    ) -> PyResult<PyObject> {
+    ) -> PyResult<Py<PyAny>> {
         let flat_data = flat_data.as_slice()?;
         let data = Matrix::new(flat_data, rows, cols);
         let parallel = parallel.unwrap_or(true);
 
         let value: Vec<Vec<Vec<HashSet<usize>>>> = self.booster.predict_nodes(&data, parallel);
 
-        Ok(value.into_py(py))
+        Ok(value.into_py_any(py).unwrap())
+    }
+
+    pub fn calculate_feature_importance(&self, method: &str, normalize: bool) -> PyResult<HashMap<usize, f32>> {
+        let method_ = to_value_error(serde_plain::from_str(method))?;
+        Ok(self.booster.calculate_feature_importance(method_, normalize))
+    }
+
+    pub fn value_partial_dependence(&self, feature: usize, value: f64) -> PyResult<f64> {
+        Ok(self.booster.value_partial_dependence(feature, value))
     }
 
     pub fn save_booster(&self, path: &str) -> PyResult<()> {
@@ -389,7 +415,7 @@ impl MultiOutputBooster {
         Ok(MultiOutputBooster { booster })
     }
 
-    pub fn get_params(&self, py: Python) -> PyResult<PyObject> {
+    pub fn get_params(&self, py: Python) -> PyResult<Py<PyAny>> {
         let objective_ = to_value_error(serde_plain::to_string::<Objective>(&self.booster.cfg.objective))?;
         let missing_node_treatment_ = to_value_error(serde_plain::to_string::<MissingNodeTreatment>(
             &self.booster.cfg.missing_node_treatment,
@@ -411,42 +437,59 @@ impl MultiOutputBooster {
             })
             .collect();
 
-        let key_vals: Vec<(&str, PyObject)> = vec![
-            ("objective", objective_.to_object(py)),
-            ("num_threads", self.booster.cfg.num_threads.to_object(py)),
+        let key_vals: Vec<(&str, Py<PyAny>)> = vec![
+            ("objective", objective_.into_py_any(py).unwrap()),
+            ("num_threads", self.booster.cfg.num_threads.into_py_any(py).unwrap()),
             (
                 "allow_missing_splits",
-                self.booster.cfg.allow_missing_splits.to_object(py),
+                self.booster.cfg.allow_missing_splits.into_py_any(py).unwrap(),
             ),
-            ("monotone_constraints", monotone_constraints_.to_object(py)),
-            ("missing", self.booster.cfg.missing.to_object(py)),
+            ("monotone_constraints", monotone_constraints_.into_py_any(py).unwrap()),
+            ("missing", self.booster.cfg.missing.into_py_any(py).unwrap()),
             (
                 "create_missing_branch",
-                self.booster.cfg.create_missing_branch.to_object(py),
+                self.booster.cfg.create_missing_branch.into_py_any(py).unwrap(),
             ),
             (
                 "terminate_missing_features",
-                self.booster.cfg.terminate_missing_features.to_object(py),
+                self.booster
+                    .cfg
+                    .terminate_missing_features
+                    .clone()
+                    .into_py_any(py)
+                    .unwrap(),
             ),
-            ("missing_node_treatment", missing_node_treatment_.to_object(py)),
-            ("log_iterations", self.booster.cfg.log_iterations.to_object(py)),
+            (
+                "missing_node_treatment",
+                missing_node_treatment_.into_py_any(py).unwrap(),
+            ),
+            (
+                "log_iterations",
+                self.booster.cfg.log_iterations.into_py_any(py).unwrap(),
+            ),
             (
                 "force_children_to_bound_parent",
-                self.booster.cfg.force_children_to_bound_parent.to_object(py),
+                self.booster.cfg.force_children_to_bound_parent.into_py_any(py).unwrap(),
             ),
-            ("quantile", self.booster.cfg.quantile.to_object(py)),
-            ("reset", self.booster.cfg.reset.to_object(py)),
+            ("quantile", self.booster.cfg.quantile.into_py_any(py).unwrap()),
+            ("reset", self.booster.cfg.reset.into_py_any(py).unwrap()),
             (
                 "categorical_features",
-                self.booster.cfg.categorical_features.to_object(py),
+                self.booster.cfg.categorical_features.clone().into_py_any(py).unwrap(),
             ),
-            ("timeout", self.booster.cfg.timeout.to_object(py)),
-            ("iteration_limit", self.booster.cfg.iteration_limit.to_object(py)),
-            ("memory_limit", self.booster.cfg.memory_limit.to_object(py)),
-            ("stopping_rounds", self.booster.cfg.stopping_rounds.to_object(py)),
+            ("timeout", self.booster.cfg.timeout.into_py_any(py).unwrap()),
+            (
+                "iteration_limit",
+                self.booster.cfg.iteration_limit.into_py_any(py).unwrap(),
+            ),
+            ("memory_limit", self.booster.cfg.memory_limit.into_py_any(py).unwrap()),
+            (
+                "stopping_rounds",
+                self.booster.cfg.stopping_rounds.into_py_any(py).unwrap(),
+            ),
         ];
-        let dict = key_vals.into_py_dict_bound(py);
+        let dict = key_vals.into_py_dict(py);
 
-        Ok(dict.to_object(py))
+        Ok(dict?.into_py_any(py)?)
     }
 }
