@@ -1,4 +1,4 @@
-use crate::{node::Node, tree::tree::Tree};
+use crate::{decision_tree::tree::Tree, node::Node};
 
 #[derive(Debug, Clone, Copy)]
 struct PathElement {

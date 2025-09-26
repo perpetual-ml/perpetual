@@ -125,7 +125,7 @@ impl<'a, T> Matrix<'a, T> {
     }
 
     /// Get access to a row of the data, as an iterator.
-    pub fn get_row_iter(&self, row: usize) -> std::iter::StepBy<std::iter::Skip<std::slice::Iter<T>>> {
+    pub fn get_row_iter(&self, row: usize) -> std::iter::StepBy<std::iter::Skip<std::slice::Iter<'a, T>>> {
         self.data.iter().skip(row).step_by(self.rows)
     }
 
@@ -202,7 +202,7 @@ impl<T> RowMajorMatrix<T> {
     /// Add a rows to the matrix, this can be multiple
     /// rows, if they are in sequential order in the items.
     pub fn append_row(&mut self, items: Vec<T>) {
-        assert!(items.len() % self.cols == 0);
+        assert!(items.len().is_multiple_of(self.cols));
         let new_rows = items.len() / self.cols;
         self.rows += new_rows;
         self.data.extend(items);

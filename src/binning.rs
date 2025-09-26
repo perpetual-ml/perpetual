@@ -47,7 +47,7 @@ pub struct BinnedData<T> {
 ///
 /// * `data` - Numeric data to be binned.
 /// * `cuts` - A slice of Vectors, where the vectors are the corresponding
-///     cut values for each of the columns.
+///   cut values for each of the columns.
 fn bin_matrix_from_cuts<T: FloatData<T>>(data: &Matrix<T>, cuts: &JaggedMatrix<T>, missing: &T) -> Vec<u16> {
     // loop through the matrix, binning the data.
     // We will determine the column we are in, by
@@ -95,7 +95,7 @@ pub fn bin_matrix(
         None => HashSet::new(),
     };
     let mut num_index: Vec<usize> = (0..data.cols).collect();
-    num_index.retain(|e| !to_remove.contains(&(*e)));
+    num_index.retain(|e| !to_remove.contains(e));
     let num_index_set: HashSet<usize> = HashSet::from_iter(num_index);
 
     // First we need to generate the bins for each of the columns.

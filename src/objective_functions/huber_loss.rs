@@ -1,13 +1,18 @@
-use super::ObjectiveFunction;
-use crate::metrics::Metric;
+//! Huber Loss function
+
+use crate::{metrics::evaluation::Metric, objective_functions::objective::ObjectiveFunction};
+use serde::{Deserialize, Serialize};
 
 /// Huber Loss
-#[derive(Default)]
-pub struct HuberLoss {}
+#[derive(Default, Debug, Deserialize, Serialize, Clone)]
+pub struct HuberLoss {
+    pub delta: Option<f64>,
+}
+
 impl ObjectiveFunction for HuberLoss {
-    fn calc_loss(y: &[f64], yhat: &[f64], sample_weight: Option<&[f64]>, delta: Option<f64>) -> Vec<f32> {
-        // Default delta value
-        let delta = delta.unwrap_or(1.0);
+    #[inline]
+    fn loss(&self, y: &[f64], yhat: &[f64], sample_weight: Option<&[f64]>, _group: Option<&[u64]>) -> Vec<f32> {
+        let delta = self.delta.unwrap_or(1.0);
         match sample_weight {
             Some(weights) => y
                 .iter()
@@ -41,14 +46,15 @@ impl ObjectiveFunction for HuberLoss {
         }
     }
 
-    fn calc_grad_hess(
+    #[inline]
+    fn gradient(
+        &self,
         y: &[f64],
         yhat: &[f64],
         sample_weight: Option<&[f64]>,
-        delta: Option<f64>,
+        _group: Option<&[u64]>,
     ) -> (Vec<f32>, Option<Vec<f32>>) {
-        // default delta value
-        let delta = delta.unwrap_or(1.0);
+        let delta = self.delta.unwrap_or(1.0);
 
         match sample_weight {
             Some(weights) => {
@@ -89,7 +95,8 @@ impl ObjectiveFunction for HuberLoss {
         }
     }
 
-    fn calc_init(y: &[f64], sample_weight: Option<&[f64]>, _quantile: Option<f64>) -> f64 {
+    #[inline]
+    fn initial_value(&self, y: &[f64], sample_weight: Option<&[f64]>, _group: Option<&[u64]>) -> f64 {
         let mut idxs = (0..y.len()).collect::<Vec<_>>();
         idxs.sort_by(|&i, &j| y[i].partial_cmp(&y[j]).unwrap());
 
@@ -109,7 +116,7 @@ impl ObjectiveFunction for HuberLoss {
         median
     }
 
-    fn default_metric() -> Metric {
+    fn default_metric(&self) -> Metric {
         Metric::RootMeanSquaredError
     }
 }

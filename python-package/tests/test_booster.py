@@ -1,17 +1,18 @@
 from __future__ import annotations
 
-import json
-import pytest
-import warnings
 import itertools
+import json
+import random
+import warnings
 from typing import Tuple
 
 import numpy as np
 import pandas as pd
-from sklearn.base import clone
-from sklearn.model_selection import train_test_split
-
+import pytest
 from perpetual import PerpetualBooster
+from sklearn.base import clone
+from sklearn.metrics import ndcg_score
+from sklearn.model_selection import train_test_split
 
 
 def loggodds_to_odds(v):
@@ -24,6 +25,39 @@ def X_y() -> Tuple[pd.DataFrame, pd.Series]:
     X = df.select_dtypes("number").drop(columns="survived").reset_index(drop=True)
     y = df["survived"]
     return X, y
+
+
+@pytest.fixture
+def X_y_g() -> Tuple[pd.DataFrame, pd.Series, pd.Series]:
+    df = pd.read_csv("../resources/goodreads.csv")
+
+    df["group"] = df["year"].astype(str) + "_" + df["category"]
+
+    df = df.sort_values("group")
+
+    composite_groups = df["group"]
+    group_ids, _unique_groups = pd.factorize(composite_groups)
+
+    group_lengths = pd.Series(group_ids).value_counts().sort_index()
+
+    feature_cols = [
+        "avg_rating",
+        "pages",
+        "5stars",
+        "4stars",
+        "3stars",
+        "2stars",
+        "1stars",
+        "ratings",
+    ]
+    target_col = "rank"
+
+    X = df[feature_cols]
+
+    rank = df[target_col]
+    y = rank.max() - rank
+
+    return X, y, group_lengths
 
 
 def test_booster_max_cat():
@@ -722,3 +756,70 @@ def test_pruning():
     model = PerpetualBooster()
     model.fit(X_train, y_train)
     model.prune(X_cal, y_cal)
+
+
+def test_ranking(X_y_g):
+    X, y, group = X_y_g
+    assert len(y) == sum(group)
+
+    model = PerpetualBooster(objective="ListNetLoss")
+    model.fit(X, y, group=group)
+
+    random.seed(42)
+    random_relevance = [random.random() for _ in range(len(y))]
+
+    yhat = model.predict(X)
+
+    assert np.isnan(yhat).sum() == 0
+    assert np.isinf(yhat).sum() == 0
+
+    start = 0
+    end = 0
+    model_ndcgs = []
+    random_ndcgs = []
+    for group_length in group:
+        end += group_length
+        real_y = y[start:end]
+        model_y = yhat[start:end]
+        random_y = random_relevance[start:end]
+
+        k = 10
+
+        model_ndcg = ndcg_score([real_y], [model_y], k=k)
+        random_ndcg = ndcg_score([real_y], [random_y], k=k)
+
+        model_ndcgs.append(model_ndcg)
+        random_ndcgs.append(random_ndcg)
+
+        start = end
+
+    assert np.mean(model_ndcgs) > np.mean(random_ndcgs)
+
+
+def test_custom_objective():
+
+    X_train = pd.read_csv("../resources/cal_housing_train.csv", index_col=False)
+    y_train = X_train.pop("MedHouseVal").to_numpy()
+
+    X_test = pd.read_csv("../resources/cal_housing_test.csv", index_col=False)
+    X_test.pop("MedHouseVal").to_numpy()
+
+    model_regular_loss = PerpetualBooster(objective="SquaredLoss")
+    model_regular_loss.fit(X_train, y_train)
+
+    def loss(y, pred, weight, group):
+        return (y - pred) ** 2
+
+    def gradient(y, pred, weight, group):
+        return (pred - y), None
+
+    def initial_value(y, weight, group):
+        return np.mean(y)
+
+    model_custom_loss = PerpetualBooster(objective=(loss, gradient, initial_value))
+    model_custom_loss.fit(X_train, y_train)
+
+    pred_regular = model_regular_loss.predict(X_test)
+    pred_custom = model_custom_loss.predict(X_test)
+
+    assert np.allclose(pred_regular, pred_custom)

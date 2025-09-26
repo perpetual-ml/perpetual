@@ -53,7 +53,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut model = PerpetualBooster::default()
         .set_objective(Objective::LogLoss)
         .set_budget(*budget);
-    model.fit(&matrix, &y, None)?;
+    model.fit(&matrix, &y, None, None)?;
 
     println!("Model prediction: {:?} ...", &model.predict(&matrix, true)[0..10]);
 

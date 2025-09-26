@@ -49,5 +49,5 @@ pub fn percentiles<'py>(
     let sample_weight_ = sample_weight.as_slice()?;
     let percentiles_ = percentiles.as_slice()?;
     let p = crate_percentiles(v_, sample_weight_, percentiles_);
-    Ok(p.into_pyarray_bound(py))
+    Ok(p.into_pyarray(py))
 }

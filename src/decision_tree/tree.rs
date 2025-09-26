@@ -2,6 +2,8 @@ use crate::data::Matrix;
 use crate::grower::Grower;
 use crate::histogram::{update_histogram, NodeHistogram};
 use crate::node::{Node, NodeType, SplittableNode};
+use crate::objective_functions::objective::ObjectiveFunction;
+use crate::objective_functions::Objective;
 use crate::partial_dependence::tree_partial_dependence;
 use crate::splitter::{SplitInfoSlice, Splitter};
 use crate::utils::{fast_f64_sum, gain, gain_const_hess, weight, weight_const_hess};
@@ -45,6 +47,7 @@ impl Tree {
     #[allow(clippy::too_many_arguments)]
     pub fn fit<T: Splitter>(
         &mut self,
+        objective_function: &Objective,
         data: &Matrix<u16>,
         mut index: Vec<usize>,
         col_index: &[usize],
@@ -55,14 +58,14 @@ impl Tree {
         target_loss_decrement: Option<f32>,
         loss: &[f32],
         y: &[f64],
-        calc_loss: fn(&[f64], &[f64], Option<&[f64]>, Option<f64>) -> Vec<f32>,
+        //loss: crate::objective_functions::LossFn,
         yhat: &[f64],
         sample_weight: Option<&[f64]>,
-        quantile: Option<f64>,
+        group: Option<&[u64]>,
         is_const_hess: bool,
-        mut hist_tree: &mut [NodeHistogram],
+        hist_tree: &mut [NodeHistogram],
         cat_index: Option<&HashSet<usize>>,
-        split_info_slice: &SplitInfoSlice,
+        split_info_slice: &mut SplitInfoSlice,
         n_nodes_alloc: usize,
     ) {
         let mut n_nodes = 1;
@@ -130,7 +133,7 @@ impl Tree {
                 hess.as_deref_mut(),
                 pool,
                 is_const_hess,
-                &mut hist_tree,
+                hist_tree,
                 cat_index,
                 split_info_slice,
             );
@@ -146,25 +149,47 @@ impl Tree {
                 self.n_leaves += n_new_nodes;
                 n_nodes += n_new_nodes;
 
+                let mut y_buffer = None;
+
                 for n in new_nodes {
                     let node = n.as_node(splitter.get_eta());
+                    let node_indices = &index[n.start_idx..n.stop_idx];
 
                     if let Some(_tld) = target_loss_decrement {
-                        for i in index[n.start_idx..n.stop_idx].iter() {
-                            let _i = *i;
-                            let s_weight: Vec<f64>;
-                            let s_w = match sample_weight {
-                                Some(sample_weight) => {
-                                    s_weight = vec![sample_weight[_i]];
-                                    Some(&s_weight[..])
-                                }
-                                None => None,
-                            };
-                            let yhat_new = yhat[_i] + node.weight_value as f64;
-                            let loss_new = calc_loss(&[y[_i]], &[yhat_new], s_w, quantile)[0];
-                            loss_decr_avg -= loss_decr[_i] / index_length;
-                            loss_decr[_i] = loss[_i] - loss_new;
-                            loss_decr_avg += loss_decr[_i] / index_length;
+                        if group.is_some() {
+                            // TODO: this could be more efficient. e.g. if all the nodes indices are
+                            // in the same group. Currently we compute the loss for all the indices
+                            let y_hat_new = y_buffer.get_or_insert_with(|| vec![0.0; y.len()]);
+                            y_hat_new.copy_from_slice(yhat);
+
+                            for &i in node_indices {
+                                y_hat_new[i] += node.weight_value as f64;
+                            }
+
+                            let loss_new = objective_function.loss(y, y_hat_new, sample_weight, group);
+                            for &i in node_indices {
+                                loss_decr_avg -= loss_decr[i] / index_length;
+                                loss_decr[i] = loss[i] - loss_new[i];
+                                loss_decr_avg += loss_decr[i] / index_length;
+                            }
+                        } else {
+                            for i in node_indices.iter() {
+                                let _i = *i;
+                                let s_weight: Vec<f64>;
+                                let s_w = match sample_weight {
+                                    Some(sample_weight) => {
+                                        s_weight = vec![sample_weight[_i]];
+                                        Some(&s_weight[..])
+                                    }
+                                    None => None,
+                                };
+
+                                let yhat_new = yhat[_i] + node.weight_value as f64;
+                                let loss_new = objective_function.loss(&[y[_i]], &[yhat_new], s_w, None)[0];
+                                loss_decr_avg -= loss_decr[_i] / index_length;
+                                loss_decr[_i] = loss[_i] - loss_new;
+                                loss_decr_avg += loss_decr[_i] / index_length;
+                            }
                         }
                     }
 
@@ -322,7 +347,7 @@ pub fn create_root_node(index: &[usize], grad: &[f32], hess: Option<&[f32]>) -> 
         root_gain,
         gradient_sum,
         hessian_sum,
-        index.len() as usize,
+        index.len(),
         0,
         0,
         index.len(),
@@ -334,32 +359,39 @@ pub fn create_root_node(index: &[usize], grad: &[f32], hess: Option<&[f32]>) -> 
     )
 }
 
+// Unit-testing
 #[cfg(test)]
 mod tests {
-    use super::*;
+
     use crate::binning::bin_matrix;
     use crate::constraints::{Constraint, ConstraintMap};
     use crate::histogram::NodeHistogramOwned;
-    use crate::objective_functions::{LogLoss, ObjectiveFunction, SquaredLoss};
+    use crate::objective_functions::objective::{Objective, ObjectiveFunction};
     use crate::splitter::{MissingImputerSplitter, SplitInfo};
     use crate::utils::precision_round;
-    use polars::datatypes::DataType;
-    use polars::io::csv::read::CsvReadOptions;
-    use polars::io::SerReader;
+
     use std::error::Error;
     use std::fs;
-    use std::sync::Arc;
+
+    use crate::decision_tree::tree::Tree;
+    use crate::histogram::NodeHistogram;
+    use crate::splitter::SplitInfoSlice;
+    use crate::Matrix;
+    use std::collections::HashSet;
 
     #[test]
     fn test_tree_fit() {
+        // instantiate objective function
+        let objective_function = Objective::LogLoss;
+
         let file =
             fs::read_to_string("resources/contiguous_no_missing.csv").expect("Something went wrong reading the file");
         let data_vec: Vec<f64> = file.lines().map(|x| x.parse::<f64>().unwrap()).collect();
         let file = fs::read_to_string("resources/performance.csv").expect("Something went wrong reading the file");
         let y: Vec<f64> = file.lines().map(|x| x.parse::<f64>().unwrap()).collect();
         let yhat = vec![0.5; y.len()];
-        let (mut g, mut h) = LogLoss::calc_grad_hess(&y, &yhat, None, None);
-        let loss = LogLoss::calc_loss(&y, &yhat, None, None);
+        let (mut g, mut h) = objective_function.gradient(&y, &yhat, None, None);
+        let loss = objective_function.loss(&y, &yhat, None, None);
 
         let data = Matrix::new(&data_vec, 891, 5);
         let splitter = MissingImputerSplitter::new(0.3, true, ConstraintMap::new());
@@ -384,9 +416,10 @@ mod tests {
         let pool = rayon::ThreadPoolBuilder::new().num_threads(2).build().unwrap();
 
         let mut split_info_vec: Vec<SplitInfo> = (0..col_index.len()).map(|_| SplitInfo::default()).collect();
-        let split_info_slice = SplitInfoSlice::new(&mut split_info_vec);
+        let mut split_info_slice = SplitInfoSlice::new(&mut split_info_vec);
 
         tree.fit(
+            &objective_function,
             &bdata,
             data.index.to_owned(),
             &col_index,
@@ -397,14 +430,14 @@ mod tests {
             Some(f32::MAX),
             &loss,
             &y,
-            LogLoss::calc_loss,
+            //loss_fn.clone(),
             &yhat,
             None,
             None,
             is_const_hess,
             &mut hist_tree,
             None,
-            &split_info_slice,
+            &mut split_info_slice,
             n_nodes_alloc,
         );
 
@@ -446,14 +479,18 @@ mod tests {
 
     #[test]
     fn test_tree_fit_monotone() {
+        // instantiate objective function
+        let objective_function = Objective::LogLoss;
+
         let file =
             fs::read_to_string("resources/contiguous_no_missing.csv").expect("Something went wrong reading the file");
         let data_vec: Vec<f64> = file.lines().map(|x| x.parse::<f64>().unwrap()).collect();
         let file = fs::read_to_string("resources/performance.csv").expect("Something went wrong reading the file");
         let y: Vec<f64> = file.lines().map(|x| x.parse::<f64>().unwrap()).collect();
         let yhat = vec![0.5; y.len()];
-        let (mut g, mut h) = LogLoss::calc_grad_hess(&y, &yhat, None, None);
-        let loss = LogLoss::calc_loss(&y, &yhat, None, None);
+        let (mut g, mut h) = objective_function.gradient(&y, &yhat, None, None);
+        let loss = objective_function.loss(&y, &yhat, None, None);
+        let is_const_hess = h.is_none();
         println!("GRADIENT -- {:?}", g);
 
         let data_ = Matrix::new(&data_vec, 891, 5);
@@ -465,7 +502,7 @@ mod tests {
         let b = bin_matrix(&data, None, 100, f64::NAN, None).unwrap();
         let bdata = Matrix::new(&b.binned_data, data.rows, data.cols);
         let col_index: Vec<usize> = (0..data.cols).collect();
-        let is_const_hess = false;
+        //let is_const_hess = false;
 
         let n_nodes_alloc = 100;
 
@@ -481,9 +518,10 @@ mod tests {
         let pool = rayon::ThreadPoolBuilder::new().num_threads(2).build().unwrap();
 
         let mut split_info_vec: Vec<SplitInfo> = (0..col_index.len()).map(|_| SplitInfo::default()).collect();
-        let split_info_slice = SplitInfoSlice::new(&mut split_info_vec);
+        let mut split_info_slice = SplitInfoSlice::new(&mut split_info_vec);
 
         tree.fit(
+            &objective_function,
             &bdata,
             data.index.to_owned(),
             &col_index,
@@ -494,14 +532,14 @@ mod tests {
             Some(f32::MAX),
             &loss,
             &y,
-            LogLoss::calc_loss,
+            //loss_fn.clone(),
             &yhat,
             None,
             None,
             is_const_hess,
             &mut hist_tree,
             None,
-            &split_info_slice,
+            &mut split_info_slice,
             n_nodes_alloc,
         );
 
@@ -541,14 +579,18 @@ mod tests {
 
     #[test]
     fn test_tree_fit_lossguide() {
+        // instantiate objective function
+        let objective_function = Objective::LogLoss;
+
         let file =
             fs::read_to_string("resources/contiguous_no_missing.csv").expect("Something went wrong reading the file");
         let data_vec: Vec<f64> = file.lines().map(|x| x.parse::<f64>().unwrap()).collect();
         let file = fs::read_to_string("resources/performance.csv").expect("Something went wrong reading the file");
         let y: Vec<f64> = file.lines().map(|x| x.parse::<f64>().unwrap()).collect();
         let yhat = vec![0.5; y.len()];
-        let (mut g, mut h) = LogLoss::calc_grad_hess(&y, &yhat, None, None);
-        let loss = LogLoss::calc_loss(&y, &yhat, None, None);
+        let (mut g, mut h) = objective_function.gradient(&y, &yhat, None, None);
+        let is_const_hess = h.is_none();
+        let loss = objective_function.loss(&y, &yhat, None, None);
 
         let data = Matrix::new(&data_vec, 891, 5);
         let splitter = MissingImputerSplitter::new(0.3, true, ConstraintMap::new());
@@ -557,7 +599,7 @@ mod tests {
         let b = bin_matrix(&data, None, 300, f64::NAN, None).unwrap();
         let bdata = Matrix::new(&b.binned_data, data.rows, data.cols);
         let col_index: Vec<usize> = (0..data.cols).collect();
-        let is_const_hess = false;
+        //let is_const_hess = false;
 
         let n_nodes_alloc = 100;
 
@@ -573,9 +615,10 @@ mod tests {
         let pool = rayon::ThreadPoolBuilder::new().num_threads(2).build().unwrap();
 
         let mut split_info_vec: Vec<SplitInfo> = (0..col_index.len()).map(|_| SplitInfo::default()).collect();
-        let split_info_slice = SplitInfoSlice::new(&mut split_info_vec);
+        let mut split_info_slice = SplitInfoSlice::new(&mut split_info_vec);
 
         tree.fit(
+            &objective_function,
             &bdata,
             data.index.to_owned(),
             &col_index,
@@ -586,14 +629,14 @@ mod tests {
             Some(f32::MAX),
             &loss,
             &y,
-            LogLoss::calc_loss,
+            //loss_fn.clone(),
             &yhat,
             None,
             None,
             is_const_hess,
             &mut hist_tree,
             None,
-            &split_info_slice,
+            &mut split_info_slice,
             n_nodes_alloc,
         );
 
@@ -634,120 +677,10 @@ mod tests {
     }
 
     #[test]
-    fn test_tree_cal_housing() -> Result<(), Box<dyn Error>> {
-        let n_bins = 256;
-        let n_cols = 8;
-        let feature_names = [
-            "MedInc".to_owned(),
-            "HouseAge".to_owned(),
-            "AveRooms".to_owned(),
-            "AveBedrms".to_owned(),
-            "Population".to_owned(),
-            "AveOccup".to_owned(),
-            "Latitude".to_owned(),
-            "Longitude".to_owned(),
-            "MedHouseVal".to_owned(),
-        ];
-
-        let df_test = CsvReadOptions::default()
-            .with_has_header(true)
-            .with_columns(Some(Arc::new(feature_names)))
-            .try_into_reader_with_file_path(Some("resources/cal_housing_test.csv".into()))?
-            .finish()
-            .unwrap();
-        let id_vars: Vec<&str> = Vec::new();
-
-        let mdf_test = df_test.unpivot(
-            [
-                "MedInc",
-                "HouseAge",
-                "AveRooms",
-                "AveBedrms",
-                "Population",
-                "AveOccup",
-                "Latitude",
-                "Longitude",
-            ],
-            &id_vars,
-        )?;
-
-        let data_test = Vec::from_iter(
-            mdf_test
-                .select_at_idx(1)
-                .expect("Invalid column")
-                .f64()?
-                .into_iter()
-                .map(|v| v.unwrap_or(f64::NAN)),
-        );
-
-        let y_test = Vec::from_iter(
-            df_test
-                .column("MedHouseVal")?
-                .cast(&DataType::Float64)?
-                .f64()?
-                .into_iter()
-                .map(|v| v.unwrap_or(f64::NAN)),
-        );
-        let y_test_avg = y_test.iter().sum::<f64>() / y_test.len() as f64;
-        let yhat = vec![y_test_avg; y_test.len()];
-        let (mut g, mut h) = SquaredLoss::calc_grad_hess(&y_test, &yhat, None, None);
-        let loss = SquaredLoss::calc_loss(&y_test, &yhat, None, None);
-
-        let splitter = MissingImputerSplitter::new(0.3, true, ConstraintMap::new());
-
-        let data = Matrix::new(&data_test, y_test.len(), n_cols);
-        let b = bin_matrix(&data, None, n_bins, f64::NAN, None).unwrap();
-        let bdata = Matrix::new(&b.binned_data, data.rows, data.cols);
-        let col_index: Vec<usize> = (0..data.cols).collect();
-        let is_const_hess = true;
-
-        let n_nodes_alloc = 100;
-
-        let mut hist_tree_owned: Vec<NodeHistogramOwned> = (0..n_nodes_alloc)
-            .map(|_| NodeHistogramOwned::empty_from_cuts(&b.cuts, &col_index, is_const_hess, true))
-            .collect();
-
-        let mut hist_tree: Vec<NodeHistogram> = hist_tree_owned
-            .iter_mut()
-            .map(|node_hist| NodeHistogram::from_owned(node_hist))
-            .collect();
-
-        let pool = rayon::ThreadPoolBuilder::new().num_threads(2).build().unwrap();
-
-        let mut split_info_vec: Vec<SplitInfo> = (0..col_index.len()).map(|_| SplitInfo::default()).collect();
-        let split_info_slice = SplitInfoSlice::new(&mut split_info_vec);
-
-        let mut tree = Tree::new();
-        tree.fit(
-            &bdata,
-            data.index.to_owned(),
-            &col_index,
-            &mut g,
-            h.as_deref_mut(),
-            &splitter,
-            &pool,
-            Some(f32::MAX),
-            &loss,
-            &y_test,
-            SquaredLoss::calc_loss,
-            &yhat,
-            None,
-            None,
-            is_const_hess,
-            &mut hist_tree,
-            None,
-            &split_info_slice,
-            n_nodes_alloc,
-        );
-        println!("{}", tree);
-        println!("tree.nodes.len: {}", tree.nodes.len());
-        println!("data.first: {:?}", data.get_row(10));
-        println!("tree.predict: {}", tree.predict(&data, true, &0.0)[10]);
-        Ok(())
-    }
-
-    #[test]
     fn test_tree_categorical() -> Result<(), Box<dyn Error>> {
+        // instantiate objective function
+        let objective_function = Objective::LogLoss;
+
         let n_bins = 256;
         let n_rows = 712;
         let n_columns = 13;
@@ -762,8 +695,9 @@ mod tests {
 
         let y_avg = y.iter().sum::<f64>() / y.len() as f64;
         let yhat = vec![y_avg; y.len()];
-        let (mut grad, mut hess) = LogLoss::calc_grad_hess(&y, &yhat, None, None);
-        let loss = LogLoss::calc_loss(&y, &yhat, None, None);
+        let (mut grad, mut hess) = objective_function.gradient(&y, &yhat, None, None);
+        let is_const_hess = hess.is_none();
+        let loss = objective_function.loss(&y, &yhat, None, None);
 
         let splitter = MissingImputerSplitter::new(0.3, true, ConstraintMap::new());
 
@@ -772,7 +706,7 @@ mod tests {
         let b = bin_matrix(&data, None, n_bins, f64::NAN, Some(&cat_index)).unwrap();
         let bdata = Matrix::new(&b.binned_data, data.rows, data.cols);
         let col_index: Vec<usize> = (0..data.cols).collect();
-        let is_const_hess = false;
+        //let is_const_hess = false;
 
         let n_nodes_alloc = 100;
 
@@ -788,10 +722,11 @@ mod tests {
         let pool = rayon::ThreadPoolBuilder::new().num_threads(2).build().unwrap();
 
         let mut split_info_vec: Vec<SplitInfo> = (0..col_index.len()).map(|_| SplitInfo::default()).collect();
-        let split_info_slice = SplitInfoSlice::new(&mut split_info_vec);
+        let mut split_info_slice = SplitInfoSlice::new(&mut split_info_vec);
 
         let mut tree = Tree::new();
         tree.fit(
+            &objective_function,
             &bdata,
             data.index.to_owned(),
             &col_index,
@@ -802,14 +737,14 @@ mod tests {
             Some(f32::MAX),
             &loss,
             &y,
-            SquaredLoss::calc_loss,
+            //loss_fn.clone(),
             &yhat,
             None,
             None,
             false,
             &mut hist_tree,
             Some(&cat_index),
-            &split_info_slice,
+            &mut split_info_slice,
             n_nodes_alloc,
         );
         println!("{}", tree);
@@ -830,4 +765,6 @@ mod tests {
 
         Ok(())
     }
+
+    // TODO: add test_tree_ranking
 }

@@ -1,18 +1,23 @@
+use crate::custom_objective::CustomObjective;
 use crate::utils::int_map_to_constraint_map;
 use crate::utils::to_value_error;
 use numpy::{IntoPyArray, PyArray1, PyArray2, PyReadonlyArray1};
-use perpetual_rs::booster::booster::MissingNodeTreatment;
-use perpetual_rs::booster::booster::PerpetualBooster as CratePerpetualBooster;
+use perpetual_rs::booster::config::BoosterIO;
+use perpetual_rs::booster::config::MissingNodeTreatment;
 use perpetual_rs::conformal::cqr::CalData;
 use perpetual_rs::constraints::Constraint;
 use perpetual_rs::data::Matrix;
 use perpetual_rs::objective_functions::Objective;
+use perpetual_rs::PerpetualBooster as CratePerpetualBooster;
 use pyo3::exceptions::{PyKeyError, PyValueError};
 use pyo3::prelude::*;
 use pyo3::types::IntoPyDict;
 use pyo3::types::PyDict;
 use pyo3::types::PyType;
+use pyo3::IntoPyObjectExt;
+use pyo3::{Bound, Python};
 use std::collections::{HashMap, HashSet};
+use std::sync::Arc;
 
 #[pyclass(subclass)]
 pub struct PerpetualBooster {
@@ -43,9 +48,12 @@ impl PerpetualBooster {
         iteration_limit,
         memory_limit,
         stopping_rounds,
+        loss,
+        grad,
+        init,
     ))]
-    pub fn new(
-        objective: &str,
+    pub fn new<'py>(
+        objective: Option<&str>,
         budget: f32,
         max_bin: u16,
         num_threads: Option<usize>,
@@ -64,8 +72,18 @@ impl PerpetualBooster {
         iteration_limit: Option<usize>,
         memory_limit: Option<f32>,
         stopping_rounds: Option<usize>,
+        loss: Option<Bound<'py, PyAny>>,
+        grad: Option<Bound<'py, PyAny>>,
+        init: Option<Bound<'py, PyAny>>,
     ) -> PyResult<Self> {
-        let objective_ = to_value_error(serde_plain::from_str(objective))?;
+        let objective_ = match objective {
+            Some(obj) => to_value_error(serde_plain::from_str(obj))?,
+            None => Objective::Custom(Arc::new(CustomObjective {
+                loss: loss.unwrap().to_owned().into(),
+                grad: grad.unwrap().to_owned().into(),
+                init: init.unwrap().to_owned().into(),
+            })),
+        };
         let missing_node_treatment_ = to_value_error(serde_plain::from_str(missing_node_treatment))?;
         let monotone_constraints_ = int_map_to_constraint_map(monotone_constraints)?;
 
@@ -98,99 +116,99 @@ impl PerpetualBooster {
     #[setter]
     fn set_objective(&mut self, value: &str) -> PyResult<()> {
         let objective_ = to_value_error(serde_plain::from_str(value))?;
-        self.booster.objective = objective_;
+        self.booster.cfg.objective = objective_;
         Ok(())
     }
     #[setter]
     fn set_budget(&mut self, value: f32) -> PyResult<()> {
-        self.booster.budget = value;
+        self.booster.cfg.budget = value;
         Ok(())
     }
     #[setter]
     fn set_max_bin(&mut self, value: u16) -> PyResult<()> {
-        self.booster.max_bin = value;
+        self.booster.cfg.max_bin = value;
         Ok(())
     }
     #[setter]
     fn set_num_threads(&mut self, value: Option<usize>) -> PyResult<()> {
-        self.booster.num_threads = value;
+        self.booster.cfg.num_threads = value;
         Ok(())
     }
     #[setter]
     fn set_monotone_constraints(&mut self, value: HashMap<usize, i8>) -> PyResult<()> {
         let map = int_map_to_constraint_map(value)?;
-        self.booster.monotone_constraints = Some(map);
+        self.booster.cfg.monotone_constraints = Some(map);
         Ok(())
     }
     #[setter]
     fn set_force_children_to_bound_parent(&mut self, value: bool) -> PyResult<()> {
-        self.booster.force_children_to_bound_parent = value;
+        self.booster.cfg.force_children_to_bound_parent = value;
         Ok(())
     }
     #[setter]
     fn set_missing(&mut self, value: f64) -> PyResult<()> {
-        self.booster.missing = value;
+        self.booster.cfg.missing = value;
         Ok(())
     }
     #[setter]
     fn set_allow_missing_splits(&mut self, value: bool) -> PyResult<()> {
-        self.booster.allow_missing_splits = value;
+        self.booster.cfg.allow_missing_splits = value;
         Ok(())
     }
     #[setter]
     fn set_create_missing_branch(&mut self, value: bool) -> PyResult<()> {
-        self.booster.create_missing_branch = value;
+        self.booster.cfg.create_missing_branch = value;
         Ok(())
     }
     #[setter]
     fn set_terminate_missing_features(&mut self, value: HashSet<usize>) -> PyResult<()> {
-        self.booster.terminate_missing_features = value;
+        self.booster.cfg.terminate_missing_features = value;
         Ok(())
     }
     #[setter]
     fn set_missing_node_treatment(&mut self, value: &str) -> PyResult<()> {
         let missing_node_treatment_ = to_value_error(serde_plain::from_str(value))?;
-        self.booster.missing_node_treatment = missing_node_treatment_;
+        self.booster.cfg.missing_node_treatment = missing_node_treatment_;
         Ok(())
     }
     #[setter]
     fn set_log_iterations(&mut self, value: usize) -> PyResult<()> {
-        self.booster.log_iterations = value;
+        self.booster.cfg.log_iterations = value;
         Ok(())
     }
     #[setter]
     fn set_quantile(&mut self, value: Option<f64>) -> PyResult<()> {
-        self.booster.quantile = value;
+        self.booster.cfg.quantile = value;
         Ok(())
     }
     #[setter]
     fn set_reset(&mut self, value: Option<bool>) -> PyResult<()> {
-        self.booster.reset = value;
+        self.booster.cfg.reset = value;
         Ok(())
     }
     #[setter]
     fn set_categorical_features(&mut self, value: Option<HashSet<usize>>) -> PyResult<()> {
-        self.booster.categorical_features = value;
+        self.booster.cfg.categorical_features = value;
         Ok(())
     }
     #[setter]
     fn set_timeout(&mut self, value: Option<f32>) -> PyResult<()> {
-        self.booster.timeout = value;
+        self.booster.cfg.timeout = value;
         Ok(())
     }
     #[setter]
     fn set_iteration_limit(&mut self, value: Option<usize>) -> PyResult<()> {
-        self.booster.iteration_limit = value;
+        self.booster.cfg.iteration_limit = value;
         Ok(())
     }
     #[setter]
     fn set_memory_limit(&mut self, value: Option<f32>) -> PyResult<()> {
-        self.booster.memory_limit = value;
+        self.booster.cfg.memory_limit = value;
         Ok(())
     }
     #[setter]
     fn set_stopping_rounds(&mut self, value: Option<usize>) -> PyResult<()> {
-        self.booster.stopping_rounds = value;
+        self.booster.cfg.stopping_rounds = value;
         Ok(())
     }
 
@@ -210,6 +228,7 @@ impl PerpetualBooster {
         cols: usize,
         y: PyReadonlyArray1<f64>,
         sample_weight: Option<PyReadonlyArray1<f64>>,
+        group: Option<PyReadonlyArray1<u64>>,
     ) -> PyResult<()> {
         let flat_data = flat_data.as_slice()?;
         let data = Matrix::new(flat_data, rows, cols);
@@ -221,8 +240,15 @@ impl PerpetualBooster {
             }
             None => None,
         };
+        let group_ = match group.as_ref() {
+            Some(gr) => {
+                let gr_slice = gr.as_slice()?;
+                Some(gr_slice)
+            }
+            None => None,
+        };
 
-        match self.booster.fit(&data, y, sample_weight_) {
+        match self.booster.fit(&data, y, sample_weight_, group_) {
             Ok(m) => Ok(m),
             Err(e) => Err(PyValueError::new_err(e.to_string())),
         }?;
@@ -237,6 +263,7 @@ impl PerpetualBooster {
         cols: usize,
         y: PyReadonlyArray1<f64>,
         sample_weight: Option<PyReadonlyArray1<f64>>,
+        group: Option<PyReadonlyArray1<u64>>,
     ) -> PyResult<()> {
         let flat_data = flat_data.as_slice()?;
         let data = Matrix::new(flat_data, rows, cols);
@@ -248,8 +275,15 @@ impl PerpetualBooster {
             }
             None => None,
         };
+        let group_ = match group.as_ref() {
+            Some(gr) => {
+                let gr_slice = gr.as_slice()?;
+                Some(gr_slice)
+            }
+            None => None,
+        };
 
-        match self.booster.prune(&data, y, sample_weight_) {
+        match self.booster.prune(&data, y, sample_weight_, group_) {
             Ok(m) => Ok(m),
             Err(e) => Err(PyValueError::new_err(e.to_string())),
         }?;
@@ -269,6 +303,7 @@ impl PerpetualBooster {
         y_cal: PyReadonlyArray1<f64>,
         alpha: PyReadonlyArray1<f64>,
         sample_weight: Option<PyReadonlyArray1<f64>>,
+        group: Option<PyReadonlyArray1<u64>>,
     ) -> PyResult<()> {
         let flat_data = flat_data.as_slice()?;
         let data = Matrix::new(flat_data, rows, cols);
@@ -280,6 +315,13 @@ impl PerpetualBooster {
             }
             None => None,
         };
+        let group_ = match group.as_ref() {
+            Some(gr) => {
+                let gr_slice = gr.as_slice()?;
+                Some(gr_slice)
+            }
+            None => None,
+        };
 
         let flat_data_cal = flat_data_cal.as_slice()?;
         let data_cal = Matrix::new(flat_data_cal, rows_cal, cols_cal);
@@ -287,7 +329,7 @@ impl PerpetualBooster {
 
         let cal_data: CalData = (data_cal, y_cal, alpha.as_slice()?);
 
-        match self.booster.calibrate(&data, y, sample_weight_, cal_data) {
+        match self.booster.calibrate(&data, y, sample_weight_, group_, cal_data) {
             Ok(m) => Ok(m),
             Err(e) => Err(PyValueError::new_err(e.to_string())),
         }?;
@@ -353,14 +395,14 @@ impl PerpetualBooster {
         rows: usize,
         cols: usize,
         parallel: Option<bool>,
-    ) -> PyResult<PyObject> {
+    ) -> PyResult<Py<PyAny>> {
         let flat_data = flat_data.as_slice()?;
         let data = Matrix::new(flat_data, rows, cols);
         let parallel = parallel.unwrap_or(true);
 
         let value: Vec<Vec<HashSet<usize>>> = self.booster.predict_nodes(&data, parallel);
 
-        Ok(value.into_py(py))
+        value.into_py_any(py)
     }
 
     pub fn predict_contributions<'py>(
@@ -446,13 +488,14 @@ impl PerpetualBooster {
         Ok(PerpetualBooster { booster })
     }
 
-    pub fn get_params(&self, py: Python) -> PyResult<PyObject> {
-        let objective_ = to_value_error(serde_plain::to_string::<Objective>(&self.booster.objective))?;
+    pub fn get_params(&self, py: Python) -> PyResult<Py<PyAny>> {
+        let objective_ = to_value_error(serde_plain::to_string::<Objective>(&self.booster.cfg.objective))?;
         let missing_node_treatment_ = to_value_error(serde_plain::to_string::<MissingNodeTreatment>(
-            &self.booster.missing_node_treatment,
+            &self.booster.cfg.missing_node_treatment,
         ))?;
         let monotone_constraints_: HashMap<usize, i8> = self
             .booster
+            .cfg
             .monotone_constraints
             .as_ref()
             .unwrap_or(&HashMap::new())
@@ -467,37 +510,60 @@ impl PerpetualBooster {
             })
             .collect();
 
-        let key_vals: Vec<(&str, PyObject)> = vec![
-            ("objective", objective_.to_object(py)),
-            ("budget", self.booster.budget.to_object(py)),
-            ("num_threads", self.booster.num_threads.to_object(py)),
-            ("allow_missing_splits", self.booster.allow_missing_splits.to_object(py)),
-            ("monotone_constraints", monotone_constraints_.to_object(py)),
-            ("missing", self.booster.missing.to_object(py)),
+        let key_vals: Vec<(&str, Py<PyAny>)> = vec![
+            ("objective", objective_.into_py_any(py).unwrap()),
+            ("budget", self.booster.cfg.budget.into_py_any(py).unwrap()),
+            ("num_threads", self.booster.cfg.num_threads.into_py_any(py).unwrap()),
+            (
+                "allow_missing_splits",
+                self.booster.cfg.allow_missing_splits.into_py_any(py).unwrap(),
+            ),
+            ("monotone_constraints", monotone_constraints_.into_py_any(py).unwrap()),
+            ("missing", self.booster.cfg.missing.into_py_any(py).unwrap()),
             (
                 "create_missing_branch",
-                self.booster.create_missing_branch.to_object(py),
+                self.booster.cfg.create_missing_branch.into_py_any(py).unwrap(),
             ),
             (
                 "terminate_missing_features",
-                self.booster.terminate_missing_features.to_object(py),
+                self.booster
+                    .cfg
+                    .terminate_missing_features
+                    .clone()
+                    .into_py_any(py)
+                    .unwrap(),
             ),
-            ("missing_node_treatment", missing_node_treatment_.to_object(py)),
-            ("log_iterations", self.booster.log_iterations.to_object(py)),
+            (
+                "missing_node_treatment",
+                missing_node_treatment_.into_py_any(py).unwrap(),
+            ),
+            (
+                "log_iterations",
+                self.booster.cfg.log_iterations.into_py_any(py).unwrap(),
+            ),
             (
                 "force_children_to_bound_parent",
-                self.booster.force_children_to_bound_parent.to_object(py),
+                self.booster.cfg.force_children_to_bound_parent.into_py_any(py).unwrap(),
             ),
-            ("quantile", self.booster.quantile.to_object(py)),
-            ("reset", self.booster.reset.to_object(py)),
-            ("categorical_features", self.booster.categorical_features.to_object(py)),
-            ("timeout", self.booster.timeout.to_object(py)),
-            ("iteration_limit", self.booster.iteration_limit.to_object(py)),
-            ("memory_limit", self.booster.memory_limit.to_object(py)),
-            ("stopping_rounds", self.booster.stopping_rounds.to_object(py)),
+            ("quantile", self.booster.cfg.quantile.into_py_any(py).unwrap()),
+            ("reset", self.booster.cfg.reset.into_py_any(py).unwrap()),
+            (
+                "categorical_features",
+                self.booster.cfg.categorical_features.clone().into_py_any(py).unwrap(),
+            ),
+            ("timeout", self.booster.cfg.timeout.into_py_any(py).unwrap()),
+            (
+                "iteration_limit",
+                self.booster.cfg.iteration_limit.into_py_any(py).unwrap(),
+            ),
+            ("memory_limit", self.booster.cfg.memory_limit.into_py_any(py).unwrap()),
+            (
+                "stopping_rounds",
+                self.booster.cfg.stopping_rounds.into_py_any(py).unwrap(),
+            ),
         ];
-        let dict = key_vals.into_py_dict_bound(py);
+        let dict = key_vals.into_py_dict(py);
 
-        Ok(dict.into_pyobject(py)?.into())
+        Ok(dict?.into_py_any(py)?)
     }
 }

@@ -15,7 +15,7 @@
 
 # Perpetual
 
-PerpetualBooster is a gradient boosting machine (GBM) algorithm that doesn't need hyperparameter optimization unlike other GBM algorithms. Similar to AutoML libraries, it has a `budget` parameter. Increasing the `budget` parameter increases the predictive power of the algorithm and gives better results on unseen data. Start with a small budget (e.g. 0.5) and increase it (e.g. 1.0) once you are confident with your features. If you don't see any improvement with further increasing the `budget`, it means that you are already extracting the most predictive power out of your data.
+PerpetualBooster is a gradient boosting machine (GBM) algorithm that doesn't need hyperparameter optimization unlike other GBMs. Similar to AutoML libraries, it has a `budget` parameter. Increasing the `budget` parameter increases the predictive power of the algorithm and gives better results on unseen data. Start with a small budget (e.g. 0.5) and increase it (e.g. 1.0) once you are confident with your features. If you don't see any improvement with further increasing the `budget`, it means that you are already extracting the most predictive power out of your data.
 
 ## Usage
 
@@ -128,3 +128,7 @@ Contributions are welcome. Check CONTRIBUTING.md for the guideline.
 ## Paper
 
 PerpetualBooster prevents overfitting with a generalization algorithm. The paper is work-in-progress to explain how the algorithm works. Check our [blog post](https://perpetual-ml.com/blog/how-perpetual-works) for a high level introduction to the algorithm.
+
+## Perpetual ML Suite
+
+Perpetual ML Suite is a data warehouse-native, batteries included ML platform where you can get the best predictive power in the shortest amount of time, easily track and compare all your model experiments, instantly deploy models for batch or real-time inference, effortlessly monitor your metrics, data drift, and concept drift, continuously learn from real-time data from a single, intuitive web interface that integrates directly with your existing data warehouse. It is [available on Snowflake marketplace](https://app.snowflake.com/marketplace/listing/GZSYZX0EMJ/perpetual-ml-perpetual-ml-suite), under development for Databricks with future plans to expand to other data warehousing solutions.

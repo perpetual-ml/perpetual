@@ -34,7 +34,9 @@ impl Bin {
         }
     }
 
-    pub fn from_parent_child(root_bin: *mut Bin, child_bin: *mut Bin, update_bin: *mut Bin) {
+    /// # Safety
+    /// Updates a `Bin` by subtracting the values of another `Bin` from a parent `Bin`.
+    pub unsafe fn from_parent_child(root_bin: *mut Bin, child_bin: *mut Bin, update_bin: *mut Bin) {
         let rb = unsafe { root_bin.as_ref().unwrap() };
         let cb = unsafe { child_bin.as_ref().unwrap() };
         let ub = unsafe { update_bin.as_mut().unwrap() };
@@ -58,7 +60,31 @@ impl Bin {
         };
     }
 
-    pub fn from_parent_two_children(
+    /// Updates a `Bin` by subtracting the values of two other `Bin`s from a parent `Bin`.
+    /// This operation is performed on the `g_folded`, `counts`, and `h_folded` fields.
+    ///
+    /// # Arguments
+    ///
+    /// * `root_bin`: A mutable raw pointer to the parent `Bin`.
+    /// * `first_bin`: A mutable raw pointer to the first child `Bin`.
+    /// * `second_bin`: A mutable raw pointer to the second child `Bin`.
+    /// * `update_bin`: A mutable raw pointer to the `Bin` that will be updated.
+    ///
+    /// # Safety
+    ///
+    /// This function is unsafe because it dereferences raw pointers (`*mut Bin`).
+    /// The caller must ensure the following conditions are met to avoid undefined behavior:
+    ///
+    /// * All pointers (`root_bin`, `first_bin`, `second_bin`, `update_bin`) must be
+    ///   **valid** and **non-null**.
+    /// * The memory pointed to by each of these pointers must be **valid** for reads
+    ///   and writes (for `update_bin`).
+    /// * The data structures (`g_folded`, `counts`, `h_folded`) within the `Bin`s
+    ///   must be in a valid state for the operations being performed.
+    /// * The `h_folded` fields of `root_bin`, `first_bin`, and `second_bin` must all be
+    ///   `Some` or all be `None` to prevent a panic when `unwrap()` is called.
+    /// * The `h_folded` field of `update_bin` must be a valid `Some` variant if the others are.
+    pub unsafe fn from_parent_two_children(
         root_bin: *mut Bin,
         first_bin: *mut Bin,
         second_bin: *mut Bin,
@@ -148,11 +174,13 @@ mod tests {
         let mut child_bin = Bin::empty_const_hess(1, 0.0);
         child_bin.counts = [9, 8, 7, 6, 5];
         let mut update_bin = Bin::empty_const_hess(2, 0.0);
-        Bin::from_parent_child(
-            &mut root_bin as *mut Bin,
-            &mut child_bin as *mut Bin,
-            &mut update_bin as *mut Bin,
-        );
+        unsafe {
+            Bin::from_parent_child(
+                &mut root_bin as *mut Bin,
+                &mut child_bin as *mut Bin,
+                &mut update_bin as *mut Bin,
+            )
+        };
         assert!(update_bin.counts == [1, 2, 3, 4, 5]);
     }
 }

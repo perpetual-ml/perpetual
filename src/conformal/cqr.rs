@@ -1,4 +1,5 @@
-use crate::{errors::PerpetualError, objective_functions::Objective, utils::percentiles, Matrix, PerpetualBooster};
+use crate::objective_functions::objective::Objective;
+use crate::{errors::PerpetualError, utils::percentiles, Matrix, PerpetualBooster};
 use std::collections::HashMap;
 
 pub type CalData<'a> = (Matrix<'a, f64>, &'a [f64], &'a [f64]); // (x_flat_data, rows, cols), y, alpha
@@ -11,22 +12,24 @@ impl PerpetualBooster {
         data: &Matrix<f64>,
         y: &[f64],
         sample_weight: Option<&[f64]>,
+        group: Option<&[u64]>,
         data_cal: CalData,
     ) -> Result<(), PerpetualError> {
         let (x_cal, y_cal, alpha) = data_cal;
 
         for alpha_ in alpha {
             let lower_quantile = Some(alpha_ / 2.0);
-            let mut model_lower = PerpetualBooster::default()
-                .set_objective(Objective::QuantileLoss)
-                .set_quantile(lower_quantile);
-            model_lower.fit(&data, &y, sample_weight)?;
+            let mut model_lower = PerpetualBooster::default().set_objective(Objective::QuantileLoss {
+                quantile: lower_quantile,
+            });
+            model_lower.fit(data, y, sample_weight, group)?;
 
             let upper_quantile = Some(1.0 - alpha_ / 2.0);
-            let mut model_upper = PerpetualBooster::default()
-                .set_objective(Objective::QuantileLoss)
-                .set_quantile(upper_quantile);
-            model_upper.fit(&data, &y, sample_weight)?;
+            let mut model_upper = PerpetualBooster::default().set_objective(Objective::QuantileLoss {
+                quantile: upper_quantile,
+            });
+
+            model_upper.fit(data, y, sample_weight, group)?;
 
             let y_cal_pred_lower = model_lower.predict(&x_cal, true);
             let y_cal_pred_upper = model_upper.predict(&x_cal, true);
@@ -34,8 +37,8 @@ impl PerpetualBooster {
             for i in 0..y_cal.len() {
                 scores.push(f64::max(y_cal_pred_lower[i] - y_cal[i], y_cal[i] - y_cal_pred_upper[i]));
             }
-            let perc = (1.0 - (*alpha_ as f64)) * (1.0 + 1.0 * (1.0 / (scores.len() as f64)));
-            let score = percentiles(&scores, &vec![1.0; scores.len()], &vec![perc])[0];
+            let perc = (1.0 - *alpha_) * (1.0 + 1.0 * (1.0 / (scores.len() as f64)));
+            let score = percentiles(&scores, &vec![1.0; scores.len()], &[perc])[0];
             self.cal_models
                 .insert(alpha_.to_string(), [(model_lower, -score), (model_upper, score)]);
         }
@@ -63,10 +66,13 @@ impl PerpetualBooster {
     }
 }
 
+// Unit-tests
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::objective_functions::Objective;
+
+    use crate::objective_functions::objective::Objective;
+    use crate::Matrix;
+    use crate::PerpetualBooster;
     use polars::io::SerReader;
     use polars::prelude::{CsvReadOptions, DataType};
     use std::error::Error;
@@ -163,12 +169,12 @@ mod tests {
             .set_max_bin(10)
             .set_budget(0.1);
 
-        model.fit(&matrix_train, &y_train, None)?;
+        model.fit(&matrix_train, &y_train, None, None)?;
 
         let alpha = vec![0.1];
         let data_cal = (matrix_test, y_test.as_slice(), alpha.as_slice());
 
-        model.calibrate(&matrix_train, &y_train, None, data_cal)?;
+        model.calibrate(&matrix_train, &y_train, None, None, data_cal)?;
 
         let matrix_test = Matrix::new(&data_test, y_test.len(), 8);
         let _intervals = model.predict_intervals(&matrix_test, true);

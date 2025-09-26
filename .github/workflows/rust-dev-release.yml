@@ -1,0 +1,93 @@
+name: Dev Release
+
+on:
+  push:
+    branches:
+      - development
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Needed for git history and tags
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+
+      - name: Install cargo-edit
+        # Removed '--features vendored-openssl' as it's no longer supported by cargo-edit
+        run: cargo install cargo-edit
+
+      - name: Get current version
+        id: get_version
+        run: |
+          # Use awk to precisely extract the version from the [package] section
+          # This ensures we get "0.9.3" and not a concatenated string.
+          VERSION=$(awk '/^\[package\]/{p=1} p && /^version = "/{print $3; exit}' Cargo.toml | tr -d '"' | tr -d '\n' | tr -d '\r')
+          echo "Extracted CURRENT_VERSION: $VERSION" # Added for debugging
+          echo "CURRENT_VERSION=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Generate new dev version
+        id: generate_dev_version
+        run: |
+          CURRENT_VERSION="${{ steps.get_version.outputs.CURRENT_VERSION }}"
+          echo "Current version from Cargo.toml: $CURRENT_VERSION"
+
+          # Check if the current version is already a pre-release (e.g., 0.9.3-dev.X)
+          if [[ "$CURRENT_VERSION" =~ -dev\.([0-9]+)$ ]]; then
+            # It's already a dev version, increment the dev counter
+            MAJOR_MINOR_PATCH_BASE=$(echo "$CURRENT_VERSION" | sed 's/-dev\..*//')
+            DEV_NUM=$((BASH_REMATCH[1] + 1))
+            NEW_DEV_VERSION="${MAJOR_MINOR_PATCH_BASE}-dev.${DEV_NUM}"
+            echo "Incrementing existing dev version to: $NEW_DEV_VERSION"
+          else
+            # It's a stable version (e.g., 0.9.3)
+            # Increment the patch version for the base of the new dev release
+            IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT_VERSION"
+            NEXT_PATCH=$((PATCH + 1))
+            BASE_VERSION="${MAJOR}.${MINOR}.${NEXT_PATCH}"
+
+            # Get the latest dev version number for this *new* base version from existing tags
+            # This handles cases where v0.9.4-dev.X might already exist
+            LATEST_DEV_TAG=$(git tag -l "v${BASE_VERSION}-dev.*" --sort=-v:refname | head -n 1)
+            DEV_VERSION_NUM=0
+            if [[ "$LATEST_DEV_TAG" =~ -dev\.([0-9]+)$ ]]; then
+              DEV_VERSION_NUM=$((BASH_REMATCH[1] + 1))
+            fi
+            NEW_DEV_VERSION="${BASE_VERSION}-dev.${DEV_VERSION_NUM}"
+            echo "Starting new dev cycle from stable version. New dev version: $NEW_DEV_VERSION"
+          fi
+
+          echo "NEW_DEV_VERSION=$NEW_DEV_VERSION" >> "$GITHUB_OUTPUT"
+          echo "Generated new dev version: $NEW_DEV_VERSION"
+
+      - name: Update Cargo.toml version
+        run: |
+          cargo set-version ${{ steps.generate_dev_version.outputs.NEW_DEV_VERSION }}
+          echo "Updated Cargo.toml to version: ${{ steps.generate_dev_version.outputs.NEW_DEV_VERSION }}"
+
+      - name: Commit and push Cargo.toml changes
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email github-actions[bot]@users.noreply.github.com
+          git add Cargo.toml
+          git commit -m "Bump to dev version: ${{ steps.generate_dev_version.outputs.NEW_DEV_VERSION }}" || echo "No changes to commit"
+          git push
+
+      - name: Publish Crate
+        env:
+          CRATES_TOKEN: ${{ secrets.CRATES_TOKEN }} # Changed to CRATES_TOKEN as requested
+        run: |
+          cargo publish --token "$CRATES_TOKEN" --allow-dirty # Added --allow-dirty and quotes for robustness
+
+      - name: Create Git Tag
+        run: |
+          TAG_NAME="v${{ steps.generate_dev_version.outputs.NEW_DEV_VERSION }}"
+          git tag "$TAG_NAME" # Added quotes for robustness
+          git push origin "$TAG_NAME" # Added quotes for robustness
+          echo "Created and pushed tag: $TAG_NAME"

@@ -1,4 +1,5 @@
 mod booster;
+mod custom_objective;
 mod multi_output;
 mod utils;
 
