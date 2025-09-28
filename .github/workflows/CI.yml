@@ -77,7 +77,7 @@ jobs:
         run: pip install perpetual --no-index --find-links dist --no-deps --force-reinstall
       - name: Run Package Tests
         run: |
-          pip install pytest pytest-cov black ruff setuptools --upgrade
+          pip install pytest pytest-cov black ruff setuptools typing-extensions --upgrade
           cd python-package
           ruff check .
           black --check .
@@ -130,7 +130,7 @@ jobs:
         run: pip install perpetual --no-index --find-links dist --no-deps --force-reinstall
       - name: Run Package Tests
         run: |
-          pip install pytest pytest-cov black ruff setuptools --upgrade
+          pip install pytest pytest-cov black ruff setuptools typing-extensions --upgrade
           cd python-package
           ruff check .
           black --check .
@@ -185,7 +185,7 @@ jobs:
         run: pip install perpetual --no-index --find-links dist --no-deps --force-reinstall
       - name: Run Package Tests
         run: |
-          pip install pytest pytest-cov black ruff setuptools --upgrade
+          pip install pytest pytest-cov black ruff setuptools typing-extensions --upgrade
           cd python-package
           ruff check .
           black --check .
@@ -239,7 +239,7 @@ jobs:
         run: pip install perpetual --no-index --find-links dist --no-deps --force-reinstall
       - name: Run Package Tests
         run: |
-          pip install pytest pytest-cov black ruff setuptools --upgrade
+          pip install pytest pytest-cov black ruff setuptools typing-extensions --upgrade
           cd python-package
           ruff check .
           black --check .
