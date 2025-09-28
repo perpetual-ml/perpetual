@@ -18,6 +18,8 @@ jobs:
         # The script also needs the general deps like pandas, scikit-learn.
         run: |
           pip install numpy pandas seaborn scikit-learn toml
+          cp README.md python-package/README.md
+          cp LICENSE python-package/LICENSE  
           mkdir -p resources # Ensure directory exists before make_resources.py runs
           cd python-package
           python -m pip install -e .[dev]
