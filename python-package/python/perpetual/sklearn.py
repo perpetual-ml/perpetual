@@ -1,10 +1,11 @@
 import warnings
 from types import FunctionType
-from typing import Any, Dict, Optional, Self, Tuple, Union
+from typing import Any, Dict, Optional, Tuple, Union
 
 from perpetual.booster import PerpetualBooster
 from sklearn.base import ClassifierMixin, RegressorMixin
 from sklearn.metrics import accuracy_score, r2_score
+from typing_extensions import Self
 
 
 class PerpetualClassifier(PerpetualBooster, ClassifierMixin):
