@@ -2,13 +2,52 @@ name: Test and Deploy
 on: [pull_request]
 
 jobs:
+  # 1. Job to create and upload the resources/data files
+  prepare-resources:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11" # Choose a single, compatible python version
+          architecture: x64
+      - name: Install dependencies for resource creation
+        # Note: 'perpetual.utils' suggests 'perpetual' is a dependency, 
+        # so we install it in editable mode to get its dependencies (like .[dev]).
+        # The script also needs the general deps like pandas, scikit-learn.
+        run: |
+          pip install numpy pandas seaborn scikit-learn toml
+          cp README.md python-package/README.md
+          cp LICENSE python-package/LICENSE  
+          mkdir -p resources # Ensure directory exists before make_resources.py runs
+          cd python-package
+          python -m pip install -e .[dev]
+          cd ..
+      - name: Build test data (create resources)
+        # The script 'make_resources.py' creates the resources directory and files.
+        run: python scripts/make_resources.py
+      - name: Upload Resources Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: perpetual-resources
+          path: resources
+          retention-days: 1 # Keep artifacts for a short time
+
+  # 2. Windows Build and Test Job (depends on resources)
   windows-build-test:
+    needs: prepare-resources # This job waits for prepare-resources to complete
     strategy:
       matrix:
         pyversion: ["3.9", "3.10", "3.11", "3.12", "3.13"]
     runs-on: "windows-latest"
     steps:
       - uses: actions/checkout@v4
+      - name: Download Resources Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: perpetual-resources
+          path: resources # Downloads the files into the 'resources' directory
       - name: Install latests stable Rust
         uses: dtolnay/rust-toolchain@stable
         with:
@@ -22,12 +61,12 @@ jobs:
       - run: |
           cp README.md python-package/README.md
           cp LICENSE python-package/LICENSE
-      - name: Build test data
+      - name: Build test data (Install perpetual with its dev dependencies)
+        # Note: The actual resource *generation* is skipped, but we still need the dev install
         run: |
           cd python-package
           python -m pip install -e .[dev]
           cd ..
-          python scripts/make_resources.py
       - name: Build wheels with maturin
         uses: PyO3/maturin-action@v1
         with:
@@ -38,7 +77,7 @@ jobs:
         run: pip install perpetual --no-index --find-links dist --no-deps --force-reinstall
       - name: Run Package Tests
         run: |
-          pip install pytest pytest-cov black ruff setuptools --upgrade
+          pip install pytest pytest-cov black ruff setuptools typing-extensions --upgrade
           cd python-package
           ruff check .
           black --check .
@@ -50,7 +89,9 @@ jobs:
           name: dist-windows-${{ matrix.pyversion }}
           path: dist
 
+  # 3. macOS Build and Test Job (depends on resources)
   macos-build-test:
+    needs: prepare-resources
     strategy:
       matrix:
         pyversion: ["3.11", "3.12", "3.13"]
@@ -58,6 +99,11 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
+      - name: Download Resources Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: perpetual-resources
+          path: resources
       - name: Install latest stable Rust
         uses: dtolnay/rust-toolchain@stable
         with:
@@ -70,12 +116,11 @@ jobs:
       - run: |
           cp README.md python-package/README.md
           cp LICENSE python-package/LICENSE
-      - name: Build test data
+      - name: Build test data (Install perpetual with its dev dependencies)
         run: |
           cd python-package
           python -m pip install -e .[dev]
           cd ..
-          python scripts/make_resources.py
       - name: Build wheels with maturin
         uses: PyO3/maturin-action@v1
         with:
@@ -85,7 +130,7 @@ jobs:
         run: pip install perpetual --no-index --find-links dist --no-deps --force-reinstall
       - name: Run Package Tests
         run: |
-          pip install pytest pytest-cov black ruff setuptools --upgrade
+          pip install pytest pytest-cov black ruff setuptools typing-extensions --upgrade
           cd python-package
           ruff check .
           black --check .
@@ -97,13 +142,20 @@ jobs:
           name: dist-${{ matrix.os }}-${{ matrix.pyversion }}
           path: dist
 
+  # 4. Linux x64 Build and Test Job (depends on resources)
   linux-build-test:
+    needs: prepare-resources
     runs-on: ubuntu-latest
     strategy:
       matrix:
         pyversion: ["3.9", "3.10", "3.11", "3.12", "3.13"]
     steps:
       - uses: actions/checkout@v4
+      - name: Download Resources Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: perpetual-resources
+          path: resources
       - name: Install latests stable Rust
         uses: dtolnay/rust-toolchain@stable
         with:
@@ -117,12 +169,11 @@ jobs:
       - run: |
           cp README.md python-package/README.md
           cp LICENSE python-package/LICENSE
-      - name: Build test data
+      - name: Build test data (Install perpetual with its dev dependencies)
         run: |
           cd python-package
           python -m pip install -e .[dev]
           cd ..
-          python scripts/make_resources.py
       - name: Build wheels with maturin
         uses: PyO3/maturin-action@v1
         with:
@@ -134,7 +185,7 @@ jobs:
         run: pip install perpetual --no-index --find-links dist --no-deps --force-reinstall
       - name: Run Package Tests
         run: |
-          pip install pytest pytest-cov black ruff setuptools --upgrade
+          pip install pytest pytest-cov black ruff setuptools typing-extensions --upgrade
           cd python-package
           ruff check .
           black --check .
@@ -146,13 +197,20 @@ jobs:
           name: dist-linux-${{ matrix.pyversion }}
           path: dist
 
+  # 5. Linux ARM Build and Test Job (depends on resources)
   linux-arm-build-test:
+    needs: prepare-resources
     runs-on: ubuntu-24.04-arm
     strategy:
       matrix:
         pyversion: ["3.9", "3.10", "3.11", "3.12", "3.13"]
     steps:
       - uses: actions/checkout@v4
+      - name: Download Resources Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: perpetual-resources
+          path: resources
       - name: Install latests stable Rust
         uses: dtolnay/rust-toolchain@stable
         with:
@@ -166,12 +224,11 @@ jobs:
       - run: |
           cp README.md python-package/README.md
           cp LICENSE python-package/LICENSE
-      - name: Build test data
+      - name: Build test data (Install perpetual with its dev dependencies)
         run: |
           cd python-package
           python -m pip install -e .[dev]
           cd ..
-          python scripts/make_resources.py
       - name: Build wheels with maturin
         uses: PyO3/maturin-action@v1
         with:
@@ -182,7 +239,7 @@ jobs:
         run: pip install perpetual --no-index --find-links dist --no-deps --force-reinstall
       - name: Run Package Tests
         run: |
-          pip install pytest pytest-cov black ruff setuptools --upgrade
+          pip install pytest pytest-cov black ruff setuptools typing-extensions --upgrade
           cd python-package
           ruff check .
           black --check .
@@ -194,10 +251,17 @@ jobs:
           name: dist-linux-arm-${{ matrix.pyversion }}
           path: dist
 
+  # 6. Cargo Test Job (depends on resources)
   cargo-build-test:
+    needs: prepare-resources
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Download Resources Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: perpetual-resources
+          path: resources
       - name: Install latest stable Rust
         uses: dtolnay/rust-toolchain@stable
         with:
@@ -211,11 +275,12 @@ jobs:
       - run: |
           cp README.md python-package/README.md
           cp LICENSE python-package/LICENSE
-      - name: Build test data
+      - name: Build test data (Install perpetual with its dev dependencies)
         run: |
           cd python-package
           python -m pip install -e .[dev]
           cd ..
-          python scripts/make_resources.py
       - name: Run tests
+        # Cargo tests in the Rust package might still need the 'resources' folder
+        # to exist and contain the data, which is now guaranteed by the download step.
         run: cargo test --verbose
