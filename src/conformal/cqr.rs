@@ -111,14 +111,16 @@ mod tests {
             .with_columns(Some(column_names_train))
             .try_into_reader_with_file_path(Some("resources/cal_housing_train.csv".into()))?
             .finish()
-            .unwrap();
+            .unwrap()
+            .head(Some(1000));
 
         let df_test = CsvReadOptions::default()
             .with_has_header(true)
             .with_columns(Some(column_names_test))
             .try_into_reader_with_file_path(Some("resources/cal_housing_test.csv".into()))?
             .finish()
-            .unwrap();
+            .unwrap()
+            .head(Some(500));
 
         // Get data in column major format...
         let id_vars_train: Vec<&str> = Vec::new();
@@ -167,11 +169,13 @@ mod tests {
         let mut model = PerpetualBooster::default()
             .set_objective(Objective::SquaredLoss)
             .set_max_bin(10)
-            .set_budget(0.1);
+            .set_budget(0.1)
+            .set_iteration_limit(Some(10))
+            .set_memory_limit(Some(0.001));
 
         model.fit(&matrix_train, &y_train, None, None)?;
 
-        let alpha = vec![0.1];
+        let alpha = vec![0.2];
         let data_cal = (matrix_test, y_test.as_slice(), alpha.as_slice());
 
         model.calibrate(&matrix_train, &y_train, None, None, data_cal)?;

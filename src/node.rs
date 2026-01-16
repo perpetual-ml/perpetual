@@ -13,8 +13,6 @@ pub struct SplittableNode {
     pub gain_value: f32,
     pub gradient_sum: f32,
     pub hessian_sum: f32,
-    pub counts_sum: usize,
-    pub depth: usize,
     pub split_value: f64,
     pub split_feature: usize,
     pub split_gain: f32,
@@ -27,11 +25,18 @@ pub struct SplittableNode {
     pub upper_bound: f32,
     pub is_leaf: bool,
     pub is_missing_leaf: bool,
-    pub generalization: Option<f32>,
-    pub node_type: NodeType,
     pub parent_node: usize,
-    pub left_cats: HashSet<usize>,
-    pub right_cats: HashSet<usize>,
+    pub left_cats: Option<HashSet<usize>>,
+    pub stats: Option<Box<NodeStats>>,
+}
+
+/// Statistics stored for each node when save_node_stats is enabled.
+#[derive(Deserialize, Serialize, Clone, Debug)]
+pub struct NodeStats {
+    pub depth: usize,
+    pub node_type: NodeType,
+    pub count: usize,
+    pub generalization: Option<f32>,
     pub weights: [f32; 5],
 }
 
@@ -40,7 +45,6 @@ pub struct Node {
     pub num: usize,
     pub weight_value: f32,
     pub hessian_sum: f32,
-    pub depth: usize,
     pub split_value: f64,
     pub split_feature: usize,
     pub split_gain: f32,
@@ -48,13 +52,9 @@ pub struct Node {
     pub left_child: usize,
     pub right_child: usize,
     pub is_leaf: bool,
-    pub generalization: Option<f32>,
-    pub node_type: NodeType,
     pub parent_node: usize,
-    pub left_cats: HashSet<usize>,
-    pub right_cats: HashSet<usize>,
-    pub count: usize,
-    pub weights: [f32; 5],
+    pub left_cats: Option<HashSet<usize>>,
+    pub stats: Option<Box<NodeStats>>,
 }
 
 impl Ord for SplittableNode {
@@ -80,7 +80,7 @@ impl Eq for SplittableNode {}
 impl Node {
     /// Update all the info that is needed if this node is a
     /// parent node, this consumes the SplitableNode.
-    pub fn make_parent_node(&mut self, split_node: SplittableNode) {
+    pub fn make_parent_node(&mut self, split_node: SplittableNode, eta: f32) {
         self.is_leaf = false;
         self.missing_node = split_node.missing_node;
         self.split_value = split_node.split_value;
@@ -90,23 +90,32 @@ impl Node {
         self.right_child = split_node.right_child;
         self.parent_node = split_node.parent_node;
         self.left_cats = split_node.left_cats;
-        self.right_cats = split_node.right_cats;
+        // If we are keeping stats, update them from the split_node stats.
+        if let Some(stats) = &mut self.stats {
+            if let Some(sn_stats) = split_node.stats {
+                stats.generalization = sn_stats.generalization;
+                stats.weights = sn_stats.weights.map(|x| x * eta);
+            }
+        }
     }
     /// Get the path that should be traveled down, given a value.
     pub fn get_child_idx(&self, v: &f64, missing: &f64) -> usize {
-        if !self.left_cats.is_empty() || !self.right_cats.is_empty() {
-            if self.left_cats.contains(&(*v as usize)) {
+        // Check for missing values FIRST
+        if is_missing(v, missing) {
+            return self.missing_node;
+        }
+
+        // Then check categorical splits
+        if let Some(left_cats) = &self.left_cats {
+            if left_cats.contains(&(*v as usize)) {
                 return self.left_child;
-            } else if self.right_cats.contains(&(*v as usize)) {
-                return self.right_child;
             } else {
-                return self.missing_node;
+                return self.right_child;
             }
         }
 
-        if is_missing(v, missing) {
-            self.missing_node
-        } else if v < &self.split_value {
+        // Finally numerical splits
+        if v < &self.split_value {
             self.left_child
         } else {
             self.right_child
@@ -144,8 +153,6 @@ impl SplittableNode {
             gain_value: node_info.gain,
             gradient_sum: node_info.grad,
             hessian_sum: node_info.cover,
-            counts_sum: node_info.counts,
-            depth,
             split_value: f64::ZERO,
             split_feature: 0,
             split_gain: f32::ZERO,
@@ -158,12 +165,15 @@ impl SplittableNode {
             upper_bound: node_info.bounds.1,
             is_leaf: true,
             is_missing_leaf: false,
-            generalization,
-            node_type,
             parent_node,
-            left_cats: HashSet::new(),
-            right_cats: HashSet::new(),
-            weights: node_info.weights,
+            left_cats: None,
+            stats: Some(Box::new(NodeStats {
+                depth,
+                node_type,
+                count: node_info.counts,
+                generalization,
+                weights: node_info.weights,
+            })),
         }
     }
 
@@ -183,8 +193,7 @@ impl SplittableNode {
         lower_bound: f32,
         upper_bound: f32,
         node_type: NodeType,
-        left_cats: HashSet<usize>,
-        right_cats: HashSet<usize>,
+        left_cats: Option<HashSet<usize>>,
         weights: [f32; 5],
     ) -> Self {
         SplittableNode {
@@ -193,8 +202,6 @@ impl SplittableNode {
             gain_value,
             gradient_sum,
             hessian_sum,
-            counts_sum,
-            depth,
             split_value: f64::ZERO,
             split_feature: 0,
             split_gain: f32::ZERO,
@@ -207,12 +214,15 @@ impl SplittableNode {
             upper_bound,
             is_leaf: true,
             is_missing_leaf: false,
-            generalization: None,
-            node_type,
             parent_node: 0,
             left_cats,
-            right_cats,
-            weights,
+            stats: Some(Box::new(NodeStats {
+                depth,
+                node_type,
+                count: counts_sum,
+                generalization: None,
+                weights,
+            })),
         }
     }
 
@@ -230,8 +240,11 @@ impl SplittableNode {
         self.split_value = split_info.split_value;
         self.missing_node = missing_child;
         self.is_leaf = false;
-        self.left_cats = split_info.left_cats.clone();
-        self.right_cats = split_info.right_cats.clone();
+        self.left_cats = if split_info.left_cats.is_empty() {
+            None
+        } else {
+            Some(split_info.left_cats.clone())
+        };
     }
 
     pub fn get_split_gain(
@@ -247,12 +260,11 @@ impl SplittableNode {
         left_node_info.gain + right_node_info.gain + missing_split_gain - self.gain_value
     }
 
-    pub fn as_node(&self, eta: f32) -> Node {
+    pub fn as_node(&self, eta: f32, save_node_stats: bool) -> Node {
         Node {
             num: self.num,
             weight_value: self.weight_value * eta,
             hessian_sum: self.hessian_sum,
-            depth: self.depth,
             missing_node: self.missing_node,
             split_value: self.split_value,
             split_feature: self.split_feature,
@@ -260,13 +272,19 @@ impl SplittableNode {
             left_child: self.left_child,
             right_child: self.right_child,
             is_leaf: self.is_leaf,
-            generalization: self.generalization,
-            node_type: self.node_type,
             parent_node: self.parent_node,
             left_cats: self.left_cats.clone(),
-            right_cats: self.right_cats.clone(),
-            count: self.counts_sum,
-            weights: self.weights.map(|x| x * eta),
+            stats: if save_node_stats {
+                if let Some(s) = &self.stats {
+                    let mut stats = s.clone();
+                    stats.weights = stats.weights.map(|x| x * eta);
+                    Some(stats)
+                } else {
+                    None
+                }
+            } else {
+                None
+            },
         }
     }
 }

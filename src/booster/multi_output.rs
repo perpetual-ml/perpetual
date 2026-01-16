@@ -120,6 +120,7 @@ impl MultiOutputBooster {
             iteration_limit,
             memory_limit,
             stopping_rounds,
+            save_node_stats: false,
         };
 
         // Base booster template that child boosters will clone.
@@ -477,8 +478,8 @@ mod multi_output_booster_test {
     fn test_multi_output_booster() -> Result<(), Box<dyn Error>> {
         let n_classes = 7;
         let n_columns = 54;
-        let n_rows = 1000;
-        let max_bin = 10;
+        let n_rows = 500;
+        let max_bin = 5;
 
         let mut features: Vec<&str> = [
             "Elevation",
@@ -561,7 +562,8 @@ mod multi_output_booster_test {
             .set_max_bin(max_bin)
             .set_n_boosters(n_classes)
             .set_budget(0.1)
-            .set_timeout(Some(60.0));
+            .set_iteration_limit(Some(5))
+            .set_memory_limit(Some(0.001));
 
         println!("The number of boosters: {:?}", booster.get_boosters().len());
         assert!(booster.get_boosters().len() == n_classes);

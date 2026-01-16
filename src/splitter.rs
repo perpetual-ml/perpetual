@@ -50,7 +50,6 @@ pub struct SplitInfo {
     pub missing_node: MissingInfo,
     pub generalization: Option<f32>,
     pub left_cats: HashSet<usize>,
-    pub right_cats: HashSet<usize>,
 }
 
 impl Default for SplitInfo {
@@ -65,7 +64,6 @@ impl Default for SplitInfo {
             missing_node: MissingInfo::None,
             generalization: None,
             left_cats: HashSet::new(),
-            right_cats: HashSet::new(),
         }
     }
 }
@@ -629,7 +627,7 @@ impl Splitter for MissingBranchSplitter {
 
         let mut missing_node = SplittableNode::from_node_info(
             missing_child,
-            node.depth + 1,
+            node.stats.as_ref().unwrap().depth + 1,
             node.start_idx,
             missing_split_idx,
             missing_info,
@@ -640,7 +638,7 @@ impl Splitter for MissingBranchSplitter {
         missing_node.is_missing_leaf = missing_is_leaf;
         let left_node = SplittableNode::from_node_info(
             left_child,
-            node.depth + 1,
+            node.stats.as_ref().unwrap().depth + 1,
             missing_split_idx,
             split_idx,
             &split_info.left_node,
@@ -650,7 +648,7 @@ impl Splitter for MissingBranchSplitter {
         );
         let right_node = SplittableNode::from_node_info(
             right_child,
-            node.depth + 1,
+            node.stats.as_ref().unwrap().depth + 1,
             split_idx,
             node.stop_idx,
             &split_info.right_node,
@@ -820,7 +818,7 @@ impl Splitter for MissingImputerSplitter {
 
         let left_node = SplittableNode::from_node_info(
             left_child,
-            node.depth + 1,
+            node.stats.as_ref().unwrap().depth + 1,
             node.start_idx,
             split_idx,
             &split_info.left_node,
@@ -830,7 +828,7 @@ impl Splitter for MissingImputerSplitter {
         );
         let right_node = SplittableNode::from_node_info(
             right_child,
-            node.depth + 1,
+            node.stats.as_ref().unwrap().depth + 1,
             split_idx,
             node.stop_idx,
             &split_info.right_node,
@@ -884,7 +882,6 @@ fn best_feature_split_const_hess(
     let split_info = unsafe { split_info_slice.get_mut(feat_idx) };
     split_info.split_gain = -1.0;
     split_info.left_cats = HashSet::new();
-    split_info.right_cats = HashSet::new();
 
     let mut max_gain: Option<f32> = None;
     let mut generalization: Option<f32>;
@@ -1012,7 +1009,7 @@ fn best_feature_split_const_hess(
         if n_folds >= 5 || node.num == 0 {
             let train_score = average(&train_scores);
             let valid_score = average(&valid_scores);
-            let parent_score = -0.5 * node.gain_value / node.counts_sum as f32;
+            let parent_score = -0.5 * node.gain_value / node.stats.as_ref().unwrap().count as f32;
             let delta_score_train = parent_score - train_score;
             let delta_score_valid = parent_score - valid_score;
             generalization = Some(delta_score_train / delta_score_valid);
@@ -1078,14 +1075,12 @@ fn best_feature_split_const_hess(
             max_gain = Some(split_gain);
 
             let mut left_cats: HashSet<usize> = HashSet::new();
-            let mut right_cats: HashSet<usize> = all_cats.iter().copied().collect();
 
             for c in all_cats.iter() {
                 if *c == b.cut_value as usize {
                     break;
                 }
                 left_cats.insert(*c);
-                right_cats.remove(c);
             }
 
             split_info.split_gain = split_gain;
@@ -1097,7 +1092,6 @@ fn best_feature_split_const_hess(
             split_info.missing_node = missing_info;
             split_info.generalization = generalization;
             split_info.left_cats = left_cats;
-            split_info.right_cats = right_cats;
         }
     }
 }
@@ -1122,7 +1116,6 @@ fn best_feature_split_var_hess(
     let split_info = unsafe { split_info_slice.get_mut(feat_idx) };
     split_info.split_gain = -1.0;
     split_info.left_cats = HashSet::new();
-    split_info.right_cats = HashSet::new();
 
     let mut max_gain: Option<f32> = None;
     let mut generalization: Option<f32>;
@@ -1260,7 +1253,7 @@ fn best_feature_split_var_hess(
         if n_folds >= 5 || node.num == 0 {
             let train_score = average(&train_scores);
             let valid_score = average(&valid_scores);
-            let parent_score = -0.5 * node.gain_value / node.counts_sum as f32;
+            let parent_score = -0.5 * node.gain_value / node.stats.as_ref().unwrap().count as f32;
             let delta_score_train = parent_score - train_score;
             let delta_score_valid = parent_score - valid_score;
             generalization = Some(delta_score_train / delta_score_valid);
@@ -1328,14 +1321,12 @@ fn best_feature_split_var_hess(
             max_gain = Some(split_gain);
 
             let mut left_cats: HashSet<usize> = HashSet::new();
-            let mut right_cats: HashSet<usize> = all_cats.iter().copied().collect();
 
             for c in all_cats.iter() {
                 if *c == b.cut_value as usize {
                     break;
                 }
                 left_cats.insert(*c);
-                right_cats.remove(c);
             }
 
             split_info.split_gain = split_gain;
@@ -1347,7 +1338,6 @@ fn best_feature_split_var_hess(
             split_info.missing_node = missing_info;
             split_info.generalization = generalization;
             split_info.left_cats = left_cats;
-            split_info.right_cats = right_cats;
         }
     }
 }
@@ -1954,8 +1944,7 @@ mod tests {
             f32::NEG_INFINITY,
             f32::INFINITY,
             NodeType::Root,
-            HashSet::new(),
-            HashSet::new(),
+            Some(HashSet::new()),
             [root_weight; 5],
         );
 
@@ -2190,8 +2179,7 @@ mod tests {
             f32::NEG_INFINITY,
             f32::INFINITY,
             NodeType::Root,
-            HashSet::new(),
-            HashSet::new(),
+            Some(HashSet::new()),
             [root_weight; 5],
         );
 
@@ -2216,8 +2204,6 @@ mod tests {
 
         println!("left_cats:");
         println!("{:?}", s.left_cats);
-        println!("right_cats:");
-        println!("{:?}", s.right_cats);
 
         println!("hist_tree[0]: {:?}", hist_tree_owned[0].data[7]);
 
@@ -2311,8 +2297,6 @@ mod tests {
 
         println!("left_cats:");
         println!("{:?}", s.left_cats);
-        println!("right_cats:");
-        println!("{:?}", s.right_cats);
 
         println!("hist_tree.0.6: {:?}", hist_tree_owned[0].data[6]);
 

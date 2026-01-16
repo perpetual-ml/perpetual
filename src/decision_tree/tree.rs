@@ -58,7 +58,6 @@ impl Tree {
         target_loss_decrement: Option<f32>,
         loss: &[f32],
         y: &[f64],
-        //loss: crate::objective_functions::LossFn,
         yhat: &[f64],
         sample_weight: Option<&[f64]>,
         group: Option<&[u64]>,
@@ -67,6 +66,7 @@ impl Tree {
         cat_index: Option<&HashSet<usize>>,
         split_info_slice: &mut SplitInfoSlice,
         n_nodes_alloc: usize,
+        save_node_stats: bool,
     ) {
         let mut n_nodes = 1;
         self.n_leaves = 1;
@@ -86,7 +86,8 @@ impl Tree {
         );
 
         let root_node = create_root_node(&index, grad, hess.as_deref());
-        self.nodes.insert(root_node.num, root_node.as_node(splitter.get_eta()));
+        self.nodes
+            .insert(root_node.num, root_node.as_node(splitter.get_eta(), save_node_stats));
 
         let mut growable = BinaryHeap::<SplittableNode>::default();
 
@@ -144,7 +145,7 @@ impl Tree {
             } else {
                 // self.nodes[n_idx].make_parent_node(node);
                 if let Some(x) = self.nodes.get_mut(&n_idx) {
-                    x.make_parent_node(node);
+                    x.make_parent_node(node, splitter.get_eta());
                 }
                 self.n_leaves += n_new_nodes;
                 n_nodes += n_new_nodes;
@@ -152,7 +153,7 @@ impl Tree {
                 let mut y_buffer = None;
 
                 for n in new_nodes {
-                    let node = n.as_node(splitter.get_eta());
+                    let node = n.as_node(splitter.get_eta(), save_node_stats);
                     let node_indices = &index[n.start_idx..n.stop_idx];
 
                     if let Some(_tld) = target_loss_decrement {
@@ -193,7 +194,7 @@ impl Tree {
                         }
                     }
 
-                    self.depth = max(self.depth, node.depth);
+                    self.depth = max(self.depth, node.stats.as_ref().map_or(0, |s| s.depth));
                     self.nodes.insert(node.num, node);
 
                     if !n.is_missing_leaf {
@@ -313,9 +314,19 @@ impl Display for Tree {
         while let Some(idx) = print_buffer.pop() {
             let node = &self.nodes[&idx];
             if node.is_leaf {
-                r += format!("{}{}\n", "      ".repeat(node.depth).as_str(), node).as_str();
+                r += format!(
+                    "{}{}\n",
+                    "      ".repeat(node.stats.as_ref().map_or(0, |s| s.depth)).as_str(),
+                    node
+                )
+                .as_str();
             } else {
-                r += format!("{}{}\n", "      ".repeat(node.depth).as_str(), node).as_str();
+                r += format!(
+                    "{}{}\n",
+                    "      ".repeat(node.stats.as_ref().map_or(0, |s| s.depth)).as_str(),
+                    node
+                )
+                .as_str();
                 print_buffer.push(node.right_child);
                 print_buffer.push(node.left_child);
                 if node.has_missing_branch() {
@@ -354,8 +365,7 @@ pub fn create_root_node(index: &[usize], grad: &[f32], hess: Option<&[f32]>) -> 
         f32::NEG_INFINITY,
         f32::INFINITY,
         NodeType::Root,
-        HashSet::new(),
-        HashSet::new(),
+        None,
         [root_weight; 5],
     )
 }
@@ -440,6 +450,7 @@ mod tests {
             None,
             &mut split_info_slice,
             n_nodes_alloc,
+            false,
         );
 
         println!("{}", tree);
@@ -542,6 +553,7 @@ mod tests {
             None,
             &mut split_info_slice,
             n_nodes_alloc,
+            false,
         );
 
         let mut pred_data_vec = data.get_col(0).to_owned();
@@ -639,6 +651,7 @@ mod tests {
             None,
             &mut split_info_slice,
             n_nodes_alloc,
+            false,
         );
 
         println!("{}", tree);
@@ -747,6 +760,7 @@ mod tests {
             Some(&cat_index),
             &mut split_info_slice,
             n_nodes_alloc,
+            false,
         );
         println!("{}", tree);
         println!("tree.nodes.len: {}", tree.nodes.len());

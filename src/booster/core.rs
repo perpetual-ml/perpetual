@@ -131,6 +131,7 @@ impl PerpetualBooster {
             iteration_limit,
             memory_limit,
             stopping_rounds,
+            save_node_stats: false,
         };
 
         let booster = PerpetualBooster {
@@ -374,6 +375,7 @@ impl PerpetualBooster {
                 self.cfg.categorical_features.as_ref(),
                 &mut split_info_slice,
                 n_nodes_alloc,
+                self.cfg.save_node_stats,
             );
 
             self.update_predictions_inplace(&mut yhat, &tree, data);
@@ -382,7 +384,7 @@ impl PerpetualBooster {
                 let generalization = tree
                     .nodes
                     .values()
-                    .map(|n| n.generalization.unwrap_or(0.0))
+                    .map(|n| n.stats.as_ref().and_then(|s| s.generalization).unwrap_or(0.0))
                     .max_by(|a, b| a.total_cmp(b))
                     .unwrap_or(0.0);
                 if generalization < GENERALIZATION_THRESHOLD_RELAXED && tree.stopper != TreeStopper::StepSize {
@@ -828,6 +830,7 @@ mod perpetual_booster_test {
             .set_categorical_features(Some(cat_index))
             .set_iteration_limit(Some(iter_limit))
             .set_memory_limit(Some(0.00003))
+            .set_save_node_stats(true)
             .set_budget(1.0);
 
         booster.fit(&data, &y, None, None).unwrap();
@@ -1159,14 +1162,16 @@ mod perpetual_booster_test {
         // define booster with custom loss function
         let mut custom_booster = PerpetualBooster::default()
             .set_objective(Objective::Custom(Arc::new(CustomSquaredLoss)))
-            .set_max_bin(100)
-            .set_budget(0.5);
+            .set_max_bin(10)
+            .set_budget(0.1)
+            .set_iteration_limit(Some(10));
 
         // define booster with built-in squared loss
         let mut booster = PerpetualBooster::default()
             .set_objective(Objective::SquaredLoss)
-            .set_max_bin(100)
-            .set_budget(0.5);
+            .set_max_bin(10)
+            .set_budget(0.1)
+            .set_iteration_limit(Some(10));
 
         // fit
         booster.fit(&matrix, &y, None, None)?;
@@ -1288,7 +1293,10 @@ mod perpetual_booster_test {
 
         let mut booster = PerpetualBooster::default()
             .set_objective(Objective::ListNetLoss)
-            .set_budget(0.1);
+            .set_budget(0.1)
+            .set_iteration_limit(Some(10))
+            .set_max_bin(10)
+            .set_memory_limit(Some(0.001));
 
         booster.fit(&matrix, &y, None, Some(&group_counts_vec))?;
 

@@ -182,6 +182,9 @@ pub struct BoosterConfig {
     /// Optional limit for auto stopping rounds.
     #[serde(default = "default_stopping_rounds")]
     pub stopping_rounds: Option<usize>,
+    /// Whether to save node statistics during training.
+    #[serde(default)]
+    pub save_node_stats: bool,
 }
 
 // Default booster base configuration
@@ -208,6 +211,7 @@ impl Default for BoosterConfig {
             iteration_limit: None,
             memory_limit: None,
             stopping_rounds: None,
+            save_node_stats: false,
         }
     }
 }
