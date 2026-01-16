@@ -5,12 +5,12 @@ perpetual/__pycache__
 .venv
 resources/*
 !resources/perp_logo.png
-python-package/Cargo.lock
-python-package/LICENSE
-python-package/README.md
-python-package/target
-python-package/python/perpetual/__pycache__
-python-package/examples/ee
+package-python/Cargo.lock
+package-python/LICENSE
+package-python/README.md
+package-python/target
+package-python/python/perpetual/__pycache__
+package-python/examples/ee
 
 # R package build artifacts
 r-lib/
