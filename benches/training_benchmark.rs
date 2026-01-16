@@ -1,5 +1,6 @@
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use perpetual::data::Matrix;
+use perpetual::objective_functions::Objective;
 use perpetual::PerpetualBooster;
 use std::fs;
 use std::time::Duration;
@@ -35,9 +36,11 @@ pub fn training_benchmark(c: &mut Criterion) {
 
     group.bench_function("train_booster_cal_housing", |b| {
         b.iter(|| {
-            let mut booster = PerpetualBooster::default();
+            let mut booster = PerpetualBooster::default().set_objective(Objective::SquaredLoss);
             // Using default parameters as baseline
-            booster.fit(black_box(&data), black_box(&y), black_box(None)).unwrap();
+            booster
+                .fit(black_box(&data), black_box(&y), black_box(None), black_box(None))
+                .unwrap();
         })
     });
     group.finish();
@@ -74,8 +77,10 @@ pub fn training_benchmark_cover_types(c: &mut Criterion) {
 
     group.bench_function("train_booster_cover_types", |b| {
         b.iter(|| {
-            let mut booster = PerpetualBooster::default();
-            booster.fit(black_box(&data), black_box(&y), black_box(None)).unwrap();
+            let mut booster = PerpetualBooster::default().set_objective(Objective::LogLoss);
+            booster
+                .fit(black_box(&data), black_box(&y), black_box(None), black_box(None))
+                .unwrap();
         })
     });
     group.finish();
