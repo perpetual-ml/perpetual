@@ -1,13 +1,17 @@
+import os
+import subprocess
+import sys
+
 import pandas as pd
 import seaborn as sns
-from sklearn.model_selection import train_test_split
-from sklearn.datasets import fetch_california_housing, fetch_covtype, fetch_openml
 from perpetual.utils import convert_input_frame, transform_input_frame
+from sklearn.datasets import fetch_california_housing, fetch_covtype, fetch_openml
+from sklearn.model_selection import train_test_split
 
 if __name__ == "__main__":
     df = sns.load_dataset("titanic")
     df.to_csv("resources/titanic.csv", index=False)
-    
+
     X = df.select_dtypes("number").drop(columns=["survived"]).astype(float)
     y = df["survived"].astype(float)
 
@@ -66,39 +70,71 @@ if __name__ == "__main__":
     data_train.to_csv("resources/cover_types_train.csv", index=False)
     data_test.to_csv("resources/cover_types_test.csv", index=False)
 
-    
-
-  
-
     X = df.drop(columns=["survived"])
     y = df["survived"]
 
     X["sex"] = pd.get_dummies(X["sex"], drop_first=True, dtype=float).to_numpy()
-    X["adult_male"] = pd.get_dummies(X["adult_male"], drop_first=True, dtype=float).to_numpy()
+    X["adult_male"] = pd.get_dummies(
+        X["adult_male"], drop_first=True, dtype=float
+    ).to_numpy()
     X.drop(columns=["alive"], inplace=True)
     X["alone"] = pd.get_dummies(X["alone"], drop_first=True, dtype=float).to_numpy()
-    cols = ['pclass', 'sibsp', 'parch', 'embarked', 'class', 'who', 'deck', 'embark_town']
-    X[cols] = X[cols].astype('category')
+    cols = [
+        "pclass",
+        "sibsp",
+        "parch",
+        "embarked",
+        "class",
+        "who",
+        "deck",
+        "embark_town",
+    ]
+    X[cols] = X[cols].astype("category")
 
-    data_train, data_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+    data_train, data_test, y_train, y_test = train_test_split(
+        X, y, test_size=0.2, random_state=42
+    )
 
-    features_, titanic_train_flat, rows, cols, categorical_features_, cat_mapping = convert_input_frame(data_train, "auto", 1000)
-    features_, titanic_test_flat, rows, cols = transform_input_frame(data_test, cat_mapping)
+    (
+        features_,
+        titanic_train_flat,
+        rows,
+        cols,
+        categorical_features_,
+        cat_mapping,
+    ) = convert_input_frame(data_train, "auto", 1000)
+    features_, titanic_test_flat, rows, cols = transform_input_frame(
+        data_test, cat_mapping
+    )
 
     data_test.to_csv("resources/titanic_test_df.csv", index=False)
 
-    pd.Series(titanic_train_flat).to_csv("resources/titanic_train_flat.csv", index=False, header=False)
-    pd.Series(titanic_test_flat).to_csv("resources/titanic_test_flat.csv", index=False, header=False)
-    pd.Series(y_train).to_csv("resources/titanic_train_y.csv", index=False, header=False)
+    pd.Series(titanic_train_flat).to_csv(
+        "resources/titanic_train_flat.csv", index=False, header=False
+    )
+    pd.Series(titanic_test_flat).to_csv(
+        "resources/titanic_test_flat.csv", index=False, header=False
+    )
+    pd.Series(y_train).to_csv(
+        "resources/titanic_train_y.csv", index=False, header=False
+    )
     pd.Series(y_test).to_csv("resources/titanic_test_y.csv", index=False, header=False)
-
 
     # https://www.openml.org/search?type=data&id=546&sort=runs&status=active
     df = fetch_openml(data_id=546)
     X = df.data
     y = df.target
-    features_, sensory_flat, rows, cols, categorical_features_, cat_mapping = convert_input_frame(X, "auto", 1000)
-    pd.Series(sensory_flat).to_csv("resources/sensory_flat.csv", index=False, header=False)
+    (
+        features_,
+        sensory_flat,
+        rows,
+        cols,
+        categorical_features_,
+        cat_mapping,
+    ) = convert_input_frame(X, "auto", 1000)
+    pd.Series(sensory_flat).to_csv(
+        "resources/sensory_flat.csv", index=False, header=False
+    )
     pd.Series(y).to_csv("resources/sensory_y.csv", index=False, header=False)
 
     # https://www.openml.org/search?type=data&id=43493&sort=runs&status=active
@@ -110,3 +146,60 @@ if __name__ == "__main__":
     data["published"] = data["published"].astype("category")
 
     data.to_csv("resources/goodreads.csv", index=False, header=True)
+
+    # ---------------------------------------------------------
+    # Generate v0.10.0 Model Artifact for Backward Compatibility
+    # ---------------------------------------------------------
+    print("Installing perpetual==0.10.0 for model generation...")
+    env = os.environ.copy()
+    env["VIRTUAL_ENV"] = sys.prefix
+    try:
+        subprocess.check_call(["uv", "pip", "install", "perpetual==0.10.0"], env=env)
+    except subprocess.CalledProcessError:
+        print(
+            "Could not find perpetual==0.10.0 on PyPI. Trying to install from local source if possible or failing gracefully."
+        )
+        # If we can't install 0.10.0, we can't generate the model.
+        raise
+
+    gen_script = """
+import pandas as pd
+import seaborn as sns
+from sklearn.model_selection import train_test_split
+from perpetual import PerpetualBooster
+
+# Replicate Titanic data loading
+df = sns.load_dataset("titanic")
+X = df.drop(columns=["survived"])
+y = df["survived"]
+X["sex"] = pd.get_dummies(X["sex"], drop_first=True, dtype=float).to_numpy()
+X["adult_male"] = pd.get_dummies(X["adult_male"], drop_first=True, dtype=float).to_numpy()
+X.drop(columns=["alive"], inplace=True)
+X["alone"] = pd.get_dummies(X["alone"], drop_first=True, dtype=float).to_numpy()
+cols = ['pclass', 'sibsp', 'parch', 'embarked', 'class', 'who', 'deck', 'embark_town']
+X[cols] = X[cols].astype('category')
+
+data_train, data_test, y_train, _ = train_test_split(X, y, test_size=0.2, random_state=42)
+
+model = PerpetualBooster(objective="LogLoss")
+model.fit(data_train, y_train)
+model.save_booster("resources/model_v0.10.0.json")
+
+# Save predictions for verification
+preds = model.predict(data_test)
+pd.Series(preds).to_csv("resources/model_v0.10.0_preds.csv", index=False, header=False)
+print("Successfully generated resources/model_v0.10.0.json and predictions")
+"""
+    with open("temp_gen_model.py", "w") as f:
+        f.write(gen_script)
+
+    try:
+        subprocess.check_call([sys.executable, "temp_gen_model.py"], env=env)
+    except subprocess.CalledProcessError as e:
+        print(f"Failed to generate model: {e}")
+    finally:
+        if os.path.exists("temp_gen_model.py"):
+            os.remove("temp_gen_model.py")
+
+        print("Restoring local package-python installation...")
+        subprocess.check_call(["uv", "pip", "install", "-e", "package-python"], env=env)

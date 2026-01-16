@@ -32,6 +32,7 @@ pub struct SplittableNode {
     pub parent_node: usize,
     pub left_cats: HashSet<usize>,
     pub right_cats: HashSet<usize>,
+    pub weights: [f32; 5],
 }
 
 #[derive(Deserialize, Serialize, Clone, Debug)]
@@ -53,6 +54,7 @@ pub struct Node {
     pub left_cats: HashSet<usize>,
     pub right_cats: HashSet<usize>,
     pub count: usize,
+    pub weights: [f32; 5],
 }
 
 impl Ord for SplittableNode {
@@ -161,6 +163,7 @@ impl SplittableNode {
             parent_node,
             left_cats: HashSet::new(),
             right_cats: HashSet::new(),
+            weights: node_info.weights,
         }
     }
 
@@ -182,6 +185,7 @@ impl SplittableNode {
         node_type: NodeType,
         left_cats: HashSet<usize>,
         right_cats: HashSet<usize>,
+        weights: [f32; 5],
     ) -> Self {
         SplittableNode {
             num,
@@ -208,6 +212,7 @@ impl SplittableNode {
             parent_node: 0,
             left_cats,
             right_cats,
+            weights,
         }
     }
 
@@ -261,6 +266,7 @@ impl SplittableNode {
             left_cats: self.left_cats.clone(),
             right_cats: self.right_cats.clone(),
             count: self.counts_sum,
+            weights: self.weights.map(|x| x * eta),
         }
     }
 }

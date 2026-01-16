@@ -124,6 +124,7 @@ pub struct NodeInfo {
     pub counts: usize, // used as counts_sum in SplittableNode.from_node_info
     pub weight: f32,   // used as weight_value in SplittableNode.from_node_info
     pub bounds: (f32, f32),
+    pub weights: [f32; 5],
 }
 
 impl Default for NodeInfo {
@@ -135,6 +136,7 @@ impl Default for NodeInfo {
             counts: 0,
             weight: 0.0,
             bounds: (0.0, 0.0),
+            weights: [0.0; 5],
         }
     }
 }
@@ -944,6 +946,8 @@ fn best_feature_split_const_hess(
         let mut train_scores = [0.0; 5];
         let mut valid_scores = [0.0; 5];
         let mut n_folds: u8 = 0;
+        let mut left_weights = [0.0; 5];
+        let mut right_weights = [0.0; 5];
         for j in 0..5 {
             right_gradient_train[j] = node_g_sum - node_grad_sum[j] - cuml_gradient_train[j];
             right_counts_train[j] = node_c_sum - node_coun_sum[j] - cuml_counts_train[j];
@@ -987,6 +991,10 @@ fn best_feature_split_const_hess(
                 }
                 Some(v) => v,
             };
+
+            left_weights[j] = left_node.weight;
+            right_weights[j] = right_node.weight;
+
             // TODO: Handle missing info!
             let left_obj = left_gradient_valid[j] * left_node.weight
                 + 0.5 * (left_counts_valid[j] as f32) * left_node.weight * left_node.weight;
@@ -1039,6 +1047,9 @@ fn best_feature_split_const_hess(
             }
             Some(v) => v,
         };
+
+        left_node_info.weights = left_weights;
+        right_node_info.weights = right_weights;
 
         let split_gain = node.get_split_gain(&left_node_info, &right_node_info, &missing_info);
 
@@ -1180,6 +1191,8 @@ fn best_feature_split_var_hess(
         let mut train_scores = [0.0; 5];
         let mut valid_scores = [0.0; 5];
         let mut n_folds: u8 = 0;
+        let mut left_weights = [0.0_f32; 5];
+        let mut right_weights = [0.0_f32; 5];
         for j in 0..5 {
             right_gradient_train[j] = node_g_sum - node_grad_sum[j] - cuml_gradient_train[j];
             right_hessian_train[j] = node_h_sum - node_hess_sum[j] - cuml_hessian_train[j];
@@ -1227,6 +1240,9 @@ fn best_feature_split_var_hess(
                 }
                 Some(v) => v,
             };
+
+            left_weights[j] = left_node.weight;
+            right_weights[j] = right_node.weight;
 
             let left_obj = left_gradient_valid[j] * left_node.weight
                 + 0.5 * left_hessian_valid[j] * left_node.weight * left_node.weight;
@@ -1280,6 +1296,9 @@ fn best_feature_split_var_hess(
             }
             Some(v) => v,
         };
+
+        left_node_info.weights = left_weights;
+        right_node_info.weights = right_weights;
 
         let split_gain = node.get_split_gain(&left_node_info, &right_node_info, &missing_info);
 
@@ -1472,6 +1491,7 @@ fn evaluate_impute_split_const_hess(
             counts: left_counts,
             weight: left_weight,
             bounds: (f32::NEG_INFINITY, f32::INFINITY),
+            weights: [0.0; 5],
         },
         NodeInfo {
             grad: right_gradient,
@@ -1480,6 +1500,7 @@ fn evaluate_impute_split_const_hess(
             counts: right_counts,
             weight: right_weight,
             bounds: (f32::NEG_INFINITY, f32::INFINITY),
+            weights: [0.0; 5],
         },
         missing_info,
     ))
@@ -1593,6 +1614,7 @@ fn evaluate_impute_split_var_hess(
             counts: left_counts,
             weight: left_weight,
             bounds: (f32::NEG_INFINITY, f32::INFINITY),
+            weights: [0.0; 5],
         },
         NodeInfo {
             grad: right_gradient,
@@ -1601,6 +1623,7 @@ fn evaluate_impute_split_var_hess(
             counts: right_counts,
             weight: right_weight,
             bounds: (f32::NEG_INFINITY, f32::INFINITY),
+            weights: [0.0; 5],
         },
         missing_info,
     ))
@@ -1688,6 +1711,7 @@ fn evaluate_branch_split_const_hess(
         // This will ensure that splits further down in the missing only
         // branch are monotonic.
         bounds: (lower_bound, upper_bound),
+        weights: [0.0; 5],
     };
     let missing_node = // Check Missing direction
         if ((missing_gradient != 0.0) || (missing_counts != 0)) && allow_missing_splits {
@@ -1708,6 +1732,7 @@ fn evaluate_branch_split_const_hess(
             counts: left_counts,
             weight: left_weight,
             bounds: (f32::NEG_INFINITY, f32::INFINITY),
+            weights: [0.0; 5],
         },
         NodeInfo {
             gain: right_gain,
@@ -1716,6 +1741,7 @@ fn evaluate_branch_split_const_hess(
             counts: right_counts,
             weight: right_weight,
             bounds: (f32::NEG_INFINITY, f32::INFINITY),
+            weights: [0.0; 5],
         },
         missing_node,
     ))
@@ -1801,6 +1827,7 @@ fn evaluate_branch_split_var_hess(
         // This will ensure that splits further down in the missing only
         // branch are monotonic.
         bounds: (lower_bound, upper_bound),
+        weights: [0.0; 5],
     };
     let missing_node = // Check Missing direction
         if ((missing_gradient != 0.0) || (missing_hessian != 0.0)) && allow_missing_splits {
@@ -1821,6 +1848,7 @@ fn evaluate_branch_split_var_hess(
             counts: left_counts,
             weight: left_weight,
             bounds: (f32::NEG_INFINITY, f32::INFINITY),
+            weights: [0.0; 5],
         },
         NodeInfo {
             gain: right_gain,
@@ -1829,6 +1857,7 @@ fn evaluate_branch_split_var_hess(
             counts: right_counts,
             weight: right_weight,
             bounds: (f32::NEG_INFINITY, f32::INFINITY),
+            weights: [0.0; 5],
         },
         missing_node,
     ))
@@ -1927,6 +1956,7 @@ mod tests {
             NodeType::Root,
             HashSet::new(),
             HashSet::new(),
+            [root_weight; 5],
         );
 
         let mut split_info_vec: Vec<SplitInfo> = (0..col_index.len()).map(|_| SplitInfo::default()).collect();
@@ -2162,6 +2192,7 @@ mod tests {
             NodeType::Root,
             HashSet::new(),
             HashSet::new(),
+            [root_weight; 5],
         );
 
         let mut split_info_vec: Vec<SplitInfo> = (0..col_index.len()).map(|_| SplitInfo::default()).collect();

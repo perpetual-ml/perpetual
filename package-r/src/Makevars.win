@@ -1,0 +1,13 @@
+TARGET = x86_64-pc-windows-gnu
+
+PKG_LIBS = -L. -lperpetual_r -lws2_32 -luserenv -lbcrypt -ladvapi32 -lntdll
+PKG_CFLAGS = -I./rust/target/$(TARGET)/release
+
+all: rust-target
+
+rust-target:
+	cd rust && cargo build --release --lib --manifest-path Cargo.toml --target $(TARGET)
+	cp rust/target/$(TARGET)/release/libperpetual_r.a .
+
+clean:
+	rm -f libperpetual_r.a

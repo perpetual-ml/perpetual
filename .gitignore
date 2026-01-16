@@ -10,3 +10,29 @@ python-package/LICENSE
 python-package/README.md
 python-package/target
 python-package/python/perpetual/__pycache__
+python-package/examples/ee
+
+# R package build artifacts
+r-lib/
+package-r/src/rust/target/
+package-r/src/*.o
+package-r/src/*.so
+package-r/src/*.a
+package-r/src/entrypoint.o
+
+# Log files
+*.log
+
+# Debug and temporary files
+debug_*.R
+check_symbols.R
+path_check.txt
+test_output.txt
+typescript
+
+# WSL build scripts (temporary)
+wsl_*.sh
+
+# Rust vendoring artifacts
+package-r/src/rust/.cargo/
+package-r/src/rust/vendor/

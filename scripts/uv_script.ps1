@@ -1,4 +1,4 @@
-Set-Location python-package
+Set-Location package-python
 uv sync
 .venv\Scripts\activate
 uv pip install pip

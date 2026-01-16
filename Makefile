@@ -24,10 +24,10 @@ help: ## List all options
 
 init: venv ## Initialise local resources for testing the software
 	@echo "Installing Python dependencies..."
-	@cp "README.md" "python-package/README.md"
-	@cp "LICENSE" "python-package/LICENSE"
+	@cp "README.md" "package-python/README.md"
+	@cp "LICENSE" "package-python/LICENSE"
 	@source $(VENV_ACTIVATE) && \
-	    cd python-package && \
+	    cd package-python && \
 	    uv pip install -e ".[dev]" && \
 	    cd .. && \
 	    uv pip install pandas seaborn && \

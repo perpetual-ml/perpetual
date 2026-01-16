@@ -1,0 +1,21 @@
+Package: perpetual
+Type: Package
+Title: Perpetual Boosting Machine
+Version: 1.0.0
+Authors@R: c(
+    person("Mutlu", "Simsek", email = "msimsek@perpetual-ml.com", role = c("aut", "cre")),
+    person("Serkan", "Korkmaz", email = "serkor1@duck.com", role = "aut"),
+    person("Pieter", "Pel", email = "pelpieter@gmail.com", role = "aut")
+  )
+Description: A self-generalizing gradient boosting machine that doesn't need hyperparameter optimization.
+License: MIT + file LICENSE
+Encoding: UTF-8
+LazyData: true
+Biarch: true
+Config/rextendr/version: 0.4.2
+SystemRequirements: Cargo (Rust's package manager), rustc
+Imports:
+    rextendr
+LinkingTo:
+    rextendr
+RoxygenNote: 7.3.1

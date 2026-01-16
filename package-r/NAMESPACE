@@ -1,0 +1,3 @@
+useDynLib(perpetual, .registration = TRUE)
+export(PerpetualBooster)
+export(test_binding)

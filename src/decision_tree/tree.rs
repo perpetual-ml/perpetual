@@ -356,6 +356,7 @@ pub fn create_root_node(index: &[usize], grad: &[f32], hess: Option<&[f32]>) -> 
         NodeType::Root,
         HashSet::new(),
         HashSet::new(),
+        [root_weight; 5],
     )
 }
 
