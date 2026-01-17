@@ -3,7 +3,6 @@ use crate::splitter::{MissingInfo, NodeInfo, SplitInfo};
 use crate::utils::is_missing;
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
-use std::collections::HashSet;
 use std::fmt::{self, Debug};
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -26,7 +25,8 @@ pub struct SplittableNode {
     pub is_leaf: bool,
     pub is_missing_leaf: bool,
     pub parent_node: usize,
-    pub left_cats: Option<HashSet<usize>>,
+    #[allow(clippy::box_collection)]
+    pub left_cats: Option<Box<Vec<bool>>>,
     pub stats: Option<Box<NodeStats>>,
 }
 
@@ -53,7 +53,8 @@ pub struct Node {
     pub right_child: usize,
     pub is_leaf: bool,
     pub parent_node: usize,
-    pub left_cats: Option<HashSet<usize>>,
+    #[allow(clippy::box_collection)]
+    pub left_cats: Option<Box<Vec<bool>>>,
     pub stats: Option<Box<NodeStats>>,
 }
 
@@ -107,7 +108,7 @@ impl Node {
 
         // Then check categorical splits
         if let Some(left_cats) = &self.left_cats {
-            if left_cats.contains(&(*v as usize)) {
+            if *left_cats.get(*v as usize).unwrap_or(&false) {
                 return self.left_child;
             } else {
                 return self.right_child;
@@ -180,6 +181,7 @@ impl SplittableNode {
     /// Create a default splitable node,
     /// we default to the node being a leaf.
     #[allow(clippy::too_many_arguments)]
+    #[allow(clippy::box_collection)]
     pub fn new(
         num: usize,
         weight_value: f32,
@@ -193,7 +195,7 @@ impl SplittableNode {
         lower_bound: f32,
         upper_bound: f32,
         node_type: NodeType,
-        left_cats: Option<HashSet<usize>>,
+        left_cats: Option<Box<Vec<bool>>>,
         weights: [f32; 5],
     ) -> Self {
         SplittableNode {
@@ -240,11 +242,7 @@ impl SplittableNode {
         self.split_value = split_info.split_value;
         self.missing_node = missing_child;
         self.is_leaf = false;
-        self.left_cats = if split_info.left_cats.is_empty() {
-            None
-        } else {
-            Some(split_info.left_cats.clone())
-        };
+        self.left_cats = split_info.left_cats.clone();
     }
 
     pub fn get_split_gain(
