@@ -547,15 +547,70 @@ mod perpetual_booster_test {
     use crate::utils::between;
     use crate::{Matrix, PerpetualBooster};
     use approx::assert_relative_eq;
-    use polars::io::SerReader;
-    use polars::prelude::*;
     use rand::Rng;
     use serde::{Deserialize, Serialize};
     use std::collections::HashMap;
     use std::collections::HashSet;
     use std::error::Error;
     use std::fs;
+    use std::fs::File;
+    use std::io::BufReader;
     use std::sync::Arc;
+
+    fn read_data(path: &str) -> Result<(Vec<f64>, Vec<f64>), Box<dyn Error>> {
+        let feature_names = [
+            "MedInc",
+            "HouseAge",
+            "AveRooms",
+            "AveBedrms",
+            "Population",
+            "AveOccup",
+            "Latitude",
+            "Longitude",
+        ];
+        let target_name = "MedHouseVal";
+
+        let file = File::open(path)?;
+        let reader = BufReader::new(file);
+        let mut csv_reader = csv::ReaderBuilder::new().has_headers(true).from_reader(reader);
+
+        let headers = csv_reader.headers()?.clone();
+        let feature_indices: Vec<usize> = feature_names
+            .iter()
+            .map(|&name| headers.iter().position(|h| h == name).unwrap())
+            .collect();
+        let target_index = headers.iter().position(|h| h == target_name).unwrap();
+
+        let mut data_columns: Vec<Vec<f64>> = vec![Vec::new(); feature_names.len()];
+        let mut y = Vec::new();
+
+        for result in csv_reader.records() {
+            let record = result?;
+
+            // Parse target
+            let target_str = &record[target_index];
+            let target_val = if target_str.is_empty() {
+                f64::NAN
+            } else {
+                target_str.parse::<f64>().unwrap_or(f64::NAN)
+            };
+            y.push(target_val);
+
+            // Parse features
+            for (i, &idx) in feature_indices.iter().enumerate() {
+                let val_str = &record[idx];
+                let val = if val_str.is_empty() {
+                    f64::NAN
+                } else {
+                    val_str.parse::<f64>().unwrap_or(f64::NAN)
+                };
+                data_columns[i].push(val);
+            }
+        }
+
+        let data: Vec<f64> = data_columns.into_iter().flatten().collect();
+        Ok((data, y))
+    }
 
     #[test]
     fn test_booster_fit() {
@@ -678,85 +733,8 @@ mod perpetual_booster_test {
 
     #[test]
     fn test_gbm_parallel() -> Result<(), Box<dyn Error>> {
-        let all_names = [
-            "MedInc".to_string(),
-            "HouseAge".to_string(),
-            "AveRooms".to_string(),
-            "AveBedrms".to_string(),
-            "Population".to_string(),
-            "AveOccup".to_string(),
-            "Latitude".to_string(),
-            "Longitude".to_string(),
-            "MedHouseVal".to_string(),
-        ];
-
-        let feature_names = [
-            "MedInc".to_string(),
-            "HouseAge".to_string(),
-            "AveRooms".to_string(),
-            "AveBedrms".to_string(),
-            "Population".to_string(),
-            "AveOccup".to_string(),
-            "Latitude".to_string(),
-            "Longitude".to_string(),
-        ];
-
-        let column_names_train = Arc::new(all_names.clone());
-        let column_names_test = Arc::new(all_names.clone());
-
-        let df_train = CsvReadOptions::default()
-            .with_has_header(true)
-            .with_columns(Some(column_names_train))
-            .try_into_reader_with_file_path(Some("resources/cal_housing_train.csv".into()))?
-            .finish()
-            .unwrap();
-
-        let df_test = CsvReadOptions::default()
-            .with_has_header(true)
-            .with_columns(Some(column_names_test))
-            .try_into_reader_with_file_path(Some("resources/cal_housing_test.csv".into()))?
-            .finish()
-            .unwrap();
-
-        // Get data in column major format...
-        let id_vars_train: Vec<&str> = Vec::new();
-        let mdf_train = df_train.unpivot(feature_names.clone(), &id_vars_train)?;
-        let id_vars_test: Vec<&str> = Vec::new();
-        let mdf_test = df_test.unpivot(feature_names, &id_vars_test)?;
-
-        let data_train = Vec::from_iter(
-            mdf_train
-                .select_at_idx(1)
-                .expect("Invalid column")
-                .f64()?
-                .into_iter()
-                .map(|v| v.unwrap_or(f64::NAN)),
-        );
-        let data_test = Vec::from_iter(
-            mdf_test
-                .select_at_idx(1)
-                .expect("Invalid column")
-                .f64()?
-                .into_iter()
-                .map(|v| v.unwrap_or(f64::NAN)),
-        );
-
-        let y_train = Vec::from_iter(
-            df_train
-                .column("MedHouseVal")?
-                .cast(&DataType::Float64)?
-                .f64()?
-                .into_iter()
-                .map(|v| v.unwrap_or(f64::NAN)),
-        );
-        let y_test = Vec::from_iter(
-            df_test
-                .column("MedHouseVal")?
-                .cast(&DataType::Float64)?
-                .f64()?
-                .into_iter()
-                .map(|v| v.unwrap_or(f64::NAN)),
-        );
+        let (data_train, y_train) = read_data("resources/cal_housing_train.csv")?;
+        let (data_test, y_test) = read_data("resources/cal_housing_test.csv")?;
 
         // Create Matrix from ndarray.
         let matrix_train = Matrix::new(&data_train, y_train.len(), 8);
@@ -894,60 +872,7 @@ mod perpetual_booster_test {
 
     #[test]
     fn test_huber_loss() -> Result<(), Box<dyn Error>> {
-        let all_names = [
-            "MedInc".to_string(),
-            "HouseAge".to_string(),
-            "AveRooms".to_string(),
-            "AveBedrms".to_string(),
-            "Population".to_string(),
-            "AveOccup".to_string(),
-            "Latitude".to_string(),
-            "Longitude".to_string(),
-            "MedHouseVal".to_string(),
-        ];
-
-        let feature_names = [
-            "MedInc".to_string(),
-            "HouseAge".to_string(),
-            "AveRooms".to_string(),
-            "AveBedrms".to_string(),
-            "Population".to_string(),
-            "AveOccup".to_string(),
-            "Latitude".to_string(),
-            "Longitude".to_string(),
-        ];
-
-        let column_names_test = Arc::new(all_names.clone());
-
-        let df_test = CsvReadOptions::default()
-            .with_has_header(true)
-            .with_columns(Some(column_names_test))
-            .try_into_reader_with_file_path(Some("resources/cal_housing_test.csv".into()))?
-            .finish()
-            .unwrap();
-
-        // Get data in column major format...
-
-        let id_vars_test: Vec<&str> = Vec::new();
-        let mdf_test = df_test.unpivot(feature_names, &id_vars_test)?;
-
-        let data_test = Vec::from_iter(
-            mdf_test
-                .select_at_idx(1)
-                .expect("Invalid column")
-                .f64()?
-                .into_iter()
-                .map(|v| v.unwrap_or(f64::NAN)),
-        );
-
-        let y_test = Vec::from_iter(
-            df_test
-                .column("MedHouseVal")?
-                .cast(&DataType::Float64)?
-                .f64()?
-                .into_iter()
-                .map(|v| v.unwrap_or(f64::NAN)),
-        );
+        let (data_test, y_test) = read_data("resources/cal_housing_test.csv")?;
 
         // Create Matrix from ndarray.
         let matrix_test = Matrix::new(&data_test, y_test.len(), 8);
@@ -972,60 +897,7 @@ mod perpetual_booster_test {
 
     #[test]
     fn test_adaptive_huber_loss() -> Result<(), Box<dyn Error>> {
-        let all_names = [
-            "MedInc".to_string(),
-            "HouseAge".to_string(),
-            "AveRooms".to_string(),
-            "AveBedrms".to_string(),
-            "Population".to_string(),
-            "AveOccup".to_string(),
-            "Latitude".to_string(),
-            "Longitude".to_string(),
-            "MedHouseVal".to_string(),
-        ];
-
-        let feature_names = [
-            "MedInc".to_string(),
-            "HouseAge".to_string(),
-            "AveRooms".to_string(),
-            "AveBedrms".to_string(),
-            "Population".to_string(),
-            "AveOccup".to_string(),
-            "Latitude".to_string(),
-            "Longitude".to_string(),
-        ];
-
-        let column_names_test = Arc::new(all_names.clone());
-
-        let df_test = CsvReadOptions::default()
-            .with_has_header(true)
-            .with_columns(Some(column_names_test))
-            .try_into_reader_with_file_path(Some("resources/cal_housing_test.csv".into()))?
-            .finish()
-            .unwrap();
-
-        // Get data in column major format...
-
-        let id_vars_test: Vec<&str> = Vec::new();
-        let mdf_test = df_test.unpivot(feature_names, &id_vars_test)?;
-
-        let data_test = Vec::from_iter(
-            mdf_test
-                .select_at_idx(1)
-                .expect("Invalid column")
-                .f64()?
-                .into_iter()
-                .map(|v| v.unwrap_or(f64::NAN)),
-        );
-
-        let y_test = Vec::from_iter(
-            df_test
-                .column("MedHouseVal")?
-                .cast(&DataType::Float64)?
-                .f64()?
-                .into_iter()
-                .map(|v| v.unwrap_or(f64::NAN)),
-        );
+        let (data_test, y_test) = read_data("resources/cal_housing_test.csv")?;
 
         // Create Matrix from ndarray.
         let matrix_test = Matrix::new(&data_test, y_test.len(), 8);
@@ -1109,53 +981,7 @@ mod perpetual_booster_test {
             }
         }
 
-        let all_names = [
-            "MedInc".to_string(),
-            "HouseAge".to_string(),
-            "AveRooms".to_string(),
-            "AveBedrms".to_string(),
-            "Population".to_string(),
-            "AveOccup".to_string(),
-            "Latitude".to_string(),
-            "Longitude".to_string(),
-            "MedHouseVal".to_string(),
-        ];
-
-        let feature_names = [
-            "MedInc".to_string(),
-            "HouseAge".to_string(),
-            "AveRooms".to_string(),
-            "AveBedrms".to_string(),
-            "Population".to_string(),
-            "AveOccup".to_string(),
-            "Latitude".to_string(),
-            "Longitude".to_string(),
-        ];
-
-        let df = CsvReadOptions::default()
-            .with_has_header(true)
-            .with_columns(Some(Arc::new(all_names.clone())))
-            .try_into_reader_with_file_path(Some("resources/cal_housing_test.csv".into()))?
-            .finish()?;
-
-        let id_vars: Vec<&str> = Vec::new();
-        let mdf = df.unpivot(feature_names.to_vec(), &id_vars)?;
-
-        let data: Vec<f64> = mdf
-            .select_at_idx(1)
-            .expect("Invalid column")
-            .f64()? // Returns Result<Float64Chunked>
-            .into_iter()
-            .map(|v| v.unwrap_or(f64::NAN))
-            .collect();
-
-        let y: Vec<f64> = df
-            .column("MedHouseVal")?
-            .cast(&DataType::Float64)?
-            .f64()? // Returns Result<Float64Chunked>
-            .into_iter()
-            .map(|v| v.unwrap_or(f64::NAN))
-            .collect();
+        let (data, y) = read_data("resources/cal_housing_test.csv")?;
 
         let matrix = Matrix::new(&data, y.len(), 8);
 
@@ -1188,36 +1014,75 @@ mod perpetual_booster_test {
 
     #[test]
     fn test_listnet_loss() -> Result<(), Box<dyn std::error::Error>> {
-        // Read CSV using Polars
-        let data = CsvReadOptions::default()
-            .with_has_header(true)
-            .with_infer_schema_length(Some(10000))
-            .try_into_reader_with_file_path(Some("resources/goodreads.csv".into()))?
-            .finish()?;
+        // Read CSV using csv crate
+        let file = File::open("resources/goodreads.csv")?;
+        let reader = BufReader::new(file);
+        let mut csv_reader = csv::ReaderBuilder::new().has_headers(true).from_reader(reader);
 
-        println!("{:?}", data.head(Some(5)));
+        let headers = csv_reader.headers()?.clone();
+
+        let year_idx = headers.iter().position(|h| h == "year").unwrap();
+        let category_idx = headers.iter().position(|h| h == "category").unwrap();
+        let rank_idx = headers.iter().position(|h| h == "rank").unwrap();
+
+        let feature_names = [
+            "avg_rating",
+            "pages",
+            "5stars",
+            "4stars",
+            "3stars",
+            "2stars",
+            "1stars",
+            "ratings",
+        ];
+        let feature_indices: Vec<usize> = feature_names
+            .iter()
+            .map(|&name| headers.iter().position(|h| h == name).unwrap())
+            .collect();
+
+        let mut groups: Vec<u64> = Vec::new();
+        let mut y_raw: Vec<i64> = Vec::new();
+        let mut data_columns: Vec<Vec<f64>> = vec![Vec::new(); feature_names.len()];
 
         let mut group_map: HashMap<(i64, String), u64> = HashMap::new();
         let mut current_group_id = 0;
 
-        let years = data.column("year")?.i64()?;
+        for result in csv_reader.records() {
+            let record = result?;
 
-        let categories = data.column("category")?.str()?;
+            // Group ID logic
+            let year = record[year_idx].parse::<i64>().unwrap();
+            let category = record[category_idx].to_string();
+            let key = (year, category);
+            let group_id = *group_map.entry(key).or_insert_with(|| {
+                let id = current_group_id;
+                current_group_id += 1;
+                id
+            });
+            groups.push(group_id);
 
-        let groups: Vec<u64> = years
-            .into_iter()
-            .zip(categories.into_iter())
-            .map(|(year, category)| {
-                let key = (year.unwrap(), category.unwrap().to_string());
-                *group_map.entry(key).or_insert_with(|| {
-                    let new_id = current_group_id;
-                    current_group_id += 1;
-                    new_id
-                })
-            })
-            .collect();
+            // Rank / Y
+            let rank = record[rank_idx].parse::<i64>().unwrap();
+            y_raw.push(rank);
 
-        println!("{:?}", groups.len());
+            // Features
+            for (i, &idx) in feature_indices.iter().enumerate() {
+                let val_str = &record[idx];
+                let val = if val_str.is_empty() {
+                    0.0 // Default for missing in numeric columns logic?
+                        // Original polars logic used check for numeric and unwrap_or(0.0) or (0).
+                        // I'll assume 0.0 for now for simplicity as per original logic snippet hint.
+                } else {
+                    val_str.parse::<f64>().unwrap_or(0.0)
+                };
+                data_columns[i].push(val);
+            }
+        }
+
+        let max_rank = *y_raw.iter().max().unwrap();
+        let y: Vec<f64> = y_raw.iter().map(|&v| (max_rank - v) as f64).collect();
+
+        let data: Vec<f64> = data_columns.into_iter().flatten().collect();
 
         let mut group_counts: HashMap<u64, u64> = HashMap::new();
         for group_id in &groups {
@@ -1228,68 +1093,7 @@ mod perpetual_booster_test {
             .map(|id| group_counts.get(&id).cloned().unwrap_or(0))
             .collect();
 
-        println!("{:?}", group_counts_vec.len());
-
-        let all_feature_names = [
-            "avg_rating".to_string(),
-            "pages".to_string(),
-            "5stars".to_string(),
-            "4stars".to_string(),
-            "3stars".to_string(),
-            "2stars".to_string(),
-            "1stars".to_string(),
-            "ratings".to_string(),
-            "rank".to_string(),
-        ];
-
-        let mdf = data.clone().select(all_feature_names.clone())?;
-
-        let cols_to_drop = ["rank".to_string()];
-
-        let features = mdf.drop_many(&cols_to_drop);
-
-        let max_rank = mdf
-            .column("rank")?
-            .i64()?
-            .into_iter()
-            .map(|v| v.unwrap())
-            .max()
-            .unwrap();
-
-        let y: Vec<f64> = mdf
-            .column("rank")?
-            .i64()?
-            .into_iter()
-            .map(|v| v.unwrap())
-            .map(|v| (max_rank - v) as f64) // Relevance
-            .collect();
-
-        let numeric_columns: Vec<Vec<f64>> = features
-            .get_columns()
-            .iter()
-            .filter_map(|col| {
-                if col.dtype().is_numeric() {
-                    // Try f64 first, then i64
-                    if let Ok(f64_col) = col.f64() {
-                        Some(f64_col.into_iter().map(|v| v.unwrap_or(0.0)).collect())
-                    } else if let Ok(i64_col) = col.i64() {
-                        Some(i64_col.into_iter().map(|v| v.unwrap_or(0) as f64).collect())
-                    } else {
-                        None
-                    }
-                } else {
-                    None
-                }
-            })
-            .collect();
-
-        let flat_features: Vec<f64> = (0..features.height())
-            .flat_map(|row_idx| numeric_columns.iter().map(move |col| col[row_idx]))
-            .collect();
-
-        let num_cols = all_feature_names.len() - 1;
-
-        let matrix = Matrix::new(&flat_features, y.len(), num_cols);
+        let matrix = Matrix::new(&data, y.len(), feature_names.len());
 
         let mut booster = PerpetualBooster::default()
             .set_objective(Objective::ListNetLoss)

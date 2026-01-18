@@ -14,10 +14,15 @@ categories = ["algorithms", "mathematics", "science"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [profile.release]
-lto = 'fat'
+lto = "fat"
 codegen-units = 1
-#debug = true      # due to flamegraph
-#strip = false     # due to flamegraph
+panic = "abort"   # Recommended for PGO to reduce binary size and overhead
+strip = false     # ensure symbols are kept if needed, though PGO handles this
+
+[profile.bench]
+debug = true          # Crucial for the agent to see function names in profile.json
+opt-level = 3
+lto = "thin"          # Gives the agent a realistic "Release" performance view
 
 [dependencies]
 rayon = "1.11.0"
@@ -31,7 +36,6 @@ sysinfo = "0.37.2"
 
 [dev-dependencies]
 criterion = "0.8.1"
-polars = "0.41"
 reqwest = { version = "0.13.1", features = ["blocking"] }
 csv = "1.4.0"
 chrono = "0.4.43"

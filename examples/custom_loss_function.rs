@@ -11,10 +11,9 @@
 //! cargo run --example custom_loss_function
 //! ```
 use std::error::Error;
+use std::fs::File;
+use std::io::BufReader;
 use std::sync::Arc;
-
-use polars::io::SerReader;
-use polars::prelude::{CsvReadOptions, DataType};
 
 use perpetual::metrics::evaluation::Metric;
 use perpetual::objective_functions::Objective;
@@ -93,59 +92,67 @@ fn main() -> Result<(), Box<dyn Error>> {
     // 1. Build dataset     //
     //----------------------//
 
-    let all_names = [
-        "MedInc".to_string(),
-        "HouseAge".to_string(),
-        "AveRooms".to_string(),
-        "AveBedrms".to_string(),
-        "Population".to_string(),
-        "AveOccup".to_string(),
-        "Latitude".to_string(),
-        "Longitude".to_string(),
-        "MedHouseVal".to_string(),
-    ];
-
     let feature_names = [
-        "MedInc".to_string(),
-        "HouseAge".to_string(),
-        "AveRooms".to_string(),
-        "AveBedrms".to_string(),
-        "Population".to_string(),
-        "AveOccup".to_string(),
-        "Latitude".to_string(),
-        "Longitude".to_string(),
+        "MedInc",
+        "HouseAge",
+        "AveRooms",
+        "AveBedrms",
+        "Population",
+        "AveOccup",
+        "Latitude",
+        "Longitude",
     ];
+    let target_name = "MedHouseVal";
 
-    let df = CsvReadOptions::default()
-        .with_has_header(true)
-        .with_columns(Some(Arc::new(all_names.clone())))
-        .try_into_reader_with_file_path(Some("resources/cal_housing_test.csv".into()))?
-        .finish()?;
+    let file = File::open("resources/cal_housing_test.csv")?;
+    let reader = BufReader::new(file);
+    let mut csv_reader = csv::ReaderBuilder::new().has_headers(true).from_reader(reader);
 
-    let id_vars: Vec<&str> = Vec::new();
-    let mdf = df.unpivot(feature_names.to_vec(), &id_vars)?;
-
-    let data: Vec<f64> = mdf
-        .select_at_idx(1)
-        .expect("Invalid column")
-        .f64()? // Returns Result<Float64Chunked>
-        .into_iter()
-        .map(|v| v.unwrap_or(f64::NAN))
+    let headers = csv_reader.headers()?.clone();
+    let feature_indices: Vec<usize> = feature_names
+        .iter()
+        .map(|&name| headers.iter().position(|h| h == name).unwrap())
         .collect();
+    let target_index = headers.iter().position(|h| h == target_name).unwrap();
 
-    let y: Vec<f64> = df
-        .column("MedHouseVal")?
-        .cast(&DataType::Float64)?
-        .f64()? // Returns Result<Float64Chunked>
-        .into_iter()
-        .map(|v| v.unwrap_or(f64::NAN))
-        .collect();
+    let mut data_columns: Vec<Vec<f64>> = vec![Vec::new(); feature_names.len()];
+    let mut y = Vec::new();
+
+    for result in csv_reader.records() {
+        let record = result?;
+
+        // Parse target
+        let target_str = &record[target_index];
+        let target_val = if target_str.is_empty() {
+            f64::NAN
+        } else {
+            target_str.parse::<f64>().unwrap_or(f64::NAN)
+        };
+        y.push(target_val);
+
+        // Parse features
+        for (i, &idx) in feature_indices.iter().enumerate() {
+            let val_str = &record[idx];
+            let val = if val_str.is_empty() {
+                f64::NAN
+            } else {
+                val_str.parse::<f64>().unwrap_or(f64::NAN)
+            };
+            data_columns[i].push(val);
+        }
+    }
+
+    let data: Vec<f64> = data_columns.into_iter().flatten().collect();
 
     let matrix = Matrix::new(&data, y.len(), 8);
 
     //--------------------------------------//
     // 2. Build booster w/ custom objective //
     //--------------------------------------//
+
+    // Explicitly annotate type for CustomSquaredLoss to match Objective enum variant if needed,
+    // but Objective::Custom takes Arc<dyn ObjectiveFunction>.
+    // The previous code was: Objective::Custom(Arc::new(CustomSquaredLoss))
     let mut booster = PerpetualBooster::default()
         .set_objective(Objective::Custom(Arc::new(CustomSquaredLoss)))
         .set_max_bin(10)

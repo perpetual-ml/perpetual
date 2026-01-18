@@ -968,7 +968,7 @@ fn best_feature_split_const_hess(
                     continue;
                 }
 
-                let (left_node, right_node, _) = if create_missing_branch {
+                let split_result = if create_missing_branch {
                     evaluate_branch_split_const_hess(
                         left_gradient_train[j],
                         f32::NAN,
@@ -1006,8 +1006,11 @@ fn best_feature_split_const_hess(
                         missing_node_treatment,
                         allow_missing_splits,
                     )
-                }
-                .unwrap();
+                };
+                let (left_node, right_node, _) = match split_result {
+                    Some(v) => v,
+                    None => continue,
+                };
 
                 left_weights[j] = left_node.weight;
                 right_weights[j] = right_node.weight;
@@ -1040,7 +1043,7 @@ fn best_feature_split_const_hess(
                 continue;
             }
 
-            let (mut left_node_info, mut right_node_info, missing_info) = if create_missing_branch {
+            let split_result = if create_missing_branch {
                 evaluate_branch_split_const_hess(
                     left_gradient_valid.iter().sum(),
                     f32::NAN,
@@ -1078,8 +1081,12 @@ fn best_feature_split_const_hess(
                     missing_node_treatment,
                     allow_missing_splits,
                 )
-            }
-            .unwrap();
+            };
+
+            let (mut left_node_info, mut right_node_info, missing_info) = match split_result {
+                Some(v) => v,
+                None => continue,
+            };
 
             left_node_info.weights = left_weights;
             right_node_info.weights = right_weights;
@@ -1157,7 +1164,7 @@ fn best_feature_split_const_hess(
                     continue;
                 }
 
-                let (left_node, right_node, _) = if create_missing_branch {
+                let split_result = if create_missing_branch {
                     evaluate_branch_split_const_hess(
                         left_gradient_train[j],
                         f32::NAN,
@@ -1195,8 +1202,11 @@ fn best_feature_split_const_hess(
                         missing_node_treatment,
                         allow_missing_splits,
                     )
-                }
-                .unwrap();
+                };
+                let (left_node, right_node, _) = match split_result {
+                    Some(v) => v,
+                    None => continue,
+                };
 
                 left_weights[j] = left_node.weight;
                 right_weights[j] = right_node.weight;
@@ -1229,7 +1239,7 @@ fn best_feature_split_const_hess(
                 continue;
             }
 
-            let (mut left_node_info, mut right_node_info, missing_info) = if create_missing_branch {
+            let split_result = if create_missing_branch {
                 evaluate_branch_split_const_hess(
                     left_gradient_valid.iter().sum(),
                     f32::NAN,
@@ -1267,8 +1277,12 @@ fn best_feature_split_const_hess(
                     missing_node_treatment,
                     allow_missing_splits,
                 )
-            }
-            .unwrap();
+            };
+
+            let (mut left_node_info, mut right_node_info, missing_info) = match split_result {
+                Some(v) => v,
+                None => continue,
+            };
 
             left_node_info.weights = left_weights;
             right_node_info.weights = right_weights;
@@ -1464,7 +1478,7 @@ fn best_feature_split_var_hess(
                     continue;
                 }
 
-                let (left_node, right_node, _) = if create_missing_branch {
+                let split_result = if create_missing_branch {
                     evaluate_branch_split_var_hess(
                         left_gradient_train[j],
                         left_hessian_train[j],
@@ -1502,8 +1516,11 @@ fn best_feature_split_var_hess(
                         missing_node_treatment,
                         allow_missing_splits,
                     )
-                }
-                .unwrap();
+                };
+                let (left_node, right_node, _) = match split_result {
+                    Some(v) => v,
+                    None => continue,
+                };
 
                 left_weights[j] = left_node.weight;
                 right_weights[j] = right_node.weight;
@@ -1536,7 +1553,7 @@ fn best_feature_split_var_hess(
                 continue;
             }
 
-            let (mut left_node_info, mut right_node_info, missing_info) = if create_missing_branch {
+            let split_result = if create_missing_branch {
                 evaluate_branch_split_var_hess(
                     left_gradient_valid.iter().sum(),
                     left_hessian_valid.iter().sum::<f32>(),
@@ -1574,8 +1591,12 @@ fn best_feature_split_var_hess(
                     missing_node_treatment,
                     allow_missing_splits,
                 )
-            }
-            .unwrap();
+            };
+
+            let (mut left_node_info, mut right_node_info, missing_info) = match split_result {
+                Some(v) => v,
+                None => continue,
+            };
 
             left_node_info.weights = left_weights;
             right_node_info.weights = right_weights;
@@ -1659,7 +1680,7 @@ fn best_feature_split_var_hess(
                     continue;
                 }
 
-                let (left_node, right_node, _) = if create_missing_branch {
+                let split_result = if create_missing_branch {
                     evaluate_branch_split_var_hess(
                         left_gradient_train[j],
                         left_hessian_train[j],
@@ -1697,8 +1718,11 @@ fn best_feature_split_var_hess(
                         missing_node_treatment,
                         allow_missing_splits,
                     )
-                }
-                .unwrap();
+                };
+                let (left_node, right_node, _) = match split_result {
+                    Some(v) => v,
+                    None => continue,
+                };
 
                 left_weights[j] = left_node.weight;
                 right_weights[j] = right_node.weight;
@@ -1731,7 +1755,7 @@ fn best_feature_split_var_hess(
                 continue;
             }
 
-            let (mut left_node_info, mut right_node_info, missing_info) = if create_missing_branch {
+            let split_result = if create_missing_branch {
                 evaluate_branch_split_var_hess(
                     left_gradient_valid.iter().sum(),
                     left_hessian_valid.iter().sum::<f32>(),
@@ -1769,8 +1793,12 @@ fn best_feature_split_var_hess(
                     missing_node_treatment,
                     allow_missing_splits,
                 )
-            }
-            .unwrap();
+            };
+
+            let (mut left_node_info, mut right_node_info, missing_info) = match split_result {
+                Some(v) => v,
+                None => continue,
+            };
 
             left_node_info.weights = left_weights;
             right_node_info.weights = right_weights;
@@ -2323,7 +2351,7 @@ mod tests {
     use crate::objective_functions::objective::{Objective, ObjectiveFunction};
     use crate::utils::gain;
     use crate::utils::weight;
-    use polars::prelude::*;
+    // use polars::prelude::*; // Removed
     use std::error::Error;
     use std::fs;
 
@@ -2442,57 +2470,57 @@ mod tests {
         let is_const_hess = true;
 
         let feature_names = [
-            "MedInc".to_owned(),
-            "HouseAge".to_owned(),
-            "AveRooms".to_owned(),
-            "AveBedrms".to_owned(),
-            "Population".to_owned(),
-            "AveOccup".to_owned(),
-            "Latitude".to_owned(),
-            "Longitude".to_owned(),
-            "MedHouseVal".to_owned(),
+            "MedInc",
+            "HouseAge",
+            "AveRooms",
+            "AveBedrms",
+            "Population",
+            "AveOccup",
+            "Latitude",
+            "Longitude",
         ];
+        let target_name = "MedHouseVal";
 
-        let df_test = CsvReadOptions::default()
-            .with_has_header(true)
-            .with_columns(Some(Arc::new(feature_names)))
-            .try_into_reader_with_file_path(Some("resources/cal_housing_test.csv".into()))?
-            .finish()
-            .unwrap();
+        let file = fs::File::open("resources/cal_housing_test.csv")?;
+        let reader = std::io::BufReader::new(file);
+        let mut csv_reader = csv::ReaderBuilder::new().has_headers(true).from_reader(reader);
 
-        let id_vars: Vec<&str> = Vec::new();
+        let headers = csv_reader.headers()?.clone();
+        let feature_indices: Vec<usize> = feature_names
+            .iter()
+            .map(|name| headers.iter().position(|h| h == *name).unwrap())
+            .collect();
+        let target_index = headers.iter().position(|h| h == target_name).unwrap();
 
-        let mdf_test = df_test.unpivot(
-            [
-                "MedInc",
-                "HouseAge",
-                "AveRooms",
-                "AveBedrms",
-                "Population",
-                "AveOccup",
-                "Latitude",
-                "Longitude",
-            ],
-            &id_vars,
-        )?;
+        let mut data_columns: Vec<Vec<f64>> = vec![Vec::new(); feature_names.len()];
+        let mut y_test = Vec::new();
 
-        let data_test = Vec::from_iter(
-            mdf_test
-                .select_at_idx(1)
-                .expect("Invalid column")
-                .f64()?
-                .into_iter()
-                .map(|v| v.unwrap_or(f64::NAN)),
-        );
+        for result in csv_reader.records() {
+            let record = result?;
 
-        let y_test = Vec::from_iter(
-            df_test
-                .column("MedHouseVal")?
-                .cast(&DataType::Float64)?
-                .f64()?
-                .into_iter()
-                .map(|v| v.unwrap_or(f64::NAN)),
-        );
+            // Parse target
+            let target_str = &record[target_index];
+            let target_val = if target_str.is_empty() {
+                f64::NAN
+            } else {
+                target_str.parse::<f64>().unwrap_or(f64::NAN)
+            };
+            y_test.push(target_val);
+
+            // Parse features
+            for (i, &idx) in feature_indices.iter().enumerate() {
+                let val_str = &record[idx];
+                let val = if val_str.is_empty() {
+                    f64::NAN
+                } else {
+                    val_str.parse::<f64>().unwrap_or(f64::NAN)
+                };
+                data_columns[i].push(val);
+            }
+        }
+
+        // Flatten column-major
+        let data_test: Vec<f64> = data_columns.into_iter().flatten().collect();
 
         let y_test_avg = y_test.iter().sum::<f64>() / y_test.len() as f64;
         let yhat = vec![y_test_avg; y_test.len()];

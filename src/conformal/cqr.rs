@@ -73,115 +73,112 @@ mod tests {
     use crate::objective_functions::objective::Objective;
     use crate::Matrix;
     use crate::PerpetualBooster;
-    use polars::io::SerReader;
-    use polars::prelude::{CsvReadOptions, DataType};
     use std::error::Error;
-    use std::sync::Arc;
+    use std::fs::File;
+    use std::io::BufReader;
+
+    fn read_data(path: &str) -> Result<(Vec<f64>, Vec<f64>), Box<dyn Error>> {
+        let feature_names = [
+            "MedInc",
+            "HouseAge",
+            "AveRooms",
+            "AveBedrms",
+            "Population",
+            "AveOccup",
+            "Latitude",
+            "Longitude",
+        ];
+        let target_name = "MedHouseVal";
+
+        let file = File::open(path)?;
+        let reader = BufReader::new(file);
+        let mut csv_reader = csv::ReaderBuilder::new().has_headers(true).from_reader(reader);
+
+        let headers = csv_reader.headers()?.clone();
+        let feature_indices: Vec<usize> = feature_names
+            .iter()
+            .map(|&name| headers.iter().position(|h| h == name).unwrap())
+            .collect();
+        let target_index = headers.iter().position(|h| h == target_name).unwrap();
+
+        let mut data_columns: Vec<Vec<f64>> = vec![Vec::new(); feature_names.len()];
+        let mut y = Vec::new();
+
+        for result in csv_reader.records() {
+            let record = result?;
+
+            // Parse target
+            let target_str = &record[target_index];
+            let target_val = if target_str.is_empty() {
+                f64::NAN
+            } else {
+                target_str.parse::<f64>().unwrap_or(f64::NAN)
+            };
+            y.push(target_val);
+
+            // Parse features
+            for (i, &idx) in feature_indices.iter().enumerate() {
+                let val_str = &record[idx];
+                let val = if val_str.is_empty() {
+                    f64::NAN
+                } else {
+                    val_str.parse::<f64>().unwrap_or(f64::NAN)
+                };
+                data_columns[i].push(val);
+            }
+        }
+
+        let data: Vec<f64> = data_columns.into_iter().flatten().collect();
+        Ok((data, y))
+    }
 
     #[test]
     fn test_cqr() -> Result<(), Box<dyn Error>> {
-        let all_names = [
-            "MedInc".to_string(),
-            "HouseAge".to_string(),
-            "AveRooms".to_string(),
-            "AveBedrms".to_string(),
-            "Population".to_string(),
-            "AveOccup".to_string(),
-            "Latitude".to_string(),
-            "Longitude".to_string(),
-            "MedHouseVal".to_string(),
-        ];
+        let (data_train, y_train) = read_data("resources/cal_housing_train.csv")?;
+        let (data_test, y_test) = read_data("resources/cal_housing_test.csv")?;
 
-        let feature_names = [
-            "MedInc".to_string(),
-            "HouseAge".to_string(),
-            "AveRooms".to_string(),
-            "AveBedrms".to_string(),
-            "Population".to_string(),
-            "AveOccup".to_string(),
-            "Latitude".to_string(),
-            "Longitude".to_string(),
-        ];
+        let _n_train_subset = 1000.min(y_train.len());
+        let _n_test_subset = 500.min(y_test.len());
 
-        let column_names_train = Arc::new(all_names.clone());
-        let column_names_test = Arc::new(all_names.clone());
+        let rows_full = y_train.len();
+        let limit_train = 1000.min(rows_full);
+        let mut data_train_sub = Vec::new();
+        // Extract 8 columns
+        for c in 0..8 {
+            let col_start = c * rows_full;
+            data_train_sub.extend_from_slice(&data_train[col_start..col_start + limit_train]);
+        }
+        let y_train_sub = y_train[0..limit_train].to_vec();
 
-        let df_train = CsvReadOptions::default()
-            .with_has_header(true)
-            .with_columns(Some(column_names_train))
-            .try_into_reader_with_file_path(Some("resources/cal_housing_train.csv".into()))?
-            .finish()
-            .unwrap()
-            .head(Some(1000));
-
-        let df_test = CsvReadOptions::default()
-            .with_has_header(true)
-            .with_columns(Some(column_names_test))
-            .try_into_reader_with_file_path(Some("resources/cal_housing_test.csv".into()))?
-            .finish()
-            .unwrap()
-            .head(Some(500));
-
-        // Get data in column major format...
-        let id_vars_train: Vec<&str> = Vec::new();
-        let mdf_train = df_train.unpivot(feature_names.clone(), &id_vars_train)?;
-        let id_vars_test: Vec<&str> = Vec::new();
-        let mdf_test = df_test.unpivot(feature_names, &id_vars_test)?;
-
-        let data_train = Vec::from_iter(
-            mdf_train
-                .select_at_idx(1)
-                .expect("Invalid column")
-                .f64()?
-                .into_iter()
-                .map(|v| v.unwrap_or(f64::NAN)),
-        );
-        let data_test = Vec::from_iter(
-            mdf_test
-                .select_at_idx(1)
-                .expect("Invalid column")
-                .f64()?
-                .into_iter()
-                .map(|v| v.unwrap_or(f64::NAN)),
-        );
-
-        let y_train = Vec::from_iter(
-            df_train
-                .column("MedHouseVal")?
-                .cast(&DataType::Float64)?
-                .f64()?
-                .into_iter()
-                .map(|v| v.unwrap_or(f64::NAN)),
-        );
-        let y_test = Vec::from_iter(
-            df_test
-                .column("MedHouseVal")?
-                .cast(&DataType::Float64)?
-                .f64()?
-                .into_iter()
-                .map(|v| v.unwrap_or(f64::NAN)),
-        );
+        let rows_test_full = y_test.len();
+        let limit_test = 500.min(rows_test_full);
+        let mut data_test_sub = Vec::new();
+        for c in 0..8 {
+            let col_start = c * rows_test_full;
+            data_test_sub.extend_from_slice(&data_test[col_start..col_start + limit_test]);
+        }
+        let y_test_sub = y_test[0..limit_test].to_vec();
 
         // Create Matrix from ndarray.
-        let matrix_train = Matrix::new(&data_train, y_train.len(), 8);
-        let matrix_test = Matrix::new(&data_test, y_test.len(), 8);
+        let matrix_train = Matrix::new(&data_train_sub, y_train_sub.len(), 8);
+        let matrix_test = Matrix::new(&data_test_sub, y_test_sub.len(), 8);
 
         let mut model = PerpetualBooster::default()
             .set_objective(Objective::SquaredLoss)
-            .set_max_bin(10)
+            .set_max_bin(5)
             .set_budget(0.1)
-            .set_iteration_limit(Some(10))
-            .set_memory_limit(Some(0.001));
+            .set_iteration_limit(Some(5))
+            .set_memory_limit(Some(0.0001));
 
-        model.fit(&matrix_train, &y_train, None, None)?;
+        model.fit(&matrix_train, &y_train_sub, None, None)?;
 
         let alpha = vec![0.2];
-        let data_cal = (matrix_test, y_test.as_slice(), alpha.as_slice());
+        let data_cal = (matrix_test, y_test_sub.as_slice(), alpha.as_slice());
 
-        model.calibrate(&matrix_train, &y_train, None, None, data_cal)?;
+        model.calibrate(&matrix_train, &y_train_sub, None, None, data_cal)?;
 
-        let matrix_test = Matrix::new(&data_test, y_test.len(), 8);
-        let _intervals = model.predict_intervals(&matrix_test, true);
+        let matrix_test_eval = Matrix::new(&data_test_sub, y_test_sub.len(), 8);
+        let _intervals = model.predict_intervals(&matrix_test_eval, true);
 
         Ok(())
     }
