@@ -1,8 +1,9 @@
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
+use criterion::{criterion_group, criterion_main, Criterion};
 use perpetual::data::Matrix;
 use perpetual::objective_functions::Objective;
 use perpetual::PerpetualBooster;
 use std::fs;
+use std::hint::black_box;
 use std::time::Duration;
 
 pub fn training_benchmark(c: &mut Criterion) {
@@ -31,8 +32,8 @@ pub fn training_benchmark(c: &mut Criterion) {
 
     let mut group = c.benchmark_group("training_benchmark");
     group.warm_up_time(Duration::from_secs(5));
-    group.measurement_time(Duration::from_secs(20)); // Give it more time for stable results
-    group.sample_size(10); // Reduce sample size as training might be slow
+    group.measurement_time(Duration::from_secs(60)); // Increased for stability
+    group.sample_size(40); // Increased from 10 to 40 to reduce outlier impact
 
     group.bench_function("train_booster_cal_housing", |b| {
         b.iter(|| {
