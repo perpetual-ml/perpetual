@@ -65,7 +65,7 @@ pub fn training_benchmark_cover_types(c: &mut Criterion) {
         // Last column is target
         y.push(values[values.len() - 1]);
         // Rest are features
-        data_vec.extend_from_slice(&values[0..values.len() - 1]);
+        data_vec.extend_from_slice(&values[0..10]);
     }
 
     let n_cols = data_vec.len() / y.len();
@@ -73,8 +73,8 @@ pub fn training_benchmark_cover_types(c: &mut Criterion) {
 
     let mut group = c.benchmark_group("training_benchmark_cover");
     group.warm_up_time(Duration::from_secs(5));
-    group.measurement_time(Duration::from_secs(20));
-    group.sample_size(10);
+    group.measurement_time(Duration::from_secs(60));
+    group.sample_size(40);
 
     group.bench_function("train_booster_cover_types", |b| {
         b.iter(|| {
