@@ -28,6 +28,11 @@ debug_*.R
 check_symbols.R
 path_check.txt
 test_output.txt
+test_output_ascii.txt
+test_errors.txt
+test_failure.txt
+errors*.txt
+profile.json*
 typescript
 
 # WSL build scripts (temporary)

@@ -807,7 +807,10 @@ mod perpetual_booster_test {
             .set_objective(Objective::SquaredLoss)
             .set_categorical_features(Some(cat_index))
             .set_iteration_limit(Some(iter_limit))
-            .set_memory_limit(Some(0.00003))
+            // Memory limit is set to a very small value to force small trees (stumps/single splits).
+            // Reduced from 0.00003 to 0.00002 because the Bin struct became smaller after refactoring,
+            // which increased the number of nodes allocated (n_nodes_alloc) for the same memory limit.
+            .set_memory_limit(Some(0.00002))
             .set_save_node_stats(true)
             .set_budget(1.0);
 

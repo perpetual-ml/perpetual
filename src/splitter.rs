@@ -876,7 +876,7 @@ fn best_feature_split_const_hess(
                 .iter()
                 .filter(|b| {
                     let bin = unsafe { &*b.get() };
-                    bin.counts.iter().sum::<usize>() > 0 && !bin.cut_value.is_nan()
+                    bin.counts.iter().sum::<u32>() > 0 && !bin.cut_value.is_nan()
                 })
                 .collect::<Vec<_>>();
             sort_cat_bins_by_stat(&mut hist_vec, true);
@@ -897,12 +897,12 @@ fn best_feature_split_const_hess(
     let miss_bin = unsafe { hist_feat.data.get_unchecked(0).get().as_ref().unwrap() };
 
     let mut node_grad_sum = [0.0; 5];
-    let mut node_coun_sum = [0; 5];
+    let mut node_coun_sum = [0_usize; 5];
     for bin in hist_feat.data[1..].iter() {
         let b = unsafe { &*bin.get() };
         for i in 0..5 {
             node_grad_sum[i] += b.g_folded[i];
-            node_coun_sum[i] += b.counts[i];
+            node_coun_sum[i] += b.counts[i] as usize;
         }
     }
 
@@ -911,7 +911,7 @@ fn best_feature_split_const_hess(
 
     // Pre-calculate node totals for training set (per fold)
     let mut node_grad_train_sum = [0.0; 5];
-    let mut node_coun_train_sum = [0; 5];
+    let mut node_coun_train_sum = [0_usize; 5];
     for j in 0..5 {
         node_grad_train_sum[j] = node_grad_scalar_sum - node_grad_sum[j];
         node_coun_train_sum[j] = node_coun_scalar_sum - node_coun_sum[j];
@@ -946,7 +946,7 @@ fn best_feature_split_const_hess(
             #[allow(clippy::needless_late_init)]
             let generalization;
             let b_grad_total: f32 = b.g_folded.iter().sum();
-            let b_coun_total: usize = b.counts.iter().sum();
+            let b_coun_total: usize = b.counts.iter().map(|&c| c as usize).sum();
             for j in 0..5 {
                 right_gradient_train[j] = node_grad_train_sum[j] - cuml_gradient_train[j];
                 right_counts_train[j] = node_coun_train_sum[j] - cuml_counts_train[j];
@@ -954,9 +954,9 @@ fn best_feature_split_const_hess(
                 right_counts_valid[j] = node_coun_sum[j] - cuml_counts_valid[j];
 
                 cuml_gradient_train[j] += b_grad_total - b.g_folded[j];
-                cuml_counts_train[j] += b_coun_total - b.counts[j];
+                cuml_counts_train[j] += b_coun_total - b.counts[j] as usize;
                 cuml_gradient_valid[j] += b.g_folded[j];
-                cuml_counts_valid[j] += b.counts[j];
+                cuml_counts_valid[j] += b.counts[j] as usize;
 
                 let left_c_train = left_counts_train[j];
                 let right_c_train = right_counts_train[j];
@@ -977,7 +977,7 @@ fn best_feature_split_const_hess(
                         right_counts_train[j],
                         miss_bin.g_folded.iter().sum(),
                         f32::NAN,
-                        miss_bin.counts.iter().sum(),
+                        miss_bin.counts.iter().map(|&c| c as usize).sum(),
                         node.lower_bound,
                         node.upper_bound,
                         node.weight_value,
@@ -996,7 +996,7 @@ fn best_feature_split_const_hess(
                         right_counts_train[j],
                         miss_bin.g_folded.iter().sum(),
                         f32::NAN,
-                        miss_bin.counts.iter().sum(),
+                        miss_bin.counts.iter().map(|&c| c as usize).sum(),
                         node.lower_bound,
                         node.upper_bound,
                         node.weight_value,
@@ -1052,7 +1052,7 @@ fn best_feature_split_const_hess(
                     right_counts_valid.iter().sum::<usize>(),
                     miss_bin.g_folded.iter().sum(),
                     f32::NAN,
-                    miss_bin.counts.iter().sum(),
+                    miss_bin.counts.iter().map(|&c| c as usize).sum(),
                     node.lower_bound,
                     node.upper_bound,
                     node.weight_value,
@@ -1071,7 +1071,7 @@ fn best_feature_split_const_hess(
                     right_counts_valid.iter().sum::<usize>(),
                     miss_bin.g_folded.iter().sum(),
                     f32::NAN,
-                    miss_bin.counts.iter().sum(),
+                    miss_bin.counts.iter().map(|&c| c as usize).sum(),
                     node.lower_bound,
                     node.upper_bound,
                     node.weight_value,
@@ -1125,7 +1125,7 @@ fn best_feature_split_const_hess(
     } else {
         for bin in &hist_feat.data[1..] {
             let b = unsafe { &*bin.get() };
-            if b.counts.iter().sum::<usize>() == 0 || b.cut_value.is_nan() {
+            if b.counts.iter().map(|&c| c as usize).sum::<usize>() == 0 || b.cut_value.is_nan() {
                 continue;
             }
             // -- Inlined logic --
@@ -1144,7 +1144,7 @@ fn best_feature_split_const_hess(
             #[allow(clippy::needless_late_init)]
             let generalization;
             let b_grad_total: f32 = b.g_folded.iter().sum();
-            let b_coun_total: usize = b.counts.iter().sum();
+            let b_coun_total: usize = b.counts.iter().map(|&c| c as usize).sum();
             for j in 0..5 {
                 right_gradient_train[j] = node_grad_train_sum[j] - cuml_gradient_train[j];
                 right_counts_train[j] = node_coun_train_sum[j] - cuml_counts_train[j];
@@ -1152,9 +1152,9 @@ fn best_feature_split_const_hess(
                 right_counts_valid[j] = node_coun_sum[j] - cuml_counts_valid[j];
 
                 cuml_gradient_train[j] += b_grad_total - b.g_folded[j];
-                cuml_counts_train[j] += b_coun_total - b.counts[j];
+                cuml_counts_train[j] += b_coun_total - b.counts[j] as usize;
                 cuml_gradient_valid[j] += b.g_folded[j];
-                cuml_counts_valid[j] += b.counts[j];
+                cuml_counts_valid[j] += b.counts[j] as usize;
 
                 let left_c_train = left_counts_train[j];
                 let right_c_train = right_counts_train[j];
@@ -1175,7 +1175,7 @@ fn best_feature_split_const_hess(
                         right_counts_train[j],
                         miss_bin.g_folded.iter().sum(),
                         f32::NAN,
-                        miss_bin.counts.iter().sum(),
+                        miss_bin.counts.iter().map(|&c| c as usize).sum(),
                         node.lower_bound,
                         node.upper_bound,
                         node.weight_value,
@@ -1194,7 +1194,7 @@ fn best_feature_split_const_hess(
                         right_counts_train[j],
                         miss_bin.g_folded.iter().sum(),
                         f32::NAN,
-                        miss_bin.counts.iter().sum(),
+                        miss_bin.counts.iter().map(|&c| c as usize).sum(),
                         node.lower_bound,
                         node.upper_bound,
                         node.weight_value,
@@ -1250,7 +1250,7 @@ fn best_feature_split_const_hess(
                     right_counts_valid.iter().sum::<usize>(),
                     miss_bin.g_folded.iter().sum(),
                     f32::NAN,
-                    miss_bin.counts.iter().sum(),
+                    miss_bin.counts.iter().map(|&c| c as usize).sum(),
                     node.lower_bound,
                     node.upper_bound,
                     node.weight_value,
@@ -1269,7 +1269,7 @@ fn best_feature_split_const_hess(
                     right_counts_valid.iter().sum::<usize>(),
                     miss_bin.g_folded.iter().sum(),
                     f32::NAN,
-                    miss_bin.counts.iter().sum(),
+                    miss_bin.counts.iter().map(|&c| c as usize).sum(),
                     node.lower_bound,
                     node.upper_bound,
                     node.weight_value,
@@ -1367,12 +1367,12 @@ fn best_feature_split_var_hess(
     // For categorical features, we need to sort the bins.
     let mut hist_vec: Vec<&UnsafeCell<Bin>> = Vec::new();
     let is_categorical = if let Some(c_index) = cat_index {
-        if c_index.contains(&feature) {
+                if c_index.contains(&feature) {
             hist_vec = hist_feat.data[1..]
                 .iter()
                 .filter(|b| {
                     let bin = unsafe { &*b.get() };
-                    bin.counts.iter().sum::<usize>() > 0 && !bin.cut_value.is_nan()
+                    bin.counts.iter().sum::<u32>() > 0 && !bin.cut_value.is_nan()
                 })
                 .collect::<Vec<_>>();
             sort_cat_bins_by_stat(&mut hist_vec, false);
@@ -1393,13 +1393,13 @@ fn best_feature_split_var_hess(
 
     let mut node_grad_sum = [0.0; 5];
     let mut node_hess_sum = [0.0; 5];
-    let mut node_coun_sum = [0; 5];
+    let mut node_coun_sum = [0_usize; 5];
     for bin in hist_feat.data[1..].iter() {
         let b = unsafe { &*bin.get() };
         for i in 0..5 {
             node_grad_sum[i] += b.g_folded[i];
-            node_hess_sum[i] += b.h_folded.unwrap()[i];
-            node_coun_sum[i] += b.counts[i];
+            node_hess_sum[i] += b.h_folded[i];
+            node_coun_sum[i] += b.counts[i] as usize;
         }
     }
 
@@ -1410,7 +1410,7 @@ fn best_feature_split_var_hess(
     // Pre-calculate node training sums
     let mut node_grad_train_sum = [0.0; 5];
     let mut node_hess_train_sum = [0.0; 5];
-    let mut node_coun_train_sum = [0; 5];
+    let mut node_coun_train_sum = [0_usize; 5];
     for j in 0..5 {
         node_grad_train_sum[j] = node_grad_scalar_sum - node_grad_sum[j];
         node_hess_train_sum[j] = node_hess_scalar_sum - node_hess_sum[j];
@@ -1452,8 +1452,8 @@ fn best_feature_split_var_hess(
             #[allow(clippy::needless_late_init)]
             let generalization;
             let b_grad_total: f32 = b.g_folded.iter().sum();
-            let b_hess_total: f32 = b.h_folded.unwrap().iter().sum();
-            let b_coun_total: usize = b.counts.iter().sum();
+            let b_hess_total: f32 = b.h_folded.iter().sum();
+            let b_coun_total: usize = b.counts.iter().map(|&c| c as usize).sum();
             for j in 0..5 {
                 right_gradient_train[j] = node_grad_train_sum[j] - cuml_gradient_train[j];
                 right_hessian_train[j] = node_hess_train_sum[j] - cuml_hessian_train[j];
@@ -1463,11 +1463,11 @@ fn best_feature_split_var_hess(
                 right_counts_valid[j] = node_coun_sum[j] - cuml_counts_valid[j];
 
                 cuml_gradient_train[j] += b_grad_total - b.g_folded[j];
-                cuml_hessian_train[j] += b_hess_total - b.h_folded.unwrap()[j];
-                cuml_counts_train[j] += b_coun_total - b.counts[j];
+                cuml_hessian_train[j] += b_hess_total - b.h_folded[j];
+                cuml_counts_train[j] += b_coun_total - b.counts[j] as usize;
                 cuml_gradient_valid[j] += b.g_folded[j];
-                cuml_hessian_valid[j] += b.h_folded.unwrap()[j];
-                cuml_counts_valid[j] += b.counts[j];
+                cuml_hessian_valid[j] += b.h_folded[j];
+                cuml_counts_valid[j] += b.counts[j] as usize;
 
                 let left_c_train = left_counts_train[j];
                 let right_c_train = right_counts_train[j];
@@ -1487,8 +1487,8 @@ fn best_feature_split_var_hess(
                         right_hessian_train[j],
                         right_counts_train[j],
                         miss_bin.g_folded.iter().sum(),
-                        miss_bin.h_folded.unwrap().iter().sum::<f32>(),
-                        miss_bin.counts.iter().sum(),
+                        miss_bin.h_folded.iter().sum::<f32>(),
+                        miss_bin.counts.iter().map(|&c| c as usize).sum(),
                         node.lower_bound,
                         node.upper_bound,
                         node.weight_value,
@@ -1506,8 +1506,8 @@ fn best_feature_split_var_hess(
                         right_hessian_train[j],
                         right_counts_train[j],
                         miss_bin.g_folded.iter().sum(),
-                        miss_bin.h_folded.unwrap().iter().sum::<f32>(),
-                        miss_bin.counts.iter().sum(),
+                        miss_bin.h_folded.iter().sum::<f32>(),
+                        miss_bin.counts.iter().map(|&c| c as usize).sum(),
                         node.lower_bound,
                         node.upper_bound,
                         node.weight_value,
@@ -1562,8 +1562,8 @@ fn best_feature_split_var_hess(
                     right_hessian_valid.iter().sum::<f32>(),
                     right_counts_valid.iter().sum::<usize>(),
                     miss_bin.g_folded.iter().sum(),
-                    miss_bin.h_folded.unwrap().iter().sum::<f32>(),
-                    miss_bin.counts.iter().sum(),
+                    miss_bin.h_folded.iter().sum::<f32>(),
+                    miss_bin.counts.iter().map(|&c| c as usize).sum(),
                     node.lower_bound,
                     node.upper_bound,
                     node.weight_value,
@@ -1581,8 +1581,8 @@ fn best_feature_split_var_hess(
                     right_hessian_valid.iter().sum::<f32>(),
                     right_counts_valid.iter().sum::<usize>(),
                     miss_bin.g_folded.iter().sum(),
-                    miss_bin.h_folded.unwrap().iter().sum::<f32>(),
-                    miss_bin.counts.iter().sum(),
+                    miss_bin.h_folded.iter().sum::<f32>(),
+                    miss_bin.counts.iter().map(|&c| c as usize).sum(),
                     node.lower_bound,
                     node.upper_bound,
                     node.weight_value,
@@ -1636,7 +1636,7 @@ fn best_feature_split_var_hess(
     } else {
         for bin in &hist_feat.data[1..] {
             let b = unsafe { &*bin.get() };
-            if b.counts.iter().sum::<usize>() == 0 || b.cut_value.is_nan() {
+            if b.counts.iter().map(|&c| c as usize).sum::<usize>() == 0 || b.cut_value.is_nan() {
                 continue;
             }
             // -- Inlined process_bin logic --
@@ -1657,8 +1657,8 @@ fn best_feature_split_var_hess(
             #[allow(clippy::needless_late_init)]
             let generalization;
             let b_grad_total: f32 = b.g_folded.iter().sum();
-            let b_hess_total: f32 = b.h_folded.unwrap().iter().sum();
-            let b_coun_total: usize = b.counts.iter().sum();
+            let b_hess_total: f32 = b.h_folded.iter().sum();
+            let b_coun_total: usize = b.counts.iter().map(|&c| c as usize).sum();
             for j in 0..5 {
                 right_gradient_train[j] = node_grad_train_sum[j] - cuml_gradient_train[j];
                 right_hessian_train[j] = node_hess_train_sum[j] - cuml_hessian_train[j];
@@ -1668,11 +1668,11 @@ fn best_feature_split_var_hess(
                 right_counts_valid[j] = node_coun_sum[j] - cuml_counts_valid[j];
 
                 cuml_gradient_train[j] += b_grad_total - b.g_folded[j];
-                cuml_hessian_train[j] += b_hess_total - b.h_folded.unwrap()[j];
-                cuml_counts_train[j] += b_coun_total - b.counts[j];
+                cuml_hessian_train[j] += b_hess_total - b.h_folded[j];
+                cuml_counts_train[j] += b_coun_total - b.counts[j] as usize;
                 cuml_gradient_valid[j] += b.g_folded[j];
-                cuml_hessian_valid[j] += b.h_folded.unwrap()[j];
-                cuml_counts_valid[j] += b.counts[j];
+                cuml_hessian_valid[j] += b.h_folded[j];
+                cuml_counts_valid[j] += b.counts[j] as usize;
 
                 let left_c_train = left_counts_train[j];
                 let right_c_train = right_counts_train[j];
@@ -1692,8 +1692,8 @@ fn best_feature_split_var_hess(
                         right_hessian_train[j],
                         right_counts_train[j],
                         miss_bin.g_folded.iter().sum(),
-                        miss_bin.h_folded.unwrap().iter().sum::<f32>(),
-                        miss_bin.counts.iter().sum(),
+                        miss_bin.h_folded.iter().sum::<f32>(),
+                        miss_bin.counts.iter().map(|&c| c as usize).sum(),
                         node.lower_bound,
                         node.upper_bound,
                         node.weight_value,
@@ -1711,8 +1711,8 @@ fn best_feature_split_var_hess(
                         right_hessian_train[j],
                         right_counts_train[j],
                         miss_bin.g_folded.iter().sum(),
-                        miss_bin.h_folded.unwrap().iter().sum::<f32>(),
-                        miss_bin.counts.iter().sum(),
+                        miss_bin.h_folded.iter().sum::<f32>(),
+                        miss_bin.counts.iter().map(|&c| c as usize).sum(),
                         node.lower_bound,
                         node.upper_bound,
                         node.weight_value,
@@ -1767,8 +1767,8 @@ fn best_feature_split_var_hess(
                     right_hessian_valid.iter().sum::<f32>(),
                     right_counts_valid.iter().sum::<usize>(),
                     miss_bin.g_folded.iter().sum(),
-                    miss_bin.h_folded.unwrap().iter().sum::<f32>(),
-                    miss_bin.counts.iter().sum(),
+                    miss_bin.h_folded.iter().sum::<f32>(),
+                    miss_bin.counts.iter().map(|&c| c as usize).sum(),
                     node.lower_bound,
                     node.upper_bound,
                     node.weight_value,
@@ -1786,8 +1786,8 @@ fn best_feature_split_var_hess(
                     right_hessian_valid.iter().sum::<f32>(),
                     right_counts_valid.iter().sum::<usize>(),
                     miss_bin.g_folded.iter().sum(),
-                    miss_bin.h_folded.unwrap().iter().sum::<f32>(),
-                    miss_bin.counts.iter().sum(),
+                    miss_bin.h_folded.iter().sum::<f32>(),
+                    miss_bin.counts.iter().map(|&c| c as usize).sum(),
                     node.lower_bound,
                     node.upper_bound,
                     node.weight_value,
