@@ -395,7 +395,7 @@ pub fn pivot_on_split(
     feature: &[u16],
     split_value: u16,
     missing_right: bool,
-    left_cats: &[bool],
+    left_cats: &[u8],
 ) -> usize {
     let index = &mut idx[start..stop];
     let g = &mut grad[start..stop];
@@ -443,7 +443,7 @@ pub fn pivot_on_split_const_hess(
     feature: &[u16],
     split_value: u16,
     missing_right: bool,
-    left_cats: &[bool],
+    left_cats: &[u8],
 ) -> usize {
     let index = &mut idx[start..stop];
     let g = &mut grad[start..stop];
@@ -504,7 +504,7 @@ pub fn pivot_on_split_exclude_missing(
     hess: &mut [f32],
     feature: &[u16],
     split_value: u16,
-    left_cats: &[bool],
+    left_cats: &[u8],
 ) -> (usize, usize) {
     let index = &mut idx[start..stop];
     let gr = &mut grad[start..stop];
@@ -576,7 +576,7 @@ pub fn pivot_on_split_exclude_missing_const_hess(
     grad: &mut [f32],
     feature: &[u16],
     split_value: u16,
-    left_cats: &[bool],
+    left_cats: &[u8],
 ) -> (usize, usize) {
     let index = &mut idx[start..stop];
     let gr = &mut grad[start..stop];
@@ -640,10 +640,16 @@ pub fn pivot_on_split_exclude_missing_const_hess(
 /// Our split value will _never_ be missing (0), thus we
 /// don't have to worry about that.
 #[inline]
-pub fn exclude_missing_compare(split_value: &u16, cmp_value: u16, left_cats: &[bool]) -> Ordering {
+pub fn exclude_missing_compare(split_value: &u16, cmp_value: u16, left_cats: &[u8]) -> Ordering {
     if !left_cats.is_empty() {
-        if *left_cats.get(cmp_value as usize).unwrap_or(&false) {
-            Ordering::Greater
+        let byte_idx = (cmp_value as usize) >> 3;
+        let bit_idx = (cmp_value as usize) & 7;
+        if let Some(&byte) = left_cats.get(byte_idx) {
+            if (byte >> bit_idx) & 1 == 1 {
+                Ordering::Greater
+            } else {
+                Ordering::Less
+            }
         } else {
             Ordering::Less
         }
@@ -656,7 +662,7 @@ pub fn exclude_missing_compare(split_value: &u16, cmp_value: u16, left_cats: &[b
 /// Our split value will _never_ be missing (0), thus we
 /// don't have to worry about that.
 #[inline]
-pub fn missing_compare(split_value: &u16, cmp_value: u16, missing_right: bool, left_cats: &[bool]) -> Ordering {
+pub fn missing_compare(split_value: &u16, cmp_value: u16, missing_right: bool, left_cats: &[u8]) -> Ordering {
     if cmp_value == 0 {
         if missing_right {
             // If missing is right, then our split_value
@@ -668,8 +674,14 @@ pub fn missing_compare(split_value: &u16, cmp_value: u16, missing_right: bool, l
             Ordering::Greater
         }
     } else if !left_cats.is_empty() {
-        if *left_cats.get(cmp_value as usize).unwrap_or(&false) {
-            Ordering::Greater
+        let byte_idx = (cmp_value as usize) >> 3;
+        let bit_idx = (cmp_value as usize) & 7;
+        if let Some(&byte) = left_cats.get(byte_idx) {
+            if (byte >> bit_idx) & 1 == 1 {
+                Ordering::Greater
+            } else {
+                Ordering::Less
+            }
         } else {
             Ordering::Less
         }

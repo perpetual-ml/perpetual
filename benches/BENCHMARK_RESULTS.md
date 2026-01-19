@@ -12,9 +12,19 @@ Date: 2026-01-19
 
 ## Results
 
+### Optimization Loop Results (Current)
+
+| optimization | train_booster_cal_housing | train_booster_cover_types | notes |
+|---|---|---|---|
+| baseline (v0.10.0) | 1.05s | 10.0s | Baseline |
+| + Bitset Optimization (Iter 1) | **0.93s** | **0.88s** | Replaced `Option<Box<Vec<bool>>>` with `Option<Box<[u8]>>` (8x smaller, better cache). |
+
+### Historical / Branch Comparisons
+
 | Benchmark | Branch | Result (Time) | confidence interval | Notes |
 | :--- | :--- | :--- | :--- | :--- |
 | `cal_housing` | `decisioning + opt 4 (bin refactor)` | **1.19s** | `[1.15s - 1.25s]` | **~42% faster** than baseline |
+
 | `cal_housing` | `decisioning + opt 1 (hoist bin sums)` | 1.73s | `[1.69s - 1.78s]` | ~16% faster than baseline |
 | `cal_housing` | `decisioning + polars removal, cargo test fixes` | 2.26s | `[2.1828s - 2.3434s]` | Regression from decisioning |
 | `cal_housing` | `decisioning` | 1.96s | `[1.8850s - 2.0485s]` | ~5% faster than baseline |
@@ -24,6 +34,8 @@ Date: 2026-01-19
 | `cover_types` | `decisioning + polars removal, cargo test fixes` | 2.06s | `[1.9588s - 2.1870s]` | Improvement from decisioning |
 | `cover_types` | `decisioning` | 2.43s | `[1.9510s - 3.0993s]` | ~29% slower than baseline |
 | `cover_types` | `v0.10.0` | 1.88s | `[1.8389s - 1.9254s]` | Baseline |
+| `cal_housing` | `decisioning + opt 4 (re-run 2)` | 1.78s | `[1.66s - 1.92s]` | Verification Run 2 (Thin LTO) |
+| `cover_types` | `decisioning + opt 4 (re-run 2)` | 1.24s | `[1.19s - 1.30s]` | Verification Run 2 (Thin LTO) |
 
 ## Summary
 

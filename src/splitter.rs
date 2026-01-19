@@ -31,8 +31,7 @@ pub struct SplitInfo {
     pub right_node: NodeInfo,
     pub missing_node: MissingInfo,
     pub generalization: Option<f32>,
-    #[allow(clippy::box_collection)]
-    pub left_cats: Option<Box<Vec<bool>>>,
+    pub left_cats: Option<Box<[u8]>>,
 }
 
 impl Default for SplitInfo {
@@ -425,7 +424,7 @@ impl Splitter for MissingBranchSplitter {
                 hess_val,
                 data.get_col(split_info.split_feature),
                 split_info.split_bin,
-                split_info.left_cats.as_deref().map(|v| v.as_slice()).unwrap_or(&[]),
+                split_info.left_cats.as_deref().unwrap_or(&[]),
             );
         } else {
             (missing_split_idx, split_idx) = pivot_on_split_exclude_missing_const_hess(
@@ -435,7 +434,7 @@ impl Splitter for MissingBranchSplitter {
                 grad,
                 data.get_col(split_info.split_feature),
                 split_info.split_bin,
-                split_info.left_cats.as_deref().map(|v| v.as_slice()).unwrap_or(&[]),
+                split_info.left_cats.as_deref().unwrap_or(&[]),
             );
         }
 
@@ -736,7 +735,7 @@ impl Splitter for MissingImputerSplitter {
                     data.get_col(split_info.split_feature),
                     split_info.split_bin,
                     missing_right,
-                    split_info.left_cats.as_deref().map(|v| v.as_slice()).unwrap_or(&[]),
+                    split_info.left_cats.as_deref().unwrap_or(&[]),
                 );
             }
             None => {
@@ -748,7 +747,7 @@ impl Splitter for MissingImputerSplitter {
                     data.get_col(split_info.split_feature),
                     split_info.split_bin,
                     missing_right,
-                    split_info.left_cats.as_deref().map(|v| v.as_slice()).unwrap_or(&[]),
+                    split_info.left_cats.as_deref().unwrap_or(&[]),
                 );
             }
         }
@@ -1327,15 +1326,17 @@ fn best_feature_split_const_hess(
             split_info.left_cats = None;
         } else {
             if split_info.left_cats.is_none() {
-                split_info.left_cats = Some(Box::new(vec![false; 65536]));
+                split_info.left_cats = Some(vec![0u8; 8192].into_boxed_slice());
             }
             let left_cats_vec = split_info.left_cats.as_mut().unwrap();
-            left_cats_vec.fill(false);
+            left_cats_vec.fill(0);
             for c in all_cats.iter() {
                 if *c == split_info.split_value as usize {
                     break;
                 }
-                left_cats_vec[*c] = true;
+                let byte_idx = c >> 3;
+                let bit_idx = c & 7;
+                left_cats_vec[byte_idx] |= 1 << bit_idx;
             }
         }
     }
@@ -1367,7 +1368,7 @@ fn best_feature_split_var_hess(
     // For categorical features, we need to sort the bins.
     let mut hist_vec: Vec<&UnsafeCell<Bin>> = Vec::new();
     let is_categorical = if let Some(c_index) = cat_index {
-                if c_index.contains(&feature) {
+        if c_index.contains(&feature) {
             hist_vec = hist_feat.data[1..]
                 .iter()
                 .filter(|b| {
@@ -1845,15 +1846,17 @@ fn best_feature_split_var_hess(
             split_info.left_cats = None;
         } else {
             if split_info.left_cats.is_none() {
-                split_info.left_cats = Some(Box::new(vec![false; 65536]));
+                split_info.left_cats = Some(vec![0u8; 8192].into_boxed_slice());
             }
             let left_cats_vec = split_info.left_cats.as_mut().unwrap();
-            left_cats_vec.fill(false);
+            left_cats_vec.fill(0);
             for c in all_cats.iter() {
                 if *c == split_info.split_value as usize {
                     break;
                 }
-                left_cats_vec[*c] = true;
+                let byte_idx = c >> 3;
+                let bit_idx = c & 7;
+                left_cats_vec[byte_idx] |= 1 << bit_idx;
             }
         }
     }

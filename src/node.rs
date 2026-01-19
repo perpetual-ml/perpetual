@@ -26,7 +26,7 @@ pub struct SplittableNode {
     pub is_missing_leaf: bool,
     pub parent_node: usize,
     #[allow(clippy::box_collection)]
-    pub left_cats: Option<Box<Vec<bool>>>,
+    pub left_cats: Option<Box<[u8]>>,
     pub stats: Option<Box<NodeStats>>,
 }
 
@@ -54,7 +54,7 @@ pub struct Node {
     pub is_leaf: bool,
     pub parent_node: usize,
     #[allow(clippy::box_collection)]
-    pub left_cats: Option<Box<Vec<bool>>>,
+    pub left_cats: Option<Box<[u8]>>,
     pub stats: Option<Box<NodeStats>>,
 }
 
@@ -108,8 +108,15 @@ impl Node {
 
         // Then check categorical splits
         if let Some(left_cats) = &self.left_cats {
-            if *left_cats.get(*v as usize).unwrap_or(&false) {
-                return self.left_child;
+            let cat_idx = *v as usize;
+            let byte_idx = cat_idx >> 3;
+            let bit_idx = cat_idx & 7;
+            if let Some(&byte) = left_cats.get(byte_idx) {
+                if (byte >> bit_idx) & 1 == 1 {
+                    return self.left_child;
+                } else {
+                    return self.right_child;
+                }
             } else {
                 return self.right_child;
             }
@@ -195,7 +202,7 @@ impl SplittableNode {
         lower_bound: f32,
         upper_bound: f32,
         node_type: NodeType,
-        left_cats: Option<Box<Vec<bool>>>,
+        left_cats: Option<Box<[u8]>>,
         weights: [f32; 5],
     ) -> Self {
         SplittableNode {

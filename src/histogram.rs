@@ -590,12 +590,9 @@ mod tests {
             b1.g_folded.iter().zip(b2.g_folded.iter()).for_each(|(g1, g2)| {
                 assert_relative_eq!(g1, g2);
             });
-            b1.h_folded
-                .iter()
-                .zip(b2.h_folded.iter())
-                .for_each(|(h1, h2)| {
-                    assert_relative_eq!(h1, h2);
-                });
+            b1.h_folded.iter().zip(b2.h_folded.iter()).for_each(|(h1, h2)| {
+                assert_relative_eq!(h1, h2);
+            });
         });
     }
 }
