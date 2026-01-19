@@ -945,14 +945,13 @@ fn best_feature_split_const_hess(
             let mut right_weights = [0.0; 5];
             #[allow(clippy::needless_late_init)]
             let generalization;
+            let b_grad_total: f32 = b.g_folded.iter().sum();
+            let b_coun_total: usize = b.counts.iter().sum();
             for j in 0..5 {
                 right_gradient_train[j] = node_grad_train_sum[j] - cuml_gradient_train[j];
                 right_counts_train[j] = node_coun_train_sum[j] - cuml_counts_train[j];
                 right_gradient_valid[j] = node_grad_sum[j] - cuml_gradient_valid[j];
                 right_counts_valid[j] = node_coun_sum[j] - cuml_counts_valid[j];
-
-                let b_grad_total: f32 = b.g_folded.iter().sum();
-                let b_coun_total: usize = b.counts.iter().sum();
 
                 cuml_gradient_train[j] += b_grad_total - b.g_folded[j];
                 cuml_counts_train[j] += b_coun_total - b.counts[j];
@@ -1144,14 +1143,16 @@ fn best_feature_split_const_hess(
             let mut right_weights = [0.0; 5];
             #[allow(clippy::needless_late_init)]
             let generalization;
+            let b_grad_total: f32 = b.g_folded.iter().sum();
+            let b_coun_total: usize = b.counts.iter().sum();
             for j in 0..5 {
                 right_gradient_train[j] = node_grad_train_sum[j] - cuml_gradient_train[j];
                 right_counts_train[j] = node_coun_train_sum[j] - cuml_counts_train[j];
                 right_gradient_valid[j] = node_grad_sum[j] - cuml_gradient_valid[j];
                 right_counts_valid[j] = node_coun_sum[j] - cuml_counts_valid[j];
 
-                cuml_gradient_train[j] += b.g_folded.iter().sum::<f32>() - b.g_folded[j];
-                cuml_counts_train[j] += b.counts.iter().sum::<usize>() - b.counts[j];
+                cuml_gradient_train[j] += b_grad_total - b.g_folded[j];
+                cuml_counts_train[j] += b_coun_total - b.counts[j];
                 cuml_gradient_valid[j] += b.g_folded[j];
                 cuml_counts_valid[j] += b.counts[j];
 
@@ -1450,6 +1451,9 @@ fn best_feature_split_var_hess(
             let mut right_weights = [0.0; 5];
             #[allow(clippy::needless_late_init)]
             let generalization;
+            let b_grad_total: f32 = b.g_folded.iter().sum();
+            let b_hess_total: f32 = b.h_folded.unwrap().iter().sum();
+            let b_coun_total: usize = b.counts.iter().sum();
             for j in 0..5 {
                 right_gradient_train[j] = node_grad_train_sum[j] - cuml_gradient_train[j];
                 right_hessian_train[j] = node_hess_train_sum[j] - cuml_hessian_train[j];
@@ -1457,10 +1461,6 @@ fn best_feature_split_var_hess(
                 right_gradient_valid[j] = node_grad_sum[j] - cuml_gradient_valid[j];
                 right_hessian_valid[j] = node_hess_sum[j] - cuml_hessian_valid[j];
                 right_counts_valid[j] = node_coun_sum[j] - cuml_counts_valid[j];
-
-                let b_grad_total: f32 = b.g_folded.iter().sum();
-                let b_hess_total: f32 = b.h_folded.unwrap().iter().sum();
-                let b_coun_total: usize = b.counts.iter().sum();
 
                 cuml_gradient_train[j] += b_grad_total - b.g_folded[j];
                 cuml_hessian_train[j] += b_hess_total - b.h_folded.unwrap()[j];
@@ -1656,6 +1656,9 @@ fn best_feature_split_var_hess(
             let mut right_weights = [0.0; 5];
             #[allow(clippy::needless_late_init)]
             let generalization;
+            let b_grad_total: f32 = b.g_folded.iter().sum();
+            let b_hess_total: f32 = b.h_folded.unwrap().iter().sum();
+            let b_coun_total: usize = b.counts.iter().sum();
             for j in 0..5 {
                 right_gradient_train[j] = node_grad_train_sum[j] - cuml_gradient_train[j];
                 right_hessian_train[j] = node_hess_train_sum[j] - cuml_hessian_train[j];
@@ -1664,9 +1667,9 @@ fn best_feature_split_var_hess(
                 right_hessian_valid[j] = node_hess_sum[j] - cuml_hessian_valid[j];
                 right_counts_valid[j] = node_coun_sum[j] - cuml_counts_valid[j];
 
-                cuml_gradient_train[j] += b.g_folded.iter().sum::<f32>() - b.g_folded[j];
-                cuml_hessian_train[j] += b.h_folded.unwrap().iter().sum::<f32>() - b.h_folded.unwrap()[j];
-                cuml_counts_train[j] += b.counts.iter().sum::<usize>() - b.counts[j];
+                cuml_gradient_train[j] += b_grad_total - b.g_folded[j];
+                cuml_hessian_train[j] += b_hess_total - b.h_folded.unwrap()[j];
+                cuml_counts_train[j] += b_coun_total - b.counts[j];
                 cuml_gradient_valid[j] += b.g_folded[j];
                 cuml_hessian_valid[j] += b.h_folded.unwrap()[j];
                 cuml_counts_valid[j] += b.counts[j];
