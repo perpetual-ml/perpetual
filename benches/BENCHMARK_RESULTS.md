@@ -12,12 +12,15 @@ Date: 2026-01-19
 
 ## Results
 
-### Optimization Loop Results (Current)
+### Optimization Loop Results (Current, on top of Opt 4)
 
 | optimization | train_booster_cal_housing | train_booster_cover_types | notes |
-|---|---|---|---|
+| :--- | :--- | :--- | :--- |
 | baseline (v0.10.0) | 1.05s | 10.0s | Baseline |
 | + Bitset Optimization (Iter 1) | **0.93s** | **0.88s** | Replaced `Option<Box<Vec<bool>>>` with `Option<Box<[u8]>>` (8x smaller, better cache). |
+| + Bin Struct Splitting (Iter 2) | 0.99s | 1.57s | [REVERTED] Split `Bin` into `Bin` and `cuts`. `cover_types` regression due to random access. |
+| + Obj Fn Vectorization (Iter 3) | 0.80s | 0.79s | `SquaredLoss` loop unrolling (12% faster). `LogLoss` f32 precision (3% faster). No new deps. |
+| + Full Vectorization (Iter 4) | **0.88s** | **0.82s** | Extended `f32` loops to all losses. `LogLoss` maintained pure `f32` without wrappers (wrappers caused regression). |
 
 ### Historical / Branch Comparisons
 

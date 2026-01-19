@@ -44,36 +44,36 @@ impl ObjectiveFunction for QuantileLoss {
         sample_weight: Option<&[f64]>,
         _group: Option<&[u64]>,
     ) -> (Vec<f32>, Option<Vec<f32>>) {
+        let quantile = self.quantile.unwrap() as f32;
+        let len = y.len();
+        let mut g = Vec::with_capacity(len);
+        let mut h = Vec::with_capacity(len);
+
         match sample_weight {
-            Some(sample_weight) => {
-                let (g, h) = y
-                    .iter()
-                    .zip(yhat)
-                    .zip(sample_weight)
-                    .map(|((y_, yhat_), w_)| {
-                        let _quantile = self.quantile.unwrap();
-                        let delta = yhat_ - *y_;
-                        let g = if delta >= 0.0 {
-                            (1.0 - _quantile) * w_
-                        } else {
-                            -_quantile * w_
-                        };
-                        (g as f32, *w_ as f32)
-                    })
-                    .unzip();
+            Some(weights) => {
+                for i in 0..len {
+                    let diff = (yhat[i] - y[i]) as f32;
+                    let w = weights[i] as f32;
+
+                    if diff >= 0.0 {
+                        g.push((1.0 - quantile) * w);
+                    } else {
+                        g.push(-quantile * w);
+                    }
+                    h.push(w);
+                }
                 (g, Some(h))
             }
             None => {
-                let g = y
-                    .iter()
-                    .zip(yhat)
-                    .map(|(y_, yhat_)| {
-                        let _quantile = self.quantile.unwrap();
-                        let delta = yhat_ - *y_;
-                        let g = if delta >= 0.0 { 1.0 - _quantile } else { -_quantile };
-                        g as f32
-                    })
-                    .collect();
+                for i in 0..len {
+                    let diff = (yhat[i] - y[i]) as f32;
+
+                    if diff >= 0.0 {
+                        g.push(1.0 - quantile);
+                    } else {
+                        g.push(-quantile);
+                    }
+                }
                 (g, None)
             }
         }
