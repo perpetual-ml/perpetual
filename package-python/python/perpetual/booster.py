@@ -1685,26 +1685,9 @@ class PerpetualBooster:
                 concat_node = helper.make_node(
                     "Concat", [one_minus_p_name, p_name], [prob_name], axis=1
                 )
-                half_name = "half"
-                half_node = helper.make_node(
-                    "Constant",
-                    [],
-                    [half_name],
-                    value=helper.make_tensor(
-                        "half_v", TensorProto.FLOAT, [1, 1], [0.5]
-                    ),
-                )
-                label_bool_name = "label_bool"
-                greater_node = helper.make_node(
-                    "Greater", [p_name, half_name], [label_bool_name]
-                )
-                label_raw_name = "label_raw"
-                cast_node = helper.make_node(
-                    "Cast", [label_bool_name], [label_raw_name], to=TensorProto.INT64
-                )
                 label_idx_name = "label_idx"
-                flatten_node = helper.make_node(
-                    "Flatten", [label_raw_name], [label_idx_name], axis=1
+                argmax_node = helper.make_node(
+                    "ArgMax", [prob_name], [label_idx_name], axis=1, keepdims=0
                 )
                 label_name = "label"
                 gather_node = helper.make_node(
@@ -1716,10 +1699,7 @@ class PerpetualBooster:
                         one_node,
                         sub_node,
                         concat_node,
-                        half_node,
-                        greater_node,
-                        cast_node,
-                        flatten_node,
+                        argmax_node,
                         gather_node,
                     ]
                 )

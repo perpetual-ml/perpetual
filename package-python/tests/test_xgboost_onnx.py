@@ -116,6 +116,10 @@ def test_onnx_export_binary(data_binary, tmp_path):
     # ONNX uses float32 internally. Sum of probs should be 1.0.
     np.testing.assert_allclose(perp_proba, onnx_proba, rtol=5e-2, atol=5e-2)
 
+    onnx_labels = res[0]
+    perp_labels = model.predict(X)
+    np.testing.assert_array_equal(perp_labels, onnx_labels)
+
 
 def test_onnx_export_multiclass(data_multiclass, tmp_path):
     X, y = data_multiclass
@@ -137,6 +141,10 @@ def test_onnx_export_multiclass(data_multiclass, tmp_path):
     perp_proba = model.predict_proba(X)
 
     np.testing.assert_allclose(perp_proba, onnx_proba, rtol=5e-2, atol=5e-2)
+
+    onnx_labels = res[0]
+    perp_labels = model.predict(X)
+    np.testing.assert_array_equal(perp_labels, onnx_labels)
 
 
 def test_onnx_export_regression(data_regression, tmp_path):
