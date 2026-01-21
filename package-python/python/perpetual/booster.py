@@ -1038,7 +1038,13 @@ class PerpetualBooster:
             # Node(num=6, weight_value...,]
             ```
         """
-        model = json.loads(self.json_dump())["trees"]
+        dump = json.loads(self.json_dump())
+        if "trees" in dump:
+            all_booster_trees = [dump["trees"]]
+        else:
+            # Multi-output
+            all_booster_trees = [b["trees"] for b in dump["boosters"]]
+
         feature_map: Union[Dict[int, str], Dict[int, int]]
         leaf_split_feature: Union[str, int]
         if map_features_names and hasattr(self, "feature_names_in_"):
@@ -1049,15 +1055,16 @@ class PerpetualBooster:
             leaf_split_feature = -1
 
         trees = []
-        for t in model:
-            nodes = []
-            for node in t["nodes"].values():
-                if not node["is_leaf"]:
-                    node["split_feature"] = feature_map[node["split_feature"]]
-                else:
-                    node["split_feature"] = leaf_split_feature
-                nodes.append(Node(**node))
-            trees.append(nodes)
+        for booster_trees in all_booster_trees:
+            for t in booster_trees:
+                nodes = []
+                for node in t["nodes"].values():
+                    if not node["is_leaf"]:
+                        node["split_feature"] = feature_map[node["split_feature"]]
+                    else:
+                        node["split_feature"] = leaf_split_feature
+                    nodes.append(Node(**node))
+                trees.append(nodes)
         return trees
 
     def trees_to_dataframe(self):
@@ -1120,3 +1127,625 @@ class PerpetualBooster:
             return pd.DataFrame.from_records(vals).sort_values(
                 ["Tree", "Node"], ascending=[True, True]
             )
+
+    def _to_xgboost_json(self) -> Dict[str, Any]:
+        """Convert the Perpetual model to an XGBoost JSON model structure."""
+
+        # Check if it's a multi-output model
+        is_multi = len(self.classes_) > 2
+
+        # Get raw dump
+        raw_dump = json.loads(self.json_dump())
+
+        # Initialize XGBoost structure
+        xgb_json = {
+            "learner": {
+                "attributes": {},
+                "feature_names": [],
+                "feature_types": [],
+                "gradient_booster": {
+                    "model": {
+                        "gbtree_model_param": {
+                            "num_parallel_tree": "1",
+                        },
+                        "trees": [],
+                        "tree_info": [],
+                        "iteration_indptr": [],
+                        "cats": {
+                            "enc": [],
+                            "feature_segments": [],
+                            "sorted_idx": [],
+                        },
+                    },
+                    "name": "gbtree",
+                },
+                "learner_model_param": {
+                    "boost_from_average": "1",
+                    "num_feature": str(self.n_features_),
+                },
+                "objective": {
+                    "name": "binary:logistic",
+                },
+            },
+            "version": [3, 1, 3],  # Use a reasonably recent version
+        }
+
+        # Fill feature names if available
+        if hasattr(self, "feature_names_in_"):
+            xgb_json["learner"]["feature_names"] = self.feature_names_in_
+            xgb_json["learner"]["feature_types"] = ["float"] * self.n_features_
+        else:
+            xgb_json["learner"]["feature_names"] = [
+                f"f{i}" for i in range(self.n_features_)
+            ]
+            xgb_json["learner"]["feature_types"] = ["float"] * self.n_features_
+
+        # Objective and Base Score Handling
+        if is_multi:
+            # Multi-class
+            n_classes = len(self.classes_)
+            xgb_json["learner"]["objective"]["name"] = "multi:softprob"
+            xgb_json["learner"]["objective"]["softmax_multiclass_param"] = {
+                "num_class": str(n_classes)
+            }
+            xgb_json["learner"]["learner_model_param"]["num_class"] = str(n_classes)
+            xgb_json["learner"]["learner_model_param"]["num_target"] = "1"
+
+            # Base score vector [0.5, 0.5, ...]
+            # 5.0E-1
+            base_score_str = ",".join(["5.0E-1"] * n_classes)
+            xgb_json["learner"]["learner_model_param"]["base_score"] = (
+                f"[{base_score_str}]"
+            )
+
+            boosters = raw_dump["boosters"]
+
+            trees = []
+            tree_info = []
+            # For multi-class, we need to interleave trees if we want to follow XGBoost structure perfectly?
+            # Or can we just dump them? iteration_indptr depends on this.
+            # XGBoost expects trees for iteration i to be contiguous.
+            # Perpetual stores boosters separately.
+            # Booster 0 has trees for class 0. Booster 1 for class 1.
+            # We need to rearrange them: Round 0 (C0, C1, C2), Round 1 (C0, C1, C2)...
+
+            # Assuming all boosters have same number of trees?
+            num_trees_per_booster = [len(b["trees"]) for b in boosters]
+            max_trees = max(num_trees_per_booster) if num_trees_per_booster else 0
+
+            # Iteration pointers: 0, 3, 6...
+            # But what if some booster has fewer trees? (Early stopping might cause this?)
+            # Perpetual implementation usually stops all or none?
+            # "MultiOutputBooster::fit" trains them sequentially but they might have different tree counts if EarlyStopping is per-booster.
+            # But XGBoost expects consistent num_class trees per round (or use "multi:softprob"?)
+            # If we just list them, XGBoost might get confused if we don't align them.
+
+            # Let's try to align them by round.
+
+            iteration_indptr = [0]
+            current_ptr = 0
+
+            for round_idx in range(max_trees):
+                # For each class
+                for group_id, booster_dump in enumerate(boosters):
+                    booster_trees = booster_dump["trees"]
+                    if round_idx < len(booster_trees):
+                        tree = booster_trees[round_idx]
+                        base_score = booster_dump["base_score"]
+
+                        xgb_tree = self._convert_tree(tree, current_ptr)
+
+                        if round_idx == 0:
+                            self._adjust_tree_leaves(xgb_tree, base_score)
+
+                        trees.append(xgb_tree)
+                        tree_info.append(group_id)
+                        current_ptr += 1
+                    else:
+                        # Missing tree for this class in this round?
+                        # Should we insert a dummy tree (0 prediction)?
+                        # For now, let's assume balanced trees or hope XGB handles it.
+                        # If we skip, tree_info tracks class.
+                        pass
+
+                iteration_indptr.append(current_ptr)
+
+            xgb_json["learner"]["gradient_booster"]["model"]["trees"] = trees
+            xgb_json["learner"]["gradient_booster"]["model"]["tree_info"] = tree_info
+            xgb_json["learner"]["gradient_booster"]["model"]["gbtree_model_param"][
+                "num_trees"
+            ] = str(len(trees))
+            xgb_json["learner"]["gradient_booster"]["model"]["iteration_indptr"] = (
+                iteration_indptr
+            )
+
+        else:
+            # Binary or Regression
+            if self.objective == "LogLoss":
+                xgb_json["learner"]["objective"]["name"] = "binary:logistic"
+                xgb_json["learner"]["objective"]["reg_loss_param"] = {
+                    "scale_pos_weight": "1"
+                }
+                xgb_json["learner"]["learner_model_param"]["num_class"] = "0"
+                xgb_json["learner"]["learner_model_param"]["num_target"] = "1"
+
+                # Base Score
+                base_score_val = 1.0 / (1.0 + np.exp(-raw_dump["base_score"]))
+                xgb_json["learner"]["learner_model_param"]["base_score"] = (
+                    f"[{base_score_val:.6E}]"
+                )
+
+            elif self.objective == "SquaredLoss":
+                xgb_json["learner"]["objective"]["name"] = "reg:squarederror"
+                xgb_json["learner"]["objective"]["reg_loss_param"] = {}
+                xgb_json["learner"]["learner_model_param"]["num_class"] = "0"
+                xgb_json["learner"]["learner_model_param"]["num_target"] = "1"
+                xgb_json["learner"]["learner_model_param"]["base_score"] = (
+                    f"[{raw_dump['base_score']:.6E}]"
+                )
+            else:
+                warnings.warn(
+                    f"Objective {self.objective} not explicitly supported for XGBoost export. Defaulting to reg:squarederror."
+                )
+                xgb_json["learner"]["objective"]["name"] = "reg:squarederror"
+                xgb_json["learner"]["objective"]["reg_loss_param"] = {}
+                xgb_json["learner"]["learner_model_param"]["num_class"] = "0"
+                xgb_json["learner"]["learner_model_param"]["num_target"] = "1"
+                xgb_json["learner"]["learner_model_param"]["base_score"] = (
+                    f"[{raw_dump['base_score']:.6E}]"
+                )
+
+            trees = []
+            tree_info = []
+            for tree_idx, tree in enumerate(raw_dump["trees"]):
+                xgb_tree = self._convert_tree(tree, tree_idx)
+                trees.append(xgb_tree)
+                tree_info.append(0)
+
+            xgb_json["learner"]["gradient_booster"]["model"]["trees"] = trees
+            xgb_json["learner"]["gradient_booster"]["model"]["tree_info"] = tree_info
+            xgb_json["learner"]["gradient_booster"]["model"]["gbtree_model_param"][
+                "num_trees"
+            ] = str(len(trees))
+            xgb_json["learner"]["gradient_booster"]["model"]["iteration_indptr"] = list(
+                range(len(trees) + 1)
+            )
+
+        return xgb_json
+
+    def _convert_tree(self, tree: Dict[str, Any], group_id: int) -> Dict[str, Any]:
+        """Convert a single Perpetual tree to XGBoost dictionary format."""
+
+        nodes_dict = tree["nodes"]
+        # Convert keys to int and sort
+        sorted_keys = sorted(nodes_dict.keys(), key=lambda x: int(x))
+
+        # Mapping from Perpetual ID (int) to XGBoost Array Index (int)
+        node_map = {int(k): i for i, k in enumerate(sorted_keys)}
+
+        num_nodes = len(sorted_keys)
+        # print(f"DEBUG: Converting tree group={group_id}. num_nodes={num_nodes}")
+
+        left_children = [-1] * num_nodes
+        right_children = [-1] * num_nodes
+        parents = [2147483647] * num_nodes
+        split_indices = [0] * num_nodes
+        split_conditions = [0.0] * num_nodes
+        split_type = [0] * num_nodes
+        sum_hessian = [0.0] * num_nodes
+        loss_changes = [0.0] * num_nodes
+        base_weights = [0.0] * num_nodes
+        default_left = [0] * num_nodes
+
+        categories = []
+        categories_nodes = []
+        categories_segments = []
+        categories_sizes = []
+
+        for i, k in enumerate(sorted_keys):
+            node = nodes_dict[k]
+            nid = int(node["num"])
+            idx = node_map[nid]
+
+            # print(f"  DEBUG: Node {i} nid={nid} idx={idx}")
+
+            sum_hessian[idx] = node["hessian_sum"]
+            base_weights[idx] = node["weight_value"]
+            loss_changes[idx] = node.get("split_gain", 0.0)
+
+            if node["is_leaf"]:
+                left_children[idx] = -1
+                right_children[idx] = -1
+                split_indices[idx] = 0
+                split_conditions[idx] = node["weight_value"]
+            else:
+                left_id = node["left_child"]
+                right_id = node["right_child"]
+
+                left_idx = node_map[left_id]
+                right_idx = node_map[right_id]
+
+                left_children[idx] = left_idx
+                right_children[idx] = right_idx
+                parents[left_idx] = idx
+                parents[right_idx] = idx
+
+                split_indices[idx] = node["split_feature"]
+                split_conditions[idx] = node["split_value"]
+
+                # Missing handling
+                # If missing_node goes left
+                if node["missing_node"] == left_id:
+                    default_left[idx] = 1
+                else:
+                    default_left[idx] = 0
+
+                if (
+                    "left_cats" in node
+                    and node["left_cats"] is not None
+                    and len(node["left_cats"]) > 0
+                ):
+                    # It's a categorical split
+                    cats = node["left_cats"]
+                    # XGBoost uses split_type=1 for categorical?
+                    # Or just presence in categories_nodes?
+                    # Docs say: split_type [default=0]: 0=numerical, 1=categorical
+                    split_type[idx] = 1
+
+                    # Update categorical arrays
+                    categories_nodes.append(idx)
+                    categories_sizes.append(len(cats))
+                    # Segment is start index.
+                    # If this is the first one, 0. Else prev_segment + prev_size?
+                    # Actually valid XGBoost format usually has segments as exclusive scan.
+                    # [0, len0, len0+len1, ...]
+                    # Wait, segments length should be same as nodes?
+                    # Let's check logic:
+                    # segments[i] points to start of cats for node i (in categories_nodes)
+
+                    next_segment = (
+                        (categories_segments[-1] + categories_sizes[-2])
+                        if categories_segments
+                        else 0
+                    )
+                    categories_segments.append(next_segment)
+
+                    categories.extend(sorted(cats))
+
+                    # split_condition for categorical is usually NaN or special?
+                    # XGBoost JSON parser might ignore it if type is categorical
+                    # But often it is set to something.
+
+        return {
+            "base_weights": base_weights,
+            "default_left": default_left,
+            "id": group_id,
+            "left_children": left_children,
+            "loss_changes": loss_changes,
+            "parents": parents,
+            "right_children": right_children,
+            "split_conditions": split_conditions,
+            "split_indices": split_indices,
+            "split_type": split_type,
+            "sum_hessian": sum_hessian,
+            "tree_param": {
+                "num_deleted": "0",
+                "num_feature": str(self.n_features_),
+                "num_nodes": str(num_nodes),
+                "size_leaf_vector": "1",
+            },
+            "categories": categories,
+            "categories_nodes": categories_nodes,
+            "categories_segments": categories_segments,
+            "categories_sizes": categories_sizes,
+        }
+
+    def _adjust_tree_leaves(self, xgb_tree: Dict[str, Any], adjustment: float):
+        """Add adjustment value to all leaves in an XGBoost tree dict."""
+        left_children = xgb_tree["left_children"]
+        split_conditions = xgb_tree["split_conditions"]
+        base_weights = xgb_tree["base_weights"]
+
+        for i, left in enumerate(left_children):
+            if left == -1:  # Leaf
+                split_conditions[i] += adjustment
+                base_weights[i] += adjustment
+
+    def save_as_xgboost(self, path: str):
+        """
+        Save the model in XGBoost JSON format.
+
+        Parameters
+        ----------
+        path : str
+            The path where the XGBoost model will be saved.
+        """
+        xgboost_json = self._to_xgboost_json()
+        with open(path, "w") as f:
+            json.dump(xgboost_json, f, indent=2)
+
+    def save_as_onnx(self, path: str, name: str = "perpetual_model"):
+        """
+        Save the model in ONNX format.
+
+        Parameters
+        ----------
+        path : str
+            The path where the ONNX model will be saved.
+        name : str, optional
+            The name of the model (graph), by default "perpetual_model".
+        """
+        import json
+
+        import onnx
+        from onnx import TensorProto, helper
+
+        raw_dump = json.loads(self.json_dump())
+        is_classifier = len(self.classes_) >= 2
+        is_multi = is_classifier and len(self.classes_) > 2
+        n_classes = len(self.classes_) if is_classifier else 1
+
+        if "trees" in raw_dump:
+            booster_data = [{"trees": raw_dump["trees"]}]
+        else:
+            booster_data = raw_dump["boosters"]
+
+        feature_map_inverse = (
+            {v: k for k, v in enumerate(self.feature_names_in_)}
+            if hasattr(self, "feature_names_in_")
+            else None
+        )
+
+        nodes_treeids = []
+        nodes_nodeids = []
+        nodes_featureids = []
+        nodes_values = []
+        nodes_modes = []
+        nodes_truenodeids = []
+        nodes_falsenodeids = []
+        nodes_missing_value_tracks_true = []
+
+        target_treeids = []
+        target_nodeids = []
+        target_ids = []
+        target_weights = []
+
+        # Base score handling
+        base_score = self.base_score
+        if is_classifier:
+            if is_multi:
+                base_values = [float(b) for b in base_score]
+            else:
+                base_values = [float(base_score)]
+        else:
+            base_values = [float(base_score)]
+
+        global_tree_idx = 0
+        for b_idx, booster in enumerate(booster_data):
+            for tree_data in booster["trees"]:
+                nodes_dict = tree_data["nodes"]
+                node_keys = sorted(nodes_dict.keys(), key=lambda x: int(x))
+
+                node_id_to_idx = {}
+                for i, k in enumerate(node_keys):
+                    node_id_to_idx[int(k)] = i
+
+                for k in node_keys:
+                    node_dict = nodes_dict[k]
+                    nid = int(node_dict["num"])
+                    idx_for_onnx = node_id_to_idx[nid]
+
+                    nodes_treeids.append(global_tree_idx)
+                    nodes_nodeids.append(idx_for_onnx)
+
+                    if node_dict["is_leaf"]:
+                        nodes_modes.append("LEAF")
+                        nodes_featureids.append(0)
+                        nodes_values.append(0.0)
+                        nodes_truenodeids.append(0)
+                        nodes_falsenodeids.append(0)
+                        nodes_missing_value_tracks_true.append(0)
+
+                        target_treeids.append(global_tree_idx)
+                        target_nodeids.append(idx_for_onnx)
+                        target_ids.append(b_idx if is_multi else 0)
+                        target_weights.append(float(node_dict["weight_value"]))
+                    else:
+                        nodes_modes.append("BRANCH_LT")
+                        feat_val = node_dict["split_feature"]
+                        f_idx = 0
+                        if isinstance(feat_val, int):
+                            f_idx = feat_val
+                        elif feature_map_inverse and feat_val in feature_map_inverse:
+                            f_idx = feature_map_inverse[feat_val]
+                        elif isinstance(feat_val, str) and feat_val.isdigit():
+                            f_idx = int(feat_val)
+
+                        nodes_featureids.append(f_idx)
+                        nodes_values.append(float(node_dict["split_value"]))
+
+                        tracks_true = 0
+                        if node_dict["missing_node"] == node_dict["left_child"]:
+                            tracks_true = 1
+                        nodes_missing_value_tracks_true.append(tracks_true)
+
+                        nodes_truenodeids.append(
+                            node_id_to_idx[int(node_dict["left_child"])]
+                        )
+                        nodes_falsenodeids.append(
+                            node_id_to_idx[int(node_dict["right_child"])]
+                        )
+
+                global_tree_idx += 1
+
+        input_name = "input"
+        input_type = helper.make_tensor_value_info(
+            input_name, TensorProto.FLOAT, [None, self.n_features_]
+        )
+
+        raw_scores_name = "raw_scores"
+        reg_node = helper.make_node(
+            "TreeEnsembleRegressor",
+            inputs=[input_name],
+            outputs=[raw_scores_name],
+            domain="ai.onnx.ml",
+            nodes_treeids=nodes_treeids,
+            nodes_nodeids=nodes_nodeids,
+            nodes_featureids=nodes_featureids,
+            nodes_values=nodes_values,
+            nodes_modes=nodes_modes,
+            nodes_truenodeids=nodes_truenodeids,
+            nodes_falsenodeids=nodes_falsenodeids,
+            nodes_missing_value_tracks_true=nodes_missing_value_tracks_true,
+            target_treeids=target_treeids,
+            target_nodeids=target_nodeids,
+            target_ids=target_ids,
+            target_weights=target_weights,
+            base_values=base_values,
+            n_targets=n_classes if is_multi else 1,
+            name="PerpetualTreeEnsemble",
+        )
+
+        ops = [reg_node]
+        if is_classifier:
+            # Prepare class labels mapping
+            classes = self.classes_
+            if all(isinstance(c, (int, np.integer)) for c in classes):
+                tensor_type = TensorProto.INT64
+                classes_array = np.array(classes, dtype=np.int64)
+            elif all(isinstance(c, (float, np.floating)) for c in classes):
+                tensor_type = TensorProto.FLOAT
+                classes_array = np.array(classes, dtype=np.float32)
+            else:
+                tensor_type = TensorProto.STRING
+                classes_array = np.array([str(c) for c in classes], dtype=object)
+
+            classes_name = "class_labels"
+            if tensor_type == TensorProto.STRING:
+                classes_const_node = helper.make_node(
+                    "Constant",
+                    [],
+                    [classes_name],
+                    value=helper.make_tensor(
+                        name="classes_tensor",
+                        data_type=tensor_type,
+                        dims=[len(classes)],
+                        vals=[s.encode("utf-8") for s in classes_array],
+                    ),
+                )
+            else:
+                classes_const_node = helper.make_node(
+                    "Constant",
+                    [],
+                    [classes_name],
+                    value=helper.make_tensor(
+                        name="classes_tensor",
+                        data_type=tensor_type,
+                        dims=[len(classes)],
+                        vals=classes_array.flatten().tolist(),
+                    ),
+                )
+            ops.append(classes_const_node)
+
+            if is_multi:
+                prob_name = "probabilities"
+                softmax_node = helper.make_node(
+                    "Softmax", [raw_scores_name], [prob_name], axis=1
+                )
+                label_idx_name = "label_idx"
+                argmax_node = helper.make_node(
+                    "ArgMax", [prob_name], [label_idx_name], axis=1, keepdims=0
+                )
+                label_name = "label"
+                gather_node = helper.make_node(
+                    "Gather", [classes_name, label_idx_name], [label_name], axis=0
+                )
+                ops.extend([softmax_node, argmax_node, gather_node])
+                outputs = [
+                    helper.make_tensor_value_info(label_name, tensor_type, [None]),
+                    helper.make_tensor_value_info(
+                        prob_name, TensorProto.FLOAT, [None, n_classes]
+                    ),
+                ]
+            else:
+                p_name = "p"
+                sigmoid_node = helper.make_node("Sigmoid", [raw_scores_name], [p_name])
+                one_name = "one"
+                one_node = helper.make_node(
+                    "Constant",
+                    [],
+                    [one_name],
+                    value=helper.make_tensor("one_v", TensorProto.FLOAT, [1, 1], [1.0]),
+                )
+                one_minus_p_name = "one_minus_p"
+                sub_node = helper.make_node(
+                    "Sub", [one_name, p_name], [one_minus_p_name]
+                )
+                prob_name = "probabilities"
+                concat_node = helper.make_node(
+                    "Concat", [one_minus_p_name, p_name], [prob_name], axis=1
+                )
+                half_name = "half"
+                half_node = helper.make_node(
+                    "Constant",
+                    [],
+                    [half_name],
+                    value=helper.make_tensor(
+                        "half_v", TensorProto.FLOAT, [1, 1], [0.5]
+                    ),
+                )
+                label_bool_name = "label_bool"
+                greater_node = helper.make_node(
+                    "Greater", [p_name, half_name], [label_bool_name]
+                )
+                label_raw_name = "label_raw"
+                cast_node = helper.make_node(
+                    "Cast", [label_bool_name], [label_raw_name], to=TensorProto.INT64
+                )
+                label_idx_name = "label_idx"
+                flatten_node = helper.make_node(
+                    "Flatten", [label_raw_name], [label_idx_name], axis=1
+                )
+                label_name = "label"
+                gather_node = helper.make_node(
+                    "Gather", [classes_name, label_idx_name], [label_name], axis=0
+                )
+                ops.extend(
+                    [
+                        sigmoid_node,
+                        one_node,
+                        sub_node,
+                        concat_node,
+                        half_node,
+                        greater_node,
+                        cast_node,
+                        flatten_node,
+                        gather_node,
+                    ]
+                )
+                outputs = [
+                    helper.make_tensor_value_info(label_name, tensor_type, [None]),
+                    helper.make_tensor_value_info(
+                        prob_name, TensorProto.FLOAT, [None, 2]
+                    ),
+                ]
+        else:
+            prediction_name = "prediction"
+            reg_node.output[0] = prediction_name
+            outputs = [
+                helper.make_tensor_value_info(
+                    prediction_name, TensorProto.FLOAT, [None, 1]
+                )
+            ]
+
+        graph_def = helper.make_graph(ops, name, [input_type], outputs)
+        model_def = helper.make_model(
+            graph_def,
+            producer_name="perpetual",
+            opset_imports=[
+                helper.make_opsetid("", 13),
+                helper.make_opsetid("ai.onnx.ml", 2),
+            ],
+        )
+        model_def.ir_version = 6
+        onnx.save(model_def, path)

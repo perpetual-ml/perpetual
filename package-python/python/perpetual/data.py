@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Iterable, Optional, Union
+from typing import Any, Iterable, Optional, Union
 
 
 @dataclass
@@ -9,18 +9,19 @@ class Node:
     num: int
     weight_value: float
     hessian_sum: float
-    depth: int
-    split_value: float
-    split_feature: Union[str, int]
-    split_gain: float
-    missing_node: int
-    left_child: int
-    right_child: int
-    is_leaf: bool
-    node_type: str
-    parent_node: int
-    generalization: Optional[float]
-    left_cats: Optional[Iterable]
-    right_cats: Optional[Iterable]
-    count: int
-    weights: Iterable[float]
+    depth: int = 0
+    split_value: float = 0.0
+    split_feature: Union[str, int] = ""
+    split_gain: float = 0.0
+    missing_node: int = 0
+    left_child: int = 0
+    right_child: int = 0
+    is_leaf: bool = False
+    node_type: str = "split"
+    parent_node: int = 0
+    generalization: Optional[float] = None
+    left_cats: Optional[Iterable] = None
+    right_cats: Optional[Iterable] = None
+    count: int = 0
+    weights: Optional[Iterable[float]] = None
+    stats: Optional[Any] = None
