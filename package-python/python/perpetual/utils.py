@@ -86,24 +86,11 @@ def convert_input_frame(
             categorical_features_ = [
                 features_.index(c) for c in categorical_columns
             ] or None
-    elif type_df(X) == "polars_df":
-        import polars.selectors as cs
-
-        try:
-            X_ = X.to_numpy(allow_copy=False)
-        except RuntimeError:
-            X_ = X.to_numpy(allow_copy=True)
-
-        features_ = X.columns
-        if categorical_features == "auto":
-            categorical_columns = X.select(cs.categorical()).columns
-            categorical_features_ = [
-                features_.index(c) for c in categorical_columns
-            ] or None
-    else:
-        # Assume it's a numpy array.
+    elif type_df(X) == "numpy":
         X_ = X
         features_ = list(map(str, range(X_.shape[1])))
+    else:
+        raise ValueError(f"Object type {type(X)} is not supported.")
 
     if (
         categorical_features
@@ -161,6 +148,89 @@ def convert_input_frame(
     return features_, flat_data, rows, cols, categorical_features_, cat_mapping
 
 
+def convert_input_frame_columnar(
+    X, categorical_features, max_cat
+) -> Tuple[List[str], List[np.ndarray], int, int, Optional[set], dict]:
+    """Convert Polars DataFrame to columnar format for zero-copy transfer.
+
+    Returns list of column arrays instead of flattened data, avoiding the
+    copy that would be required for np.column_stack.
+    """
+    import polars.selectors as cs
+
+    features_ = list(X.columns)
+    rows, cols = X.shape
+
+    # Determine categorical features
+    categorical_features_ = None
+    if categorical_features == "auto":
+        categorical_columns = X.select(cs.categorical()).columns
+        categorical_features_ = [
+            features_.index(c) for c in categorical_columns
+        ] or None
+    elif (
+        categorical_features
+        and all(isinstance(s, int) for s in categorical_features)
+        and isinstance(categorical_features, list)
+    ):
+        categorical_features_ = categorical_features
+    elif (
+        categorical_features
+        and all(isinstance(s, str) for s in categorical_features)
+        and isinstance(categorical_features, list)
+    ):
+        categorical_features_ = [features_.index(c) for c in categorical_features]
+
+    cat_mapping = {}
+    cat_to_num = []
+    categorical_set = set(categorical_features_) if categorical_features_ else set()
+
+    # Convert each column to numpy array
+    columns = []
+    for i, col_name in enumerate(features_):
+        if i in categorical_set:
+            # For categorical columns, we need to encode them
+            col_data = X[col_name].to_numpy(allow_copy=True, writable=True)
+            col_data = col_data.astype(str)
+            categories, inversed = np.unique(col_data, return_inverse=True)
+
+            categories = list(categories)
+            if "nan" in categories:
+                categories.remove("nan")
+            categories.insert(0, "nan")
+
+            inversed = inversed.astype("float64") + 1.0
+
+            if len(categories) > max_cat:
+                cat_to_num.append(i)
+                logger.warning(
+                    f"Feature {col_name} will be treated as numerical since the number of categories ({len(categories)}) exceeds max_cat ({max_cat}) threshold."
+                )
+
+            cat_mapping[col_name] = categories
+            ind_nan = len(categories)
+            inversed[inversed == ind_nan] = np.nan
+            columns.append(inversed)
+        else:
+            # For non-categorical columns, use zero-copy
+            col_array = X[col_name].to_numpy(allow_copy=False, writable=False)
+            if not np.issubdtype(col_array.dtype, "float64"):
+                col_array = col_array.astype(dtype="float64", copy=False)
+            columns.append(col_array)
+
+    if categorical_features_:
+        categorical_features_ = [
+            x for x in categorical_features_ if x not in cat_to_num
+        ]
+        logger.info(f"Categorical features: {categorical_features_}")
+        logger.info(f"Mapping of categories: {cat_mapping}")
+
+    if isinstance(categorical_features_, list):
+        categorical_features_ = set(categorical_features_)
+
+    return features_, columns, rows, cols, categorical_features_, cat_mapping
+
+
 def transform_input_frame(X, cat_mapping) -> Tuple[List[str], np.ndarray, int, int]:
     """Convert data to format needed by booster.
 
@@ -170,16 +240,11 @@ def transform_input_frame(X, cat_mapping) -> Tuple[List[str], np.ndarray, int, i
     if type_df(X) == "pandas_df":
         X_ = X.to_numpy()
         features_ = X.columns.to_list()
-    elif type_df(X) == "polars_df":
-        try:
-            X_ = X.to_numpy(allow_copy=False)
-        except RuntimeError:
-            X_ = X.to_numpy(allow_copy=True)
-        features_ = X.columns
-    else:
-        # Assume it's a numpy array.
+    elif type_df(X) == "numpy":
         X_ = X
         features_ = list(map(str, range(X_.shape[1])))
+    else:
+        raise ValueError(f"Object type {type(X)} is not supported.")
 
     if cat_mapping:
         for feature_name, categories in cat_mapping.items():
@@ -198,6 +263,40 @@ def transform_input_frame(X, cat_mapping) -> Tuple[List[str], np.ndarray, int, i
     rows, cols = X_.shape
 
     return features_, flat_data, rows, cols
+
+
+def transform_input_frame_columnar(
+    X, cat_mapping
+) -> Tuple[List[str], List[np.ndarray], int, int]:
+    """Convert Polars DataFrame to columnar format for zero-copy prediction.
+
+    Returns list of column arrays instead of flattened data, avoiding copies.
+    """
+    features_ = list(X.columns)
+    rows, cols = X.shape
+
+    columns = []
+    for i, col_name in enumerate(features_):
+        if cat_mapping and col_name in cat_mapping:
+            # For categorical columns, we need to encode them (this creates a copy)
+            categories = cat_mapping[col_name]
+            cats = categories.copy()
+            cats.remove("nan")
+            col_data = X[col_name].to_numpy(allow_copy=True, writable=True)
+            x_enc = np.searchsorted(cats, col_data.astype(str))
+            x_enc = x_enc + 1.0
+            ind_nan = len(categories)
+            x_enc[x_enc == ind_nan] = np.nan
+            columns.append(x_enc.astype("float64"))
+        else:
+            # For non-categorical columns, use zero-copy
+            col_series = X[col_name]
+            col_array = col_series.to_numpy(allow_copy=False, writable=False)
+            if not np.issubdtype(col_array.dtype, "float64"):
+                col_array = col_array.astype(dtype="float64", copy=False)
+            columns.append(col_array)
+
+    return features_, columns, rows, cols
 
 
 CONTRIBUTION_METHODS = {

@@ -7,7 +7,7 @@ use perpetual_rs::booster::config::BoosterIO;
 use perpetual_rs::booster::config::MissingNodeTreatment;
 use perpetual_rs::booster::multi_output::MultiOutputBooster as CrateMultiOutputBooster;
 use perpetual_rs::constraints::Constraint;
-use perpetual_rs::data::Matrix;
+use perpetual_rs::data::{ColumnarMatrix, Matrix};
 use perpetual_rs::objective_functions::Objective;
 use pyo3::exceptions::{PyKeyError, PyValueError};
 use pyo3::prelude::*;
@@ -276,6 +276,48 @@ impl MultiOutputBooster {
         Ok(())
     }
 
+    /// Fit the booster using columnar data (zero-copy from Polars).
+    pub fn fit_columnar(
+        &mut self,
+        columns: Vec<PyReadonlyArray1<f64>>,
+        rows: usize,
+        y: PyReadonlyArray1<f64>,
+        sample_weight: Option<PyReadonlyArray1<f64>>,
+        group: Option<PyReadonlyArray1<u64>>,
+    ) -> PyResult<()> {
+        let col_slices: Vec<&[f64]> = columns
+            .iter()
+            .map(|col| col.as_slice())
+            .collect::<Result<Vec<_>, _>>()?;
+
+        let data = ColumnarMatrix::new(col_slices, rows);
+
+        let y = y.as_slice()?;
+        let y_data = Matrix::new(y, rows, self.booster.n_boosters);
+
+        let sample_weight_ = match sample_weight.as_ref() {
+            Some(sw) => {
+                let sw_slice = sw.as_slice()?;
+                Some(sw_slice)
+            }
+            None => None,
+        };
+        let group_ = match group.as_ref() {
+            Some(gr) => {
+                let gr_slice = gr.as_slice()?;
+                Some(gr_slice)
+            }
+            None => None,
+        };
+
+        match self.booster.fit_columnar(&data, &y_data, sample_weight_, group_) {
+            Ok(m) => Ok(m),
+            Err(e) => Err(PyValueError::new_err(e.to_string())),
+        }?;
+
+        Ok(())
+    }
+
     pub fn prune(
         &mut self,
         flat_data: PyReadonlyArray1<f64>,
@@ -328,6 +370,24 @@ impl MultiOutputBooster {
         Ok(self.booster.predict(&data, parallel).into_pyarray(py))
     }
 
+    /// Predict using columnar data (zero-copy from Polars).
+    pub fn predict_columnar<'py>(
+        &self,
+        py: Python<'py>,
+        columns: Vec<PyReadonlyArray1<f64>>,
+        rows: usize,
+        parallel: Option<bool>,
+    ) -> PyResult<Bound<'py, PyArray1<f64>>> {
+        let col_slices: Vec<&[f64]> = columns
+            .iter()
+            .map(|col| col.as_slice())
+            .collect::<Result<Vec<_>, _>>()?;
+
+        let data = ColumnarMatrix::new(col_slices, rows);
+        let parallel = parallel.unwrap_or(true);
+        Ok(self.booster.predict_columnar(&data, parallel).into_pyarray(py))
+    }
+
     pub fn predict_proba<'py>(
         &self,
         py: Python<'py>,
@@ -340,6 +400,24 @@ impl MultiOutputBooster {
         let data = Matrix::new(flat_data, rows, cols);
         let parallel = parallel.unwrap_or(true);
         Ok(self.booster.predict_proba(&data, parallel).into_pyarray(py))
+    }
+
+    /// Predict probabilities using columnar data (zero-copy from Polars).
+    pub fn predict_proba_columnar<'py>(
+        &self,
+        py: Python<'py>,
+        columns: Vec<PyReadonlyArray1<f64>>,
+        rows: usize,
+        parallel: Option<bool>,
+    ) -> PyResult<Bound<'py, PyArray1<f64>>> {
+        let col_slices: Vec<&[f64]> = columns
+            .iter()
+            .map(|col| col.as_slice())
+            .collect::<Result<Vec<_>, _>>()?;
+
+        let data = ColumnarMatrix::new(col_slices, rows);
+        let parallel = parallel.unwrap_or(true);
+        Ok(self.booster.predict_proba_columnar(&data, parallel).into_pyarray(py))
     }
 
     pub fn predict_nodes<'py>(
@@ -357,6 +435,69 @@ impl MultiOutputBooster {
         let value: Vec<Vec<Vec<HashSet<usize>>>> = self.booster.predict_nodes(&data, parallel);
 
         Ok(value.into_py_any(py).unwrap())
+    }
+
+    /// Predict nodes using columnar data (zero-copy from Polars).
+    pub fn predict_nodes_columnar<'py>(
+        &self,
+        py: Python<'py>,
+        columns: Vec<PyReadonlyArray1<f64>>,
+        rows: usize,
+        parallel: Option<bool>,
+    ) -> PyResult<Py<PyAny>> {
+        let col_slices: Vec<&[f64]> = columns
+            .iter()
+            .map(|col| col.as_slice())
+            .collect::<Result<Vec<_>, _>>()?;
+
+        let data = ColumnarMatrix::new(col_slices, rows);
+        let parallel = parallel.unwrap_or(true);
+
+        let value: Vec<Vec<Vec<HashSet<usize>>>> = self.booster.predict_nodes_columnar(&data, parallel);
+
+        Ok(value.into_py_any(py).unwrap())
+    }
+
+    pub fn predict_contributions<'py>(
+        &self,
+        py: Python<'py>,
+        flat_data: PyReadonlyArray1<f64>,
+        rows: usize,
+        cols: usize,
+        method: &str,
+        parallel: Option<bool>,
+    ) -> PyResult<Bound<'py, PyArray1<f64>>> {
+        let flat_data = flat_data.as_slice()?;
+        let data = Matrix::new(flat_data, rows, cols);
+        let parallel = parallel.unwrap_or(true);
+        let method_ = to_value_error(serde_plain::from_str(method))?;
+        Ok(self
+            .booster
+            .predict_contributions(&data, method_, parallel)
+            .into_pyarray(py))
+    }
+
+    /// Predict contributions using columnar data (zero-copy from Polars).
+    pub fn predict_contributions_columnar<'py>(
+        &self,
+        py: Python<'py>,
+        columns: Vec<PyReadonlyArray1<f64>>,
+        rows: usize,
+        method: &str,
+        parallel: Option<bool>,
+    ) -> PyResult<Bound<'py, PyArray1<f64>>> {
+        let col_slices: Vec<&[f64]> = columns
+            .iter()
+            .map(|col| col.as_slice())
+            .collect::<Result<Vec<_>, _>>()?;
+
+        let data = ColumnarMatrix::new(col_slices, rows);
+        let parallel = parallel.unwrap_or(true);
+        let method_ = to_value_error(serde_plain::from_str(method))?;
+        Ok(self
+            .booster
+            .predict_contributions_columnar(&data, method_, parallel)
+            .into_pyarray(py))
     }
 
     pub fn calculate_feature_importance(&self, method: &str, normalize: bool) -> PyResult<HashMap<usize, f32>> {

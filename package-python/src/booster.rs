@@ -6,7 +6,7 @@ use perpetual_rs::booster::config::BoosterIO;
 use perpetual_rs::booster::config::MissingNodeTreatment;
 use perpetual_rs::conformal::cqr::CalData;
 use perpetual_rs::constraints::Constraint;
-use perpetual_rs::data::Matrix;
+use perpetual_rs::data::{ColumnarMatrix, Matrix};
 use perpetual_rs::objective_functions::Objective;
 use perpetual_rs::PerpetualBooster as CratePerpetualBooster;
 use pyo3::exceptions::{PyKeyError, PyValueError};
@@ -256,6 +256,47 @@ impl PerpetualBooster {
         Ok(())
     }
 
+    /// Fit using columnar data (zero-copy from Polars).
+    /// Each column is passed as a separate 1D array.
+    pub fn fit_columnar(
+        &mut self,
+        columns: Vec<PyReadonlyArray1<f64>>,
+        rows: usize,
+        y: PyReadonlyArray1<f64>,
+        sample_weight: Option<PyReadonlyArray1<f64>>,
+        group: Option<PyReadonlyArray1<u64>>,
+    ) -> PyResult<()> {
+        // Extract slices from each column array
+        let col_slices: Vec<&[f64]> = columns
+            .iter()
+            .map(|col| col.as_slice())
+            .collect::<Result<Vec<_>, _>>()?;
+
+        let data = ColumnarMatrix::new(col_slices, rows);
+        let y = y.as_slice()?;
+        let sample_weight_ = match sample_weight.as_ref() {
+            Some(sw) => {
+                let sw_slice = sw.as_slice()?;
+                Some(sw_slice)
+            }
+            None => None,
+        };
+        let group_ = match group.as_ref() {
+            Some(gr) => {
+                let gr_slice = gr.as_slice()?;
+                Some(gr_slice)
+            }
+            None => None,
+        };
+
+        match self.booster.fit_columnar(&data, y, sample_weight_, group_) {
+            Ok(m) => Ok(m),
+            Err(e) => Err(PyValueError::new_err(e.to_string())),
+        }?;
+
+        Ok(())
+    }
+
     pub fn prune(
         &mut self,
         flat_data: PyReadonlyArray1<f64>,
@@ -337,6 +378,52 @@ impl PerpetualBooster {
         Ok(())
     }
 
+    pub fn calibrate_columnar(
+        &mut self,
+        columns: Vec<PyReadonlyArray1<f64>>,
+        rows: usize,
+        y: PyReadonlyArray1<f64>,
+        columns_cal: Vec<PyReadonlyArray1<f64>>,
+        rows_cal: usize,
+        y_cal: PyReadonlyArray1<f64>,
+        alpha: PyReadonlyArray1<f64>,
+        sample_weight: Option<PyReadonlyArray1<f64>>,
+        group: Option<PyReadonlyArray1<u64>>,
+    ) -> PyResult<()> {
+        let col_slices: Vec<&[f64]> = columns
+            .iter()
+            .map(|col| col.as_slice())
+            .collect::<Result<Vec<_>, _>>()?;
+        let data = ColumnarMatrix::new(col_slices, rows);
+
+        let col_slices_cal: Vec<&[f64]> = columns_cal
+            .iter()
+            .map(|col| col.as_slice())
+            .collect::<Result<Vec<_>, _>>()?;
+        let data_cal = ColumnarMatrix::new(col_slices_cal, rows_cal);
+
+        let y = y.as_slice()?;
+        let y_cal = y_cal.as_slice()?;
+        let alpha = alpha.as_slice()?;
+
+        let sample_weight_ = match sample_weight.as_ref() {
+            Some(sw) => Some(sw.as_slice()?),
+            None => None,
+        };
+        let group_ = match group.as_ref() {
+            Some(gr) => Some(gr.as_slice()?),
+            None => None,
+        };
+
+        match self
+            .booster
+            .calibrate_columnar(&data, y, sample_weight_, group_, (&data_cal, y_cal, alpha))
+        {
+            Ok(_) => Ok(()),
+            Err(e) => Err(PyValueError::new_err(e.to_string())),
+        }
+    }
+
     pub fn predict_intervals<'py>(
         &self,
         py: Python<'py>,
@@ -357,7 +444,34 @@ impl PerpetualBooster {
             py_dict.set_item(key, py_array)?;
         }
 
-        Ok(py_dict.into_py_dict(py)?)
+        Ok(py_dict)
+    }
+
+    /// Predict intervals using columnar data (zero-copy from Polars).
+    pub fn predict_intervals_columnar<'py>(
+        &self,
+        py: Python<'py>,
+        columns: Vec<PyReadonlyArray1<f64>>,
+        rows: usize,
+        parallel: Option<bool>,
+    ) -> PyResult<Bound<'py, PyDict>> {
+        let col_slices: Vec<&[f64]> = columns
+            .iter()
+            .map(|col| col.as_slice())
+            .collect::<Result<Vec<_>, _>>()?;
+
+        let data = ColumnarMatrix::new(col_slices, rows);
+        let parallel = parallel.unwrap_or(true);
+
+        let predictions: HashMap<String, Vec<Vec<f64>>> = self.booster.predict_intervals_columnar(&data, parallel);
+
+        let py_dict = PyDict::new(py);
+        for (key, value) in predictions.iter() {
+            let py_array = PyArray2::from_vec2(py, value)?;
+            py_dict.set_item(key, py_array)?;
+        }
+
+        Ok(py_dict)
     }
 
     pub fn predict<'py>(
@@ -374,6 +488,24 @@ impl PerpetualBooster {
         Ok(self.booster.predict(&data, parallel).into_pyarray(py))
     }
 
+    /// Predict using columnar data (zero-copy from Polars).
+    pub fn predict_columnar<'py>(
+        &self,
+        py: Python<'py>,
+        columns: Vec<PyReadonlyArray1<f64>>,
+        rows: usize,
+        parallel: Option<bool>,
+    ) -> PyResult<Bound<'py, PyArray1<f64>>> {
+        let col_slices: Vec<&[f64]> = columns
+            .iter()
+            .map(|col| col.as_slice())
+            .collect::<Result<Vec<_>, _>>()?;
+
+        let data = ColumnarMatrix::new(col_slices, rows);
+        let parallel = parallel.unwrap_or(true);
+        Ok(self.booster.predict_columnar(&data, parallel).into_pyarray(py))
+    }
+
     pub fn predict_proba<'py>(
         &self,
         py: Python<'py>,
@@ -386,6 +518,24 @@ impl PerpetualBooster {
         let data = Matrix::new(flat_data, rows, cols);
         let parallel = parallel.unwrap_or(true);
         Ok(self.booster.predict_proba(&data, parallel).into_pyarray(py))
+    }
+
+    /// Predict probabilities using columnar data (zero-copy from Polars).
+    pub fn predict_proba_columnar<'py>(
+        &self,
+        py: Python<'py>,
+        columns: Vec<PyReadonlyArray1<f64>>,
+        rows: usize,
+        parallel: Option<bool>,
+    ) -> PyResult<Bound<'py, PyArray1<f64>>> {
+        let col_slices: Vec<&[f64]> = columns
+            .iter()
+            .map(|col| col.as_slice())
+            .collect::<Result<Vec<_>, _>>()?;
+
+        let data = ColumnarMatrix::new(col_slices, rows);
+        let parallel = parallel.unwrap_or(true);
+        Ok(self.booster.predict_proba_columnar(&data, parallel).into_pyarray(py))
     }
 
     pub fn predict_nodes<'py>(
@@ -401,6 +551,27 @@ impl PerpetualBooster {
         let parallel = parallel.unwrap_or(true);
 
         let value: Vec<Vec<HashSet<usize>>> = self.booster.predict_nodes(&data, parallel);
+
+        value.into_py_any(py)
+    }
+
+    /// Predict nodes using columnar data (zero-copy from Polars).
+    pub fn predict_nodes_columnar<'py>(
+        &self,
+        py: Python<'py>,
+        columns: Vec<PyReadonlyArray1<f64>>,
+        rows: usize,
+        parallel: Option<bool>,
+    ) -> PyResult<Py<PyAny>> {
+        let col_slices: Vec<&[f64]> = columns
+            .iter()
+            .map(|col| col.as_slice())
+            .collect::<Result<Vec<_>, _>>()?;
+
+        let data = ColumnarMatrix::new(col_slices, rows);
+        let parallel = parallel.unwrap_or(true);
+
+        let value: Vec<Vec<HashSet<usize>>> = self.booster.predict_nodes_columnar(&data, parallel);
 
         value.into_py_any(py)
     }
@@ -421,6 +592,29 @@ impl PerpetualBooster {
         Ok(self
             .booster
             .predict_contributions(&data, method_, parallel)
+            .into_pyarray(py))
+    }
+
+    /// Predict contributions using columnar data (zero-copy from Polars).
+    pub fn predict_contributions_columnar<'py>(
+        &self,
+        py: Python<'py>,
+        columns: Vec<PyReadonlyArray1<f64>>,
+        rows: usize,
+        method: &str,
+        parallel: Option<bool>,
+    ) -> PyResult<Bound<'py, PyArray1<f64>>> {
+        let col_slices: Vec<&[f64]> = columns
+            .iter()
+            .map(|col| col.as_slice())
+            .collect::<Result<Vec<_>, _>>()?;
+
+        let data = ColumnarMatrix::new(col_slices, rows);
+        let parallel = parallel.unwrap_or(true);
+        let method_ = to_value_error(serde_plain::from_str(method))?;
+        Ok(self
+            .booster
+            .predict_contributions_columnar(&data, method_, parallel)
             .into_pyarray(py))
     }
 

@@ -16,7 +16,7 @@ use std::path::Path;
 // across implementations
 
 /// Contributions
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone, Copy)]
 pub enum ContributionsMethod {
     /// This method will use the internal leaf weights, to calculate the contributions. This is the same as what is described by Saabas [here](https://blog.datadive.net/interpreting-random-forests/).
     Weight,
@@ -246,4 +246,4 @@ pub trait BoosterIO: Serialize + DeserializeOwned + Sized {
     }
 }
 
-impl<T> BoosterIO for T where T: Serialize + DeserializeOwned + Sized {}
+impl BoosterIO for BoosterConfig {}

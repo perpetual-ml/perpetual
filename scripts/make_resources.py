@@ -1,6 +1,5 @@
 import os
 import subprocess
-import sys
 
 import pandas as pd
 import seaborn as sns
@@ -150,17 +149,7 @@ if __name__ == "__main__":
     # ---------------------------------------------------------
     # Generate v0.10.0 Model Artifact for Backward Compatibility
     # ---------------------------------------------------------
-    print("Installing perpetual==0.10.0 for model generation...")
-    env = os.environ.copy()
-    env["VIRTUAL_ENV"] = sys.prefix
-    try:
-        subprocess.check_call(["uv", "pip", "install", "perpetual==0.10.0"], env=env)
-    except subprocess.CalledProcessError:
-        print(
-            "Could not find perpetual==0.10.0 on PyPI. Trying to install from local source if possible or failing gracefully."
-        )
-        # If we can't install 0.10.0, we can't generate the model.
-        raise
+    print("Generating v0.10.0 model artifact...")
 
     gen_script = """
 import pandas as pd
@@ -188,18 +177,19 @@ model.save_booster("resources/model_v0.10.0.json")
 # Save predictions for verification
 preds = model.predict(data_test)
 pd.Series(preds).to_csv("resources/model_v0.10.0_preds.csv", index=False, header=False)
+probs = model.predict_proba(data_test)
+pd.DataFrame(probs).to_csv("resources/model_v0.10.0_probs.csv", index=False, header=False)
 print("Successfully generated resources/model_v0.10.0.json and predictions")
 """
     with open("temp_gen_model.py", "w") as f:
         f.write(gen_script)
 
     try:
-        subprocess.check_call([sys.executable, "temp_gen_model.py"], env=env)
+        subprocess.check_call(
+            ["uv", "run", "--with", "perpetual==0.10.0", "python", "temp_gen_model.py"]
+        )
     except subprocess.CalledProcessError as e:
         print(f"Failed to generate model: {e}")
     finally:
         if os.path.exists("temp_gen_model.py"):
             os.remove("temp_gen_model.py")
-
-        print("Restoring local package-python installation...")
-        subprocess.check_call(["uv", "pip", "install", "-e", "package-python"], env=env)

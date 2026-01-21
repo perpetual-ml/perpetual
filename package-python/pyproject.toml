@@ -40,4 +40,11 @@ sdist-include = ["LICENSE", "README.md"]
 python-source = "python"
 module-name = "perpetual.perpetual"
 
+[dependency-groups]
+dev = [
+    "maturin>=1.11.5",
+    "polars>=1.37.1",
+    "pytest>=9.0.2",
+]
+
 

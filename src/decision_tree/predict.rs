@@ -1,4 +1,5 @@
 use super::tree::Tree;
+use crate::data::ColumnarMatrix;
 use crate::{utils::odds, Matrix};
 use rayon::prelude::*;
 use std::collections::{HashMap, HashSet};
@@ -287,6 +288,84 @@ impl Tree {
             self.predict_nodes_parallel(data, missing)
         } else {
             self.predict_nodes_single_threaded(data, missing)
+        }
+    }
+
+    // Columnar matrix methods for zero-copy Polars support
+
+    fn predict_row_columnar(&self, data: &ColumnarMatrix<f64>, row: usize, missing: &f64) -> f64 {
+        let mut node_idx = 0;
+        loop {
+            let node = &self.nodes.get(&node_idx).unwrap();
+            if node.is_leaf {
+                return node.weight_value as f64;
+            } else {
+                node_idx = node.get_child_idx(data.get(row, node.split_feature), missing);
+            }
+        }
+    }
+
+    fn predict_single_threaded_columnar(&self, data: &ColumnarMatrix<f64>, missing: &f64) -> Vec<f64> {
+        data.index
+            .iter()
+            .map(|i| self.predict_row_columnar(data, *i, missing))
+            .collect()
+    }
+
+    fn predict_parallel_columnar(&self, data: &ColumnarMatrix<f64>, missing: &f64) -> Vec<f64> {
+        data.index
+            .par_iter()
+            .map(|i| self.predict_row_columnar(data, *i, missing))
+            .collect()
+    }
+
+    pub fn predict_columnar(&self, data: &ColumnarMatrix<f64>, parallel: bool, missing: &f64) -> Vec<f64> {
+        if parallel {
+            self.predict_parallel_columnar(data, missing)
+        } else {
+            self.predict_single_threaded_columnar(data, missing)
+        }
+    }
+
+    fn predict_nodes_row_columnar(&self, data: &ColumnarMatrix<f64>, row: usize, missing: &f64) -> HashSet<usize> {
+        let mut node_idx = 0;
+        let mut set = HashSet::new();
+        set.insert(0);
+        loop {
+            let node = &self.nodes.get(&node_idx).unwrap();
+            if node.is_leaf {
+                return set;
+            } else {
+                node_idx = node.get_child_idx(data.get(row, node.split_feature), missing);
+                set.insert(node_idx);
+            }
+        }
+    }
+
+    fn predict_nodes_single_threaded_columnar(&self, data: &ColumnarMatrix<f64>, missing: &f64) -> Vec<HashSet<usize>> {
+        data.index
+            .iter()
+            .map(|i| self.predict_nodes_row_columnar(data, *i, missing))
+            .collect()
+    }
+
+    fn predict_nodes_parallel_columnar(&self, data: &ColumnarMatrix<f64>, missing: &f64) -> Vec<HashSet<usize>> {
+        data.index
+            .par_iter()
+            .map(|i| self.predict_nodes_row_columnar(data, *i, missing))
+            .collect()
+    }
+
+    pub fn predict_nodes_columnar(
+        &self,
+        data: &ColumnarMatrix<f64>,
+        parallel: bool,
+        missing: &f64,
+    ) -> Vec<HashSet<usize>> {
+        if parallel {
+            self.predict_nodes_parallel_columnar(data, missing)
+        } else {
+            self.predict_nodes_single_threaded_columnar(data, missing)
         }
     }
 }

@@ -26,7 +26,7 @@ lto = "thin"          # Gives the agent a realistic "Release" performance view
 
 [dependencies]
 rayon = "1.11.0"
-thiserror = "2.0.17"
+thiserror = "2.0.18"
 serde_json = { version = "1.0.149", features = ["float_roundtrip"] }
 serde = { version = "1.0.228", features = ["derive"] }
 approx = "0.5.1"

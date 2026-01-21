@@ -158,6 +158,66 @@ where
     }
 }
 
+/// Columnar matrix storing columns as separate slices.
+/// This enables true zero-copy data transfer from Arrow/Polars
+/// where each column is a separate memory allocation.
+pub struct ColumnarMatrix<'a, T> {
+    pub columns: Vec<&'a [T]>,
+    pub index: Vec<usize>,
+    pub rows: usize,
+    pub cols: usize,
+}
+
+impl<'a, T> ColumnarMatrix<'a, T> {
+    /// Create a new columnar matrix from a vector of column slices.
+    ///
+    /// * `columns` - Vector of slices, one per column.
+    /// * `rows` - Number of rows (must match length of each column slice).
+    pub fn new(columns: Vec<&'a [T]>, rows: usize) -> Self {
+        let cols = columns.len();
+        ColumnarMatrix {
+            columns,
+            index: (0..rows).collect(),
+            rows,
+            cols,
+        }
+    }
+
+    /// Get a single reference to an item in the matrix.
+    ///
+    /// * `i` - The ith row of the data to get.
+    /// * `j` - the jth column of the data to get.
+    pub fn get(&self, i: usize, j: usize) -> &T {
+        &self.columns[j][i]
+    }
+
+    /// Get an entire column in the matrix.
+    ///
+    /// * `col` - The index of the column to get.
+    pub fn get_col(&self, col: usize) -> &[T] {
+        self.columns[col]
+    }
+
+    /// Get a slice of a column in the matrix.
+    ///
+    /// * `col` - The index of the column to select.
+    /// * `start_row` - The index of the start of the slice.
+    /// * `end_row` - The index of the end of the slice of the column to select.
+    pub fn get_col_slice(&self, col: usize, start_row: usize, end_row: usize) -> &[T] {
+        &self.columns[col][start_row..end_row]
+    }
+}
+
+impl<'a, T> ColumnarMatrix<'a, T>
+where
+    T: Copy,
+{
+    /// Get a row of the data as a vector.
+    pub fn get_row(&self, row: usize) -> Vec<T> {
+        self.columns.iter().map(|col| col[row]).collect()
+    }
+}
+
 /// A lightweight row major matrix, this is primarily
 /// for returning data to the user, it is especially
 /// suited for appending rows to, such as when building

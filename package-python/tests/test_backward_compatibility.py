@@ -61,10 +61,6 @@ def test_load_v0_10_0_model():
     assert preds.shape[0] == data_test.shape[0]
     assert not np.isnan(preds).any()
 
-    # Since we can't easily reproduce exact float predictions without the exact same split/random state (which we try to control),
-    # we verify that the model can be used for prediction and produces reasonable output.
-    # We could also check metadata if available.
-
     # Check objective
     assert model.objective == "LogLoss"
 
@@ -74,6 +70,15 @@ def test_load_v0_10_0_model():
         expected_preds = (
             pd.read_csv(preds_path, header=None).squeeze("columns").to_numpy()
         )
-        np.testing.assert_allclose(preds, expected_preds, rtol=1e-5)
+        if model.objective == "LogLoss":
+            np.testing.assert_array_equal(np.rint(preds), np.rint(expected_preds))
+
+            # Compare probabilities
+            probs_path = resource_dir / "model_v0.10.0_probs.csv"
+            expected_probs = pd.read_csv(probs_path, header=None).to_numpy()
+            preds_probs = model.predict_proba(data_test)
+            np.testing.assert_allclose(preds_probs, expected_probs, rtol=1e-5)
+        else:
+            np.testing.assert_allclose(preds, expected_preds, rtol=1e-5)
     else:
         pytest.fail(f"Prediction artifact not found at {preds_path}")

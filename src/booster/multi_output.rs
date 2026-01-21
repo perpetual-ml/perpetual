@@ -9,7 +9,7 @@ use crate::booster::config::*;
 use crate::constraints::ConstraintMap;
 use crate::errors::PerpetualError;
 use crate::objective_functions::objective::Objective;
-use crate::{Matrix, PerpetualBooster};
+use crate::{ColumnarMatrix, Matrix, PerpetualBooster};
 
 /// Perpetual Booster object
 #[derive(Clone, Serialize, Deserialize)]
@@ -158,6 +158,19 @@ impl MultiOutputBooster {
     ) -> Result<(), PerpetualError> {
         for i in 0..self.n_boosters {
             let _ = self.boosters[i].fit(data, y.get_col(i), sample_weight, group);
+        }
+        Ok(())
+    }
+
+    pub fn fit_columnar(
+        &mut self,
+        data: &ColumnarMatrix<f64>,
+        y: &Matrix<f64>,
+        sample_weight: Option<&[f64]>,
+        group: Option<&[u64]>,
+    ) -> Result<(), PerpetualError> {
+        for i in 0..self.n_boosters {
+            let _ = self.boosters[i].fit_columnar(data, y.get_col(i), sample_weight, group);
         }
         Ok(())
     }
@@ -459,6 +472,15 @@ impl MultiOutputBooster {
             .into_iter()
             .map(|(k, v)| (k, v / self.n_boosters as f32))
             .collect()
+    }
+}
+
+impl BoosterIO for MultiOutputBooster {
+    fn from_json(json_str: &str) -> Result<Self, PerpetualError> {
+        let mut value: serde_json::Value =
+            serde_json::from_str(json_str).map_err(|e| PerpetualError::UnableToRead(e.to_string()))?;
+        crate::booster::core::fix_legacy_value(&mut value);
+        serde_json::from_value::<Self>(value).map_err(|e| PerpetualError::UnableToRead(e.to_string()))
     }
 }
 
