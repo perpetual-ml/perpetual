@@ -8,11 +8,11 @@ The repository comes with a predefined set of development tools in the `Makefile
 make init
 ```
 
-For development, it is assumed you have stable Rust installed, and at least Python 3.9.
+For development, it is assumed you have stable Rust installed, and at least Python 3.10.
 
 ### Running tests
 
-To run the tests in the repository use `make test` - this will run all tests available in the repository. For Python or Rust specific tests that has no downstream or upstream changes use `make py-test` or `make rust-test`, respectively. 
+To run the tests in the repository use `make test` - this will run all tests available in the repository. For Python or Rust specific tests that has no downstream or upstream changes use `make py-test` or `make rust-test`, respectively.
 
 ## Benchmarking
 

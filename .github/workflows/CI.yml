@@ -39,7 +39,7 @@ jobs:
     needs: prepare-resources # This job waits for prepare-resources to complete
     strategy:
       matrix:
-        pyversion: ["3.9", "3.10", "3.11", "3.12", "3.13"]
+        pyversion: ["3.10", "3.11", "3.12", "3.13", "3.14"]
     runs-on: "windows-latest"
     steps:
       - uses: actions/checkout@v4
@@ -148,7 +148,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        pyversion: ["3.9", "3.10", "3.11", "3.12", "3.13"]
+        pyversion: ["3.10", "3.11", "3.12", "3.13", "3.14"]
     steps:
       - uses: actions/checkout@v4
       - name: Download Resources Artifact
@@ -203,7 +203,7 @@ jobs:
     runs-on: ubuntu-24.04-arm
     strategy:
       matrix:
-        pyversion: ["3.9", "3.10", "3.11", "3.12", "3.13"]
+        pyversion: ["3.10", "3.11", "3.12", "3.13", "3.14"]
     steps:
       - uses: actions/checkout@v4
       - name: Download Resources Artifact
