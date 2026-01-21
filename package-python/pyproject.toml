@@ -33,7 +33,7 @@ classifiers = [
 ]
 
 [project.optional-dependencies]
-dev = ["black", "pandas", "polars", "pyarrow", "maturin", "pytest", "seaborn", "scikit-learn", "mkdocs-material", "mkdocstrings[python]", "mkdocs-autorefs", "ruff"]
+dev = ["black", "pandas", "polars", "pyarrow", "maturin", "pytest", "seaborn", "scikit-learn", "mkdocs-material", "mkdocstrings[python]", "mkdocs-autorefs", "ruff", "xgboost", "onnxmltools", "onnx", "onnxruntime"]
 
 [tool.maturin]
 sdist-include = ["LICENSE", "README.md"]
