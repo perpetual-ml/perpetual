@@ -10,6 +10,7 @@
 [![Python Versions](https://img.shields.io/pypi/pyversions/perpetual.svg?logo=python&logoColor=white)](https://pypi.org/project/perpetual)
 [![PyPI Version](https://img.shields.io/pypi/v/perpetual.svg?logo=pypi&logoColor=white)](https://pypi.org/project/perpetual)
 [![Crates.io Version](https://img.shields.io/crates/v/perpetual?logo=rust&logoColor=white)](https://crates.io/crates/perpetual)
+[![R Version](https://img.shields.io/badge/R-1.0.0-blue?logo=r&logoColor=white)](https://github.com/perpetual-ml/perpetual/tree/main/package-r)
 [![Static Badge](https://img.shields.io/badge/join-discord-blue?logo=discord)](https://discord.gg/AyUK7rr6wy)
 ![PyPI - Downloads](https://img.shields.io/pypi/dm/perpetual)
 
