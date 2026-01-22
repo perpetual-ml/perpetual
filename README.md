@@ -123,4 +123,11 @@ PerpetualBooster prevents overfitting with a generalization algorithm. The paper
 
 ## Perpetual ML Suite
 
-Perpetual ML Suite is a data warehouse-native, batteries included ML platform where you can get the best predictive power in the shortest amount of time, easily track and compare all your model experiments, instantly deploy models for batch or real-time inference, effortlessly monitor your metrics, data drift, and concept drift, continuously learn from real-time data from a single, intuitive web interface that integrates directly with your existing data warehouse. It is [available on Snowflake marketplace](https://app.snowflake.com/marketplace/listing/GZSYZX0EMJ/perpetual-ml-perpetual-ml-suite), under development for Databricks with future plans to expand to other data warehousing solutions.
+The **Perpetual ML Suite** is a comprehensive, batteries-included ML platform designed to deliver maximum predictive power with minimal effort. It allows you to track experiments, monitor metrics, and manage model drift through an intuitive interface.
+
+For a fully managed, **serverless ML experience**, visit [app.perpetual-ml.com](https://app.perpetual-ml.com).
+
+- **Serverless Marimo Notebooks**: Run interactive, reactive notebooks without managing any infrastructure.
+- **Serverless ML Endpoints**: One-click deployment of models as production-ready endpoints for real-time inference.
+
+Perpetual is also designed to live where your data lives. It is available as a native application on the [Snowflake Marketplace](https://app.snowflake.com/marketplace/listing/GZSYZX0EMJ/perpetual-ml-perpetual-ml-suite), with support for Databricks and other major data warehouses coming soon.
