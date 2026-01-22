@@ -18,10 +18,11 @@ jobs:
         # The script also needs the general deps like pandas, scikit-learn.
         run: |
           pip install numpy pandas seaborn scikit-learn toml
-          cp README.md python-package/README.md
-          cp LICENSE python-package/LICENSE  
+          cp README.md package-python/README.md
+          cp LICENSE package-python/LICENSE  
+          cp LICENSE package-r/LICENSE
           mkdir -p resources # Ensure directory exists before make_resources.py runs
-          cd python-package
+          cd package-python
           python -m pip install -e .[dev]
           cd ..
       - name: Build test data (create resources)
@@ -59,12 +60,13 @@ jobs:
       - name: Install deps
         run: pip install numpy pandas seaborn scikit-learn toml
       - run: |
-          cp README.md python-package/README.md
-          cp LICENSE python-package/LICENSE
+          cp README.md package-python/README.md
+          cp LICENSE package-python/LICENSE
+          cp LICENSE package-r/LICENSE
       - name: Build test data (Install perpetual with its dev dependencies)
         # Note: The actual resource *generation* is skipped, but we still need the dev install
         run: |
-          cd python-package
+          cd package-python
           python -m pip install -e .[dev]
           cd ..
       - name: Build wheels with maturin
@@ -72,13 +74,13 @@ jobs:
         with:
           target: x86_64
           command: build
-          args: --release --strip --interpreter python --manifest-path python-package/Cargo.toml --out dist --sdist
+          args: --release --strip --interpreter python --manifest-path package-python/Cargo.toml --out dist --sdist
       - name: Install wheel
         run: pip install perpetual --no-index --find-links dist --no-deps --force-reinstall
       - name: Run Package Tests
         run: |
           pip install pytest pytest-cov black ruff setuptools typing-extensions --upgrade
-          cd python-package
+          cd package-python
           ruff check .
           black --check .
           pytest --cov-fail-under=90 tests
@@ -114,24 +116,25 @@ jobs:
       - name: Install deps
         run: pip install numpy pandas seaborn scikit-learn toml
       - run: |
-          cp README.md python-package/README.md
-          cp LICENSE python-package/LICENSE
+          cp README.md package-python/README.md
+          cp LICENSE package-python/LICENSE
+          cp LICENSE package-r/LICENSE
       - name: Build test data (Install perpetual with its dev dependencies)
         run: |
-          cd python-package
+          cd package-python
           python -m pip install -e .[dev]
           cd ..
       - name: Build wheels with maturin
         uses: PyO3/maturin-action@v1
         with:
           command: build
-          args: --release --strip --interpreter python --manifest-path python-package/Cargo.toml --out dist --sdist
+          args: --release --strip --interpreter python --manifest-path package-python/Cargo.toml --out dist --sdist
       - name: Install wheel
         run: pip install perpetual --no-index --find-links dist --no-deps --force-reinstall
       - name: Run Package Tests
         run: |
           pip install pytest pytest-cov black ruff setuptools typing-extensions --upgrade
-          cd python-package
+          cd package-python
           ruff check .
           black --check .
           pytest --cov-fail-under=90 tests
@@ -167,11 +170,12 @@ jobs:
       - name: Install deps
         run: pip install numpy pandas seaborn scikit-learn toml
       - run: |
-          cp README.md python-package/README.md
-          cp LICENSE python-package/LICENSE
+          cp README.md package-python/README.md
+          cp LICENSE package-python/LICENSE
+          cp LICENSE package-r/LICENSE
       - name: Build test data (Install perpetual with its dev dependencies)
         run: |
-          cd python-package
+          cd package-python
           python -m pip install -e .[dev]
           cd ..
       - name: Build wheels with maturin
@@ -180,13 +184,13 @@ jobs:
           target: x86_64
           manylinux: auto
           command: build
-          args: --release --strip --interpreter python${{ matrix.pyversion }} --manifest-path python-package/Cargo.toml --out dist --sdist
+          args: --release --strip --interpreter python${{ matrix.pyversion }} --manifest-path package-python/Cargo.toml --out dist --sdist
       - name: Install wheel
         run: pip install perpetual --no-index --find-links dist --no-deps --force-reinstall
       - name: Run Package Tests
         run: |
           pip install pytest pytest-cov black ruff setuptools typing-extensions --upgrade
-          cd python-package
+          cd package-python
           ruff check .
           black --check .
           pytest --cov-fail-under=90 tests
@@ -222,11 +226,12 @@ jobs:
       - name: Install deps
         run: pip install numpy pandas seaborn scikit-learn toml
       - run: |
-          cp README.md python-package/README.md
-          cp LICENSE python-package/LICENSE
+          cp README.md package-python/README.md
+          cp LICENSE package-python/LICENSE
+          cp LICENSE package-r/LICENSE
       - name: Build test data (Install perpetual with its dev dependencies)
         run: |
-          cd python-package
+          cd package-python
           python -m pip install -e .[dev]
           cd ..
       - name: Build wheels with maturin
@@ -234,13 +239,13 @@ jobs:
         with:
           manylinux: auto
           command: build
-          args: --release --strip --interpreter python${{ matrix.pyversion }} --manifest-path python-package/Cargo.toml --out dist --sdist
+          args: --release --strip --interpreter python${{ matrix.pyversion }} --manifest-path package-python/Cargo.toml --out dist --sdist
       - name: Install wheel
         run: pip install perpetual --no-index --find-links dist --no-deps --force-reinstall
       - name: Run Package Tests
         run: |
           pip install pytest pytest-cov black ruff setuptools typing-extensions --upgrade
-          cd python-package
+          cd package-python
           ruff check .
           black --check .
           pytest --cov-fail-under=90 tests
@@ -273,11 +278,12 @@ jobs:
       - name: Install deps
         run: pip install numpy pandas seaborn scikit-learn toml
       - run: |
-          cp README.md python-package/README.md
-          cp LICENSE python-package/LICENSE
+          cp README.md package-python/README.md
+          cp LICENSE package-python/LICENSE
+          cp LICENSE package-r/LICENSE
       - name: Build test data (Install perpetual with its dev dependencies)
         run: |
-          cd python-package
+          cd package-python
           python -m pip install -e .[dev]
           cd ..
       - name: Run tests

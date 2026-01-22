@@ -24,6 +24,7 @@ jobs:
       - run: |
           cp README.md package-python/README.md
           cp LICENSE package-python/LICENSE
+          cp LICENSE package-r/LICENSE
       - name: Run PGO Optimization
         shell: bash
         run: |
@@ -64,6 +65,7 @@ jobs:
       - run: |
           cp README.md package-python/README.md
           cp LICENSE package-python/LICENSE
+          cp LICENSE package-r/LICENSE
       - name: Run PGO Optimization
         shell: bash
         run: |
@@ -103,6 +105,7 @@ jobs:
       - run: |
           cp README.md package-python/README.md
           cp LICENSE package-python/LICENSE
+          cp LICENSE package-r/LICENSE
       - name: Run PGO Optimization
         shell: bash
         run: |
@@ -144,6 +147,7 @@ jobs:
       - run: |
           cp README.md package-python/README.md
           cp LICENSE package-python/LICENSE
+          cp LICENSE package-r/LICENSE
       - name: Run PGO Optimization
         shell: bash
         run: |
@@ -181,6 +185,7 @@ jobs:
       - run: |
           cp README.md package-python/README.md
           cp LICENSE package-python/LICENSE
+          cp LICENSE package-r/LICENSE
       - name: Publish Crate
         run: cargo publish --token ${CRATES_TOKEN} --allow-dirty
         env:

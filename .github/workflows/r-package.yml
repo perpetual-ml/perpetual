@@ -26,6 +26,9 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+      
+      - name: Copy LICENSE
+        run: cp LICENSE package-r/LICENSE
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
