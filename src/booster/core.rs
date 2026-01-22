@@ -26,14 +26,24 @@ use sysinfo::System;
 
 type ImportanceFn = fn(&Tree, &mut HashMap<usize, (f32, usize)>);
 
-/// Perpetual Booster object
+/// A self-generalizing Gradient Boosting Machine (GBM) with Perpetual Learning.
+///
+/// `PerpetualBooster` is the main object for training and prediction. It automatically
+/// finds the best configuration (learning rate, tree complexity, etc.) based on a single
+/// `budget` parameter.
 #[derive(Clone, Serialize, Deserialize)]
 pub struct PerpetualBooster {
+    /// Configuration for the booster.
     pub cfg: BoosterConfig,
+    /// The initial prediction value of the model.
     pub base_score: f64,
+    /// The global learning rate (eta) derived from the budget.
     pub eta: f32,
+    /// The collection of decision trees in the ensemble.
     pub trees: Vec<Tree>,
+    /// Calibration models for prediction intervals.
     pub cal_models: HashMap<String, [(PerpetualBooster, f64); 2]>,
+    /// Arbitrary metadata saved with the model.
     pub metadata: HashMap<String, String>,
 }
 
@@ -51,41 +61,30 @@ impl Default for PerpetualBooster {
 }
 
 impl PerpetualBooster {
-    /// Perpetual Booster object
+    /// Create a new `PerpetualBooster` instance.
     ///
-    /// * `objective` - The name of objective function used to optimize. Valid options are:
-    ///   "LogLoss" to use logistic loss as the objective function,
-    ///   "SquaredLoss" to use Squared Error as the objective function,
-    ///   "QuantileLoss" for quantile regression.
-    ///   "AdaptiveHuberLoss" for adaptive huber loss regression.
-    ///   "HuberLoss" for huber loss regression.
-    ///   "ListNetLoss" for listnet loss ranking.
-    ///   or a custom objective function that implements the ObjectiveFunction trait.
-    /// * `budget` - budget to fit the model.
-    /// * `base_score` - The initial_value prediction value of the model. If set to None, it will be calculated based on the objective function at fit time.
-    /// * `max_bin` - Number of bins to calculate to partition the data. Setting this to
-    ///   a smaller number, will result in faster training time, while potentially sacrificing
-    ///   accuracy. If there are more bins, than unique values in a column, all unique values
-    ///   will be used.
-    /// * `num_threads` - Number of threads to use during training
-    /// * `monotone_constraints` - Constraints that are used to enforce a specific relationship
-    ///   between the training features and the target variable.
-    /// * `force_children_to_bound_parent` - force_children_to_bound_parent.
-    /// * `missing` - Value to consider missing.
-    /// * `allow_missing_splits` - Should the algorithm allow splits that completed seperate out missing
-    ///   and non-missing values, in the case where `create_missing_branch` is false. When `create_missing_branch`
-    ///   is true, setting this to true will result in the missing branch being further split.
-    /// * `create_missing_branch` - Should missing be split out its own separate branch?
-    /// * `missing_node_treatment` - specify how missing nodes should be handled during training.
-    /// * `log_iterations` - Setting to a value (N) other than zero will result in information being logged about ever N iterations.
-    /// * `seed` - Integer value used to seed any randomness used in the algorithm.
-    /// * `quantile` - used only in quantile regression.
-    /// * `reset` - Reset the model or continue training.
-    /// * `categorical_features` - categorical features.
-    /// * `timeout` - fit timeout limit in seconds.
-    /// * `iteration_limit` - optional limit for the number of boosting rounds.
-    /// * `memory_limit` - optional limit for memory allocation.
-    /// * `stopping_rounds` - optional limit for auto stopping rounds.
+    /// # Arguments
+    /// * `objective` - Learning objective (e.g., LogLoss, SquaredLoss).
+    /// * `budget` - A positive number for fitting budget. Higher values result in more boosting rounds.
+    /// * `base_score` - Initial prediction value. If NaN, it's calculated from data.
+    /// * `max_bin` - Maximum number of bins for feature discretization.
+    /// * `num_threads` - Number of threads for parallel execution.
+    /// * `monotone_constraints` - Constraints to enforce monotonic relationships.
+    /// * `force_children_to_bound_parent` - Restrict child node weights to the parent range.
+    /// * `missing` - Value used to represent missing data.
+    /// * `allow_missing_splits` - Allow splits that isolate missing values.
+    /// * `create_missing_branch` - Create ternary trees with an explicit missing branch.
+    /// * `terminate_missing_features` - Features for which missing branches are always leaves.
+    /// * `missing_node_treatment` - Strategy for calculating missing node weights.
+    /// * `log_iterations` - Logging frequency (every N iterations).
+    /// * `seed` - Random seed for reproducibility.
+    /// * `quantile` - Target quantile for QuantileLoss.
+    /// * `reset` - Whether to reset or continue training on subsequent fit calls.
+    /// * `categorical_features` - Indices of features to treat as categorical.
+    /// * `timeout` - Time limit for fitting in seconds.
+    /// * `iteration_limit` - Maximum number of boosting rounds.
+    /// * `memory_limit` - Memory limit for the ensemble in GB.
+    /// * `stopping_rounds` - Early stopping rounds.
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         objective: Objective,
@@ -155,12 +154,13 @@ impl PerpetualBooster {
         self.trees = Vec::new();
     }
 
-    /// Fit the gradient booster on a provided dataset.
+    /// Fit the booster on a provided dataset.
     ///
-    /// * `data` -  Either a Polars or Pandas DataFrame, or a 2 dimensional Numpy array.
-    /// * `y` - Either a Polars or Pandas Series, or a 1 dimensional Numpy array.
-    /// * `sample_weight` - Instance weights to use when training the model.
-    /// * `group` - Group labels to use when training a model that uses a ranking objective.
+    /// # Arguments
+    /// * `data` - Feature matrix (row-major).
+    /// * `y` - Target vector.
+    /// * `sample_weight` - Optional per-sample weights.
+    /// * `group` - Optional group labels for ranking.
     pub fn fit(
         &mut self,
         data: &Matrix<f64>,
@@ -195,12 +195,13 @@ impl PerpetualBooster {
         Ok(())
     }
 
-    /// Fit the gradient booster on columnar data (zero-copy from Arrow/Polars).
+    /// Fit the booster on columnar data (zero-copy path).
     ///
-    /// * `data` - A ColumnarMatrix where each column is a separate slice.
-    /// * `y` - Either a Polars or Pandas Series, or a 1 dimensional Numpy array.
-    /// * `sample_weight` - Instance weights to use when training the model.
-    /// * `group` - Group labels to use when training a model that uses a ranking objective.
+    /// # Arguments
+    /// * `data` - Columnar feature matrix.
+    /// * `y` - Target vector.
+    /// * `sample_weight` - Optional per-sample weights.
+    /// * `group` - Optional group labels for ranking.
     pub fn fit_columnar(
         &mut self,
         data: &ColumnarMatrix<f64>,

@@ -68,107 +68,97 @@ class PerpetualBooster:
         max_bin: int = 256,
         max_cat: int = 1000,
     ):
-        """PerpetualBooster class, used to create gradient boosted decision tree ensembles.
+        """
+        Gradient Boosting Machine with Perpetual Learning.
 
-        Args:
-            objective (str, optional): Learning objective function to be used for optimization. Valid options are:
-                "LogLoss" to use logistic loss (classification),
-                "SquaredLoss" to use squared error (regression),
-                "QuantileLoss" to use quantile error (regression),
-                "HuberLoss" to use huber error (regression),
-                "AdaptiveHuberLoss" to use adaptive huber error (regression).
-                "ListNetLoss" to use ListNet loss (ranking).
-                custom objective in the form of (grad, hess, init)
-                where grad and hess are functions that take (y, pred, sample_weight, group) and return the gradient and hessian
-                init is a function that takes (y, sample_weight, group) and returns the initial prediction value.
-                Defaults to "LogLoss".
-            budget (float, optional): a positive number for fitting budget. Increasing this number will more
-                likely result in more boosting rounds and more increased predictive power.
-                Default value is 0.5.
-            num_threads (int, optional): Number of threads to be used during training.
-            monotone_constraints (Dict[Any, int], optional): Constraints that are used to enforce a
-                specific relationship between the training features and the target variable. A dictionary
-                should be provided where the keys are the feature index value if the model will be fit on
-                a numpy array, or a feature name if it will be fit on a Dataframe. The values of
-                the dictionary should be an integer value of -1, 1, or 0 to specify the relationship
-                that should be estimated between the respective feature and the target variable.
-                Use a value of -1 to enforce a negative relationship, 1 a positive relationship,
-                and 0 will enforce no specific relationship at all. Features not included in the
-                mapping will not have any constraint applied. If `None` is passed, no constraints
-                will be enforced on any variable. Defaults to `None`.
-            force_children_to_bound_parent (bool, optional): Setting this parameter to `True` will restrict children nodes, so that they always contain the parent node inside of their range. Without setting this it's possible that both, the left and the right nodes could be greater, than or less than, the parent node. Defaults to `False`.
-            missing (float, optional): Value to consider missing, when training and predicting
-                with the booster. Defaults to `np.nan`.
-            allow_missing_splits (bool, optional): Allow for splits to be made such that all missing values go
-                down one branch, and all non-missing values go down the other, if this results
-                in the greatest reduction of loss. If this is false, splits will only be made on non
-                missing values. If `create_missing_branch` is set to `True` having this parameter be
-                set to `True` will result in the missing branch further split, if this parameter
-                is `False` then in that case the missing branch will always be a terminal node.
-                Defaults to `True`.
-            create_missing_branch (bool, optional): An experimental parameter, that if `True`, will
-                create a separate branch for missing, creating a ternary tree, the missing node will be given the same
-                weight value as the parent node. If this parameter is `False`, missing will be sent
-                down either the left or right branch, creating a binary tree. Defaults to `False`.
-            terminate_missing_features (Set[Any], optional): An optional iterable of features
-                (either strings, or integer values specifying the feature indices if numpy arrays are used for fitting),
-                for which the missing node will always be terminated, even if `allow_missing_splits` is set to true.
-                This value is only valid if `create_missing_branch` is also True.
-            missing_node_treatment (str, optional): Method for selecting the `weight` for the missing node, if `create_missing_branch` is set to `True`. Defaults to "None". Valid options are:
-                - "None": Calculate missing node weight values without any constraints.
-                - "AssignToParent": Assign the weight of the missing node to that of the parent.
-                - "AverageLeafWeight": After training each tree, starting from the bottom of the tree, assign the missing node weight to the weighted average of the left and right child nodes. Next assign the parent to the weighted average of the children nodes. This is performed recursively up through the entire tree. This is performed as a post processing step on each tree after it is built, and prior to updating the predictions for which to train the next tree.
-                - "AverageNodeWeight": Set the missing node to be equal to the weighted average weight of the left and the right nodes.
-            log_iterations (int, optional): Setting to a value (N) other than zero will result in information being logged about ever N iterations, info can be interacted with directly with the python [`logging`](https://docs.python.org/3/howto/logging.html) module. For an example of how to utilize the logging information see the example [here](/#logging-output).
-            feature_importance_method (str, optional): The feature importance method type that will be used to calculate the `feature_importances_` attribute on the booster.
-            quantile (float, optional): only used in quantile regression.
-            reset (bool, optional): whether to reset the model or continue training.
-            categorical_features (Union[Iterable[int], Iterable[str], str, None], optional): The names or indices for categorical features.
-                Defaults to `auto` for Polars or Pandas categorical data types.
-            timeout (float, optional): optional fit timeout in seconds
-            iteration_limit (int, optional): optional limit for the number of boosting rounds. The default value is 1000 boosting rounds.
-                The algorithm automatically stops for most of the cases before hitting this limit.
-                If you want to experiment with very high budget (>2.0), you can also increase this limit.
-            memory_limit (float, optional): optional limit for memory allocation in GB. If not set, the memory will be allocated based on
-                available memory and the algorithm requirements.
-            stopping_rounds (int, optional): optional limit for auto stopping.
-            max_bin (int, optional): maximum number of bins for feature discretization. Defaults to 256.
-            max_cat (int, optional): Maximum number of unique categories for a categorical feature.
-                Features with more categories will be treated as numerical.
-                Defaults to 1000.
+        A self-generalizing gradient boosting machine that doesn't need hyperparameter optimization.
+        It automatically finds the best configuration based on the provided budget.
 
-        Raises:
-            TypeError: Raised if an invalid dtype is passed.
+        Parameters
+        ----------
+        objective : str or tuple, default="LogLoss"
+            Learning objective function to be used for optimization. Valid options are:
 
-        Example:
-            Once, the booster has been initialized, it can be fit on a provided dataset, and performance field. After fitting, the model can be used to predict on a dataset.
-            In the case of this example, the predictions are the log odds of a given record being 1.
+            - "LogLoss": logistic loss for binary classification.
+            - "SquaredLoss": squared error for regression.
+            - "QuantileLoss": quantile error for quantile regression.
+            - "HuberLoss": Huber loss for robust regression.
+            - "AdaptiveHuberLoss": adaptive Huber loss for robust regression.
+            - "ListNetLoss": ListNet loss for ranking.
+            - custom objective: a tuple of (grad, hess, init) functions.
 
-            ```python
-            # Small example dataset
-            from seaborn import load_dataset
+        budget : float, default=0.5
+            A positive number for fitting budget. Increasing this number will more likely result
+            in more boosting rounds and increased predictive power.
+        num_threads : int, optional
+            Number of threads to be used during training and prediction.
+        monotone_constraints : dict, optional
+            Constraints to enforce a specific relationship between features and target.
+            Keys are feature indices or names, values are -1, 1, or 0.
+        force_children_to_bound_parent : bool, default=False
+            Whether to restrict children nodes to be within the parent's range.
+        missing : float, default=np.nan
+            Value to consider as missing data.
+        allow_missing_splits : bool, default=True
+            Whether to allow splits that separate missing from non-missing values.
+        create_missing_branch : bool, default=False
+            Whether to create a separate branch for missing values (ternary trees).
+        terminate_missing_features : iterable, optional
+            Features for which missing branches will always be terminated if
+            ``create_missing_branch`` is True.
+        missing_node_treatment : str, default="None"
+            How to handle weights for missing nodes if ``create_missing_branch`` is True.
+            Options: "None", "AssignToParent", "AverageLeafWeight", "AverageNodeWeight".
+        log_iterations : int, default=0
+            Logging frequency (every N iterations). 0 disables logging.
+        feature_importance_method : str, default="Gain"
+            Method for calculating feature importance. Options: "Gain", "Weight", "Cover",
+            "TotalGain", "TotalCover".
+        quantile : float, optional
+            Target quantile for quantile regression (objective="QuantileLoss").
+        reset : bool, optional
+            Whether to reset the model or continue training on subsequent calls to fit.
+        categorical_features : str or iterable, default="auto"
+            Feature indices or names to treat as categorical.
+        timeout : float, optional
+            Time limit for fitting in seconds.
+        iteration_limit : int, optional
+            Maximum number of boosting iterations.
+        memory_limit : float, optional
+            Memory limit for training in GB.
+        stopping_rounds : int, optional
+            Early stopping rounds.
+        max_bin : int, default=256
+            Maximum number of bins for feature discretization.
+        max_cat : int, default=1000
+            Maximum unique categories before a feature is treated as numerical.
 
-            df = load_dataset("titanic")
-            X = df.select_dtypes("number").drop(columns=["survived"])
-            y = df["survived"]
+        Attributes
+        ----------
+        feature_names_in_ : list of str
+            Names of features seen during :meth:`fit`.
+        n_features_ : int
+            Number of features seen during :meth:`fit`.
+        classes_ : list
+            Class labels for classification tasks.
+        feature_importances_ : ndarray of shape (n_features,)
+            Feature importances calculated via ``feature_importance_method``.
 
-            # Initialize a booster with defaults.
-            from perpetual import PerpetualBooster
-            model = PerpetualBooster(objective="LogLoss")
-            model.fit(X, y)
+        See Also
+        --------
+        perpetual.sklearn.PerpetualClassifier : Scikit-learn compatible classifier.
+        perpetual.sklearn.PerpetualRegressor : Scikit-learn compatible regressor.
 
-            # Predict on data
-            model.predict(X.head())
-            # array([-1.94919663,  2.25863229,  0.32963671,  2.48732194, -3.00371813])
+        Examples
+        --------
+        Basic usage for binary classification:
 
-            # predict contributions
-            model.predict_contributions(X.head())
-            # array([[-0.63014213,  0.33880048, -0.16520798, -0.07798772, -0.85083578,
-            #        -1.07720813],
-            #       [ 1.05406709,  0.08825999,  0.21662544, -0.12083538,  0.35209258,
-            #        -1.07720813],
-            ```
-
+        >>> from perpetual import PerpetualBooster
+        >>> from sklearn.datasets import make_classification
+        >>> X, y = make_classification(n_samples=1000, n_features=20)
+        >>> model = PerpetualBooster(objective="LogLoss")
+        >>> model.fit(X, y)
+        >>> preds = model.predict(X[:5])
         """
 
         terminate_missing_features_ = (
@@ -236,18 +226,25 @@ class PerpetualBooster:
         self.booster = cast(BoosterType, booster)
 
     def fit(self, X, y, sample_weight=None, group=None) -> Self:
-        """Fit the gradient booster on a provided dataset.
+        """
+        Fit the gradient booster on a provided dataset.
 
-        Args:
-            X (FrameLike): Either a Polars or Pandas DataFrame, or a 2 dimensional Numpy array.
-            y (Union[FrameLike, ArrayLike]): Either a Polars or Pandas DataFrame or Series,
-                or a 1 or 2 dimensional Numpy array.
-            sample_weight (Union[ArrayLike, None], optional): Instance weights to use when
-                training the model. If None is passed, a weight of 1 will be used for every record.
-                Defaults to None.
-            group (Union[ArrayLike, None], optional): Group lengths to use for a ranking objective.
-                If None is passes, all items are assumed to be in the same group.
-                Defaults to None.
+        Parameters
+        ----------
+        X : array-like of shape (n_samples, n_features)
+            Training data. Can be a Polars or Pandas DataFrame, or a 2D Numpy array.
+            Polars DataFrames use a zero-copy columnar path for efficiency.
+        y : array-like of shape (n_samples,) or (n_samples, n_targets)
+            Target values.
+        sample_weight : array-like of shape (n_samples,), optional
+            Individual weights for each sample. If None, all samples are weighted equally.
+        group : array-like, optional
+            Group labels for ranking objectives.
+
+        Returns
+        -------
+        self : object
+            Returns self.
         """
 
         # Check if input is a Polars DataFrame for zero-copy columnar path
@@ -385,18 +382,27 @@ class PerpetualBooster:
         return self
 
     def prune(self, X, y, sample_weight=None, group=None) -> Self:
-        """Prune the gradient booster on a provided dataset.
+        """
+        Prune the gradient booster on a provided dataset.
 
-        Args:
-            X (FrameLike): Either a Polars or Pandas DataFrame, or a 2 dimensional Numpy array.
-            y (Union[FrameLike, ArrayLike]): Either a Polars or Pandas DataFrame or Series,
-                or a 1 or 2 dimensional Numpy array.
-            sample_weight (Union[ArrayLike, None], optional): Instance weights to use when
-                training the model. If None is passed, a weight of 1 will be used for every record.
-                Defaults to None.
-            group (Union[ArrayLike, None], optional): Group lengths to use for a ranking objective.
-                If None is passes, all items are assumed to be in the same group.
-                Defaults to None.
+        This removes nodes that do not contribute to a reduction in loss on the provided
+        validation set.
+
+        Parameters
+        ----------
+        X : array-like of shape (n_samples, n_features)
+            Validation data.
+        y : array-like of shape (n_samples,)
+            Validation targets.
+        sample_weight : array-like of shape (n_samples,), optional
+            Weights for validation samples.
+        group : array-like, optional
+            Group labels for ranking objectives.
+
+        Returns
+        -------
+        self : object
+            Returns self.
         """
 
         _, flat_data, rows, cols = transform_input_frame(X, self.cat_mapping)
@@ -427,24 +433,33 @@ class PerpetualBooster:
     def calibrate(
         self, X_train, y_train, X_cal, y_cal, alpha, sample_weight=None, group=None
     ) -> Self:
-        """Calibrate the gradient booster on a provided dataset.
+        """
+        Calibrate the gradient booster for prediction intervals.
 
-        Args:
-            X_train (FrameLike): Either a Polars or Pandas DataFrame, or a 2 dimensional Numpy array.
-            y_train (Union[FrameLike, ArrayLike]): Either a Polars or Pandas DataFrame or Series,
-                or a 1 or 2 dimensional Numpy array.
-            X_cal (FrameLike): Either a Polars or Pandas DataFrame, or a 2 dimensional Numpy array.
-            y_cal (Union[FrameLike, ArrayLike]): Either a Polars or Pandas DataFrame or Series,
-                or a 1 or 2 dimensional Numpy array.
-            alpha (ArrayLike): Between 0 and 1, represents the uncertainty of the confidence interval.
-                Lower alpha produce larger (more conservative) prediction intervals.
-                alpha is the complement of the target coverage level.
-            sample_weight (Union[ArrayLike, None], optional): Instance weights to use when
-                training the model. If None is passed, a weight of 1 will be used for every record.
-                Defaults to None.
-            group (Union[ArrayLike, None], optional): Group lengths to use for a ranking objective.
-                If None is passes, all items are assumed to be in the same group.
-                Defaults to None.
+        Uses the provided training and calibration sets to compute scaling factors
+        for intervals.
+
+        Parameters
+        ----------
+        X_train : array-like
+            Data used to train the base model.
+        y_train : array-like
+            Targets for training data.
+        X_cal : array-like
+            Independent calibration dataset.
+        y_cal : array-like
+            Targets for calibration data.
+        alpha : float or array-like
+            Significance level(s) for the intervals (1 - coverage).
+        sample_weight : array-like, optional
+            Sample weights.
+        group : array-like, optional
+            Group labels.
+
+        Returns
+        -------
+        self : object
+            Returns self.
         """
 
         is_polars = type_df(X_train) == "polars_df"
@@ -518,17 +533,20 @@ class PerpetualBooster:
                     )
 
     def predict_intervals(self, X, parallel: Union[bool, None] = None) -> dict:
-        """Predict intervals with the fitted booster on new data.
+        """
+        Predict intervals with the fitted booster on new data.
 
-        Args:
-            X (FrameLike): Either a Polars or Pandas DataFrame, or a 2 dimensional Numpy array.
-            parallel (Union[bool, None], optional): Optionally specify if the predict
-                function should run in parallel on multiple threads. If `None` is
-                passed, the `parallel` attribute of the booster will be used.
-                Defaults to `None`.
+        Parameters
+        ----------
+        X : array-like of shape (n_samples, n_features)
+            New data for prediction.
+        parallel : bool, optional
+            Whether to run prediction in parallel. If None, uses class default.
 
-        Returns:
-            np.ndarray: Returns a numpy array of the predictions.
+        Returns
+        -------
+        intervals : dict
+            A dictionary containing lower and upper bounds for the specified alpha levels.
         """
         is_polars = type_df(X) == "polars_df"
         if is_polars:
@@ -551,17 +569,20 @@ class PerpetualBooster:
         )
 
     def predict(self, X, parallel: Union[bool, None] = None) -> np.ndarray:
-        """Predict with the fitted booster on new data.
+        """
+        Predict with the fitted booster on new data.
 
-        Args:
-            X (FrameLike): Either a Polars or Pandas DataFrame, or a 2 dimensional Numpy array.
-            parallel (Union[bool, None], optional): Optionally specify if the predict
-                function should run in parallel on multiple threads. If `None` is
-                passed, the `parallel` attribute of the booster will be used.
-                Defaults to `None`.
+        Parameters
+        ----------
+        X : array-like of shape (n_samples, n_features)
+            Input features.
+        parallel : bool, optional
+            Whether to run prediction in parallel.
 
-        Returns:
-            np.ndarray: Returns a numpy array of the predictions.
+        Returns
+        -------
+        predictions : ndarray of shape (n_samples,)
+            The predicted values (log-odds for classification, raw values for regression).
         """
         is_polars = type_df(X) == "polars_df"
         if is_polars:
@@ -608,17 +629,22 @@ class PerpetualBooster:
             return np.array([self.classes_[i] for i in indices])
 
     def predict_proba(self, X, parallel: Union[bool, None] = None) -> np.ndarray:
-        """Predict probabilities with the fitted booster on new data.
+        """
+        Predict class probabilities with the fitted booster on new data.
 
-        Args:
-            X (FrameLike): Either a Polars or Pandas DataFrame, or a 2 dimensional Numpy array.
-            parallel (Union[bool, None], optional): Optionally specify if the predict
-                function should run in parallel on multiple threads. If `None` is
-                passed, the `parallel` attribute of the booster will be used.
-                Defaults to `None`.
+        Only valid for classification tasks.
 
-        Returns:
-            np.ndarray, shape (n_samples, n_classes): Returns a numpy array of the class probabilities.
+        Parameters
+        ----------
+        X : array-like of shape (n_samples, n_features)
+            Input features.
+        parallel : bool, optional
+            Whether to run prediction in parallel.
+
+        Returns
+        -------
+        probabilities : ndarray of shape (n_samples, n_classes)
+            The class probabilities.
         """
         is_polars = type_df(X) == "polars_df"
         if is_polars:
@@ -661,17 +687,22 @@ class PerpetualBooster:
             return np.ones((rows, 1))
 
     def predict_log_proba(self, X, parallel: Union[bool, None] = None) -> np.ndarray:
-        """Predict class log-probabilities with the fitted booster on new data.
+        """
+        Predict class log-probabilities with the fitted booster on new data.
 
-        Args:
-            X (FrameLike): Either a Polars or Pandas DataFrame, or a 2 dimensional Numpy array.
-            parallel (Union[bool, None], optional): Optionally specify if the predict
-                function should run in parallel on multiple threads. If `None` is
-                passed, the `parallel` attribute of the booster will be used.
-                Defaults to `None`.
+        Only valid for classification tasks.
 
-        Returns:
-            np.ndarray: Returns a numpy array of the predictions.
+        Parameters
+        ----------
+        X : array-like of shape (n_samples, n_features)
+            Input features.
+        parallel : bool, optional
+            Whether to run prediction in parallel.
+
+        Returns
+        -------
+        log_probabilities : ndarray of shape (n_samples, n_classes)
+            The log-probabilities of each class.
         """
         is_polars = type_df(X) == "polars_df"
         if is_polars:
@@ -713,17 +744,21 @@ class PerpetualBooster:
             return np.ones((rows, 1))
 
     def predict_nodes(self, X, parallel: Union[bool, None] = None) -> List:
-        """Predict nodes with the fitted booster on new data.
+        """
+        Predict leaf node indices with the fitted booster on new data.
 
-        Args:
-            X (FrameLike): Either a Polars or Pandas DataFrame, or a 2 dimensional Numpy array.
-            parallel (Union[bool, None], optional): Optionally specify if the predict
-                function should run in parallel on multiple threads. If `None` is
-                passed, the `parallel` attribute of the booster will be used.
-                Defaults to `None`.
+        Parameters
+        ----------
+        X : array-like of shape (n_samples, n_features)
+            Input features.
+        parallel : bool, optional
+            Whether to run prediction in parallel.
 
-        Returns:
-            List: Returns a list of node predictions.
+        Returns
+        -------
+        node_indices : list of ndarray
+            A list where each element corresponds to a tree and contains node indices
+            for each sample.
         """
         is_polars = type_df(X) == "polars_df"
         if is_polars:
@@ -757,28 +792,32 @@ class PerpetualBooster:
     def predict_contributions(
         self, X, method: str = "Average", parallel: Union[bool, None] = None
     ) -> np.ndarray:
-        """Predict with the fitted booster on new data, returning the feature
-        contribution matrix. The last column is the bias term.
+        """
+        Predict feature contributions (SHAP-like values) for new data.
 
+        Parameters
+        ----------
+        X : array-like of shape (n_samples, n_features)
+            Input features.
+        method : str, default="Average"
+            Method to calculate contributions. Options:
 
-        Args:
-            X (FrameLike): Either a pandas DataFrame, or a 2 dimensional numpy array.
-            method (str, optional): Method to calculate the contributions, available options are:
+            - "Average": Internal node averages.
+            - "Shapley": Exact tree SHAP values.
+            - "Weight": Saabas-style leaf weights.
+            - "BranchDifference": Difference between chosen and other branch.
+            - "MidpointDifference": Weighted difference between branches.
+            - "ModeDifference": Difference from the most frequent node.
+            - "ProbabilityChange": Change in probability (LogLoss only).
 
-                - "Average": If this option is specified, the average internal node values are calculated.
-                - "Shapley": Using this option will calculate contributions using the tree shap algorithm.
-                - "Weight": This method will use the internal leaf weights, to calculate the contributions. This is the same as what is described by Saabas [here](https://blog.datadive.net/interpreting-random-forests/).
-                - "BranchDifference": This method will calculate contributions by subtracting the weight of the node the record will travel down by the weight of the other non-missing branch. This method does not have the property where the contributions summed is equal to the final prediction of the model.
-                - "MidpointDifference": This method will calculate contributions by subtracting the weight of the node the record will travel down by the mid-point between the right and left node weighted by the cover of each node. This method does not have the property where the contributions summed is equal to the final prediction of the model.
-                - "ModeDifference": This method will calculate contributions by subtracting the weight of the node the record will travel down by the weight of the node with the largest cover (the mode node). This method does not have the property where the contributions summed is equal to the final prediction of the model.
-                - "ProbabilityChange": This method is only valid when the objective type is set to "LogLoss". This method will calculate contributions as the change in a records probability of being 1 moving from a parent node to a child node. The sum of the returned contributions matrix, will be equal to the probability a record will be 1. For example, given a model, `model.predict_contributions(X, method="ProbabilityChange") == 1 / (1 + np.exp(-model.predict(X)))`
-            parallel (Union[bool, None], optional): Optionally specify if the predict
-                function should run in parallel on multiple threads. If `None` is
-                passed, the `parallel` attribute of the booster will be used.
-                Defaults to `None`.
+        parallel : bool, optional
+            Whether to run prediction in parallel.
 
-        Returns:
-            np.ndarray: Returns a numpy array of the predictions.
+        Returns
+        -------
+        contributions : ndarray of shape (n_samples, n_features + 1)
+            The contribution of each feature to the prediction. The last column
+            is the bias term.
         """
         is_polars = type_df(X) == "polars_df"
         if is_polars:
@@ -822,69 +861,37 @@ class PerpetualBooster:
         exclude_missing: bool = True,
         percentile_bounds: Tuple[float, float] = (0.2, 0.98),
     ) -> np.ndarray:
-        """Calculate the partial dependence values of a feature. For each unique
-        value of the feature, this gives the estimate of the predicted value for that
-        feature, with the effects of all features averaged out. This information gives
-        an estimate of how a given feature impacts the model.
+        """
+        Calculate the partial dependence values of a feature.
 
-        Args:
-            X (FrameLike): Either a pandas DataFrame, or a 2 dimensional numpy array.
-                This should be the same data passed into the models fit, or predict,
-                with the columns in the same order.
-            feature (Union[str, int]): The feature for which to calculate the partial
-                dependence values. This can be the name of a column, if the provided
-                X is a pandas DataFrame, or the index of the feature.
-            samples (Optional[int]): Number of evenly spaced samples to select. If None
-                is passed all unique values will be used. Defaults to 100.
-            exclude_missing (bool, optional): Should missing excluded from the features? Defaults to True.
-            percentile_bounds (Tuple[float, float], optional): Upper and lower percentiles to start at
-                when calculating the samples. Defaults to (0.2, 0.98) to cap the samples selected
-                at the 5th and 95th percentiles respectively.
+        For each unique value of the feature, this gives the estimate of the predicted
+        value for that feature, with the effects of all other features averaged out.
 
-        Raises:
-            ValueError: An error will be raised if the provided X parameter is not a
-                pandas DataFrame, and a string is provided for the feature.
+        Parameters
+        ----------
+        X : array-like
+            Data used to calculate partial dependence. Should be the same format
+            as passed to :meth:`fit`.
+        feature : str or int
+            The feature for which to calculate partial dependence.
+        samples : int, optional, default=100
+            Number of evenly spaced samples to select. If None, all unique values are used.
+        exclude_missing : bool, optional, default=True
+            Whether to exclude missing values from the calculation.
+        percentile_bounds : tuple of float, optional, default=(0.2, 0.98)
+            Lower and upper percentiles for sample selection.
 
-        Returns:
-            np.ndarray: A 2 dimensional numpy array, where the first column is the
-                sorted unique values of the feature, and then the second column
-                is the partial dependence values for each feature value.
+        Returns
+        -------
+        pd_values : ndarray of shape (n_samples, 2)
+            The first column contains the feature values, and the second column
+            contains the partial dependence values.
 
-        Example:
-            This information can be plotted to visualize how a feature is used in the model, like so.
-
-            ```python
-            from seaborn import lineplot
-            import matplotlib.pyplot as plt
-
-            pd_values = model.partial_dependence(X=X, feature="age", samples=None)
-
-            fig = lineplot(x=pd_values[:,0], y=pd_values[:,1],)
-            plt.title("Partial Dependence Plot")
-            plt.xlabel("Age")
-            plt.ylabel("Log Odds")
-            ```
-            <img  height="340" src="https://github.com/jinlow/forust/raw/main/resources/pdp_plot_age.png">
-
-            We can see how this is impacted if a model is created, where a specific constraint is applied to the feature using the `monotone_constraint` parameter.
-
-            ```python
-            model = PerpetualBooster(
-                objective="LogLoss",
-                monotone_constraints={"age": -1},
-            )
-            model.fit(X, y)
-
-            pd_values = model.partial_dependence(X=X, feature="age")
-            fig = lineplot(
-                x=pd_values[:, 0],
-                y=pd_values[:, 1],
-            )
-            plt.title("Partial Dependence Plot with Monotonicity")
-            plt.xlabel("Age")
-            plt.ylabel("Log Odds")
-            ```
-            <img  height="340" src="https://github.com/jinlow/forust/raw/main/resources/pdp_plot_age_mono.png">
+        Examples
+        --------
+        >>> import matplotlib.pyplot as plt
+        >>> pd_values = model.partial_dependence(X, feature="age")
+        >>> plt.plot(pd_values[:, 0], pd_values[:, 1])
         """
         if isinstance(feature, str):
             is_polars = type_df(X) == "polars_df"
@@ -944,32 +951,27 @@ class PerpetualBooster:
     def calculate_feature_importance(
         self, method: str = "Gain", normalize: bool = True
     ) -> Union[Dict[int, float], Dict[str, float]]:
-        """Feature importance values can be calculated with the `calculate_feature_importance` method. This function will return a dictionary of the features and their importance values. It should be noted that if a feature was never used for splitting it will not be returned in importance dictionary.
+        """
+        Calculate feature importance for the model.
 
-        Args:
-            method (str, optional): Variable importance method. Defaults to "Gain". Valid options are:
+        Parameters
+        ----------
+        method : str, optional, default="Gain"
+            Importance method. Options:
 
-                - "Weight": The number of times a feature is used to split the data across all trees.
-                - "Gain": The average split gain across all splits the feature is used in.
-                - "Cover": The average coverage across all splits the feature is used in.
-                - "TotalGain": The total gain across all splits the feature is used in.
-                - "TotalCover": The total coverage across all splits the feature is used in.
-            normalize (bool, optional): Should the importance be normalized to sum to 1? Defaults to `True`.
+            - "Weight": Number of times a feature is used in splits.
+            - "Gain": Average improvement in loss brought by a feature.
+            - "Cover": Average number of samples affected by splits on a feature.
+            - "TotalGain": Total improvement in loss brought by a feature.
+            - "TotalCover": Total number of samples affected by splits on a feature.
 
-        Returns:
-            Dict[str, float]: Variable importance values, for features present in the model.
+        normalize : bool, optional, default=True
+            Whether to normalize importance scores to sum to 1.
 
-        Example:
-            ```python
-            model.calculate_feature_importance("Gain")
-            # {
-            #   'parch': 0.0713072270154953,
-            #   'age': 0.11609109491109848,
-            #   'sibsp': 0.1486879289150238,
-            #   'fare': 0.14309120178222656,
-            #   'pclass': 0.5208225250244141
-            # }
-            ```
+        Returns
+        -------
+        importance : dict
+            A dictionary mapping feature names (or indices) to importance scores.
         """
         importance_: Dict[int, float] = self.booster.calculate_feature_importance(
             method=method,
@@ -983,41 +985,41 @@ class PerpetualBooster:
         return importance_
 
     def text_dump(self) -> List[str]:
-        """Return all of the trees of the model in text form.
+        """
+        Return the booster model in a human-readable text format.
 
-        Returns:
-            List[str]: A list of strings, where each string is a text representation
-                of the tree.
-        Example:
-            ```python
-            model.text_dump()[0]
-            # 0:[0 < 3] yes=1,no=2,missing=2,gain=91.50833,cover=209.388307
-            #       1:[4 < 13.7917] yes=3,no=4,missing=4,gain=28.185467,cover=94.00148
-            #             3:[1 < 18] yes=7,no=8,missing=8,gain=1.4576768,cover=22.090348
-            #                   7:[1 < 17] yes=15,no=16,missing=16,gain=0.691266,cover=0.705011
-            #                         15:leaf=-0.15120,cover=0.23500
-            #                         16:leaf=0.154097,cover=0.470007
-            ```
+        Returns
+        -------
+        dump : list of str
+            A list where each string represents a tree in the ensemble.
         """
         return self.booster.text_dump()
 
     def json_dump(self) -> str:
-        """Return the booster object as a string.
+        """
+        Return the booster model in JSON format.
 
-        Returns:
-            str: The booster dumped as a json object in string form.
+        Returns
+        -------
+        dump : str
+            The JSON representation of the model.
         """
         return self.booster.json_dump()
 
     @classmethod
     def load_booster(cls, path: str) -> Self:
-        """Load a booster object that was saved with the `save_booster` method.
+        """
+        Load a booster model from a file.
 
-        Args:
-            path (str): Path to the saved booster file.
+        Parameters
+        ----------
+        path : str
+            Path to the saved booster (JSON format).
 
-        Returns:
-            PerpetualBooster: An initialized booster object.
+        Returns
+        -------
+        model : PerpetualBooster
+            The loaded booster object.
         """
         try:
             booster = CratePerpetualBooster.load_booster(str(path))
@@ -1048,10 +1050,15 @@ class PerpetualBooster:
         return c
 
     def save_booster(self, path: str):
-        """Save a booster object, the underlying representation is a json file.
+        """
+        Save the booster model to a file.
 
-        Args:
-            path (str): Path to save the booster object.
+        The model is saved in a JSON-based format.
+
+        Parameters
+        ----------
+        path : str
+            Path where the model will be saved.
         """
         self.booster.save_booster(str(path))
 
@@ -1076,22 +1083,33 @@ class PerpetualBooster:
             return set(feature_map[f] for f in self.terminate_missing_features)
 
     def insert_metadata(self, key: str, value: str):
-        """Insert data into the models metadata, this will be saved on the booster object.
+        """
+        Insert metadata into the model.
 
-        Args:
-            key (str): Key to give the inserted value in the metadata.
-            value (str): String value to assign to the key.
-        """  # noqa: E501
+        Metadata is saved alongside the model and can be retrieved later.
+
+        Parameters
+        ----------
+        key : str
+            The key for the metadata item.
+        value : str
+            The value for the metadata item.
+        """
         self.booster.insert_metadata(key=key, value=value)
 
     def get_metadata(self, key: str) -> str:
-        """Get the value associated with a given key, on the boosters metadata.
+        """
+        Get metadata associated with a given key.
 
-        Args:
-            key (str): Key of item in metadata.
+        Parameters
+        ----------
+        key : str
+            The key to look up in the metadata.
 
-        Returns:
-            str: Value associated with the provided key in the boosters metadata.
+        Returns
+        -------
+        value : str
+            The value associated with the key.
         """
         v = self.booster.get_metadata(key=key)
         return v
@@ -1106,19 +1124,25 @@ class PerpetualBooster:
 
     @property
     def base_score(self) -> Union[float, Iterable[float]]:
-        """Base score of the model.
+        """
+        The base score(s) of the model.
 
-        Returns:
-            Union[float, Iterable[float]]: Base score(s) of the model.
+        Returns
+        -------
+        score : float or iterable of float
+            The initial prediction value(s) of the model.
         """
         return self.booster.base_score
 
     @property
     def number_of_trees(self) -> Union[int, Iterable[int]]:
-        """The number of trees in the model.
+        """
+        The number of trees in the ensemble.
 
-        Returns:
-            int: The total number of trees in the model.
+        Returns
+        -------
+        n_trees : int or iterable of int
+            Total number of trees.
         """
         return self.booster.number_of_trees
 
@@ -1153,22 +1177,35 @@ class PerpetualBooster:
     # Functions for scikit-learn compatibility, will feel out adding these manually,
     # and then if that feels too unwieldy will add scikit-learn as a dependency.
     def get_params(self, deep=True) -> Dict[str, Any]:
-        """Get all of the parameters for the booster.
+        """
+        Get parameters for this booster.
 
-        Args:
-            deep (bool, optional): This argument does nothing, and is simply here for scikit-learn compatibility.. Defaults to True.
+        Parameters
+        ----------
+        deep : bool, default=True
+            Currently ignored, exists for scikit-learn compatibility.
 
-        Returns:
-            Dict[str, Any]: The parameters of the booster.
+        Returns
+        -------
+        params : dict
+            Parameter names mapped to their values.
         """
         args = inspect.getfullargspec(PerpetualBooster).kwonlyargs
         return {param: getattr(self, param) for param in args}
 
     def set_params(self, **params: Any) -> Self:
-        """Set the parameters of the booster, this has the same effect as reinstating the booster.
+        """
+        Set parameters for this booster.
 
-        Returns:
-            PerpetualBooster: Booster with new parameters.
+        Parameters
+        ----------
+        **params : dict
+            Booster parameters.
+
+        Returns
+        -------
+        self : object
+            Returns self.
         """
         old_params = self.get_params()
         old_params.update(params)
@@ -1176,31 +1213,18 @@ class PerpetualBooster:
         return self
 
     def get_node_lists(self, map_features_names: bool = True) -> List[List[Node]]:
-        """Return the tree structures representation as a list of python objects.
+        """
+        Return tree structures as lists of node objects.
 
-        Args:
-            map_features_names (bool, optional): Should the feature names tried to be mapped to a string, if a pandas dataframe was used. Defaults to True.
+        Parameters
+        ----------
+        map_features_names : bool, default=True
+            Whether to use feature names instead of indices.
 
-        Returns:
-            List[List[Node]]: A list of lists where each sub list is a tree, with all of it's respective nodes.
-
-        Example:
-            This can be run directly to get the tree structure as python objects.
-
-            ```python
-            model = PerpetualBooster()
-            model.fit(X, y)
-
-            model.get_node_lists()[0]
-
-            # [Node(num=0, weight_value...,
-            # Node(num=1, weight_value...,
-            # Node(num=2, weight_value...,
-            # Node(num=3, weight_value...,
-            # Node(num=4, weight_value...,
-            # Node(num=5, weight_value...,
-            # Node(num=6, weight_value...,]
-            ```
+        Returns
+        -------
+        trees : list of list of Node
+            Each inner list represents a tree.
         """
         dump = json.loads(self.json_dump())
         if "trees" in dump:
@@ -1231,23 +1255,14 @@ class PerpetualBooster:
                 trees.append(nodes)
         return trees
 
-    def trees_to_dataframe(self):
-        """Return the tree structure as a Polars or Pandas DataFrame object.
+    def trees_to_dataframe(self) -> Any:
+        """
+        Return the tree structures as a DataFrame.
 
-        Returns:
-            DataFrame: Trees in a Polars or Pandas DataFrame.
-
-        Example:
-            This can be used directly to print out the tree structure as a dataframe. The Leaf values will have the "Gain" column replaced with the weight value.
-
-            ```python
-            model.trees_to_dataframe().head()
-            ```
-
-            |    |   Tree |   Node | ID   | Feature   |   Split | Yes   | No   | Missing   |    Gain |    Cover |
-            |---:|-------:|-------:|:-----|:----------|--------:|:------|:-----|:----------|--------:|---------:|
-            |  0 |      0 |      0 | 0-0  | pclass    |  3      | 0-1   | 0-2  | 0-2       | 91.5083 | 209.388  |
-            |  1 |      0 |      1 | 0-1  | fare      | 13.7917 | 0-3   | 0-4  | 0-4       | 28.1855 |  94.0015 |
+        Returns
+        -------
+        df : DataFrame
+            A Polars or Pandas DataFrame containing tree information.
         """
 
         def node_to_row(
@@ -1622,7 +1637,7 @@ class PerpetualBooster:
         Parameters
         ----------
         path : str
-            The path where the XGBoost model will be saved.
+            The path where the XGBoost-compatible model will be saved.
         """
         xgboost_json = self._to_xgboost_json()
         with open(path, "w") as f:
@@ -1636,8 +1651,8 @@ class PerpetualBooster:
         ----------
         path : str
             The path where the ONNX model will be saved.
-        name : str, optional
-            The name of the model (graph), by default "perpetual_model".
+        name : str, optional, default="perpetual_model"
+            The name of the graph in the exported model.
         """
         import json
 

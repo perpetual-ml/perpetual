@@ -1,25 +1,49 @@
 #' Train a PerpetualBooster model
 #'
+#' Perpetual is a self-generalizing gradient boosting machine that doesn't need 
+#' hyperparameter optimization. It automatically finds the best configuration 
+#' based on the provided budget.
+#'
 #' @param x A matrix or data frame of features.
 #' @param y A numeric vector of targets.
-#' @param objective Objective function (e.g. "LogLoss", "SquaredLoss").
-#' @param budget Training budget.
-#' @param iteration_limit Limit on number of iterations.
-#' @param stopping_rounds Number of rounds for early stopping.
-#' @param max_bin Maximum number of bins.
+#' @param objective Objective function to be used for optimization. Valid options:
+#'   "LogLoss" (binary classification), "SquaredLoss" (regression), 
+#'   "QuantileLoss" (quantile regression), "HuberLoss" (robust regression),
+#'   "AdaptiveHuberLoss" (robust regression), "ListNetLoss" (ranking).
+#' @param budget Training budget (default 0.5). Increasing this will likely 
+#'   result in more boosting rounds and increased predictive power.
+#' @param iteration_limit Optional limit on the number of boosting rounds.
+#' @param stopping_rounds Optional limit for early stopping.
+#' @param max_bin Maximum number of bins for feature discretization (default 256).
 #' @param num_threads Number of threads to use.
-#' @param missing Value to consider missing.
-#' @param allow_missing_splits Should missing splits be allowed?
-#' @param create_missing_branch Should a separate branch be created for missing?
-#' @param missing_node_treatment Treatment for missing nodes.
-#' @param log_iterations Log iterations.
-#' @param quantile Quantile for quantile regression.
-#' @param reset Reset the model.
-#' @param timeout Timeout in seconds.
-#' @param memory_limit Memory limit in GB.
-#' @param seed Random seed.
-#' @param ... Additional parameters for PerpetualBooster$new.
-#' @return A fitted PerpetualBooster object with classes attribute.
+#' @param missing Value to consider as missing data (default NA).
+#' @param allow_missing_splits Should splits be allowed that separate missing 
+#'   from non-missing values?
+#' @param create_missing_branch Should a separate branch be created for missing 
+#'   values (ternary trees)?
+#' @param missing_node_treatment Method for calculating weights for missing 
+#'   nodes. Options: "None", "AssignToParent", "AverageLeafWeight", 
+#'   "AverageNodeWeight".
+#' @param log_iterations Frequency of logging internal information (0 to disable).
+#' @param quantile Target quantile for quantile regression.
+#' @param reset Whether to reset the model or continue training on subsequent fit calls.
+#' @param timeout Optional fit timeout in seconds.
+#' @param memory_limit Optional limit for memory allocation in GB.
+#' @param seed Random seed for reproducibility.
+#' @param ... Additional parameters passed to the booster.
+#'
+#' @return A fitted PerpetualBooster object.
+#'
+#' @examples
+#' \dontrun{
+#' library(perpetual)
+#' data(mtcars)
+#' x <- as.matrix(mtcars[, -1])
+#' y <- mtcars$mpg
+#' model <- perpetual(x, y, objective = "SquaredLoss", budget = 0.5)
+#' print(model)
+#' }
+#' 
 #' @export
 perpetual <- function(x, y, objective = "LogLoss", budget = NULL, 
                       iteration_limit = NULL, stopping_rounds = NULL, 
@@ -65,11 +89,27 @@ perpetual <- function(x, y, objective = "LogLoss", budget = NULL,
 #' Predict using a PerpetualBooster model
 #'
 #' @param object A PerpetualBooster object.
-#' @param newdata A matrix or data frame of new data.
-#' @param type Type of prediction: "class" (label), "prob" (probability), "raw" (log-odds/raw score),
-#' "contribution" (SHAP values), or "interval" (prediction intervals).
-#' @param method Contribution method (default "average"). Only used if type = "contribution".
+#' @param newdata A matrix or data frame of new data for prediction.
+#' @param type Type of prediction:
+#'   - "class": Return predicted class labels (for classification).
+#'   - "prob": Return predicted probabilities (for classification).
+#'   - "raw": Return raw scores or log-odds.
+#'   - "contribution": Return feature contributions (SHAP-like values).
+#'   - "interval": Return prediction intervals (if calibrated).
+#' @param method Contribution method. Options: "average", "shapley", "weight", 
+#'   "branchdifference", "midpointdifference", "modedifference", "probabilitychange". 
+#'   Only used if type = "contribution".
 #' @param ... Not used.
+#'
+#' @return A vector of predictions, a matrix of probabilities or contributions, 
+#'   or a list for intervals.
+#'
+#' @examples
+#' \dontrun{
+#' preds <- predict(model, x_test, type = "prob")
+#' contribs <- predict(model, x_test, type = "contribution", method = "shapley")
+#' }
+#' 
 #' @export
 predict.PerpetualBooster <- function(object, newdata, type = c("class", "prob", "raw", "contribution", "interval"), method = "average", ...) {
   type <- match.arg(type)
@@ -174,7 +214,10 @@ print.PerpetualBooster <- function(x, ...) {
 #' Save a PerpetualBooster model
 #'
 #' @param model A PerpetualBooster object.
-#' @param path Path to save the model (as JSON).
+#' @param path Path to the file where the model will be saved (JSON format).
+#'
+#' @seealso \code{\link{perpetual_load}}
+#'
 #' @export
 perpetual_save <- function(model, path) {
   if (!inherits(model, "PerpetualBooster")) {
@@ -185,8 +228,11 @@ perpetual_save <- function(model, path) {
 
 #' Load a PerpetualBooster model
 #'
-#' @param path Path to the saved model (JSON).
-#' @return A PerpetualBooster object.
+#' @param path Path to the saved booster file (JSON).
+#' @return An initialized PerpetualBooster object.
+#'
+#' @seealso \code{\link{perpetual_save}}
+#'
 #' @export
 perpetual_load <- function(path) {
   if (!file.exists(path)) {
@@ -213,12 +259,18 @@ perpetual_load <- function(path) {
 
 #' Calibrate a PerpetualBooster model for prediction intervals
 #'
+#' Uses the provided training and calibration sets to compute scaling factors
+#' for prediction intervals. 
+#'
 #' @param model A PerpetualBooster object.
-#' @param x Training data.
-#' @param y Training targets.
-#' @param x_cal Calibration data.
-#' @param y_cal Calibration targets.
-#' @param alpha Alpha values (1 - coverage).
+#' @param x Data used to train the base model.
+#' @param y Targets for the training data.
+#' @param x_cal Independent calibration dataset.
+#' @param y_cal Targets for the calibration data.
+#' @param alpha Significance level(s) for the intervals (1 - coverage).
+#'
+#' @return The model (invisibly) updated with calibration information.
+#'
 #' @export
 perpetual_calibrate <- function(model, x, y, x_cal, y_cal, alpha) {
   if (is.data.frame(x)) x <- as.matrix(x)
@@ -236,9 +288,13 @@ perpetual_calibrate <- function(model, x, y, x_cal, y_cal, alpha) {
 #' Get feature importance from a PerpetualBooster model
 #'
 #' @param model A PerpetualBooster object.
-#' @param method Importance method ("weight", "gain", "totalgain", "cover", "totalcover").
-#' @param normalize Whether to normalize importance values.
-#' @return A named numeric vector of feature importance.
+#' @param method Variable importance method. Options: "weight", "gain", 
+#'   "totalgain", "cover", "totalcover".
+#' @param normalize Whether to normalize the importance values to sum to 1.
+#'
+#' @return A named numeric vector where names are feature names (or indices) 
+#'   and values are importance scores.
+#'
 #' @export
 perpetual_importance <- function(model, method = "gain", normalize = TRUE) {
   imp <- .Call("wrap__PerpetualBooster__calculate_feature_importance", model$.ptr, method, normalize, PACKAGE = "perpetual")

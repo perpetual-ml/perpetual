@@ -17,6 +17,16 @@
 
 PerpetualBooster is a gradient boosting machine (GBM) algorithm that doesn't need hyperparameter optimization unlike other GBMs. Similar to AutoML libraries, it has a `budget` parameter. Increasing the `budget` parameter increases the predictive power of the algorithm and gives better results on unseen data. Start with a small budget (e.g. 0.5) and increase it (e.g. 1.0) once you are confident with your features. If you don't see any improvement with further increasing the `budget`, it means that you are already extracting the most predictive power out of your data.
 
+## Supported Languages
+
+Perpetual is built in Rust and provides high-performance bindings for Python and R.
+
+| Language | Installation | Documentation | Repository |
+| :--- | :--- | :--- | :--- |
+| **Python** | `pip install perpetual` | [Python API](https://perpetual-ml.github.io/perpetual) | [`package-python`](./package-python) |
+| **Rust** | `cargo add perpetual` | [docs.rs](https://docs.rs/perpetual) | [`src`](./src) |
+| **R** | `devtools::install_github("perpetual-ml/perpetual", subdir="package-r")` | [pkgdown Site](https://perpetual-ml.github.io/perpetual/r) | [`package-r`](./package-r) |
+
 ## Usage
 
 You can use the algorithm like in the example below. Check examples folders for both Rust and Python.
@@ -30,7 +40,11 @@ model.fit(X, y)
 
 ## Documentation
 
-Documentation for the Python API can be found [in the documentation](https://perpetual-ml.github.io/perpetual) and for the Rust API [on docs.rs](https://docs.rs/perpetual/latest/perpetual/).
+Comprehensive documentation for all supported languages is available:
+
+- **Python**: [API Reference & Guides](https://perpetual-ml.github.io/perpetual)
+- **Rust**: [docs.rs/perpetual](https://docs.rs/perpetual)
+- **R**: [pkgdown Documentation](https://perpetual-ml.github.io/perpetual/r)
 
 ## Benchmark
 
@@ -98,29 +112,9 @@ PerpetualBooster demonstrates greater robustness compared to AutoGluon, successf
 
 The results can be reproduced using the [automlbenchmark fork](https://github.com/deadsoul44/automlbenchmark).
 
-## Installation
-
-The package can be installed directly from [pypi](https://pypi.org/project/perpetual):
-
-```shell
-pip install perpetual
-```
-
-Using [conda-forge](https://anaconda.org/conda-forge/perpetual):
-
-```shell
-conda install conda-forge::perpetual
-```
-
-To use in a Rust project and to get the package from [crates.io](https://crates.io/crates/perpetual):
-
-```shell
-cargo add perpetual
-```
-
 ## Contribution
 
-Contributions are welcome. Check CONTRIBUTING.md for the guideline.
+Contributions are welcome. Check [CONTRIBUTING.md](./CONTRIBUTING.md) for the guideline.
 
 ## Paper
 
