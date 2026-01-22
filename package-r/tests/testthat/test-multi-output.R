@@ -1,23 +1,31 @@
-test_that("Multiclass prediction works", {
+# Multiclass classification tests using XGBoost/LightGBM style API
+
+test_that("Multiclass prediction with perpetual() and predict()", {
   X <- as.matrix(iris[, 1:4])
-  y <- as.numeric(iris[, 5]) - 1 # 0, 1, 2 (3 classes)
+  storage.mode(X) <- "double"
+  y <- as.numeric(iris[, 5])  # 1, 2, 3 (3 classes)
   
-  flat_data <- as.vector(X)
-  rows <- nrow(X)
-  cols <- ncol(X)
+  model <- perpetual(X, y, objective = "LogLoss")
   
-  model <- PerpetualBooster$new(objective = "LogLoss")
-  model$fit(flat_data, rows, cols, y)
+  # Class predictions should return labels for each sample
+  preds_class <- predict(model, X, type = "class")
+  expect_true(length(preds_class) == nrow(X))
+  expect_true(all(preds_class %in% c(1, 2, 3)))
   
-  preds <- model$predict(flat_data, rows, cols)
-  expect_true(length(preds) == rows)
-  expect_true(!any(is.na(preds)))
+  # Probability predictions should return matrix (n_samples x n_classes)
+  preds_prob <- predict(model, X, type = "prob")
+  expect_true(is.matrix(preds_prob))
+  expect_equal(nrow(preds_prob), nrow(X))
+  expect_equal(ncol(preds_prob), 3)  # 3 classes
   
-  # Check predict_proba returns probabilities
-  # PerpetualBooster's predict_proba returns one probability per sample 
-  # (sigmoid transformation of predictions)
-  preds_proba <- model$predict_proba(flat_data, rows, cols)
-  expect_true(length(preds_proba) == rows)
   # Probabilities should be between 0 and 1
-  expect_true(all(preds_proba >= 0 & preds_proba <= 1))
+  expect_true(all(preds_prob >= 0 & preds_prob <= 1))
+  
+  # Each row should sum to 1
+  row_sums <- rowSums(preds_prob)
+  expect_equal(row_sums, rep(1, nrow(X)), tolerance = 1e-6)
+  
+  # Raw predictions
+  preds_raw <- predict(model, X, type = "raw")
+  expect_true(length(preds_raw) == nrow(X) * 3)  # n_samples * n_classes
 })

@@ -14,10 +14,12 @@ package-python/examples/ee
 
 # R package build artifacts
 r-lib/
+package-r/R_library/
 package-r/src/rust/target/
 package-r/src/*.o
 package-r/src/*.so
 package-r/src/*.a
+package-r/src/*.dll
 package-r/src/entrypoint.o
 
 # Log files

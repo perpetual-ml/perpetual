@@ -433,7 +433,7 @@ impl MultiOutputBooster {
     /// * `parallel` -  Predict in parallel.
     pub fn predict_proba(&self, data: &Matrix<f64>, parallel: bool) -> Vec<f64> {
         let log_odds = self.predict(data, parallel);
-        let data_log_odds = Matrix::new(&log_odds, data.rows, data.cols);
+        let data_log_odds = Matrix::new(&log_odds, data.rows, self.n_boosters);
         let mut preds = Vec::with_capacity(log_odds.len());
         for row in 0..data.rows {
             let y_p_exp = data_log_odds.get_row(row).iter().map(|e| e.exp()).collect::<Vec<f64>>();

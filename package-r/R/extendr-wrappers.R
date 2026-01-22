@@ -49,6 +49,33 @@ test_binding <- function() {
     .Call("wrap__PerpetualBooster__base_score", self$.ptr, PACKAGE = "perpetual")
   }
   
+  self$predict_contributions <- function(flat_data, rows, cols, method = "Average") {
+    .Call("wrap__PerpetualBooster__predict_contributions", self$.ptr, flat_data, 
+          as.integer(rows), as.integer(cols), method, PACKAGE = "perpetual")
+  }
+
+  self$calibrate <- function(flat_data, rows, cols, y, flat_data_cal, rows_cal, cols_cal, y_cal, alpha) {
+    .Call("wrap__PerpetualBooster__calibrate", self$.ptr, flat_data, as.integer(rows), as.integer(cols), y, 
+          flat_data_cal, as.integer(rows_cal), as.integer(cols_cal), y_cal, alpha, PACKAGE = "perpetual")
+    invisible(self)
+  }
+
+  self$predict_intervals <- function(flat_data, rows, cols) {
+    .Call("wrap__PerpetualBooster__predict_intervals", self$.ptr, flat_data, as.integer(rows), as.integer(cols), PACKAGE = "perpetual")
+  }
+
+  self$calculate_feature_importance <- function(method = "Gain", normalize = TRUE) {
+    .Call("wrap__PerpetualBooster__calculate_feature_importance", self$.ptr, method, normalize, PACKAGE = "perpetual")
+  }
+
+  self$get_classes <- function() {
+    .Call("wrap__rust_get_classes", self$.ptr, PACKAGE = "perpetual")
+  }
+
+  self$get_objective <- function() {
+    .Call("wrap__rust_get_objective", self$.ptr, PACKAGE = "perpetual")
+  }
+  
   self
 }
 
@@ -72,7 +99,8 @@ PerpetualBooster <- local({
     timeout = NULL,
     iteration_limit = NULL,
     memory_limit = NULL,
-    stopping_rounds = NULL
+    stopping_rounds = NULL,
+    seed = NULL
   ) {
     # Convert NULL to appropriate NA types for the .Call
     if (is.null(objective)) objective <- NA_character_
@@ -90,6 +118,7 @@ PerpetualBooster <- local({
     if (is.null(iteration_limit)) iteration_limit <- NA_integer_
     if (is.null(memory_limit)) memory_limit <- NA_real_
     if (is.null(stopping_rounds)) stopping_rounds <- NA_integer_
+    if (is.null(seed)) seed <- NA_integer_
     
     ptr <- .Call("wrap__PerpetualBooster__new",
       objective,
@@ -107,6 +136,7 @@ PerpetualBooster <- local({
       iteration_limit,
       memory_limit,
       stopping_rounds,
+      seed,
       PACKAGE = "perpetual"
     )
     
