@@ -676,7 +676,8 @@ def test_categorical():
 def test_polars():
     import polars as pl
 
-    X = pl.read_csv("../resources/titanic_test_df.csv")
+    X_pl = pl.read_csv("../resources/titanic_test_df.csv")
+    X_pd = pd.read_csv("../resources/titanic_test_df.csv")
 
     y = np.array(
         pd.read_csv(
@@ -693,11 +694,23 @@ def test_polars():
         "deck",
         "embark_town",
     ]
-    X = X.with_columns(pl.col(cols).cast(pl.String).cast(pl.Categorical))
-    model = PerpetualBooster(budget=0.1)
-    model.fit(X, y)
-    model.predict(X)
-    model.trees_to_dataframe()
+    X_pl = X_pl.with_columns(pl.col(cols).cast(pl.String).cast(pl.Categorical))
+    X_pd[cols] = X_pd[cols].astype("category")
+
+    model_pl = PerpetualBooster(objective="LogLoss", budget=0.1)
+    model_pl.fit(X_pl, y)
+
+    model_pd = PerpetualBooster(objective="LogLoss", budget=0.1)
+    model_pd.fit(X_pd, y)
+
+    # Compare predictions
+    pred_pl = model_pl.predict(X_pl)
+    pred_pd = model_pd.predict(X_pd)
+
+    assert np.allclose(pred_pl, pred_pd)
+
+    model_pl.trees_to_dataframe()
+    model_pd.trees_to_dataframe()
 
 
 def test_calibration():

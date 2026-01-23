@@ -280,6 +280,7 @@ impl MultiOutputBooster {
     pub fn fit_columnar(
         &mut self,
         columns: Vec<PyReadonlyArray1<f64>>,
+        masks: Option<Vec<Option<PyReadonlyArray1<u8>>>>,
         rows: usize,
         y: PyReadonlyArray1<f64>,
         sample_weight: Option<PyReadonlyArray1<f64>>,
@@ -290,7 +291,20 @@ impl MultiOutputBooster {
             .map(|col| col.as_slice())
             .collect::<Result<Vec<_>, _>>()?;
 
-        let data = ColumnarMatrix::new(col_slices, rows);
+        let mut mask_slices: Option<Vec<Option<&[u8]>>> = None;
+        if let Some(ref m) = masks {
+            let mut v = Vec::with_capacity(m.len());
+            for mask in m {
+                if let Some(arr) = mask {
+                    v.push(Some(arr.as_slice()?));
+                } else {
+                    v.push(None);
+                }
+            }
+            mask_slices = Some(v);
+        }
+
+        let data = ColumnarMatrix::new(col_slices, mask_slices, rows);
 
         let y = y.as_slice()?;
         let y_data = Matrix::new(y, rows, self.booster.n_boosters);
@@ -375,6 +389,7 @@ impl MultiOutputBooster {
         &self,
         py: Python<'py>,
         columns: Vec<PyReadonlyArray1<f64>>,
+        masks: Option<Vec<Option<PyReadonlyArray1<u8>>>>,
         rows: usize,
         parallel: Option<bool>,
     ) -> PyResult<Bound<'py, PyArray1<f64>>> {
@@ -383,7 +398,20 @@ impl MultiOutputBooster {
             .map(|col| col.as_slice())
             .collect::<Result<Vec<_>, _>>()?;
 
-        let data = ColumnarMatrix::new(col_slices, rows);
+        let mut mask_slices: Option<Vec<Option<&[u8]>>> = None;
+        if let Some(ref m) = masks {
+            let mut v = Vec::with_capacity(m.len());
+            for mask in m {
+                if let Some(arr) = mask {
+                    v.push(Some(arr.as_slice()?));
+                } else {
+                    v.push(None);
+                }
+            }
+            mask_slices = Some(v);
+        }
+
+        let data = ColumnarMatrix::new(col_slices, mask_slices, rows);
         let parallel = parallel.unwrap_or(true);
         Ok(self.booster.predict_columnar(&data, parallel).into_pyarray(py))
     }
@@ -407,6 +435,7 @@ impl MultiOutputBooster {
         &self,
         py: Python<'py>,
         columns: Vec<PyReadonlyArray1<f64>>,
+        masks: Option<Vec<Option<PyReadonlyArray1<u8>>>>,
         rows: usize,
         parallel: Option<bool>,
     ) -> PyResult<Bound<'py, PyArray1<f64>>> {
@@ -415,7 +444,20 @@ impl MultiOutputBooster {
             .map(|col| col.as_slice())
             .collect::<Result<Vec<_>, _>>()?;
 
-        let data = ColumnarMatrix::new(col_slices, rows);
+        let mut mask_slices: Option<Vec<Option<&[u8]>>> = None;
+        if let Some(ref m) = masks {
+            let mut v = Vec::with_capacity(m.len());
+            for mask in m {
+                if let Some(arr) = mask {
+                    v.push(Some(arr.as_slice()?));
+                } else {
+                    v.push(None);
+                }
+            }
+            mask_slices = Some(v);
+        }
+
+        let data = ColumnarMatrix::new(col_slices, mask_slices, rows);
         let parallel = parallel.unwrap_or(true);
         Ok(self.booster.predict_proba_columnar(&data, parallel).into_pyarray(py))
     }
@@ -442,6 +484,7 @@ impl MultiOutputBooster {
         &self,
         py: Python<'py>,
         columns: Vec<PyReadonlyArray1<f64>>,
+        masks: Option<Vec<Option<PyReadonlyArray1<u8>>>>,
         rows: usize,
         parallel: Option<bool>,
     ) -> PyResult<Py<PyAny>> {
@@ -450,7 +493,20 @@ impl MultiOutputBooster {
             .map(|col| col.as_slice())
             .collect::<Result<Vec<_>, _>>()?;
 
-        let data = ColumnarMatrix::new(col_slices, rows);
+        let mut mask_slices: Option<Vec<Option<&[u8]>>> = None;
+        if let Some(ref m) = masks {
+            let mut v = Vec::with_capacity(m.len());
+            for mask in m {
+                if let Some(arr) = mask {
+                    v.push(Some(arr.as_slice()?));
+                } else {
+                    v.push(None);
+                }
+            }
+            mask_slices = Some(v);
+        }
+
+        let data = ColumnarMatrix::new(col_slices, mask_slices, rows);
         let parallel = parallel.unwrap_or(true);
 
         let value: Vec<Vec<Vec<HashSet<usize>>>> = self.booster.predict_nodes_columnar(&data, parallel);
@@ -482,6 +538,7 @@ impl MultiOutputBooster {
         &self,
         py: Python<'py>,
         columns: Vec<PyReadonlyArray1<f64>>,
+        masks: Option<Vec<Option<PyReadonlyArray1<u8>>>>,
         rows: usize,
         method: &str,
         parallel: Option<bool>,
@@ -491,7 +548,20 @@ impl MultiOutputBooster {
             .map(|col| col.as_slice())
             .collect::<Result<Vec<_>, _>>()?;
 
-        let data = ColumnarMatrix::new(col_slices, rows);
+        let mut mask_slices: Option<Vec<Option<&[u8]>>> = None;
+        if let Some(ref m) = masks {
+            let mut v = Vec::with_capacity(m.len());
+            for mask in m {
+                if let Some(arr) = mask {
+                    v.push(Some(arr.as_slice()?));
+                } else {
+                    v.push(None);
+                }
+            }
+            mask_slices = Some(v);
+        }
+
+        let data = ColumnarMatrix::new(col_slices, mask_slices, rows);
         let parallel = parallel.unwrap_or(true);
         let method_ = to_value_error(serde_plain::from_str(method))?;
         Ok(self

@@ -255,6 +255,7 @@ class PerpetualBooster:
             (
                 features_,
                 columns,  # list of 1D arrays instead of flat_data
+                masks,
                 rows,
                 cols,
                 categorical_features_,
@@ -363,6 +364,7 @@ class PerpetualBooster:
             # Use columnar fit for Polars (zero-copy)
             self.booster.fit_columnar(
                 columns=columns,
+                masks=masks,
                 rows=rows,
                 y=y_,
                 sample_weight=sample_weight_,  # type: ignore
@@ -464,12 +466,12 @@ class PerpetualBooster:
 
         is_polars = type_df(X_train) == "polars_df"
         if is_polars:
-            features_train, cols_train, rows_train, _ = transform_input_frame_columnar(
-                X_train, self.cat_mapping
+            features_train, cols_train, masks_train, rows_train, _ = (
+                transform_input_frame_columnar(X_train, self.cat_mapping)
             )
             self._validate_features(features_train)
-            features_cal, cols_cal, rows_cal, _ = transform_input_frame_columnar(
-                X_cal, self.cat_mapping
+            features_cal, cols_cal, masks_cal, rows_cal, _ = (
+                transform_input_frame_columnar(X_cal, self.cat_mapping)
             )
             # Use columnar calibration
             y_train_, _ = convert_input_array(y_train, self.objective)
@@ -481,9 +483,11 @@ class PerpetualBooster:
 
             self.booster.calibrate_columnar(
                 columns=cols_train,
+                masks=masks_train,
                 rows=rows_train,
                 y=y_train_,
                 columns_cal=cols_cal,
+                masks_cal=masks_cal,
                 rows_cal=rows_cal,
                 y_cal=y_cal_,
                 alpha=np.array(alpha),
@@ -550,12 +554,12 @@ class PerpetualBooster:
         """
         is_polars = type_df(X) == "polars_df"
         if is_polars:
-            features_, columns, rows, cols = transform_input_frame_columnar(
+            features_, columns, masks, rows, cols = transform_input_frame_columnar(
                 X, self.cat_mapping
             )
             self._validate_features(features_)
             return self.booster.predict_intervals_columnar(
-                columns=columns, rows=rows, parallel=parallel
+                columns=columns, masks=masks, rows=rows, parallel=parallel
             )
 
         features_, flat_data, rows, cols = transform_input_frame(X, self.cat_mapping)
@@ -586,7 +590,7 @@ class PerpetualBooster:
         """
         is_polars = type_df(X) == "polars_df"
         if is_polars:
-            features_, columns, rows, cols = transform_input_frame_columnar(
+            features_, columns, masks, rows, cols = transform_input_frame_columnar(
                 X, self.cat_mapping
             )
         else:
@@ -598,7 +602,7 @@ class PerpetualBooster:
         if len(self.classes_) == 0:
             if is_polars:
                 return self.booster.predict_columnar(
-                    columns=columns, rows=rows, parallel=parallel
+                    columns=columns, masks=masks, rows=rows, parallel=parallel
                 )
             return self.booster.predict(
                 flat_data=flat_data, rows=rows, cols=cols, parallel=parallel
@@ -607,7 +611,7 @@ class PerpetualBooster:
             if is_polars:
                 return np.rint(
                     self.booster.predict_proba_columnar(
-                        columns=columns, rows=rows, parallel=parallel
+                        columns=columns, masks=masks, rows=rows, parallel=parallel
                     )
                 ).astype(int)
             return np.rint(
@@ -618,7 +622,7 @@ class PerpetualBooster:
         else:
             if is_polars:
                 preds = self.booster.predict_columnar(
-                    columns=columns, rows=rows, parallel=parallel
+                    columns=columns, masks=masks, rows=rows, parallel=parallel
                 )
             else:
                 preds = self.booster.predict(
@@ -648,7 +652,7 @@ class PerpetualBooster:
         """
         is_polars = type_df(X) == "polars_df"
         if is_polars:
-            features_, columns, rows, cols = transform_input_frame_columnar(
+            features_, columns, masks, rows, cols = transform_input_frame_columnar(
                 X, self.cat_mapping
             )
         else:
@@ -660,7 +664,7 @@ class PerpetualBooster:
         if len(self.classes_) > 2:
             if is_polars:
                 probabilities = self.booster.predict_proba_columnar(
-                    columns=columns, rows=rows, parallel=parallel
+                    columns=columns, masks=masks, rows=rows, parallel=parallel
                 )
             else:
                 probabilities = self.booster.predict_proba(
@@ -670,7 +674,7 @@ class PerpetualBooster:
         elif len(self.classes_) == 2:
             if is_polars:
                 probabilities = self.booster.predict_proba_columnar(
-                    columns=columns, rows=rows, parallel=parallel
+                    columns=columns, masks=masks, rows=rows, parallel=parallel
                 )
             else:
                 probabilities = self.booster.predict_proba(
@@ -706,7 +710,7 @@ class PerpetualBooster:
         """
         is_polars = type_df(X) == "polars_df"
         if is_polars:
-            features_, columns, rows, cols = transform_input_frame_columnar(
+            features_, columns, masks, rows, cols = transform_input_frame_columnar(
                 X, self.cat_mapping
             )
         else:
@@ -718,7 +722,7 @@ class PerpetualBooster:
         if len(self.classes_) > 2:
             if is_polars:
                 preds = self.booster.predict_columnar(
-                    columns=columns, rows=rows, parallel=parallel
+                    columns=columns, masks=masks, rows=rows, parallel=parallel
                 )
             else:
                 preds = self.booster.predict(
@@ -731,7 +735,7 @@ class PerpetualBooster:
         elif len(self.classes_) == 2:
             if is_polars:
                 return self.booster.predict_columnar(
-                    columns=columns, rows=rows, parallel=parallel
+                    columns=columns, masks=masks, rows=rows, parallel=parallel
                 )
             return self.booster.predict(
                 flat_data=flat_data,
@@ -762,12 +766,12 @@ class PerpetualBooster:
         """
         is_polars = type_df(X) == "polars_df"
         if is_polars:
-            features_, columns, rows, cols = transform_input_frame_columnar(
+            features_, columns, masks, rows, cols = transform_input_frame_columnar(
                 X, self.cat_mapping
             )
             self._validate_features(features_)
             return self.booster.predict_nodes_columnar(
-                columns=columns, rows=rows, parallel=parallel
+                columns=columns, masks=masks, rows=rows, parallel=parallel
             )
 
         features_, flat_data, rows, cols = transform_input_frame(X, self.cat_mapping)
@@ -821,12 +825,13 @@ class PerpetualBooster:
         """
         is_polars = type_df(X) == "polars_df"
         if is_polars:
-            features_, columns, rows, cols = transform_input_frame_columnar(
+            features_, columns, masks, rows, cols = transform_input_frame_columnar(
                 X, self.cat_mapping
             )
             self._validate_features(features_)
             contributions = self.booster.predict_contributions_columnar(
                 columns=columns,
+                masks=masks,
                 rows=rows,
                 method=CONTRIBUTION_METHODS.get(method, method),
                 parallel=parallel,

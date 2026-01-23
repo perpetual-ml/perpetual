@@ -300,7 +300,12 @@ impl Tree {
             if node.is_leaf {
                 return node.weight_value as f64;
             } else {
-                node_idx = node.get_child_idx(data.get(row, node.split_feature), missing);
+                let val = if data.is_valid(row, node.split_feature) {
+                    data.get(row, node.split_feature)
+                } else {
+                    missing
+                };
+                node_idx = node.get_child_idx(val, missing);
             }
         }
     }
@@ -336,7 +341,12 @@ impl Tree {
             if node.is_leaf {
                 return set;
             } else {
-                node_idx = node.get_child_idx(data.get(row, node.split_feature), missing);
+                let val = if data.is_valid(row, node.split_feature) {
+                    data.get(row, node.split_feature)
+                } else {
+                    missing
+                };
+                node_idx = node.get_child_idx(val, missing);
                 set.insert(node_idx);
             }
         }

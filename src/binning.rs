@@ -76,8 +76,12 @@ fn bin_columnar_matrix_from_cuts<T: FloatData<T>>(
     for col in 0..data.cols {
         let col_data = data.get_col(col);
         let col_cuts = cuts.get_col(col);
-        for v in col_data {
-            result.push(map_bin(col_cuts, v, missing).unwrap());
+        for (row, v) in col_data.iter().enumerate() {
+            if data.is_valid(row, col) {
+                result.push(map_bin(col_cuts, v, missing).unwrap());
+            } else {
+                result.push(0);
+            }
         }
     }
     result
@@ -219,7 +223,9 @@ pub fn bin_columnar_matrix(
             .get_col(i)
             .iter()
             .zip(weight.iter())
-            .filter(|(v, _)| !is_missing(v, &missing))
+            .enumerate()
+            .filter(|(row, (v, _))| data.is_valid(*row, i) && !is_missing(v, &missing))
+            .map(|(_, (v, w))| (v, w))
             .unzip();
         assert_eq!(no_miss.len(), w.len());
 

@@ -258,9 +258,11 @@ impl PerpetualBooster {
 
     /// Fit using columnar data (zero-copy from Polars).
     /// Each column is passed as a separate 1D array.
+    #[allow(clippy::too_many_arguments)]
     pub fn fit_columnar(
         &mut self,
         columns: Vec<PyReadonlyArray1<f64>>,
+        masks: Option<Vec<Option<PyReadonlyArray1<u8>>>>,
         rows: usize,
         y: PyReadonlyArray1<f64>,
         sample_weight: Option<PyReadonlyArray1<f64>>,
@@ -272,7 +274,20 @@ impl PerpetualBooster {
             .map(|col| col.as_slice())
             .collect::<Result<Vec<_>, _>>()?;
 
-        let data = ColumnarMatrix::new(col_slices, rows);
+        let mut mask_slices: Option<Vec<Option<&[u8]>>> = None;
+        if let Some(ref m) = masks {
+            let mut v = Vec::with_capacity(m.len());
+            for mask in m {
+                if let Some(arr) = mask {
+                    v.push(Some(arr.as_slice()?));
+                } else {
+                    v.push(None);
+                }
+            }
+            mask_slices = Some(v);
+        }
+
+        let data = ColumnarMatrix::new(col_slices, mask_slices, rows);
         let y = y.as_slice()?;
         let sample_weight_ = match sample_weight.as_ref() {
             Some(sw) => {
@@ -381,9 +396,11 @@ impl PerpetualBooster {
     pub fn calibrate_columnar(
         &mut self,
         columns: Vec<PyReadonlyArray1<f64>>,
+        masks: Option<Vec<Option<PyReadonlyArray1<u8>>>>,
         rows: usize,
         y: PyReadonlyArray1<f64>,
         columns_cal: Vec<PyReadonlyArray1<f64>>,
+        masks_cal: Option<Vec<Option<PyReadonlyArray1<u8>>>>,
         rows_cal: usize,
         y_cal: PyReadonlyArray1<f64>,
         alpha: PyReadonlyArray1<f64>,
@@ -394,13 +411,39 @@ impl PerpetualBooster {
             .iter()
             .map(|col| col.as_slice())
             .collect::<Result<Vec<_>, _>>()?;
-        let data = ColumnarMatrix::new(col_slices, rows);
+
+        let mut mask_slices: Option<Vec<Option<&[u8]>>> = None;
+        if let Some(ref m) = masks {
+            let mut v = Vec::with_capacity(m.len());
+            for mask in m {
+                if let Some(arr) = mask {
+                    v.push(Some(arr.as_slice()?));
+                } else {
+                    v.push(None);
+                }
+            }
+            mask_slices = Some(v);
+        }
+        let data = ColumnarMatrix::new(col_slices, mask_slices, rows);
 
         let col_slices_cal: Vec<&[f64]> = columns_cal
             .iter()
             .map(|col| col.as_slice())
             .collect::<Result<Vec<_>, _>>()?;
-        let data_cal = ColumnarMatrix::new(col_slices_cal, rows_cal);
+
+        let mut mask_slices_cal: Option<Vec<Option<&[u8]>>> = None;
+        if let Some(ref m) = masks_cal {
+            let mut v = Vec::with_capacity(m.len());
+            for mask in m {
+                if let Some(arr) = mask {
+                    v.push(Some(arr.as_slice()?));
+                } else {
+                    v.push(None);
+                }
+            }
+            mask_slices_cal = Some(v);
+        }
+        let data_cal = ColumnarMatrix::new(col_slices_cal, mask_slices_cal, rows_cal);
 
         let y = y.as_slice()?;
         let y_cal = y_cal.as_slice()?;
@@ -452,6 +495,7 @@ impl PerpetualBooster {
         &self,
         py: Python<'py>,
         columns: Vec<PyReadonlyArray1<f64>>,
+        masks: Option<Vec<Option<PyReadonlyArray1<u8>>>>,
         rows: usize,
         parallel: Option<bool>,
     ) -> PyResult<Bound<'py, PyDict>> {
@@ -460,7 +504,19 @@ impl PerpetualBooster {
             .map(|col| col.as_slice())
             .collect::<Result<Vec<_>, _>>()?;
 
-        let data = ColumnarMatrix::new(col_slices, rows);
+        let mut mask_slices: Option<Vec<Option<&[u8]>>> = None;
+        if let Some(ref m) = masks {
+            let mut v = Vec::with_capacity(m.len());
+            for mask in m {
+                if let Some(arr) = mask {
+                    v.push(Some(arr.as_slice()?));
+                } else {
+                    v.push(None);
+                }
+            }
+            mask_slices = Some(v);
+        }
+        let data = ColumnarMatrix::new(col_slices, mask_slices, rows);
         let parallel = parallel.unwrap_or(true);
 
         let predictions: HashMap<String, Vec<Vec<f64>>> = self.booster.predict_intervals_columnar(&data, parallel);
@@ -493,6 +549,7 @@ impl PerpetualBooster {
         &self,
         py: Python<'py>,
         columns: Vec<PyReadonlyArray1<f64>>,
+        masks: Option<Vec<Option<PyReadonlyArray1<u8>>>>,
         rows: usize,
         parallel: Option<bool>,
     ) -> PyResult<Bound<'py, PyArray1<f64>>> {
@@ -501,7 +558,19 @@ impl PerpetualBooster {
             .map(|col| col.as_slice())
             .collect::<Result<Vec<_>, _>>()?;
 
-        let data = ColumnarMatrix::new(col_slices, rows);
+        let mut mask_slices: Option<Vec<Option<&[u8]>>> = None;
+        if let Some(ref m) = masks {
+            let mut v = Vec::with_capacity(m.len());
+            for mask in m {
+                if let Some(arr) = mask {
+                    v.push(Some(arr.as_slice()?));
+                } else {
+                    v.push(None);
+                }
+            }
+            mask_slices = Some(v);
+        }
+        let data = ColumnarMatrix::new(col_slices, mask_slices, rows);
         let parallel = parallel.unwrap_or(true);
         Ok(self.booster.predict_columnar(&data, parallel).into_pyarray(py))
     }
@@ -525,6 +594,7 @@ impl PerpetualBooster {
         &self,
         py: Python<'py>,
         columns: Vec<PyReadonlyArray1<f64>>,
+        masks: Option<Vec<Option<PyReadonlyArray1<u8>>>>,
         rows: usize,
         parallel: Option<bool>,
     ) -> PyResult<Bound<'py, PyArray1<f64>>> {
@@ -533,7 +603,19 @@ impl PerpetualBooster {
             .map(|col| col.as_slice())
             .collect::<Result<Vec<_>, _>>()?;
 
-        let data = ColumnarMatrix::new(col_slices, rows);
+        let mut mask_slices: Option<Vec<Option<&[u8]>>> = None;
+        if let Some(ref m) = masks {
+            let mut v = Vec::with_capacity(m.len());
+            for mask in m {
+                if let Some(arr) = mask {
+                    v.push(Some(arr.as_slice()?));
+                } else {
+                    v.push(None);
+                }
+            }
+            mask_slices = Some(v);
+        }
+        let data = ColumnarMatrix::new(col_slices, mask_slices, rows);
         let parallel = parallel.unwrap_or(true);
         Ok(self.booster.predict_proba_columnar(&data, parallel).into_pyarray(py))
     }
@@ -560,6 +642,7 @@ impl PerpetualBooster {
         &self,
         py: Python<'py>,
         columns: Vec<PyReadonlyArray1<f64>>,
+        masks: Option<Vec<Option<PyReadonlyArray1<u8>>>>,
         rows: usize,
         parallel: Option<bool>,
     ) -> PyResult<Py<PyAny>> {
@@ -568,7 +651,19 @@ impl PerpetualBooster {
             .map(|col| col.as_slice())
             .collect::<Result<Vec<_>, _>>()?;
 
-        let data = ColumnarMatrix::new(col_slices, rows);
+        let mut mask_slices: Option<Vec<Option<&[u8]>>> = None;
+        if let Some(ref m) = masks {
+            let mut v = Vec::with_capacity(m.len());
+            for mask in m {
+                if let Some(arr) = mask {
+                    v.push(Some(arr.as_slice()?));
+                } else {
+                    v.push(None);
+                }
+            }
+            mask_slices = Some(v);
+        }
+        let data = ColumnarMatrix::new(col_slices, mask_slices, rows);
         let parallel = parallel.unwrap_or(true);
 
         let value: Vec<Vec<HashSet<usize>>> = self.booster.predict_nodes_columnar(&data, parallel);
@@ -600,6 +695,7 @@ impl PerpetualBooster {
         &self,
         py: Python<'py>,
         columns: Vec<PyReadonlyArray1<f64>>,
+        masks: Option<Vec<Option<PyReadonlyArray1<u8>>>>,
         rows: usize,
         method: &str,
         parallel: Option<bool>,
@@ -609,7 +705,19 @@ impl PerpetualBooster {
             .map(|col| col.as_slice())
             .collect::<Result<Vec<_>, _>>()?;
 
-        let data = ColumnarMatrix::new(col_slices, rows);
+        let mut mask_slices: Option<Vec<Option<&[u8]>>> = None;
+        if let Some(ref m) = masks {
+            let mut v = Vec::with_capacity(m.len());
+            for mask in m {
+                if let Some(arr) = mask {
+                    v.push(Some(arr.as_slice()?));
+                } else {
+                    v.push(None);
+                }
+            }
+            mask_slices = Some(v);
+        }
+        let data = ColumnarMatrix::new(col_slices, mask_slices, rows);
         let parallel = parallel.unwrap_or(true);
         let method_ = to_value_error(serde_plain::from_str(method))?;
         Ok(self
