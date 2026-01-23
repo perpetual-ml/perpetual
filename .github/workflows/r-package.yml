@@ -49,11 +49,18 @@ jobs:
           needs: check
           working-directory: package-r
 
-      - name: Dump install logs on failure
+      - name: Dump all check files on failure
         if: failure()
         shell: bash
         run: |
-          find package-r/check -name '00install.out' -exec cat {} \; || true
+          echo "Listing all files in package-r/check:"
+          ls -R package-r/check || true
+          echo "Dumping 00install.out if it exists:"
+          find . -name "00install.out" -print -exec cat {} \; || true
+          echo "Dumping 00check.log if it exists:"
+          find . -name "00check.log" -print -exec cat {} \; || true
+          echo "Verifying vendored directory:"
+          ls -R package-r/src/rust/core || true
 
       - name: Check
         uses: r-lib/actions/check-r-package@v2
