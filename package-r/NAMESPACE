@@ -1,6 +1,4 @@
 useDynLib(perpetual, .registration = TRUE)
-export(PerpetualBooster)
-export(test_binding)
 export(perpetual)
 export(perpetual_save)
 export(perpetual_load)

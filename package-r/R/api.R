@@ -4,46 +4,6 @@
 #' hyperparameter optimization. It automatically finds the best configuration 
 #' based on the provided budget.
 #'
-#' @param x A matrix or data frame of features.
-#' @param y A numeric vector of targets.
-#' @param objective Objective function to be used for optimization. Valid options:
-#'   "LogLoss" (binary classification), "SquaredLoss" (regression), 
-#'   "QuantileLoss" (quantile regression), "HuberLoss" (robust regression),
-#'   "AdaptiveHuberLoss" (robust regression), "ListNetLoss" (ranking).
-#' @param budget Training budget (default 0.5). Increasing this will likely 
-#'   result in more boosting rounds and increased predictive power.
-#' @param iteration_limit Optional limit on the number of boosting rounds.
-#' @param stopping_rounds Optional limit for early stopping.
-#' @param max_bin Maximum number of bins for feature discretization (default 256).
-#' @param num_threads Number of threads to use.
-#' @param missing Value to consider as missing data (default NA).
-#' @param allow_missing_splits Should splits be allowed that separate missing 
-#'   from non-missing values?
-#' @param create_missing_branch Should a separate branch be created for missing 
-#'   values (ternary trees)?
-#' @param missing_node_treatment Method for calculating weights for missing 
-#'   nodes. Options: "None", "AssignToParent", "AverageLeafWeight", 
-#'   "AverageNodeWeight".
-#' @param log_iterations Frequency of logging internal information (0 to disable).
-#' @param quantile Target quantile for quantile regression.
-#' @param reset Whether to reset the model or continue training on subsequent fit calls.
-#' @param timeout Optional fit timeout in seconds.
-#' @param memory_limit Optional limit for memory allocation in GB.
-#' @param seed Random seed for reproducibility.
-#' @param ... Additional parameters passed to the booster.
-#'
-#' @return A fitted PerpetualBooster object.
-#'
-#' @examples
-#' \dontrun{
-#' library(perpetual)
-#' data(mtcars)
-#' x <- as.matrix(mtcars[, -1])
-#' y <- mtcars$mpg
-#' model <- perpetual(x, y, objective = "SquaredLoss", budget = 0.5)
-#' print(model)
-#' }
-#' 
 #' @export
 perpetual <- function(x, y, objective = "LogLoss", budget = NULL, 
                       iteration_limit = NULL, stopping_rounds = NULL, 
@@ -66,20 +26,33 @@ perpetual <- function(x, y, objective = "LogLoss", budget = NULL,
   # Detect classes for classification objectives
   classes <- sort(unique(y[!is.na(y)]))
   
-  model <- PerpetualBooster$new(objective = objective, budget = budget, 
-                                iteration_limit = iteration_limit, 
-                                stopping_rounds = stopping_rounds, 
-                                max_bin = max_bin, num_threads = num_threads,
-                                missing = missing, allow_missing_splits = allow_missing_splits,
-                                create_missing_branch = create_missing_branch,
-                                missing_node_treatment = missing_node_treatment,
-                                log_iterations = log_iterations,
-                                quantile = quantile, reset = reset,
-                                timeout = timeout, memory_limit = memory_limit,
-                                seed = seed, ...)
-  model$fit(flat_data, rows, cols, y)
+  ptr <- .Call("PerpetualBooster_new",
+        objective,
+        budget,
+        max_bin,
+        num_threads,
+        missing,
+        allow_missing_splits,
+        create_missing_branch,
+        missing_node_treatment,
+        log_iterations,
+        quantile,
+        reset,
+        timeout,
+        iteration_limit,
+        memory_limit,
+        stopping_rounds,
+        seed,
+        PACKAGE = "perpetual"
+  )
   
-  # Store classes and objective on the R object for predict()
+  # Create a lightweight R6-like object (just a list with class)
+  model <- structure(list(.ptr = ptr), class = "PerpetualBooster")
+  
+  # Fit
+  .Call("PerpetualBooster_fit", ptr, flat_data, as.integer(rows), as.integer(cols), y, PACKAGE = "perpetual")
+  
+  # Store classes and objective
   attr(model, "classes") <- classes
   attr(model, "objective") <- objective
   
@@ -87,29 +60,6 @@ perpetual <- function(x, y, objective = "LogLoss", budget = NULL,
 }
 
 #' Predict using a PerpetualBooster model
-#'
-#' @param object A PerpetualBooster object.
-#' @param newdata A matrix or data frame of new data for prediction.
-#' @param type Type of prediction:
-#'   - "class": Return predicted class labels (for classification).
-#'   - "prob": Return predicted probabilities (for classification).
-#'   - "raw": Return raw scores or log-odds.
-#'   - "contribution": Return feature contributions (SHAP-like values).
-#'   - "interval": Return prediction intervals (if calibrated).
-#' @param method Contribution method. Options: "average", "shapley", "weight", 
-#'   "branchdifference", "midpointdifference", "modedifference", "probabilitychange". 
-#'   Only used if type = "contribution".
-#' @param ... Not used.
-#'
-#' @return A vector of predictions, a matrix of probabilities or contributions, 
-#'   or a list for intervals.
-#'
-#' @examples
-#' \dontrun{
-#' preds <- predict(model, x_test, type = "prob")
-#' contribs <- predict(model, x_test, type = "contribution", method = "shapley")
-#' }
-#' 
 #' @export
 predict.PerpetualBooster <- function(object, newdata, type = c("class", "prob", "raw", "contribution", "interval"), method = "average", ...) {
   type <- match.arg(type)
@@ -122,10 +72,8 @@ predict.PerpetualBooster <- function(object, newdata, type = c("class", "prob", 
   rows <- nrow(newdata)
   cols <- ncol(newdata)
   
-  # Get raw predictions
-  raw_preds <- .Call("wrap__PerpetualBooster__predict", object$.ptr, flat_data, as.integer(rows), as.integer(cols), PACKAGE = "perpetual")
+  raw_preds <- .Call("PerpetualBooster_predict", object$.ptr, flat_data, as.integer(rows), as.integer(cols), PACKAGE = "perpetual")
   
-  # Get classes from attribute (set during training)
   classes <- attr(object, "classes")
   objective <- attr(object, "objective")
   
@@ -134,24 +82,18 @@ predict.PerpetualBooster <- function(object, newdata, type = c("class", "prob", 
   }
   
   if (type == "contribution") {
-    # Method can be one of: "weight", "average", "branchdifference", "midpointdifference", "modedifference", "probabilitychange", "shapley"
-    contribs <- .Call("wrap__PerpetualBooster__predict_contributions", object$.ptr, flat_data, as.integer(rows), as.integer(cols), method, PACKAGE = "perpetual")
-    
-    # Reshape contribs (rows x (cols + 1))
+    contribs <- .Call("PerpetualBooster_predict_contributions", object$.ptr, flat_data, as.integer(rows), as.integer(cols), method, PACKAGE = "perpetual")
     contrib_mat <- matrix(contribs, nrow = rows, ncol = cols + 1, byrow = FALSE)
     return(contrib_mat)
   }
   
   if (type == "interval") {
-    intervals <- .Call("wrap__PerpetualBooster__predict_intervals", object$.ptr, flat_data, as.integer(rows), as.integer(cols), PACKAGE = "perpetual")
+    intervals <- .Call("PerpetualBooster_predict_intervals", object$.ptr, flat_data, as.integer(rows), as.integer(cols), PACKAGE = "perpetual")
     return(intervals)
   }
   
-  # If classes not available (loaded model), try to infer from prediction shape
   if (is.null(classes) || length(classes) == 0) {
-    # Assume regression or simple binary
     if (type == "prob") {
-      # Apply sigmoid for binary classification
       probs <- 1 / (1 + exp(-raw_preds))
       return(probs)
     } else {
@@ -160,9 +102,7 @@ predict.PerpetualBooster <- function(object, newdata, type = c("class", "prob", 
   }
   
   if (length(classes) <= 2) {
-    # Binary classification or Regression
     if (length(classes) == 2 && !is.null(objective) && objective == "LogLoss") {
-      # Binary classification
       probs <- 1 / (1 + exp(-raw_preds))
       if (type == "prob") {
         return(probs)
@@ -170,27 +110,17 @@ predict.PerpetualBooster <- function(object, newdata, type = c("class", "prob", 
         return(ifelse(probs >= 0.5, classes[2], classes[1]))
       }
     } else {
-      # Regression or single class
       return(raw_preds)
     }
   } else {
-    # Multiclass
     n_classes <- length(classes)
-    # Reshape raw_preds (column-major from Rust flat_map)
-    preds_mat <- matrix(raw_preds, nrow = rows, ncol = n_classes, byrow = FALSE)
-    
     if (type == "prob") {
-      # Use Rust side predict_proba if available
-      probs_flat <- .Call("wrap__PerpetualBooster__predict_proba", object$.ptr, flat_data, as.integer(rows), as.integer(cols), PACKAGE = "perpetual")
+      probs_flat <- .Call("PerpetualBooster_predict_proba", object$.ptr, flat_data, as.integer(rows), as.integer(cols), PACKAGE = "perpetual")
       probs <- matrix(probs_flat, nrow = rows, ncol = n_classes, byrow = FALSE)
-      # Normalize so each row sums to 1 (One-vs-Rest doesn't guarantee this)
       row_sums <- rowSums(probs)
       probs <- probs / row_sums
       return(probs)
     } else {
-      # Class labels
-      # Still use raw_preds for class labels to avoid double softmax if not needed,
-      # but we need to reshape correctly.
       preds_mat <- matrix(raw_preds, nrow = rows, ncol = n_classes, byrow = FALSE)
       max_idx <- max.col(preds_mat, ties.method = "first")
       return(classes[max_idx])
@@ -201,9 +131,12 @@ predict.PerpetualBooster <- function(object, newdata, type = c("class", "prob", 
 #' Print PerpetualBooster
 #' @export
 print.PerpetualBooster <- function(x, ...) {
+  n_trees <- .Call("PerpetualBooster_number_of_trees", x$.ptr, PACKAGE = "perpetual")
+  base_score <- .Call("PerpetualBooster_base_score", x$.ptr, PACKAGE = "perpetual")
+
   cat("Perpetual Boosting Machine model\n")
-  cat("Number of trees: ", x$number_of_trees(), "\n")
-  cat("Base score: ", x$base_score(), "\n")
+  cat("Number of trees: ", n_trees, "\n")
+  cat("Base score: ", base_score, "\n")
   classes <- attr(x, "classes")
   if (!is.null(classes) && length(classes) > 0) {
     cat("Classes: ", paste(classes, collapse = ", "), "\n")
@@ -212,44 +145,30 @@ print.PerpetualBooster <- function(x, ...) {
 }
 
 #' Save a PerpetualBooster model
-#'
-#' @param model A PerpetualBooster object.
-#' @param path Path to the file where the model will be saved (JSON format).
-#'
-#' @seealso \code{\link{perpetual_load}}
-#'
 #' @export
 perpetual_save <- function(model, path) {
   if (!inherits(model, "PerpetualBooster")) {
     stop("model must be a PerpetualBooster object")
   }
-  model$save_booster(path)
+  .Call("PerpetualBooster_save_booster", model$.ptr, path, PACKAGE = "perpetual")
 }
 
 #' Load a PerpetualBooster model
-#'
-#' @param path Path to the saved booster file (JSON).
-#' @return An initialized PerpetualBooster object.
-#'
-#' @seealso \code{\link{perpetual_save}}
-#'
 #' @export
 perpetual_load <- function(path) {
   if (!file.exists(path)) {
     stop("File not found: ", path)
   }
-  model <- PerpetualBooster$load_booster(path)
   
-  # Try to set attributes from metadata if available (standard rextendr load might not preserve them)
-  # But the Rust side load_booster already populates internal fields.
-  # If we need classes here, we can extract them if we expose a get_classes method.
-  classes <- .Call("wrap__rust_get_classes", model$.ptr, PACKAGE = "perpetual")
+  ptr <- .Call("PerpetualBooster_load_booster", path, PACKAGE = "perpetual")
+  model <- structure(list(.ptr = ptr), class = "PerpetualBooster")
+  
+  classes <- .Call("PerpetualBooster_get_classes", model$.ptr, PACKAGE = "perpetual")
   if (length(classes) > 0) {
     attr(model, "classes") <- classes
   }
   
-  # Restore objective
-  objective <- .Call("wrap__rust_get_objective", model$.ptr, PACKAGE = "perpetual")
+  objective <- .Call("PerpetualBooster_get_objective", model$.ptr, PACKAGE = "perpetual")
   if (!is.null(objective) && nzchar(objective)) {
     attr(model, "objective") <- objective
   }
@@ -257,20 +176,7 @@ perpetual_load <- function(path) {
   return(model)
 }
 
-#' Calibrate a PerpetualBooster model for prediction intervals
-#'
-#' Uses the provided training and calibration sets to compute scaling factors
-#' for prediction intervals. 
-#'
-#' @param model A PerpetualBooster object.
-#' @param x Data used to train the base model.
-#' @param y Targets for the training data.
-#' @param x_cal Independent calibration dataset.
-#' @param y_cal Targets for the calibration data.
-#' @param alpha Significance level(s) for the intervals (1 - coverage).
-#'
-#' @return The model (invisibly) updated with calibration information.
-#'
+#' Calibrate a PerpetualBooster model
 #' @export
 perpetual_calibrate <- function(model, x, y, x_cal, y_cal, alpha) {
   if (is.data.frame(x)) x <- as.matrix(x)
@@ -278,28 +184,28 @@ perpetual_calibrate <- function(model, x, y, x_cal, y_cal, alpha) {
   storage.mode(x) <- "double"
   storage.mode(x_cal) <- "double"
   
-  .Call("wrap__PerpetualBooster__calibrate", model$.ptr, 
+  .Call("PerpetualBooster_calibrate", model$.ptr, 
         as.vector(x), as.integer(nrow(x)), as.integer(ncol(x)), as.numeric(y),
         as.vector(x_cal), as.integer(nrow(x_cal)), as.integer(ncol(x_cal)), as.numeric(y_cal),
         as.numeric(alpha), PACKAGE = "perpetual")
   invisible(model)
 }
 
-#' Get feature importance from a PerpetualBooster model
-#'
-#' @param model A PerpetualBooster object.
-#' @param method Variable importance method. Options: "weight", "gain", 
-#'   "totalgain", "cover", "totalcover".
-#' @param normalize Whether to normalize the importance values to sum to 1.
-#'
-#' @return A named numeric vector where names are feature names (or indices) 
-#'   and values are importance scores.
-#'
+#' Get feature importance
 #' @export
 perpetual_importance <- function(model, method = "gain", normalize = TRUE) {
-  imp <- .Call("wrap__PerpetualBooster__calculate_feature_importance", model$.ptr, method, normalize, PACKAGE = "perpetual")
-  # imp is a list with names as feature indices
-  vals <- unlist(imp)
-  names(vals) <- names(imp)
-  return(vals)
+  imp <- .Call("PerpetualBooster_calculate_feature_importance", model$.ptr, method, normalize, PACKAGE = "perpetual")
+  # imp is a list (from Rust) but with names. Wait, in Rust we returned a Named Vector!
+  # So imp is a named numeric vector
+  return(imp)
 }
+
+# Compatibility for old R6 style usage (optional, but good for backward compat)
+PerpetualBooster <- list(
+    new = function(...) {
+        stop("Please use perpetual() instead of PerpetualBooster$new()")
+    },
+    load_booster = function(path) {
+        perpetual_load(path)
+    }
+)

@@ -12,10 +12,7 @@ License: MIT + file LICENSE
 Encoding: UTF-8
 LazyData: true
 Biarch: true
-Config/rextendr/version: 0.4.2
 SystemRequirements: Cargo (Rust's package manager), rustc
 Imports:
-    rextendr
 LinkingTo:
-    rextendr
 RoxygenNote: 7.3.1
