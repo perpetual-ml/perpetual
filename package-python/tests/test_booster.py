@@ -676,10 +676,8 @@ def test_categorical():
 def test_polars():
     import polars as pl
 
-    X = pl.from_pandas(
-        pd.read_csv("../resources/titanic_test_df.csv", index_col=False),
-        nan_to_null=False,
-    )
+    X = pl.read_csv("../resources/titanic_test_df.csv")
+
     y = np.array(
         pd.read_csv(
             "../resources/titanic_test_y.csv", index_col=False, header=None
