@@ -53,7 +53,7 @@ def test_xgboost_export_binary(data_binary, tmp_path):
     bst = xgb.Booster()
     bst.load_model(str(xgb_path))
 
-    dmat = xgb.DMatrix(X)
+    dmat = xgb.DMatrix(X, feature_names=X.columns.tolist())
     xgb_preds = bst.predict(dmat)
     perp_proba = model.predict_proba(X)[:, 1]
 
@@ -73,7 +73,7 @@ def test_xgboost_export_multiclass(data_multiclass, tmp_path):
     bst = xgb.Booster()
     bst.load_model(str(xgb_path))
 
-    dmat = xgb.DMatrix(X)
+    dmat = xgb.DMatrix(X, feature_names=X.columns.tolist())
     xgb_preds = bst.predict(dmat)
     perp_proba = model.predict_proba(X)
 
@@ -93,7 +93,7 @@ def test_xgboost_export_regression(data_regression, tmp_path):
     bst = xgb.Booster()
     bst.load_model(str(xgb_path))
 
-    dmat = xgb.DMatrix(X)
+    dmat = xgb.DMatrix(X, feature_names=X.columns.tolist())
     xgb_preds = bst.predict(dmat)
     perp_preds = model.predict(X)
 
