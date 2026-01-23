@@ -91,15 +91,4 @@ fmt: ## Format the project using cargo
 
 vendor-r: ## Vendor core Rust logic into the R package
 	@echo "Vendoring core Rust logic..."
-	mkdir -p package-r/src/rust/core
-	cp -r src package-r/src/rust/core/
-	cp Cargo.toml package-r/src/rust/core/
-	@# Remove workspace, dev-dependencies, benches, and external file refs from vendored Cargo.toml
-	@if [ "$(OS)" = "Windows_NT" ]; then \
-		powershell -Command "(Get-Content package-r/src/rust/core/Cargo.toml) -replace '(?s)\[workspace\].*?members = \[.*?\]', '' -replace '(?s)\[dev-dependencies\].*', '' -replace 'license-file = \"LICENSE\"', '# license-file = \"LICENSE\"' -replace 'readme = \"README.md\"', '# readme = \"README.md\"' | Set-Content package-r/src/rust/core/Cargo.toml"; \
-	else \
-		sed -i '/\[workspace\]/,/\]/d' package-r/src/rust/core/Cargo.toml; \
-		sed -i '/\[dev-dependencies\]/,$d' package-r/src/rust/core/Cargo.toml; \
-		sed -i 's/license-file = "LICENSE"/# license-file = "LICENSE"/' package-r/src/rust/core/Cargo.toml; \
-		sed -i 's/readme = "README.md"/# readme = "README.md"/' package-r/src/rust/core/Cargo.toml; \
-	fi
+	$(PYTHON) scripts/vendor_r.py

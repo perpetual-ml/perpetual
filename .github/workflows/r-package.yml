@@ -32,29 +32,16 @@ jobs:
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ runner.os == 'Windows' && 'x86_64-pc-windows-gnu' || '' }}
 
       - uses: r-lib/actions/setup-r@v2
         with:
           r-version: ${{ matrix.config.r }}
           use-public-rspm: true
 
-      - name: Create core directory
-        run: mkdir -p package-r/src/rust/core
-
       - name: Vendor core Rust logic
-        shell: bash
-        run: |
-          cp -r src package-r/src/rust/core/
-          cp Cargo.toml package-r/src/rust/core/
-          # Remove workspace, dev-dependencies, benches, and external file refs from vendored Cargo.toml
-          if [[ "${{ runner.os }}" == "Windows" ]]; then
-            powershell -Command "(Get-Content package-r/src/rust/core/Cargo.toml) -replace '(?s)\[workspace\].*?members = \[.*?\]', '' -replace '(?s)\[dev-dependencies\].*', '' -replace 'license-file = \"LICENSE\"', '# license-file = \"LICENSE\"' -replace 'readme = \"README.md\"', '# readme = \"README.md\"' | Set-Content package-r/src/rust/core/Cargo.toml"
-          else
-            sed -i '/\[workspace\]/,/\]/d' package-r/src/rust/core/Cargo.toml
-            sed -i '/\[dev-dependencies\]/,$d' package-r/src/rust/core/Cargo.toml
-            sed -i 's/license-file = "LICENSE"/# license-file = "LICENSE"/' package-r/src/rust/core/Cargo.toml
-            sed -i 's/readme = "README.md"/# readme = "README.md"/' package-r/src/rust/core/Cargo.toml
-          fi
+        run: python scripts/vendor_r.py
 
       - uses: r-lib/actions/setup-r-dependencies@v2
         with:
