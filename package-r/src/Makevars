@@ -5,7 +5,7 @@ PKG_LIBS = -L$(LIBDIR) -lperpetual_r
 $(SHLIB): $(STATLIB)
 
 $(STATLIB):
-	. $(HOME)/.cargo/env && cd rust && cargo build --release --lib
+	cd rust && cargo build --release --lib
 
 clean:
 	rm -rf rust/target

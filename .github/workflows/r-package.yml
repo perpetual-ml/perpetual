@@ -49,6 +49,12 @@ jobs:
           needs: check
           working-directory: package-r
 
+      - name: Dump install logs on failure
+        if: failure()
+        shell: bash
+        run: |
+          find package-r/check -name '00install.out' -exec cat {} \; || true
+
       - name: Check
         uses: r-lib/actions/check-r-package@v2
         with:
