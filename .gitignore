@@ -43,6 +43,7 @@ wsl_*.sh
 # Rust vendoring artifacts
 package-r/src/rust/.cargo/
 package-r/src/rust/vendor/
+package-r/src/rust/core/
 
 # Python cache
 .ruff_cache/
