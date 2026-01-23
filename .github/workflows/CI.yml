@@ -83,10 +83,10 @@ jobs:
         run: pip install perpetual --no-index --find-links dist --no-deps --force-reinstall
       - name: Run Package Tests
         run: |
-          pip install pytest pytest-cov black ruff setuptools typing-extensions --upgrade
+          pip install pytest pytest-cov ruff setuptools typing-extensions --upgrade
           cd package-python
           ruff check .
-          black --check .
+          ruff format --check .
           pytest --cov-fail-under=90 tests
           cd ..
       - name: Save Artifacts
@@ -137,10 +137,10 @@ jobs:
         run: pip install perpetual --no-index --find-links dist --no-deps --force-reinstall
       - name: Run Package Tests
         run: |
-          pip install pytest pytest-cov black ruff setuptools typing-extensions --upgrade
+          pip install pytest pytest-cov ruff setuptools typing-extensions --upgrade
           cd package-python
           ruff check .
-          black --check .
+          ruff format --check .
           pytest --cov-fail-under=90 tests
           cd ..
       - name: Save Artifacts
@@ -193,10 +193,10 @@ jobs:
         run: pip install perpetual --no-index --find-links dist --no-deps --force-reinstall
       - name: Run Package Tests
         run: |
-          pip install pytest pytest-cov black ruff setuptools typing-extensions --upgrade
+          pip install pytest pytest-cov ruff setuptools typing-extensions --upgrade
           cd package-python
           ruff check .
-          black --check .
+          ruff format --check .
           pytest --cov-fail-under=90 tests
           cd ..
       - name: Save Artifacts
@@ -248,10 +248,10 @@ jobs:
         run: pip install perpetual --no-index --find-links dist --no-deps --force-reinstall
       - name: Run Package Tests
         run: |
-          pip install pytest pytest-cov black ruff setuptools typing-extensions --upgrade
+          pip install pytest pytest-cov ruff setuptools typing-extensions --upgrade
           cd package-python
           ruff check .
-          black --check .
+          ruff format --check .
           pytest --cov-fail-under=90 tests
           cd ..
       - name: Save Artifacts

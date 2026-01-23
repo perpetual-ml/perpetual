@@ -1,10 +1,16 @@
 import os
+import sys
 
 import numpy as np
-import onnxruntime as rt
 import pandas as pd
 import pytest
 import xgboost as xgb
+
+if sys.version_info >= (3, 14):
+    rt = pytest.importorskip("onnxruntime")
+else:
+    import onnxruntime as rt
+
 from perpetual import PerpetualBooster
 
 

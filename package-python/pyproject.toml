@@ -23,7 +23,6 @@ authors = [
 dependencies = ["numpy", "typing-extensions"]
 requires-python = ">=3.10"
 classifiers = [
-  "Programming Language :: Rust",
   "Programming Language :: Python :: 3",
   "Programming Language :: Python :: 3.10",
   "Programming Language :: Python :: 3.11",
@@ -33,7 +32,7 @@ classifiers = [
 ]
 
 [project.optional-dependencies]
-dev = ["black", "pandas", "polars", "pyarrow", "maturin", "pytest", "seaborn", "scikit-learn", "mkdocs-material", "mkdocstrings[python]", "mkdocs-autorefs", "ruff", "xgboost", "onnxmltools", "onnx", "onnxruntime"]
+dev = ["pandas", "polars", "pyarrow", "maturin", "pytest", "seaborn", "scikit-learn", "mkdocs-material", "mkdocstrings[python]", "mkdocs-autorefs", "ruff", "xgboost", "onnxmltools", "onnx", "onnxruntime; python_version < '3.14'"]
 
 [tool.maturin]
 sdist-include = ["LICENSE", "README.md"]
