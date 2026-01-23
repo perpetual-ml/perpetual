@@ -100,11 +100,13 @@ jobs:
     needs: prepare-resources
     strategy:
       matrix:
-        pyversion: ["3.11", "3.12", "3.13"]
+        pyversion: ["3.11", "3.12", "3.13", "3.14"]
         os: [macos-latest, macos-latest-large]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
+      - name: Install OpenMP
+        run: brew install libomp
       - name: Download Resources Artifact
         uses: actions/download-artifact@v4
         with:
