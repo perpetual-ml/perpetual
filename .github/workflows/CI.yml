@@ -18,16 +18,16 @@ jobs:
           enable-cache: true
       - name: Install dependencies for resource creation
         run: |
-          uv pip install numpy pandas seaborn scikit-learn toml
+          uv pip install --system numpy pandas seaborn scikit-learn toml
           cp README.md package-python/README.md
           cp LICENSE package-python/LICENSE  
           cp LICENSE package-r/LICENSE
           mkdir -p resources
           cd package-python
-          uv pip install -e .[dev]
+          uv pip install --system -e .[dev]
           cd ..
       - name: Build test data (create resources)
-        run: uv run scripts/make_resources.py
+        run: python scripts/make_resources.py
       - name: Upload Resources Artifact
         uses: actions/upload-artifact@v4
         with:
@@ -62,7 +62,7 @@ jobs:
           python-version: ${{ matrix.pyversion }}
           architecture: x64
       - name: Install deps
-        run: uv pip install numpy pandas seaborn scikit-learn toml
+        run: uv pip install --system numpy pandas seaborn scikit-learn toml
       - run: |
           cp README.md package-python/README.md
           cp LICENSE package-python/LICENSE
@@ -70,7 +70,7 @@ jobs:
       - name: Build test data (Install perpetual with its dev dependencies)
         run: |
           cd package-python
-          uv pip install -e .[dev]
+          uv pip install --system -e .[dev]
           cd ..
       - name: Build wheels with maturin
         uses: PyO3/maturin-action@v1
@@ -79,14 +79,14 @@ jobs:
           command: build
           args: --release --strip --interpreter python --manifest-path package-python/Cargo.toml --out dist --sdist
       - name: Install wheel
-        run: uv pip install perpetual --no-index --find-links dist --no-deps --force-reinstall
+        run: uv pip install --system perpetual --no-index --find-links dist --no-deps --force-reinstall
       - name: Run Package Tests
         run: |
-          uv pip install pytest pytest-cov ruff setuptools typing-extensions --upgrade
+          uv pip install --system pytest pytest-cov ruff setuptools typing-extensions --upgrade
           cd package-python
-          uv run ruff check .
-          uv run ruff format --check .
-          uv run pytest --cov-fail-under=90 tests
+          ruff check .
+          ruff format --check .
+          pytest --cov-fail-under=90 tests
           cd ..
       - name: Save Artifacts
         uses: actions/upload-artifact@v4
@@ -123,7 +123,7 @@ jobs:
         with:
           python-version: ${{ matrix.pyversion }}
       - name: Install deps
-        run: uv pip install numpy pandas seaborn scikit-learn toml
+        run: uv pip install --system numpy pandas seaborn scikit-learn toml
       - run: |
           cp README.md package-python/README.md
           cp LICENSE package-python/LICENSE
@@ -131,7 +131,7 @@ jobs:
       - name: Build test data (Install perpetual with its dev dependencies)
         run: |
           cd package-python
-          uv pip install -e .[dev]
+          uv pip install --system -e .[dev]
           cd ..
       - name: Build wheels with maturin
         uses: PyO3/maturin-action@v1
@@ -139,14 +139,14 @@ jobs:
           command: build
           args: --release --strip --interpreter python --manifest-path package-python/Cargo.toml --out dist --sdist
       - name: Install wheel
-        run: uv pip install perpetual --no-index --find-links dist --no-deps --force-reinstall
+        run: uv pip install --system perpetual --no-index --find-links dist --no-deps --force-reinstall
       - name: Run Package Tests
         run: |
-          uv pip install pytest pytest-cov ruff setuptools typing-extensions --upgrade
+          uv pip install --system pytest pytest-cov ruff setuptools typing-extensions --upgrade
           cd package-python
-          uv run ruff check .
-          uv run ruff format --check .
-          uv run pytest --cov-fail-under=90 tests
+          ruff check .
+          ruff format --check .
+          pytest --cov-fail-under=90 tests
           cd ..
       - name: Save Artifacts
         uses: actions/upload-artifact@v4
@@ -181,7 +181,7 @@ jobs:
           python-version: ${{ matrix.pyversion }}
           architecture: x64
       - name: Install deps
-        run: uv pip install numpy pandas seaborn scikit-learn toml
+        run: uv pip install --system numpy pandas seaborn scikit-learn toml
       - run: |
           cp README.md package-python/README.md
           cp LICENSE package-python/LICENSE
@@ -189,7 +189,7 @@ jobs:
       - name: Build test data (Install perpetual with its dev dependencies)
         run: |
           cd package-python
-          uv pip install -e .[dev]
+          uv pip install --system -e .[dev]
           cd ..
       - name: Build wheels with maturin
         uses: PyO3/maturin-action@v1
@@ -199,14 +199,14 @@ jobs:
           command: build
           args: --release --strip --interpreter python${{ matrix.pyversion }} --manifest-path package-python/Cargo.toml --out dist --sdist
       - name: Install wheel
-        run: uv pip install perpetual --no-index --find-links dist --no-deps --force-reinstall
+        run: uv pip install --system perpetual --no-index --find-links dist --no-deps --force-reinstall
       - name: Run Package Tests
         run: |
-          uv pip install pytest pytest-cov ruff setuptools typing-extensions --upgrade
+          uv pip install --system pytest pytest-cov ruff setuptools typing-extensions --upgrade
           cd package-python
-          uv run ruff check .
-          uv run ruff format --check .
-          uv run pytest --cov-fail-under=90 tests
+          ruff check .
+          ruff format --check .
+          pytest --cov-fail-under=90 tests
           cd ..
       - name: Save Artifacts
         uses: actions/upload-artifact@v4
@@ -241,7 +241,7 @@ jobs:
           python-version: ${{ matrix.pyversion }}
           architecture: arm64
       - name: Install deps
-        run: uv pip install numpy pandas seaborn scikit-learn toml
+        run: uv pip install --system numpy pandas seaborn scikit-learn toml
       - run: |
           cp README.md package-python/README.md
           cp LICENSE package-python/LICENSE
@@ -249,7 +249,7 @@ jobs:
       - name: Build test data (Install perpetual with its dev dependencies)
         run: |
           cd package-python
-          uv pip install -e .[dev]
+          uv pip install --system -e .[dev]
           cd ..
       - name: Build wheels with maturin
         uses: PyO3/maturin-action@v1
@@ -258,14 +258,14 @@ jobs:
           command: build
           args: --release --strip --interpreter python${{ matrix.pyversion }} --manifest-path package-python/Cargo.toml --out dist --sdist
       - name: Install wheel
-        run: uv pip install perpetual --no-index --find-links dist --no-deps --force-reinstall
+        run: uv pip install --system perpetual --no-index --find-links dist --no-deps --force-reinstall
       - name: Run Package Tests
         run: |
-          uv pip install pytest pytest-cov ruff setuptools typing-extensions --upgrade
+          uv pip install --system pytest pytest-cov ruff setuptools typing-extensions --upgrade
           cd package-python
-          uv run ruff check .
-          uv run ruff format --check .
-          uv run pytest --cov-fail-under=90 tests
+          ruff check .
+          ruff format --check .
+          pytest --cov-fail-under=90 tests
           cd ..
       - name: Save Artifacts
         uses: actions/upload-artifact@v4
@@ -297,7 +297,7 @@ jobs:
           python-version: "3.11"
           architecture: x64
       - name: Install deps
-        run: uv pip install numpy pandas seaborn scikit-learn toml
+        run: uv pip install --system numpy pandas seaborn scikit-learn toml
       - run: |
           cp README.md package-python/README.md
           cp LICENSE package-python/LICENSE
@@ -305,7 +305,7 @@ jobs:
       - name: Build test data (Install perpetual with its dev dependencies)
         run: |
           cd package-python
-          uv pip install -e .[dev]
+          uv pip install --system -e .[dev]
           cd ..
       - name: Run tests
         # Cargo tests in the Rust package might still need the 'resources' folder
