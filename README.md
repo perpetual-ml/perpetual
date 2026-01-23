@@ -26,7 +26,7 @@ Perpetual is built in Rust and provides high-performance bindings for Python and
 | :--- | :--- | :--- | :--- |
 | **Python** | `pip install perpetual` | [Python API](https://perpetual-ml.github.io/perpetual) | [`package-python`](./package-python) |
 | **Rust** | `cargo add perpetual` | [docs.rs](https://docs.rs/perpetual) | [`src`](./src) |
-| **R** | `devtools::install_github("perpetual-ml/perpetual", subdir="package-r")` | [pkgdown Site](https://perpetual-ml.github.io/perpetual/r) | [`package-r`](./package-r) |
+| **R** | `install.packages("perpetual")` | [pkgdown Site](https://perpetual-ml.github.io/perpetual/r) | [`package-r`](./package-r) |
 
 ## Usage
 

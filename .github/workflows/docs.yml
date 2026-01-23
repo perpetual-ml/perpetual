@@ -2,8 +2,6 @@ name: docs
 on:
   release:
     types: [published]
-  push:
-    branches: [main]
 
 permissions:
   contents: write
@@ -32,7 +30,6 @@ jobs:
 
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
-        if: github.event_name == 'release' || github.ref == 'refs/heads/main'
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: package-python/docs/build/html
