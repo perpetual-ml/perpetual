@@ -1,3 +1,10 @@
+[workspace]
+members = [
+    ".",
+    "package-python",
+    "package-r/src/rust",
+]
+
 [package]
 name = "perpetual"
 version = "1.0.0"

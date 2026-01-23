@@ -67,4 +67,4 @@ if __name__ == "__main__":
 
     print(f"avg cpu time: {np.mean(cpu_times)}, avg {metric_name}: {np.mean(metrics)}")
     print(f"avg wall time: {np.mean(wall_times)}")
-    print(f"cpu time / wall time: {(np.mean(cpu_times)/np.mean(wall_times)):.1f}")
+    print(f"cpu time / wall time: {(np.mean(cpu_times) / np.mean(wall_times)):.1f}")
