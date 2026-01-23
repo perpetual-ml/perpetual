@@ -2,29 +2,37 @@ name: docs
 on:
   release:
     types: [published]
+  push:
+    branches: [main]
 
 permissions:
   contents: write
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-python@v4
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
         with:
-          python-version: 3.x
-      - run: echo "cache_id=$(date --utc '+%V')" >> $GITHUB_ENV
-      - uses: actions/cache@v3
-        with:
-          key: mkdocs-material-${{ env.cache_id }}
-          path: .cache
-          restore-keys: |
-            mkdocs-material-
-      - run: |
-          cp README.md python-package/README.md
-          cp LICENSE python-package/LICENSE
-      - run: pip install mkdocs-material
-      - run: |
-          cd python-package
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          cd package-python
           pip install .[dev]
-          mkdocs gh-deploy --force
+          pip install sphinx sphinx_rtd_theme numpydoc
+
+      - name: Build Python Documentation
+        run: |
+          cd package-python/docs
+          sphinx-build -b html source build/html
+
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v3
+        if: github.event_name == 'release' || github.ref == 'refs/heads/main'
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: package-python/docs/build/html

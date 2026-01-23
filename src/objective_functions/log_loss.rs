@@ -61,28 +61,36 @@ impl ObjectiveFunction for LogLoss {
         sample_weight: Option<&[f64]>,
         _group: Option<&[u64]>,
     ) -> (Vec<f32>, Option<Vec<f32>>) {
+        let len = y.len();
+        let mut g = Vec::with_capacity(len);
+        let mut h = Vec::with_capacity(len);
+
         match sample_weight {
-            Some(sample_weight) => {
-                let (g, h) = y
-                    .iter()
-                    .zip(yhat)
-                    .zip(sample_weight)
-                    .map(|((y_, yhat_), w_)| {
-                        let yhat_ = f64::ONE / (f64::ONE + (-*yhat_).exp());
-                        (((yhat_ - *y_) * *w_) as f32, (yhat_ * (f64::ONE - yhat_) * *w_) as f32)
-                    })
-                    .unzip();
+            Some(w) => {
+                for i in 0..len {
+                    let y_val = y[i] as f32;
+                    let yhat_val = yhat[i] as f32;
+                    let w_val = w[i] as f32;
+
+                    // Sigmoid in f32
+                    let p = 1.0 / (1.0 + (-yhat_val).exp());
+
+                    g.push((p - y_val) * w_val);
+                    h.push(p * (1.0 - p) * w_val);
+                }
                 (g, Some(h))
             }
             None => {
-                let (g, h) = y
-                    .iter()
-                    .zip(yhat)
-                    .map(|(y_, yhat_)| {
-                        let yhat_ = f64::ONE / (f64::ONE + (-*yhat_).exp());
-                        ((yhat_ - *y_) as f32, (yhat_ * (f64::ONE - yhat_)) as f32)
-                    })
-                    .unzip();
+                for i in 0..len {
+                    let y_val = y[i] as f32;
+                    let yhat_val = yhat[i] as f32;
+
+                    // Sigmoid in f32
+                    let p = 1.0 / (1.0 + (-yhat_val).exp());
+
+                    g.push(p - y_val);
+                    h.push(p * (1.0 - p));
+                }
                 (g, Some(h))
             }
         }

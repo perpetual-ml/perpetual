@@ -26,4 +26,4 @@ pub mod utils;
 // Individual classes, and functions
 pub use booster::core::PerpetualBooster;
 pub use booster::multi_output::MultiOutputBooster;
-pub use data::Matrix;
+pub use data::{ColumnarMatrix, Matrix};

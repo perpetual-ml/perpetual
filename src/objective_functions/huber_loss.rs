@@ -54,43 +54,44 @@ impl ObjectiveFunction for HuberLoss {
         sample_weight: Option<&[f64]>,
         _group: Option<&[u64]>,
     ) -> (Vec<f32>, Option<Vec<f32>>) {
-        let delta = self.delta.unwrap_or(1.0);
+        let delta = self.delta.unwrap_or(1.0) as f32;
+        let len = y.len();
+        let mut g = Vec::with_capacity(len);
+        let mut h = Vec::with_capacity(len);
 
         match sample_weight {
             Some(weights) => {
-                let (grad, hess): (Vec<f32>, Vec<f32>) = y
-                    .iter()
-                    .zip(yhat.iter())
-                    .enumerate()
-                    .map(|(i, (&yi, &yh))| {
-                        let r = yi - yh;
-                        let ar = r.abs();
-                        let sign = (yh - yi).signum();
-                        let g = if ar <= delta {
-                            (yh - yi) * weights[i]
-                        } else {
-                            delta * sign * weights[i]
-                        };
-                        let h = if ar <= delta { weights[i] } else { 0.0 };
-                        (g as f32, h as f32)
-                    })
-                    .unzip();
-                (grad, Some(hess))
+                for i in 0..len {
+                    let diff = (yhat[i] - y[i]) as f32;
+                    let abs_diff = diff.abs();
+                    let w = weights[i] as f32;
+
+                    if abs_diff <= delta {
+                        g.push(diff * w);
+                        h.push(w);
+                    } else {
+                        let sign = diff.signum();
+                        g.push(delta * sign * w);
+                        h.push(0.0);
+                    }
+                }
+                (g, Some(h))
             }
             None => {
-                let (grad, hess): (Vec<f32>, Vec<f32>) = y
-                    .iter()
-                    .zip(yhat.iter())
-                    .map(|(&yi, &yh)| {
-                        let r = yi - yh;
-                        let ar = r.abs();
-                        let sign = (yh - yi).signum();
-                        let g = if ar <= delta { yh - yi } else { delta * sign };
-                        let h = if ar <= delta { 1.0 } else { 0.0 };
-                        (g as f32, h as f32)
-                    })
-                    .unzip();
-                (grad, Some(hess))
+                for i in 0..len {
+                    let diff = (yhat[i] - y[i]) as f32;
+                    let abs_diff = diff.abs();
+
+                    if abs_diff <= delta {
+                        g.push(diff);
+                        h.push(1.0);
+                    } else {
+                        let sign = diff.signum();
+                        g.push(delta * sign);
+                        h.push(0.0);
+                    }
+                }
+                (g, Some(h))
             }
         }
     }

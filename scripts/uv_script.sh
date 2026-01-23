@@ -1,4 +1,4 @@
-cd python-package
+cd package-python
 uv sync
 source .venv\Scripts\activate
 uv pip install pip

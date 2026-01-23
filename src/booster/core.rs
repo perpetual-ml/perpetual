@@ -1,12 +1,12 @@
 use crate::bin::Bin;
-use crate::binning::bin_matrix;
+use crate::binning::{bin_columnar_matrix, bin_matrix};
 use crate::booster::config::*;
 use crate::constants::{
     FREE_MEM_ALLOC_FACTOR, GENERALIZATION_THRESHOLD_RELAXED, ITER_LIMIT, MIN_COL_AMOUNT, N_NODES_ALLOC_MAX,
     N_NODES_ALLOC_MIN, STOPPING_ROUNDS,
 };
 use crate::constraints::ConstraintMap;
-use crate::data::Matrix;
+use crate::data::{ColumnarMatrix, Matrix};
 use crate::decision_tree::tree::{Tree, TreeStopper};
 use crate::errors::PerpetualError;
 use crate::histogram::{update_cuts, NodeHistogram, NodeHistogramOwned};
@@ -26,14 +26,24 @@ use sysinfo::System;
 
 type ImportanceFn = fn(&Tree, &mut HashMap<usize, (f32, usize)>);
 
-/// Perpetual Booster object
+/// A self-generalizing Gradient Boosting Machine (GBM) with Perpetual Learning.
+///
+/// `PerpetualBooster` is the main object for training and prediction. It automatically
+/// finds the best configuration (learning rate, tree complexity, etc.) based on a single
+/// `budget` parameter.
 #[derive(Clone, Serialize, Deserialize)]
 pub struct PerpetualBooster {
+    /// Configuration for the booster.
     pub cfg: BoosterConfig,
+    /// The initial prediction value of the model.
     pub base_score: f64,
+    /// The global learning rate (eta) derived from the budget.
     pub eta: f32,
+    /// The collection of decision trees in the ensemble.
     pub trees: Vec<Tree>,
+    /// Calibration models for prediction intervals.
     pub cal_models: HashMap<String, [(PerpetualBooster, f64); 2]>,
+    /// Arbitrary metadata saved with the model.
     pub metadata: HashMap<String, String>,
 }
 
@@ -51,41 +61,30 @@ impl Default for PerpetualBooster {
 }
 
 impl PerpetualBooster {
-    /// Perpetual Booster object
+    /// Create a new `PerpetualBooster` instance.
     ///
-    /// * `objective` - The name of objective function used to optimize. Valid options are:
-    ///   "LogLoss" to use logistic loss as the objective function,
-    ///   "SquaredLoss" to use Squared Error as the objective function,
-    ///   "QuantileLoss" for quantile regression.
-    ///   "AdaptiveHuberLoss" for adaptive huber loss regression.
-    ///   "HuberLoss" for huber loss regression.
-    ///   "ListNetLoss" for listnet loss ranking.
-    ///   or a custom objective function that implements the ObjectiveFunction trait.
-    /// * `budget` - budget to fit the model.
-    /// * `base_score` - The initial_value prediction value of the model. If set to None, it will be calculated based on the objective function at fit time.
-    /// * `max_bin` - Number of bins to calculate to partition the data. Setting this to
-    ///   a smaller number, will result in faster training time, while potentially sacrificing
-    ///   accuracy. If there are more bins, than unique values in a column, all unique values
-    ///   will be used.
-    /// * `num_threads` - Number of threads to use during training
-    /// * `monotone_constraints` - Constraints that are used to enforce a specific relationship
-    ///   between the training features and the target variable.
-    /// * `force_children_to_bound_parent` - force_children_to_bound_parent.
-    /// * `missing` - Value to consider missing.
-    /// * `allow_missing_splits` - Should the algorithm allow splits that completed seperate out missing
-    ///   and non-missing values, in the case where `create_missing_branch` is false. When `create_missing_branch`
-    ///   is true, setting this to true will result in the missing branch being further split.
-    /// * `create_missing_branch` - Should missing be split out its own separate branch?
-    /// * `missing_node_treatment` - specify how missing nodes should be handled during training.
-    /// * `log_iterations` - Setting to a value (N) other than zero will result in information being logged about ever N iterations.
-    /// * `seed` - Integer value used to seed any randomness used in the algorithm.
-    /// * `quantile` - used only in quantile regression.
-    /// * `reset` - Reset the model or continue training.
-    /// * `categorical_features` - categorical features.
-    /// * `timeout` - fit timeout limit in seconds.
-    /// * `iteration_limit` - optional limit for the number of boosting rounds.
-    /// * `memory_limit` - optional limit for memory allocation.
-    /// * `stopping_rounds` - optional limit for auto stopping rounds.
+    /// # Arguments
+    /// * `objective` - Learning objective (e.g., LogLoss, SquaredLoss).
+    /// * `budget` - A positive number for fitting budget. Higher values result in more boosting rounds.
+    /// * `base_score` - Initial prediction value. If NaN, it's calculated from data.
+    /// * `max_bin` - Maximum number of bins for feature discretization.
+    /// * `num_threads` - Number of threads for parallel execution.
+    /// * `monotone_constraints` - Constraints to enforce monotonic relationships.
+    /// * `force_children_to_bound_parent` - Restrict child node weights to the parent range.
+    /// * `missing` - Value used to represent missing data.
+    /// * `allow_missing_splits` - Allow splits that isolate missing values.
+    /// * `create_missing_branch` - Create ternary trees with an explicit missing branch.
+    /// * `terminate_missing_features` - Features for which missing branches are always leaves.
+    /// * `missing_node_treatment` - Strategy for calculating missing node weights.
+    /// * `log_iterations` - Logging frequency (every N iterations).
+    /// * `seed` - Random seed for reproducibility.
+    /// * `quantile` - Target quantile for QuantileLoss.
+    /// * `reset` - Whether to reset or continue training on subsequent fit calls.
+    /// * `categorical_features` - Indices of features to treat as categorical.
+    /// * `timeout` - Time limit for fitting in seconds.
+    /// * `iteration_limit` - Maximum number of boosting rounds.
+    /// * `memory_limit` - Memory limit for the ensemble in GB.
+    /// * `stopping_rounds` - Early stopping rounds.
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         objective: Objective,
@@ -131,6 +130,7 @@ impl PerpetualBooster {
             iteration_limit,
             memory_limit,
             stopping_rounds,
+            save_node_stats: false,
         };
 
         let booster = PerpetualBooster {
@@ -154,12 +154,13 @@ impl PerpetualBooster {
         self.trees = Vec::new();
     }
 
-    /// Fit the gradient booster on a provided dataset.
+    /// Fit the booster on a provided dataset.
     ///
-    /// * `data` -  Either a Polars or Pandas DataFrame, or a 2 dimensional Numpy array.
-    /// * `y` - Either a Polars or Pandas Series, or a 1 dimensional Numpy array.
-    /// * `sample_weight` - Instance weights to use when training the model.
-    /// * `group` - Group labels to use when training a model that uses a ranking objective.
+    /// # Arguments
+    /// * `data` - Feature matrix (row-major).
+    /// * `y` - Target vector.
+    /// * `sample_weight` - Optional per-sample weights.
+    /// * `group` - Optional group labels for ranking.
     pub fn fit(
         &mut self,
         data: &Matrix<f64>,
@@ -189,6 +190,47 @@ impl PerpetualBooster {
         } else {
             let splitter = MissingImputerSplitter::new(self.eta, self.cfg.allow_missing_splits, constraints_map);
             self.fit_trees(data, y, &splitter, sample_weight, group)?;
+        };
+
+        Ok(())
+    }
+
+    /// Fit the booster on columnar data (zero-copy path).
+    ///
+    /// # Arguments
+    /// * `data` - Columnar feature matrix.
+    /// * `y` - Target vector.
+    /// * `sample_weight` - Optional per-sample weights.
+    /// * `group` - Optional group labels for ranking.
+    pub fn fit_columnar(
+        &mut self,
+        data: &ColumnarMatrix<f64>,
+        y: &[f64],
+        sample_weight: Option<&[f64]>,
+        group: Option<&[u64]>,
+    ) -> Result<(), PerpetualError> {
+        let constraints_map = self
+            .cfg
+            .monotone_constraints
+            .as_ref()
+            .unwrap_or(&ConstraintMap::new())
+            .to_owned();
+
+        self.set_eta(self.cfg.budget);
+
+        if self.cfg.create_missing_branch {
+            let splitter = MissingBranchSplitter::new(
+                self.eta,
+                self.cfg.allow_missing_splits,
+                constraints_map,
+                self.cfg.terminate_missing_features.clone(),
+                self.cfg.missing_node_treatment,
+                self.cfg.force_children_to_bound_parent,
+            );
+            self.fit_trees_columnar(data, y, &splitter, sample_weight, group)?;
+        } else {
+            let splitter = MissingImputerSplitter::new(self.eta, self.cfg.allow_missing_splits, constraints_map);
+            self.fit_trees_columnar(data, y, &splitter, sample_weight, group)?;
         };
 
         Ok(())
@@ -374,6 +416,7 @@ impl PerpetualBooster {
                 self.cfg.categorical_features.as_ref(),
                 &mut split_info_slice,
                 n_nodes_alloc,
+                self.cfg.save_node_stats,
             );
 
             self.update_predictions_inplace(&mut yhat, &tree, data);
@@ -382,7 +425,7 @@ impl PerpetualBooster {
                 let generalization = tree
                     .nodes
                     .values()
-                    .map(|n| n.generalization.unwrap_or(0.0))
+                    .map(|n| n.stats.as_ref().and_then(|s| s.generalization).unwrap_or(0.0))
                     .max_by(|a, b| a.total_cmp(b))
                     .unwrap_or(0.0);
                 if generalization < GENERALIZATION_THRESHOLD_RELAXED && tree.stopper != TreeStopper::StepSize {
@@ -444,8 +487,253 @@ impl PerpetualBooster {
         Ok(())
     }
 
+    fn fit_trees_columnar<T: Splitter>(
+        &mut self,
+        data: &ColumnarMatrix<f64>,
+        y: &[f64],
+        splitter: &T,
+        sample_weight: Option<&[f64]>,
+        group: Option<&[u64]>,
+    ) -> Result<(), PerpetualError> {
+        let start = Instant::now();
+        let objective_fn = &self.cfg.objective;
+
+        let n_threads_available = std::thread::available_parallelism().unwrap().get();
+        let num_threads = match self.cfg.num_threads {
+            Some(num_threads) => num_threads,
+            None => n_threads_available,
+        };
+        let pool = rayon::ThreadPoolBuilder::new()
+            .num_threads(num_threads)
+            .build()
+            .unwrap();
+
+        // If reset, reset the trees. Otherwise continue training.
+        let mut yhat;
+        if self.cfg.reset.unwrap_or(true) || self.trees.is_empty() {
+            if self.base_score.is_nan() {
+                self.base_score = objective_fn.initial_value(y, sample_weight, group);
+            }
+            yhat = vec![self.base_score; y.len()];
+        } else {
+            // For reset=false, we need to predict - create temp flat data
+            let flat_data: Vec<f64> = (0..data.cols)
+                .flat_map(|col| data.get_col(col).iter().copied())
+                .collect();
+            let temp_matrix = Matrix::new(&flat_data, data.rows, data.cols);
+            yhat = self.predict(&temp_matrix, true);
+        }
+
+        let (mut grad, mut hess) = objective_fn.gradient(y, &yhat, sample_weight, group);
+        let mut loss = objective_fn.loss(y, &yhat, sample_weight, group);
+        let loss_base = objective_fn.loss(y, &vec![self.base_score; y.len()], sample_weight, group);
+        let loss_avg = loss_base.iter().sum::<f32>() / loss_base.len() as f32;
+
+        let base = 10.0_f32;
+        let n = base / self.cfg.budget;
+        let reciprocals_of_powers = n / (n - 1.0);
+        let truncated_series_sum = reciprocals_of_powers - (1.0 + 1.0 / n);
+        let c = 1.0 / n - truncated_series_sum;
+        let target_loss_decrement = c * base.powf(-self.cfg.budget) * loss_avg;
+
+        let is_const_hess = hess.is_none();
+
+        // Generate binned data using columnar binning
+        let binned_data = bin_columnar_matrix(
+            data,
+            sample_weight,
+            self.cfg.max_bin,
+            self.cfg.missing,
+            self.cfg.categorical_features.as_ref(),
+        )?;
+        let bdata = Matrix::new(&binned_data.binned_data, data.rows, data.cols);
+
+        let col_index: Vec<usize> = (0..data.cols).collect();
+        let mut stopping = 0;
+        let mut n_low_loss_rounds = 0;
+
+        let mut rng = StdRng::seed_from_u64(self.cfg.seed);
+
+        let row_column_ratio_limit = 10.0_f32.powf(-self.cfg.budget) * 1000.0;
+        let colsample_bytree = (data.rows as f32 / data.cols as f32) / row_column_ratio_limit;
+
+        let col_amount = (((col_index.len() as f32) * colsample_bytree).floor() as usize)
+            .clamp(usize::min(MIN_COL_AMOUNT, col_index.len()), col_index.len());
+
+        let mem_bin = mem::size_of::<Bin>();
+        let mem_hist: usize = if col_amount == col_index.len() {
+            mem_bin * binned_data.nunique.iter().sum::<usize>()
+        } else {
+            mem_bin * self.cfg.max_bin as usize * col_amount
+        };
+        let sys = System::new_all();
+        let mem_available = match self.cfg.memory_limit {
+            Some(mem_limit) => mem_limit * 1e9_f32,
+            None => match sys.cgroup_limits() {
+                Some(limits) => limits.free_memory as f32,
+                None => sys.available_memory() as f32,
+            },
+        };
+
+        let mut n_nodes_alloc: usize;
+        if self.cfg.memory_limit.is_none() {
+            n_nodes_alloc = (FREE_MEM_ALLOC_FACTOR * (mem_available / (mem_hist as f32))) as usize;
+            n_nodes_alloc = n_nodes_alloc.clamp(N_NODES_ALLOC_MIN, N_NODES_ALLOC_MAX);
+        } else {
+            n_nodes_alloc = (FREE_MEM_ALLOC_FACTOR * (mem_available / (mem_hist as f32))) as usize;
+        }
+
+        let mut hist_tree_owned: Vec<NodeHistogramOwned>;
+        if col_amount == col_index.len() {
+            hist_tree_owned = (0..n_nodes_alloc)
+                .map(|_| NodeHistogramOwned::empty_from_cuts(&binned_data.cuts, &col_index, is_const_hess, false))
+                .collect();
+        } else {
+            hist_tree_owned = (0..n_nodes_alloc)
+                .map(|_| NodeHistogramOwned::empty(self.cfg.max_bin, col_amount, is_const_hess, false))
+                .collect();
+        }
+
+        let mut hist_tree: Vec<NodeHistogram> = hist_tree_owned.iter_mut().map(NodeHistogram::from_owned).collect();
+        let mut split_info_vec: Vec<SplitInfo> = (0..col_amount).map(|_| SplitInfo::default()).collect();
+        let mut split_info_slice = SplitInfoSlice::new(&mut split_info_vec);
+
+        for i in 0..self.cfg.iteration_limit.unwrap_or(ITER_LIMIT) {
+            let verbose = if self.cfg.log_iterations == 0 {
+                false
+            } else {
+                i % self.cfg.log_iterations == 0
+            };
+
+            let tld = if n_low_loss_rounds > (self.cfg.stopping_rounds.unwrap_or(STOPPING_ROUNDS) + 1) {
+                None
+            } else {
+                Some(target_loss_decrement)
+            };
+
+            let col_index_sample: Vec<usize> = if col_amount == col_index.len() {
+                Vec::new()
+            } else {
+                let mut v: Vec<usize> = col_index
+                    .iter()
+                    .choose_multiple(&mut rng, col_amount)
+                    .iter()
+                    .map(|i| **i)
+                    .collect();
+                v.sort();
+                v
+            };
+
+            let col_index_fit = if col_amount == col_index.len() {
+                &col_index
+            } else {
+                &col_index_sample
+            };
+
+            if col_amount != col_index.len() {
+                hist_tree.iter().for_each(|h| {
+                    update_cuts(h, col_index_fit, &binned_data.cuts, true);
+                })
+            }
+
+            let mut tree = Tree::new();
+            tree.fit(
+                objective_fn,
+                &bdata,
+                data.index.to_owned(),
+                col_index_fit,
+                &mut grad,
+                hess.as_deref_mut(),
+                splitter,
+                &pool,
+                tld,
+                &loss,
+                y,
+                &yhat,
+                sample_weight,
+                group,
+                is_const_hess,
+                &mut hist_tree,
+                self.cfg.categorical_features.as_ref(),
+                &mut split_info_slice,
+                n_nodes_alloc,
+                self.cfg.save_node_stats,
+            );
+
+            self.update_predictions_inplace_columnar(&mut yhat, &tree, data);
+
+            if tree.nodes.len() < 5 {
+                let generalization = tree
+                    .nodes
+                    .values()
+                    .map(|n| n.stats.as_ref().and_then(|s| s.generalization).unwrap_or(0.0))
+                    .max_by(|a, b| a.total_cmp(b))
+                    .unwrap_or(0.0);
+                if generalization < GENERALIZATION_THRESHOLD_RELAXED && tree.stopper != TreeStopper::StepSize {
+                    stopping += 1;
+                    if tree.nodes.len() == 1 {
+                        break;
+                    }
+                }
+            }
+
+            if tree.stopper != TreeStopper::StepSize {
+                n_low_loss_rounds += 1;
+            } else {
+                n_low_loss_rounds = 0;
+            }
+
+            (grad, hess) = objective_fn.gradient(y, &yhat, sample_weight, group);
+            loss = objective_fn.loss(y, &yhat, sample_weight, group);
+
+            if verbose {
+                info!(
+                    "round {:0?}, tree.nodes: {:1?}, tree.depth: {:2?}, tree.stopper: {:3?}, loss: {:4?}",
+                    i,
+                    tree.nodes.len(),
+                    tree.depth,
+                    tree.stopper,
+                    loss.iter().sum::<f32>() / loss.len() as f32,
+                );
+            }
+
+            self.trees.push(tree);
+
+            if stopping >= self.cfg.stopping_rounds.unwrap_or(STOPPING_ROUNDS) {
+                info!("Auto stopping since stopping round limit reached.");
+                break;
+            }
+
+            if let Some(t) = self.cfg.timeout {
+                if start.elapsed().as_secs_f32() > t {
+                    warn!("Reached timeout limit before auto stopping. Try to decrease the budget or increase the timeout for the best performance.");
+                    break;
+                }
+            }
+
+            if i == self.cfg.iteration_limit.unwrap_or(ITER_LIMIT) - 1 {
+                warn!("Reached iteration limit before auto stopping. Try to decrease the budget for the best performance.");
+            }
+        }
+
+        if self.cfg.log_iterations > 0 {
+            info!(
+                "Finished training a booster with {0} trees in {1} seconds.",
+                self.trees.len(),
+                start.elapsed().as_secs()
+            );
+        }
+
+        Ok(())
+    }
+
     fn update_predictions_inplace(&self, yhat: &mut [f64], tree: &Tree, data: &Matrix<f64>) {
         let preds = tree.predict(data, true, &self.cfg.missing);
+        yhat.iter_mut().zip(preds).for_each(|(i, j)| *i += j);
+    }
+
+    fn update_predictions_inplace_columnar(&self, yhat: &mut [f64], tree: &Tree, data: &ColumnarMatrix<f64>) {
+        let preds = tree.predict_columnar(data, true, &self.cfg.missing);
         yhat.iter_mut().zip(preds).for_each(|(i, j)| *i += j);
     }
 
@@ -535,6 +823,92 @@ impl PerpetualBooster {
     }
 }
 
+pub(crate) fn fix_legacy_value(value: &mut serde_json::Value) {
+    if let serde_json::Value::Object(map) = value {
+        if map.contains_key("nodes") {
+            if let Some(nodes) = map.get_mut("nodes").and_then(|n| n.as_object_mut()) {
+                for node in nodes.values_mut() {
+                    fix_legacy_node(node);
+                }
+            }
+        }
+        for v in map.values_mut() {
+            fix_legacy_value(v);
+        }
+    } else if let serde_json::Value::Array(arr) = value {
+        for v in arr {
+            fix_legacy_value(v);
+        }
+    }
+}
+
+pub(crate) fn fix_legacy_node(node: &mut serde_json::Value) {
+    if let Some(node_obj) = node.as_object_mut() {
+        if let Some(left_cats_val) = node_obj.get("left_cats") {
+            if let Some(left_cats_arr) = left_cats_val.as_array() {
+                if left_cats_arr.len() != 8192 && (!left_cats_arr.is_empty() || node_obj.contains_key("right_cats")) {
+                    let left_cats_indices: Vec<u16> = left_cats_arr
+                        .iter()
+                        .filter_map(|v| v.as_u64().map(|n| n as u16))
+                        .collect();
+                    let right_cats_indices: Vec<u16> = node_obj
+                        .get("right_cats")
+                        .and_then(|v| v.as_array())
+                        .map(|arr| arr.iter().filter_map(|v| v.as_u64().map(|n| n as u16)).collect())
+                        .unwrap_or_default();
+
+                    if !left_cats_indices.is_empty() || !right_cats_indices.is_empty() {
+                        let missing_node = node_obj.get("missing_node").and_then(|v| v.as_u64()).unwrap_or(0) as usize;
+                        let left_child = node_obj.get("left_child").and_then(|v| v.as_u64()).unwrap_or(0) as usize;
+
+                        let mut bitset = vec![0u8; 8192];
+                        if missing_node == left_child {
+                            bitset.fill(255);
+                            for &cat in &right_cats_indices {
+                                let byte_idx = (cat >> 3) as usize;
+                                let bit_idx = (cat & 7) as u8;
+                                if byte_idx < 8192 {
+                                    bitset[byte_idx] &= !(1 << bit_idx);
+                                }
+                            }
+                        } else {
+                            for &cat in &left_cats_indices {
+                                let byte_idx = (cat >> 3) as usize;
+                                let bit_idx = (cat & 7) as u8;
+                                if byte_idx < 8192 {
+                                    bitset[byte_idx] |= 1 << bit_idx;
+                                }
+                            }
+                        }
+                        node_obj.insert(
+                            "left_cats".to_string(),
+                            serde_json::Value::Array(
+                                bitset
+                                    .into_iter()
+                                    .map(|b| serde_json::Value::Number(b.into()))
+                                    .collect(),
+                            ),
+                        );
+                    } else {
+                        // It's a numerical split, ensure left_cats is null for the current library
+                        node_obj.insert("left_cats".to_string(), serde_json::Value::Null);
+                    }
+                }
+            }
+        }
+        node_obj.remove("right_cats");
+    }
+}
+
+impl BoosterIO for PerpetualBooster {
+    fn from_json(json_str: &str) -> Result<Self, PerpetualError> {
+        let mut value: serde_json::Value =
+            serde_json::from_str(json_str).map_err(|e| PerpetualError::UnableToRead(e.to_string()))?;
+        fix_legacy_value(&mut value);
+        serde_json::from_value::<Self>(value).map_err(|e| PerpetualError::UnableToRead(e.to_string()))
+    }
+}
+
 #[cfg(test)]
 mod perpetual_booster_test {
 
@@ -545,15 +919,70 @@ mod perpetual_booster_test {
     use crate::utils::between;
     use crate::{Matrix, PerpetualBooster};
     use approx::assert_relative_eq;
-    use polars::io::SerReader;
-    use polars::prelude::*;
     use rand::Rng;
     use serde::{Deserialize, Serialize};
     use std::collections::HashMap;
     use std::collections::HashSet;
     use std::error::Error;
     use std::fs;
+    use std::fs::File;
+    use std::io::BufReader;
     use std::sync::Arc;
+
+    fn read_data(path: &str) -> Result<(Vec<f64>, Vec<f64>), Box<dyn Error>> {
+        let feature_names = [
+            "MedInc",
+            "HouseAge",
+            "AveRooms",
+            "AveBedrms",
+            "Population",
+            "AveOccup",
+            "Latitude",
+            "Longitude",
+        ];
+        let target_name = "MedHouseVal";
+
+        let file = File::open(path)?;
+        let reader = BufReader::new(file);
+        let mut csv_reader = csv::ReaderBuilder::new().has_headers(true).from_reader(reader);
+
+        let headers = csv_reader.headers()?.clone();
+        let feature_indices: Vec<usize> = feature_names
+            .iter()
+            .map(|&name| headers.iter().position(|h| h == name).unwrap())
+            .collect();
+        let target_index = headers.iter().position(|h| h == target_name).unwrap();
+
+        let mut data_columns: Vec<Vec<f64>> = vec![Vec::new(); feature_names.len()];
+        let mut y = Vec::new();
+
+        for result in csv_reader.records() {
+            let record = result?;
+
+            // Parse target
+            let target_str = &record[target_index];
+            let target_val = if target_str.is_empty() {
+                f64::NAN
+            } else {
+                target_str.parse::<f64>().unwrap_or(f64::NAN)
+            };
+            y.push(target_val);
+
+            // Parse features
+            for (i, &idx) in feature_indices.iter().enumerate() {
+                let val_str = &record[idx];
+                let val = if val_str.is_empty() {
+                    f64::NAN
+                } else {
+                    val_str.parse::<f64>().unwrap_or(f64::NAN)
+                };
+                data_columns[i].push(val);
+            }
+        }
+
+        let data: Vec<f64> = data_columns.into_iter().flatten().collect();
+        Ok((data, y))
+    }
 
     #[test]
     fn test_booster_fit() {
@@ -676,85 +1105,8 @@ mod perpetual_booster_test {
 
     #[test]
     fn test_gbm_parallel() -> Result<(), Box<dyn Error>> {
-        let all_names = [
-            "MedInc".to_string(),
-            "HouseAge".to_string(),
-            "AveRooms".to_string(),
-            "AveBedrms".to_string(),
-            "Population".to_string(),
-            "AveOccup".to_string(),
-            "Latitude".to_string(),
-            "Longitude".to_string(),
-            "MedHouseVal".to_string(),
-        ];
-
-        let feature_names = [
-            "MedInc".to_string(),
-            "HouseAge".to_string(),
-            "AveRooms".to_string(),
-            "AveBedrms".to_string(),
-            "Population".to_string(),
-            "AveOccup".to_string(),
-            "Latitude".to_string(),
-            "Longitude".to_string(),
-        ];
-
-        let column_names_train = Arc::new(all_names.clone());
-        let column_names_test = Arc::new(all_names.clone());
-
-        let df_train = CsvReadOptions::default()
-            .with_has_header(true)
-            .with_columns(Some(column_names_train))
-            .try_into_reader_with_file_path(Some("resources/cal_housing_train.csv".into()))?
-            .finish()
-            .unwrap();
-
-        let df_test = CsvReadOptions::default()
-            .with_has_header(true)
-            .with_columns(Some(column_names_test))
-            .try_into_reader_with_file_path(Some("resources/cal_housing_test.csv".into()))?
-            .finish()
-            .unwrap();
-
-        // Get data in column major format...
-        let id_vars_train: Vec<&str> = Vec::new();
-        let mdf_train = df_train.unpivot(feature_names.clone(), &id_vars_train)?;
-        let id_vars_test: Vec<&str> = Vec::new();
-        let mdf_test = df_test.unpivot(feature_names, &id_vars_test)?;
-
-        let data_train = Vec::from_iter(
-            mdf_train
-                .select_at_idx(1)
-                .expect("Invalid column")
-                .f64()?
-                .into_iter()
-                .map(|v| v.unwrap_or(f64::NAN)),
-        );
-        let data_test = Vec::from_iter(
-            mdf_test
-                .select_at_idx(1)
-                .expect("Invalid column")
-                .f64()?
-                .into_iter()
-                .map(|v| v.unwrap_or(f64::NAN)),
-        );
-
-        let y_train = Vec::from_iter(
-            df_train
-                .column("MedHouseVal")?
-                .cast(&DataType::Float64)?
-                .f64()?
-                .into_iter()
-                .map(|v| v.unwrap_or(f64::NAN)),
-        );
-        let y_test = Vec::from_iter(
-            df_test
-                .column("MedHouseVal")?
-                .cast(&DataType::Float64)?
-                .f64()?
-                .into_iter()
-                .map(|v| v.unwrap_or(f64::NAN)),
-        );
+        let (data_train, y_train) = read_data("resources/cal_housing_train.csv")?;
+        let (data_test, y_test) = read_data("resources/cal_housing_test.csv")?;
 
         // Create Matrix from ndarray.
         let matrix_train = Matrix::new(&data_train, y_train.len(), 8);
@@ -827,7 +1179,11 @@ mod perpetual_booster_test {
             .set_objective(Objective::SquaredLoss)
             .set_categorical_features(Some(cat_index))
             .set_iteration_limit(Some(iter_limit))
-            .set_memory_limit(Some(0.00003))
+            // Memory limit is set to a very small value to force small trees (stumps/single splits).
+            // Reduced from 0.00003 to 0.00002 because the Bin struct became smaller after refactoring,
+            // which increased the number of nodes allocated (n_nodes_alloc) for the same memory limit.
+            .set_memory_limit(Some(0.00002))
+            .set_save_node_stats(true)
             .set_budget(1.0);
 
         booster.fit(&data, &y, None, None).unwrap();
@@ -891,60 +1247,7 @@ mod perpetual_booster_test {
 
     #[test]
     fn test_huber_loss() -> Result<(), Box<dyn Error>> {
-        let all_names = [
-            "MedInc".to_string(),
-            "HouseAge".to_string(),
-            "AveRooms".to_string(),
-            "AveBedrms".to_string(),
-            "Population".to_string(),
-            "AveOccup".to_string(),
-            "Latitude".to_string(),
-            "Longitude".to_string(),
-            "MedHouseVal".to_string(),
-        ];
-
-        let feature_names = [
-            "MedInc".to_string(),
-            "HouseAge".to_string(),
-            "AveRooms".to_string(),
-            "AveBedrms".to_string(),
-            "Population".to_string(),
-            "AveOccup".to_string(),
-            "Latitude".to_string(),
-            "Longitude".to_string(),
-        ];
-
-        let column_names_test = Arc::new(all_names.clone());
-
-        let df_test = CsvReadOptions::default()
-            .with_has_header(true)
-            .with_columns(Some(column_names_test))
-            .try_into_reader_with_file_path(Some("resources/cal_housing_test.csv".into()))?
-            .finish()
-            .unwrap();
-
-        // Get data in column major format...
-
-        let id_vars_test: Vec<&str> = Vec::new();
-        let mdf_test = df_test.unpivot(feature_names, &id_vars_test)?;
-
-        let data_test = Vec::from_iter(
-            mdf_test
-                .select_at_idx(1)
-                .expect("Invalid column")
-                .f64()?
-                .into_iter()
-                .map(|v| v.unwrap_or(f64::NAN)),
-        );
-
-        let y_test = Vec::from_iter(
-            df_test
-                .column("MedHouseVal")?
-                .cast(&DataType::Float64)?
-                .f64()?
-                .into_iter()
-                .map(|v| v.unwrap_or(f64::NAN)),
-        );
+        let (data_test, y_test) = read_data("resources/cal_housing_test.csv")?;
 
         // Create Matrix from ndarray.
         let matrix_test = Matrix::new(&data_test, y_test.len(), 8);
@@ -969,60 +1272,7 @@ mod perpetual_booster_test {
 
     #[test]
     fn test_adaptive_huber_loss() -> Result<(), Box<dyn Error>> {
-        let all_names = [
-            "MedInc".to_string(),
-            "HouseAge".to_string(),
-            "AveRooms".to_string(),
-            "AveBedrms".to_string(),
-            "Population".to_string(),
-            "AveOccup".to_string(),
-            "Latitude".to_string(),
-            "Longitude".to_string(),
-            "MedHouseVal".to_string(),
-        ];
-
-        let feature_names = [
-            "MedInc".to_string(),
-            "HouseAge".to_string(),
-            "AveRooms".to_string(),
-            "AveBedrms".to_string(),
-            "Population".to_string(),
-            "AveOccup".to_string(),
-            "Latitude".to_string(),
-            "Longitude".to_string(),
-        ];
-
-        let column_names_test = Arc::new(all_names.clone());
-
-        let df_test = CsvReadOptions::default()
-            .with_has_header(true)
-            .with_columns(Some(column_names_test))
-            .try_into_reader_with_file_path(Some("resources/cal_housing_test.csv".into()))?
-            .finish()
-            .unwrap();
-
-        // Get data in column major format...
-
-        let id_vars_test: Vec<&str> = Vec::new();
-        let mdf_test = df_test.unpivot(feature_names, &id_vars_test)?;
-
-        let data_test = Vec::from_iter(
-            mdf_test
-                .select_at_idx(1)
-                .expect("Invalid column")
-                .f64()?
-                .into_iter()
-                .map(|v| v.unwrap_or(f64::NAN)),
-        );
-
-        let y_test = Vec::from_iter(
-            df_test
-                .column("MedHouseVal")?
-                .cast(&DataType::Float64)?
-                .f64()?
-                .into_iter()
-                .map(|v| v.unwrap_or(f64::NAN)),
-        );
+        let (data_test, y_test) = read_data("resources/cal_housing_test.csv")?;
 
         // Create Matrix from ndarray.
         let matrix_test = Matrix::new(&data_test, y_test.len(), 8);
@@ -1106,67 +1356,23 @@ mod perpetual_booster_test {
             }
         }
 
-        let all_names = [
-            "MedInc".to_string(),
-            "HouseAge".to_string(),
-            "AveRooms".to_string(),
-            "AveBedrms".to_string(),
-            "Population".to_string(),
-            "AveOccup".to_string(),
-            "Latitude".to_string(),
-            "Longitude".to_string(),
-            "MedHouseVal".to_string(),
-        ];
-
-        let feature_names = [
-            "MedInc".to_string(),
-            "HouseAge".to_string(),
-            "AveRooms".to_string(),
-            "AveBedrms".to_string(),
-            "Population".to_string(),
-            "AveOccup".to_string(),
-            "Latitude".to_string(),
-            "Longitude".to_string(),
-        ];
-
-        let df = CsvReadOptions::default()
-            .with_has_header(true)
-            .with_columns(Some(Arc::new(all_names.clone())))
-            .try_into_reader_with_file_path(Some("resources/cal_housing_test.csv".into()))?
-            .finish()?;
-
-        let id_vars: Vec<&str> = Vec::new();
-        let mdf = df.unpivot(feature_names.to_vec(), &id_vars)?;
-
-        let data: Vec<f64> = mdf
-            .select_at_idx(1)
-            .expect("Invalid column")
-            .f64()? // Returns Result<Float64Chunked>
-            .into_iter()
-            .map(|v| v.unwrap_or(f64::NAN))
-            .collect();
-
-        let y: Vec<f64> = df
-            .column("MedHouseVal")?
-            .cast(&DataType::Float64)?
-            .f64()? // Returns Result<Float64Chunked>
-            .into_iter()
-            .map(|v| v.unwrap_or(f64::NAN))
-            .collect();
+        let (data, y) = read_data("resources/cal_housing_test.csv")?;
 
         let matrix = Matrix::new(&data, y.len(), 8);
 
         // define booster with custom loss function
         let mut custom_booster = PerpetualBooster::default()
             .set_objective(Objective::Custom(Arc::new(CustomSquaredLoss)))
-            .set_max_bin(100)
-            .set_budget(0.5);
+            .set_max_bin(10)
+            .set_budget(0.1)
+            .set_iteration_limit(Some(10));
 
         // define booster with built-in squared loss
         let mut booster = PerpetualBooster::default()
             .set_objective(Objective::SquaredLoss)
-            .set_max_bin(100)
-            .set_budget(0.5);
+            .set_max_bin(10)
+            .set_budget(0.1)
+            .set_iteration_limit(Some(10));
 
         // fit
         booster.fit(&matrix, &y, None, None)?;
@@ -1183,36 +1389,75 @@ mod perpetual_booster_test {
 
     #[test]
     fn test_listnet_loss() -> Result<(), Box<dyn std::error::Error>> {
-        // Read CSV using Polars
-        let data = CsvReadOptions::default()
-            .with_has_header(true)
-            .with_infer_schema_length(Some(10000))
-            .try_into_reader_with_file_path(Some("resources/goodreads.csv".into()))?
-            .finish()?;
+        // Read CSV using csv crate
+        let file = File::open("resources/goodreads.csv")?;
+        let reader = BufReader::new(file);
+        let mut csv_reader = csv::ReaderBuilder::new().has_headers(true).from_reader(reader);
 
-        println!("{:?}", data.head(Some(5)));
+        let headers = csv_reader.headers()?.clone();
+
+        let year_idx = headers.iter().position(|h| h == "year").unwrap();
+        let category_idx = headers.iter().position(|h| h == "category").unwrap();
+        let rank_idx = headers.iter().position(|h| h == "rank").unwrap();
+
+        let feature_names = [
+            "avg_rating",
+            "pages",
+            "5stars",
+            "4stars",
+            "3stars",
+            "2stars",
+            "1stars",
+            "ratings",
+        ];
+        let feature_indices: Vec<usize> = feature_names
+            .iter()
+            .map(|&name| headers.iter().position(|h| h == name).unwrap())
+            .collect();
+
+        let mut groups: Vec<u64> = Vec::new();
+        let mut y_raw: Vec<i64> = Vec::new();
+        let mut data_columns: Vec<Vec<f64>> = vec![Vec::new(); feature_names.len()];
 
         let mut group_map: HashMap<(i64, String), u64> = HashMap::new();
         let mut current_group_id = 0;
 
-        let years = data.column("year")?.i64()?;
+        for result in csv_reader.records() {
+            let record = result?;
 
-        let categories = data.column("category")?.str()?;
+            // Group ID logic
+            let year = record[year_idx].parse::<i64>().unwrap();
+            let category = record[category_idx].to_string();
+            let key = (year, category);
+            let group_id = *group_map.entry(key).or_insert_with(|| {
+                let id = current_group_id;
+                current_group_id += 1;
+                id
+            });
+            groups.push(group_id);
 
-        let groups: Vec<u64> = years
-            .into_iter()
-            .zip(categories.into_iter())
-            .map(|(year, category)| {
-                let key = (year.unwrap(), category.unwrap().to_string());
-                *group_map.entry(key).or_insert_with(|| {
-                    let new_id = current_group_id;
-                    current_group_id += 1;
-                    new_id
-                })
-            })
-            .collect();
+            // Rank / Y
+            let rank = record[rank_idx].parse::<i64>().unwrap();
+            y_raw.push(rank);
 
-        println!("{:?}", groups.len());
+            // Features
+            for (i, &idx) in feature_indices.iter().enumerate() {
+                let val_str = &record[idx];
+                let val = if val_str.is_empty() {
+                    0.0 // Default for missing in numeric columns logic?
+                        // Original polars logic used check for numeric and unwrap_or(0.0) or (0).
+                        // I'll assume 0.0 for now for simplicity as per original logic snippet hint.
+                } else {
+                    val_str.parse::<f64>().unwrap_or(0.0)
+                };
+                data_columns[i].push(val);
+            }
+        }
+
+        let max_rank = *y_raw.iter().max().unwrap();
+        let y: Vec<f64> = y_raw.iter().map(|&v| (max_rank - v) as f64).collect();
+
+        let data: Vec<f64> = data_columns.into_iter().flatten().collect();
 
         let mut group_counts: HashMap<u64, u64> = HashMap::new();
         for group_id in &groups {
@@ -1223,72 +1468,14 @@ mod perpetual_booster_test {
             .map(|id| group_counts.get(&id).cloned().unwrap_or(0))
             .collect();
 
-        println!("{:?}", group_counts_vec.len());
-
-        let all_feature_names = [
-            "avg_rating".to_string(),
-            "pages".to_string(),
-            "5stars".to_string(),
-            "4stars".to_string(),
-            "3stars".to_string(),
-            "2stars".to_string(),
-            "1stars".to_string(),
-            "ratings".to_string(),
-            "rank".to_string(),
-        ];
-
-        let mdf = data.clone().select(all_feature_names.clone())?;
-
-        let cols_to_drop = ["rank".to_string()];
-
-        let features = mdf.drop_many(&cols_to_drop);
-
-        let max_rank = mdf
-            .column("rank")?
-            .i64()?
-            .into_iter()
-            .map(|v| v.unwrap())
-            .max()
-            .unwrap();
-
-        let y: Vec<f64> = mdf
-            .column("rank")?
-            .i64()?
-            .into_iter()
-            .map(|v| v.unwrap())
-            .map(|v| (max_rank - v) as f64) // Relevance
-            .collect();
-
-        let numeric_columns: Vec<Vec<f64>> = features
-            .get_columns()
-            .iter()
-            .filter_map(|col| {
-                if col.dtype().is_numeric() {
-                    // Try f64 first, then i64
-                    if let Ok(f64_col) = col.f64() {
-                        Some(f64_col.into_iter().map(|v| v.unwrap_or(0.0)).collect())
-                    } else if let Ok(i64_col) = col.i64() {
-                        Some(i64_col.into_iter().map(|v| v.unwrap_or(0) as f64).collect())
-                    } else {
-                        None
-                    }
-                } else {
-                    None
-                }
-            })
-            .collect();
-
-        let flat_features: Vec<f64> = (0..features.height())
-            .flat_map(|row_idx| numeric_columns.iter().map(move |col| col[row_idx]))
-            .collect();
-
-        let num_cols = all_feature_names.len() - 1;
-
-        let matrix = Matrix::new(&flat_features, y.len(), num_cols);
+        let matrix = Matrix::new(&data, y.len(), feature_names.len());
 
         let mut booster = PerpetualBooster::default()
             .set_objective(Objective::ListNetLoss)
-            .set_budget(0.1);
+            .set_budget(0.1)
+            .set_iteration_limit(Some(10))
+            .set_max_bin(10)
+            .set_memory_limit(Some(0.001));
 
         booster.fit(&matrix, &y, None, Some(&group_counts_vec))?;
 

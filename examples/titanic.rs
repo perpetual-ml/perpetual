@@ -1,47 +1,58 @@
 //! An example using the `titanic` dataset
 use perpetual::objective_functions::Objective;
 use perpetual::{Matrix, PerpetualBooster};
-use polars::prelude::*;
 use std::env;
 use std::error::Error;
+use std::fs::File;
+use std::io::BufReader;
 
 fn main() -> Result<(), Box<dyn Error>> {
     let args: Vec<String> = env::args().collect();
     let budget = &args[1].parse::<f32>().unwrap();
 
-    let features_and_target = ["survived", "pclass", "age", "sibsp", "parch", "fare"];
+    let feature_names = ["pclass", "age", "sibsp", "parch", "fare"];
+    let target_name = "survived";
 
-    let features_and_target_arc = features_and_target
+    let file = File::open("resources/titanic.csv")?;
+    let reader = BufReader::new(file);
+    let mut csv_reader = csv::ReaderBuilder::new().has_headers(true).from_reader(reader);
+
+    let headers = csv_reader.headers()?.clone();
+    let feature_indices: Vec<usize> = feature_names
         .iter()
-        .map(|s| String::from(s.to_owned()))
-        .collect::<Vec<String>>()
-        .into();
+        .map(|&name| headers.iter().position(|h| h == name).unwrap())
+        .collect();
+    let target_index = headers.iter().position(|h| h == target_name).unwrap();
 
-    let df = CsvReadOptions::default()
-        .with_has_header(true)
-        .with_columns(Some(features_and_target_arc))
-        .try_into_reader_with_file_path(Some("resources/titanic.csv".into()))?
-        .finish()
-        .unwrap();
+    let mut data_columns: Vec<Vec<f64>> = vec![Vec::new(); feature_names.len()];
+    let mut y = Vec::new();
 
-    // Get data in column major format...
-    let id_vars: Vec<&str> = Vec::new();
-    let mdf = df.unpivot(["pclass", "age", "sibsp", "parch", "fare"], id_vars)?;
+    for result in csv_reader.records() {
+        let record = result?;
 
-    let data = Vec::from_iter(
-        mdf.select_at_idx(1)
-            .expect("Invalid column")
-            .f64()?
-            .into_iter()
-            .map(|v| v.unwrap_or(f64::NAN)),
-    );
-    let y = Vec::from_iter(
-        df.column("survived")?
-            .cast(&DataType::Float64)?
-            .f64()?
-            .into_iter()
-            .map(|v| v.unwrap_or(f64::NAN)),
-    );
+        // Parse target
+        let target_str = &record[target_index];
+        let target_val = if target_str.is_empty() {
+            f64::NAN
+        } else {
+            target_str.parse::<f64>().unwrap_or(f64::NAN)
+        };
+        y.push(target_val);
+
+        // Parse features
+        for (i, &idx) in feature_indices.iter().enumerate() {
+            let val_str = &record[idx];
+            let val = if val_str.is_empty() {
+                f64::NAN
+            } else {
+                val_str.parse::<f64>().unwrap_or(f64::NAN)
+            };
+            data_columns[i].push(val);
+        }
+    }
+
+    // Flatten columns to create column-major data
+    let data: Vec<f64> = data_columns.into_iter().flatten().collect();
 
     // Create Matrix from ndarray.
     let matrix = Matrix::new(&data, y.len(), 5);

@@ -1,0 +1,25 @@
+url: https://perpetual-ml.github.io/r/
+
+template:
+  bootstrap: 5
+
+navbar:
+  structure:
+    left:  [intro, reference, articles, news]
+    right: [github]
+
+reference:
+  - title: Model Training
+    contents:
+      - perpetual
+  - title: Prediction and Interpretation
+    contents:
+      - predict.PerpetualBooster
+      - perpetual_importance
+  - title: Calibration
+    contents:
+      - perpetual_calibrate
+  - title: Serialization
+    contents:
+      - perpetual_save
+      - perpetual_load

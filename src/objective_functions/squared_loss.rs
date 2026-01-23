@@ -39,20 +39,27 @@ impl ObjectiveFunction for SquaredLoss {
         sample_weight: Option<&[f64]>,
         _group: Option<&[u64]>,
     ) -> (Vec<f32>, Option<Vec<f32>>) {
+        let len = y.len();
+        let mut g = Vec::with_capacity(len);
+        let mut h = Vec::with_capacity(len);
+
         match sample_weight {
-            Some(sample_weight) => {
-                let (g, h) = y
-                    .iter()
-                    .zip(yhat)
-                    .zip(sample_weight)
-                    .map(|((y_, yhat_), w_)| (((yhat_ - *y_) * *w_) as f32, *w_ as f32))
-                    .unzip();
+            Some(w) => {
+                for i in 0..len {
+                    let diff = (yhat[i] - y[i]) as f32;
+                    let w_val = w[i] as f32;
+                    g.push(diff * w_val);
+                    h.push(w_val);
+                }
                 (g, Some(h))
             }
-            None => (
-                y.iter().zip(yhat).map(|(y_, yhat_)| (yhat_ - *y_) as f32).collect(),
-                None,
-            ),
+            None => {
+                for i in 0..len {
+                    let diff = (yhat[i] - y[i]) as f32;
+                    g.push(diff);
+                }
+                (g, None)
+            }
         }
     }
 
