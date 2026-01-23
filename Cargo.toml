@@ -2,7 +2,6 @@
 members = [
     ".",
     "package-python",
-    "package-r/src/rust",
 ]
 
 [package]

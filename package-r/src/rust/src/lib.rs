@@ -247,7 +247,8 @@ pub unsafe extern "C" fn PerpetualBooster_fit(ptr: SEXP, flat_data: SEXP, rows: 
     let data_slice = slice::from_raw_parts(REAL(flat_data), rows_val * cols_val);
     let y_slice = slice::from_raw_parts(REAL(y), Rf_xlength(y) as usize);
 
-    let matrix = Matrix::new(&data_slice.to_vec(), rows_val, cols_val);
+    let _data_vec = data_slice.to_vec();
+    let matrix = Matrix::new(&_data_vec, rows_val, cols_val);
 
     // Detect unique classes
     let mut unique_classes: Vec<f64> = y_slice.iter().filter(|v| !v.is_nan()).cloned().collect();
@@ -355,7 +356,8 @@ pub unsafe extern "C" fn PerpetualBooster_predict(ptr: SEXP, flat_data: SEXP, ro
     let rows_val = get_int(rows) as usize;
     let cols_val = get_int(cols) as usize;
     let data_slice = slice::from_raw_parts(REAL(flat_data), rows_val * cols_val);
-    let matrix = Matrix::new(&data_slice.to_vec(), rows_val, cols_val);
+    let _data_vec = data_slice.to_vec();
+    let matrix = Matrix::new(&_data_vec, rows_val, cols_val);
 
     let preds = match &booster.internal {
         Some(InternalBooster::Single(b)) => b.predict(&matrix, true),
@@ -378,7 +380,8 @@ pub unsafe extern "C" fn PerpetualBooster_predict_proba(ptr: SEXP, flat_data: SE
     let rows_val = get_int(rows) as usize;
     let cols_val = get_int(cols) as usize;
     let data_slice = slice::from_raw_parts(REAL(flat_data), rows_val * cols_val);
-    let matrix = Matrix::new(&data_slice.to_vec(), rows_val, cols_val);
+    let _data_vec = data_slice.to_vec();
+    let matrix = Matrix::new(&_data_vec, rows_val, cols_val);
 
     let preds = match &booster.internal {
         Some(InternalBooster::Single(b)) => b.predict_proba(&matrix, true),
@@ -503,7 +506,8 @@ pub unsafe extern "C" fn PerpetualBooster_predict_contributions(
     let rows_val = get_int(rows) as usize;
     let cols_val = get_int(cols) as usize;
     let data_slice = slice::from_raw_parts(REAL(flat_data), rows_val * cols_val);
-    let matrix = Matrix::new(&data_slice.to_vec(), rows_val, cols_val);
+    let _data_vec = data_slice.to_vec();
+    let matrix = Matrix::new(&_data_vec, rows_val, cols_val);
     let method_str = get_str(method);
 
     let method_enum = match method_str.to_lowercase().as_str() {
@@ -550,7 +554,8 @@ pub unsafe extern "C" fn PerpetualBooster_calibrate(
     let cols_val = get_int(cols) as usize;
     let data_slice = slice::from_raw_parts(REAL(flat_data), rows_val * cols_val);
     let y_slice = slice::from_raw_parts(REAL(y), Rf_xlength(y) as usize);
-    let matrix = Matrix::new(&data_slice.to_vec(), rows_val, cols_val);
+    let _data_vec = data_slice.to_vec();
+    let matrix = Matrix::new(&_data_vec, rows_val, cols_val);
 
     let rows_cal_val = get_int(rows_cal) as usize;
     let cols_cal_val = get_int(cols_cal) as usize;
@@ -558,16 +563,19 @@ pub unsafe extern "C" fn PerpetualBooster_calibrate(
     let y_cal_slice = slice::from_raw_parts(REAL(y_cal), Rf_xlength(y_cal) as usize);
     let alpha_slice = slice::from_raw_parts(REAL(alpha), Rf_xlength(alpha) as usize);
 
-    let matrix_cal = Matrix::new(&data_cal_slice.to_vec(), rows_cal_val, cols_cal_val);
+    let _data_cal_vec = data_cal_slice.to_vec();
+    let matrix_cal = Matrix::new(&_data_cal_vec, rows_cal_val, cols_cal_val);
 
     match &mut booster.internal {
         Some(InternalBooster::Single(b)) => {
+            let _y_cal_vec = y_cal_slice.to_vec();
+            let _alpha_vec = alpha_slice.to_vec();
             b.calibrate(
                 &matrix,
                 &y_slice.to_vec(),
                 None,
                 None,
-                (matrix_cal, y_cal_slice, alpha_slice),
+                (matrix_cal, &_y_cal_vec, &_alpha_vec),
             )
             .unwrap();
         }
@@ -587,7 +595,8 @@ pub unsafe extern "C" fn PerpetualBooster_predict_intervals(
     let rows_val = get_int(rows) as usize;
     let cols_val = get_int(cols) as usize;
     let data_slice = slice::from_raw_parts(REAL(flat_data), rows_val * cols_val);
-    let matrix = Matrix::new(&data_slice.to_vec(), rows_val, cols_val);
+    let _data_vec = data_slice.to_vec();
+    let matrix = Matrix::new(&_data_vec, rows_val, cols_val);
 
     let result = match &booster.internal {
         Some(InternalBooster::Single(b)) => {
@@ -596,7 +605,7 @@ pub unsafe extern "C" fn PerpetualBooster_predict_intervals(
             for (i, (_, preds)) in intervals.into_iter().enumerate() {
                 let alpha_vec = Rf_allocVector(REALSXP, preds.len() as R_xlen_t);
                 let r_alpha = REAL(alpha_vec);
-                for (j, p) in preds.into_iter().enumerate() {
+                for (j, p) in preds.into_iter().flatten().enumerate() {
                     *r_alpha.add(j) = p;
                 }
                 SET_VECTOR_ELT(r_list, i as R_xlen_t, alpha_vec);
