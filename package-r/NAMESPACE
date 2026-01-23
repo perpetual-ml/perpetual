@@ -1,0 +1,8 @@
+useDynLib(perpetual, .registration = TRUE)
+export(perpetual)
+export(perpetual_save)
+export(perpetual_load)
+export(perpetual_calibrate)
+export(perpetual_importance)
+S3method(predict, PerpetualBooster)
+S3method(print, PerpetualBooster)

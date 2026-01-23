@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 
-use crate::data::{FloatData, JaggedMatrix, Matrix};
+use crate::data::{ColumnarMatrix, FloatData, JaggedMatrix, Matrix};
 use crate::errors::PerpetualError;
 use crate::utils::{is_missing, map_bin, percentiles};
 
@@ -62,6 +62,29 @@ fn bin_matrix_from_cuts<T: FloatData<T>>(data: &Matrix<T>, cuts: &JaggedMatrix<T
             map_bin(cuts.get_col(col), v, missing).unwrap()
         })
         .collect()
+}
+
+/// Convert a columnar matrix of data into a binned matrix (column-major output).
+/// This version works with ColumnarMatrix for zero-copy Arrow/Polars support.
+fn bin_columnar_matrix_from_cuts<T: FloatData<T>>(
+    data: &ColumnarMatrix<T>,
+    cuts: &JaggedMatrix<T>,
+    missing: &T,
+) -> Vec<u16> {
+    // Build column-major output by iterating through each column
+    let mut result = Vec::with_capacity(data.rows * data.cols);
+    for col in 0..data.cols {
+        let col_data = data.get_col(col);
+        let col_cuts = cuts.get_col(col);
+        for (row, v) in col_data.iter().enumerate() {
+            if data.is_valid(row, col) {
+                result.push(map_bin(col_cuts, v, missing).unwrap());
+            } else {
+                result.push(0);
+            }
+        }
+    }
+    result
 }
 
 /// Bin a numeric matrix.
@@ -151,6 +174,93 @@ pub fn bin_matrix(
     cuts.n_records = cuts.ends.iter().sum();
 
     let binned_data = bin_matrix_from_cuts(data, &cuts, &missing);
+
+    Ok(BinnedData {
+        binned_data,
+        cuts,
+        nunique,
+    })
+}
+
+/// Bin a columnar matrix (for zero-copy Arrow/Polars support).
+///
+/// * `data` - A columnar matrix of data to be binned.
+/// * `sample_weight` - Instance weights for each row of the data.
+/// * `nbins` - The number of bins each column should be binned into.
+/// * `missing` - Float value to consider as missing.
+pub fn bin_columnar_matrix(
+    data: &ColumnarMatrix<f64>,
+    sample_weight: Option<&[f64]>,
+    nbins: u16,
+    missing: f64,
+    cat_index: Option<&HashSet<usize>>,
+) -> Result<BinnedData<f64>, PerpetualError> {
+    let mut pcts = Vec::new();
+    let nbins_ = f64::from_u16(nbins);
+    for i in 0..nbins {
+        let v = f64::from_u16(i) / nbins_;
+        pcts.push(v);
+    }
+
+    let s_w = vec![1.0; data.rows];
+    let weight = match sample_weight {
+        Some(sample_weight) => sample_weight,
+        None => &s_w,
+    };
+
+    let to_remove = match cat_index {
+        Some(cat_index) => HashSet::from_iter(cat_index),
+        None => HashSet::new(),
+    };
+    let mut num_index: Vec<usize> = (0..data.cols).collect();
+    num_index.retain(|e| !to_remove.contains(e));
+    let num_index_set: HashSet<usize> = HashSet::from_iter(num_index);
+
+    let mut cuts = JaggedMatrix::new();
+    let mut nunique = Vec::new();
+    for i in 0..data.cols {
+        let (no_miss, w): (Vec<f64>, Vec<f64>) = data
+            .get_col(i)
+            .iter()
+            .zip(weight.iter())
+            .enumerate()
+            .filter(|(row, (v, _))| data.is_valid(*row, i) && !is_missing(v, &missing))
+            .map(|(_, (v, w))| (v, w))
+            .unzip();
+        assert_eq!(no_miss.len(), w.len());
+
+        if num_index_set.contains(&i) {
+            let mut col_cuts = percentiles_or_value(&no_miss, &w, &pcts);
+            col_cuts.push(f64::MAX);
+            col_cuts.dedup();
+            nunique.push(col_cuts.len());
+            let l = col_cuts.len();
+            cuts.data.extend(col_cuts);
+            let e = match cuts.ends.last() {
+                Some(v) => v + l,
+                None => l,
+            };
+            cuts.ends.push(e);
+        } else {
+            let col_categories: HashSet<u16> = HashSet::from_iter(no_miss.iter().map(|&e| e as u16));
+            let mut col_cuts: Vec<f64> = col_categories.iter().map(|&e| e as f64).collect();
+            col_cuts.sort_unstable_by(|a, b| a.partial_cmp(b).unwrap());
+            col_cuts.push(f64::MAX);
+            nunique.push(col_cuts.len());
+            let l = col_cuts.len();
+            cuts.data.extend(col_cuts);
+            let e = match cuts.ends.last() {
+                Some(v) => v + l,
+                None => l,
+            };
+            cuts.ends.push(e);
+        }
+    }
+
+    cuts.cols = cuts.ends.len();
+    cuts.n_records = cuts.ends.iter().sum();
+
+    let binned_data = bin_columnar_matrix_from_cuts(data, &cuts, &missing);
 
     Ok(BinnedData {
         binned_data,

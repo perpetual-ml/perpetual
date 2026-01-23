@@ -9,10 +9,22 @@
 
 // cargo flamegraph --example cover_types
 
+//! An example using the `cover types` dataset
+
+// cargo run --release --example cover_types 1.0
+
+// cargo build --release --example cover_types
+// hyperfine --runs 3 ./target/release/examples/cover_types
+// hyperfine --runs 3 .\target\release\examples\cover_types 1.0
+// hyperfine --runs 3 'cargo run --release --example cover_types 1.0'
+
+// cargo flamegraph --example cover_types
+
 use perpetual::{objective_functions::Objective, Matrix, PerpetualBooster};
-use polars::prelude::*;
 use std::env;
 use std::error::Error;
+use std::fs::File;
+use std::io::BufReader;
 
 pub fn mse(y_test: &[f64], y_pred: &[f64]) -> f32 {
     let mut error = 0.0;
@@ -35,6 +47,51 @@ pub fn multiclass_log_loss(y_true: &[f64], y_pred: &[Vec<f64>]) -> f64 {
         losses[i] = -1.0 * p.ln();
     }
     losses.iter().sum::<f64>() / losses.len() as f64
+}
+
+fn read_data(path: &str, feature_names: &[&str]) -> Result<(Vec<f64>, Vec<f64>), Box<dyn Error>> {
+    let target_name = "Cover_Type";
+
+    let file = File::open(path)?;
+    let reader = BufReader::new(file);
+    let mut csv_reader = csv::ReaderBuilder::new().has_headers(true).from_reader(reader);
+
+    let headers = csv_reader.headers()?.clone();
+    let feature_indices: Vec<usize> = feature_names
+        .iter()
+        .map(|&name| headers.iter().position(|h| h == name).unwrap())
+        .collect();
+    let target_index = headers.iter().position(|h| h == target_name).unwrap();
+
+    let mut data_columns: Vec<Vec<f64>> = vec![Vec::new(); feature_names.len()];
+    let mut y = Vec::new();
+
+    for result in csv_reader.records() {
+        let record = result?;
+
+        // Parse target
+        let target_str = &record[target_index];
+        let target_val = if target_str.is_empty() {
+            f64::NAN
+        } else {
+            target_str.parse::<f64>().unwrap_or(f64::NAN)
+        };
+        y.push(target_val);
+
+        // Parse features
+        for (i, &idx) in feature_indices.iter().enumerate() {
+            let val_str = &record[idx];
+            let val = if val_str.is_empty() {
+                f64::NAN
+            } else {
+                val_str.parse::<f64>().unwrap_or(f64::NAN)
+            };
+            data_columns[i].push(val);
+        }
+    }
+
+    let data: Vec<f64> = data_columns.into_iter().flatten().collect();
+    Ok((data, y))
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -63,74 +120,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     let s_types = soil_types.iter().map(|s| s.as_str()).collect::<Vec<_>>();
     features.extend(s_types);
 
-    let mut features_and_target = features.clone();
-    features_and_target.push("Cover_Type");
-
-    let features_and_target_arc1 = features_and_target
-        .iter()
-        .map(|s| String::from(s.to_owned()))
-        .collect::<Vec<String>>()
-        .into();
-
-    let features_and_target_arc2 = features_and_target
-        .iter()
-        .map(|s| String::from(s.to_owned()))
-        .collect::<Vec<String>>()
-        .into();
-
-    let df_train = CsvReadOptions::default()
-        .with_has_header(true)
-        .with_columns(Some(features_and_target_arc1))
-        .try_into_reader_with_file_path(Some("resources/cover_types_train.csv".into()))?
-        .finish()
-        .unwrap();
-
-    let df_test = CsvReadOptions::default()
-        .with_has_header(true)
-        .with_columns(Some(features_and_target_arc2))
-        .try_into_reader_with_file_path(Some("resources/cover_types_test.csv".into()))?
-        .finish()
-        .unwrap();
-
-    // Get data in column major format...
-    let id_vars_train: Vec<&str> = Vec::new();
-    let mdf_train = df_train.unpivot(&features, &id_vars_train)?;
-    let id_vars_test: Vec<&str> = Vec::new();
-    let mdf_test = df_test.unpivot(&features, &id_vars_test)?;
-
-    let data_train = Vec::from_iter(
-        mdf_train
-            .select_at_idx(1)
-            .expect("Invalid column")
-            .f64()?
-            .into_iter()
-            .map(|v| v.unwrap_or(f64::NAN)),
-    );
-    let data_test = Vec::from_iter(
-        mdf_test
-            .select_at_idx(1)
-            .expect("Invalid column")
-            .f64()?
-            .into_iter()
-            .map(|v| v.unwrap_or(f64::NAN)),
-    );
-
-    let y_train = Vec::from_iter(
-        df_train
-            .column("Cover_Type")?
-            .cast(&DataType::Float64)?
-            .f64()?
-            .into_iter()
-            .map(|v| v.unwrap_or(f64::NAN)),
-    );
-    let y_test = Vec::from_iter(
-        df_test
-            .column("Cover_Type")?
-            .cast(&DataType::Float64)?
-            .f64()?
-            .into_iter()
-            .map(|v| v.unwrap_or(f64::NAN)),
-    );
+    let (data_train, y_train) = read_data("resources/cover_types_train.csv", &features)?;
+    let (data_test, y_test) = read_data("resources/cover_types_test.csv", &features)?;
 
     // Create Matrix from ndarray.
     let matrix_train = Matrix::new(&data_train, y_train.len(), 54);

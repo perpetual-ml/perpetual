@@ -163,4 +163,11 @@ impl PerpetualBooster {
         self.cfg.stopping_rounds = stopping_rounds;
         self
     }
+
+    /// Set whether to save node stats on the booster.
+    /// * `save_node_stats` - Whether to save node statistics during training.
+    pub fn set_save_node_stats(mut self, save_node_stats: bool) -> Self {
+        self.cfg.save_node_stats = save_node_stats;
+        self
+    }
 }

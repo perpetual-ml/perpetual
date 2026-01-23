@@ -12,20 +12,21 @@ jobs:
         with:
           python-version: "3.11" # Choose a single, compatible python version
           architecture: x64
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
       - name: Install dependencies for resource creation
-        # Note: 'perpetual.utils' suggests 'perpetual' is a dependency, 
-        # so we install it in editable mode to get its dependencies (like .[dev]).
-        # The script also needs the general deps like pandas, scikit-learn.
         run: |
-          pip install numpy pandas seaborn scikit-learn toml
-          cp README.md python-package/README.md
-          cp LICENSE python-package/LICENSE  
-          mkdir -p resources # Ensure directory exists before make_resources.py runs
-          cd python-package
-          python -m pip install -e .[dev]
+          uv pip install --system numpy pandas seaborn scikit-learn toml
+          cp README.md package-python/README.md
+          cp LICENSE package-python/LICENSE  
+          cp LICENSE package-r/LICENSE
+          mkdir -p resources
+          cd package-python
+          uv pip install --system -e .[dev]
           cd ..
       - name: Build test data (create resources)
-        # The script 'make_resources.py' creates the resources directory and files.
         run: python scripts/make_resources.py
       - name: Upload Resources Artifact
         uses: actions/upload-artifact@v4
@@ -39,16 +40,20 @@ jobs:
     needs: prepare-resources # This job waits for prepare-resources to complete
     strategy:
       matrix:
-        pyversion: ["3.9", "3.10", "3.11", "3.12", "3.13"]
+        pyversion: ["3.10", "3.11", "3.12", "3.13", "3.14"]
     runs-on: "windows-latest"
     steps:
       - uses: actions/checkout@v4
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
       - name: Download Resources Artifact
         uses: actions/download-artifact@v4
         with:
           name: perpetual-resources
-          path: resources # Downloads the files into the 'resources' directory
-      - name: Install latests stable Rust
+          path: resources
+      - name: Install latest stable Rust
         uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: stable
@@ -57,30 +62,30 @@ jobs:
           python-version: ${{ matrix.pyversion }}
           architecture: x64
       - name: Install deps
-        run: pip install numpy pandas seaborn scikit-learn toml
+        run: uv pip install --system numpy pandas seaborn scikit-learn toml
       - run: |
-          cp README.md python-package/README.md
-          cp LICENSE python-package/LICENSE
+          cp README.md package-python/README.md
+          cp LICENSE package-python/LICENSE
+          cp LICENSE package-r/LICENSE
       - name: Build test data (Install perpetual with its dev dependencies)
-        # Note: The actual resource *generation* is skipped, but we still need the dev install
         run: |
-          cd python-package
-          python -m pip install -e .[dev]
+          cd package-python
+          uv pip install --system -e .[dev]
           cd ..
       - name: Build wheels with maturin
         uses: PyO3/maturin-action@v1
         with:
           target: x86_64
           command: build
-          args: --release --strip --interpreter python --manifest-path python-package/Cargo.toml --out dist --sdist
+          args: --release --strip --interpreter python --manifest-path package-python/Cargo.toml --out dist --sdist
       - name: Install wheel
-        run: pip install perpetual --no-index --find-links dist --no-deps --force-reinstall
+        run: uv pip install --system perpetual --no-index --find-links dist --no-deps --force-reinstall
       - name: Run Package Tests
         run: |
-          pip install pytest pytest-cov black ruff setuptools typing-extensions --upgrade
-          cd python-package
+          uv pip install --system pytest pytest-cov ruff setuptools typing-extensions --upgrade
+          cd package-python
           ruff check .
-          black --check .
+          ruff format --check .
           pytest --cov-fail-under=90 tests
           cd ..
       - name: Save Artifacts
@@ -94,11 +99,17 @@ jobs:
     needs: prepare-resources
     strategy:
       matrix:
-        pyversion: ["3.11", "3.12", "3.13"]
+        pyversion: ["3.11", "3.12", "3.13", "3.14"]
         os: [macos-latest, macos-latest-large]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - name: Install OpenMP
+        run: brew install libomp
       - name: Download Resources Artifact
         uses: actions/download-artifact@v4
         with:
@@ -112,28 +123,29 @@ jobs:
         with:
           python-version: ${{ matrix.pyversion }}
       - name: Install deps
-        run: pip install numpy pandas seaborn scikit-learn toml
+        run: uv pip install --system numpy pandas seaborn scikit-learn toml
       - run: |
-          cp README.md python-package/README.md
-          cp LICENSE python-package/LICENSE
+          cp README.md package-python/README.md
+          cp LICENSE package-python/LICENSE
+          cp LICENSE package-r/LICENSE
       - name: Build test data (Install perpetual with its dev dependencies)
         run: |
-          cd python-package
-          python -m pip install -e .[dev]
+          cd package-python
+          uv pip install --system -e .[dev]
           cd ..
       - name: Build wheels with maturin
         uses: PyO3/maturin-action@v1
         with:
           command: build
-          args: --release --strip --interpreter python --manifest-path python-package/Cargo.toml --out dist --sdist
+          args: --release --strip --interpreter python --manifest-path package-python/Cargo.toml --out dist --sdist
       - name: Install wheel
-        run: pip install perpetual --no-index --find-links dist --no-deps --force-reinstall
+        run: uv pip install --system perpetual --no-index --find-links dist --no-deps --force-reinstall
       - name: Run Package Tests
         run: |
-          pip install pytest pytest-cov black ruff setuptools typing-extensions --upgrade
-          cd python-package
+          uv pip install --system pytest pytest-cov ruff setuptools typing-extensions --upgrade
+          cd package-python
           ruff check .
-          black --check .
+          ruff format --check .
           pytest --cov-fail-under=90 tests
           cd ..
       - name: Save Artifacts
@@ -148,15 +160,19 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        pyversion: ["3.9", "3.10", "3.11", "3.12", "3.13"]
+        pyversion: ["3.10", "3.11", "3.12", "3.13", "3.14"]
     steps:
       - uses: actions/checkout@v4
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
       - name: Download Resources Artifact
         uses: actions/download-artifact@v4
         with:
           name: perpetual-resources
           path: resources
-      - name: Install latests stable Rust
+      - name: Install latest stable Rust
         uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: stable
@@ -165,14 +181,15 @@ jobs:
           python-version: ${{ matrix.pyversion }}
           architecture: x64
       - name: Install deps
-        run: pip install numpy pandas seaborn scikit-learn toml
+        run: uv pip install --system numpy pandas seaborn scikit-learn toml
       - run: |
-          cp README.md python-package/README.md
-          cp LICENSE python-package/LICENSE
+          cp README.md package-python/README.md
+          cp LICENSE package-python/LICENSE
+          cp LICENSE package-r/LICENSE
       - name: Build test data (Install perpetual with its dev dependencies)
         run: |
-          cd python-package
-          python -m pip install -e .[dev]
+          cd package-python
+          uv pip install --system -e .[dev]
           cd ..
       - name: Build wheels with maturin
         uses: PyO3/maturin-action@v1
@@ -180,15 +197,15 @@ jobs:
           target: x86_64
           manylinux: auto
           command: build
-          args: --release --strip --interpreter python${{ matrix.pyversion }} --manifest-path python-package/Cargo.toml --out dist --sdist
+          args: --release --strip --interpreter python${{ matrix.pyversion }} --manifest-path package-python/Cargo.toml --out dist --sdist
       - name: Install wheel
-        run: pip install perpetual --no-index --find-links dist --no-deps --force-reinstall
+        run: uv pip install --system perpetual --no-index --find-links dist --no-deps --force-reinstall
       - name: Run Package Tests
         run: |
-          pip install pytest pytest-cov black ruff setuptools typing-extensions --upgrade
-          cd python-package
+          uv pip install --system pytest pytest-cov ruff setuptools typing-extensions --upgrade
+          cd package-python
           ruff check .
-          black --check .
+          ruff format --check .
           pytest --cov-fail-under=90 tests
           cd ..
       - name: Save Artifacts
@@ -203,15 +220,19 @@ jobs:
     runs-on: ubuntu-24.04-arm
     strategy:
       matrix:
-        pyversion: ["3.9", "3.10", "3.11", "3.12", "3.13"]
+        pyversion: ["3.10", "3.11", "3.12", "3.13", "3.14"]
     steps:
       - uses: actions/checkout@v4
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
       - name: Download Resources Artifact
         uses: actions/download-artifact@v4
         with:
           name: perpetual-resources
           path: resources
-      - name: Install latests stable Rust
+      - name: Install latest stable Rust
         uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: stable
@@ -220,29 +241,30 @@ jobs:
           python-version: ${{ matrix.pyversion }}
           architecture: arm64
       - name: Install deps
-        run: pip install numpy pandas seaborn scikit-learn toml
+        run: uv pip install --system numpy pandas seaborn scikit-learn toml
       - run: |
-          cp README.md python-package/README.md
-          cp LICENSE python-package/LICENSE
+          cp README.md package-python/README.md
+          cp LICENSE package-python/LICENSE
+          cp LICENSE package-r/LICENSE
       - name: Build test data (Install perpetual with its dev dependencies)
         run: |
-          cd python-package
-          python -m pip install -e .[dev]
+          cd package-python
+          uv pip install --system -e .[dev]
           cd ..
       - name: Build wheels with maturin
         uses: PyO3/maturin-action@v1
         with:
           manylinux: auto
           command: build
-          args: --release --strip --interpreter python${{ matrix.pyversion }} --manifest-path python-package/Cargo.toml --out dist --sdist
+          args: --release --strip --interpreter python${{ matrix.pyversion }} --manifest-path package-python/Cargo.toml --out dist --sdist
       - name: Install wheel
-        run: pip install perpetual --no-index --find-links dist --no-deps --force-reinstall
+        run: uv pip install --system perpetual --no-index --find-links dist --no-deps --force-reinstall
       - name: Run Package Tests
         run: |
-          pip install pytest pytest-cov black ruff setuptools typing-extensions --upgrade
-          cd python-package
+          uv pip install --system pytest pytest-cov ruff setuptools typing-extensions --upgrade
+          cd package-python
           ruff check .
-          black --check .
+          ruff format --check .
           pytest --cov-fail-under=90 tests
           cd ..
       - name: Save Artifacts
@@ -257,6 +279,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
       - name: Download Resources Artifact
         uses: actions/download-artifact@v4
         with:
@@ -271,14 +297,15 @@ jobs:
           python-version: "3.11"
           architecture: x64
       - name: Install deps
-        run: pip install numpy pandas seaborn scikit-learn toml
+        run: uv pip install --system numpy pandas seaborn scikit-learn toml
       - run: |
-          cp README.md python-package/README.md
-          cp LICENSE python-package/LICENSE
+          cp README.md package-python/README.md
+          cp LICENSE package-python/LICENSE
+          cp LICENSE package-r/LICENSE
       - name: Build test data (Install perpetual with its dev dependencies)
         run: |
-          cd python-package
-          python -m pip install -e .[dev]
+          cd package-python
+          uv pip install --system -e .[dev]
           cd ..
       - name: Run tests
         # Cargo tests in the Rust package might still need the 'resources' folder

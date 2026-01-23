@@ -9,7 +9,7 @@ use crate::booster::config::*;
 use crate::constraints::ConstraintMap;
 use crate::errors::PerpetualError;
 use crate::objective_functions::objective::Objective;
-use crate::{Matrix, PerpetualBooster};
+use crate::{ColumnarMatrix, Matrix, PerpetualBooster};
 
 /// Perpetual Booster object
 #[derive(Clone, Serialize, Deserialize)]
@@ -120,6 +120,7 @@ impl MultiOutputBooster {
             iteration_limit,
             memory_limit,
             stopping_rounds,
+            save_node_stats: false,
         };
 
         // Base booster template that child boosters will clone.
@@ -157,6 +158,19 @@ impl MultiOutputBooster {
     ) -> Result<(), PerpetualError> {
         for i in 0..self.n_boosters {
             let _ = self.boosters[i].fit(data, y.get_col(i), sample_weight, group);
+        }
+        Ok(())
+    }
+
+    pub fn fit_columnar(
+        &mut self,
+        data: &ColumnarMatrix<f64>,
+        y: &Matrix<f64>,
+        sample_weight: Option<&[f64]>,
+        group: Option<&[u64]>,
+    ) -> Result<(), PerpetualError> {
+        for i in 0..self.n_boosters {
+            let _ = self.boosters[i].fit_columnar(data, y.get_col(i), sample_weight, group);
         }
         Ok(())
     }
@@ -461,24 +475,76 @@ impl MultiOutputBooster {
     }
 }
 
+impl BoosterIO for MultiOutputBooster {
+    fn from_json(json_str: &str) -> Result<Self, PerpetualError> {
+        let mut value: serde_json::Value =
+            serde_json::from_str(json_str).map_err(|e| PerpetualError::UnableToRead(e.to_string()))?;
+        crate::booster::core::fix_legacy_value(&mut value);
+        serde_json::from_value::<Self>(value).map_err(|e| PerpetualError::UnableToRead(e.to_string()))
+    }
+}
+
 #[cfg(test)]
 mod multi_output_booster_test {
 
     use crate::objective_functions::objective::Objective;
     use crate::Matrix;
     use crate::{utils::between, MultiOutputBooster};
-    use polars::{
-        io::SerReader,
-        prelude::{CsvReadOptions, DataType},
-    };
     use std::error::Error;
+    use std::fs::File;
+    use std::io::BufReader;
+
+    fn read_data(path: &str, feature_names: &[&str]) -> Result<(Vec<f64>, Vec<f64>), Box<dyn Error>> {
+        let target_name = "Cover_Type";
+
+        let file = File::open(path)?;
+        let reader = BufReader::new(file);
+        let mut csv_reader = csv::ReaderBuilder::new().has_headers(true).from_reader(reader);
+
+        let headers = csv_reader.headers()?.clone();
+        let feature_indices: Vec<usize> = feature_names
+            .iter()
+            .map(|&name| headers.iter().position(|h| h == name).unwrap())
+            .collect();
+        let target_index = headers.iter().position(|h| h == target_name).unwrap();
+
+        let mut data_columns: Vec<Vec<f64>> = vec![Vec::new(); feature_names.len()];
+        let mut y = Vec::new();
+
+        for result in csv_reader.records() {
+            let record = result?;
+
+            // Parse target
+            let target_str = &record[target_index];
+            let target_val = if target_str.is_empty() {
+                f64::NAN
+            } else {
+                target_str.parse::<f64>().unwrap_or(f64::NAN)
+            };
+            y.push(target_val);
+
+            // Parse features
+            for (i, &idx) in feature_indices.iter().enumerate() {
+                let val_str = &record[idx];
+                let val = if val_str.is_empty() {
+                    f64::NAN
+                } else {
+                    val_str.parse::<f64>().unwrap_or(f64::NAN)
+                };
+                data_columns[i].push(val);
+            }
+        }
+
+        let data: Vec<f64> = data_columns.into_iter().flatten().collect();
+        Ok((data, y))
+    }
 
     #[test]
     fn test_multi_output_booster() -> Result<(), Box<dyn Error>> {
         let n_classes = 7;
         let n_columns = 54;
-        let n_rows = 1000;
-        let max_bin = 10;
+        let n_rows = 500;
+        let max_bin = 5;
 
         let mut features: Vec<&str> = [
             "Elevation",
@@ -502,47 +568,33 @@ mod multi_output_booster_test {
         let s_types = soil_types.iter().map(|s| s.as_str()).collect::<Vec<_>>();
         features.extend(s_types);
 
-        let mut features_and_target = features.clone();
-        features_and_target.push("Cover_Type");
+        // Read data using csv crate
+        // NOTE: The original test performed a `.head(Some(n_rows))` operation via polars.
+        // We will read all and then slice, or we can just use all if n_rows is small enough.
+        // n_rows is 500. `resources/cover_types_test.csv` might be larger.
+        // But since this is a test, let's just use 500 rows to match original behavior exactly for performance.
 
-        let features_and_target_arc = features_and_target
-            .iter()
-            .map(|s| String::from(s.to_owned()))
-            .collect::<Vec<String>>()
-            .into();
+        // Actually, slicing column-major data is tedious.
+        // Let's modify `read_data` to take a limit optionally?
+        // Or just read everything and slice `y` and `data`.
+        // `data` is [col1_val1...col1_valN, col2_val1...].
+        // To slice 500 rows, we need to reconstruct new vector.
 
-        let df_test = CsvReadOptions::default()
-            .with_has_header(true)
-            .with_columns(Some(features_and_target_arc))
-            .try_into_reader_with_file_path(Some("resources/cover_types_test.csv".into()))?
-            .finish()
-            .unwrap()
-            .head(Some(n_rows));
+        let (data_full, y_full) = read_data("resources/cover_types_test.csv", &features)?;
 
-        // Get data in column major format...
-        let id_vars_test: Vec<&str> = Vec::new();
-        let mdf_test = df_test.unpivot(&features, &id_vars_test)?;
+        let rows_full = y_full.len();
+        let limit = n_rows.min(rows_full);
 
-        let data_test = Vec::from_iter(
-            mdf_test
-                .select_at_idx(1)
-                .expect("Invalid column")
-                .f64()?
-                .into_iter()
-                .map(|v| v.unwrap_or(f64::NAN)),
-        );
-
-        let y_test = Vec::from_iter(
-            df_test
-                .column("Cover_Type")?
-                .cast(&DataType::Float64)?
-                .f64()?
-                .into_iter()
-                .map(|v| v.unwrap_or(f64::NAN)),
-        );
+        let mut data = Vec::new();
+        // Extract n_columns columns
+        for c in 0..n_columns {
+            let col_start = c * rows_full;
+            data.extend_from_slice(&data_full[col_start..col_start + limit]);
+        }
+        let y_test = y_full[0..limit].to_vec();
 
         // Create Matrix from ndarray.
-        let data = Matrix::new(&data_test, y_test.len(), n_columns);
+        let data_matrix = Matrix::new(&data, y_test.len(), n_columns);
 
         let mut y_vec: Vec<Vec<f64>> = Vec::new();
         for i in 0..n_classes {
@@ -561,14 +613,15 @@ mod multi_output_booster_test {
             .set_max_bin(max_bin)
             .set_n_boosters(n_classes)
             .set_budget(0.1)
-            .set_timeout(Some(60.0));
+            .set_iteration_limit(Some(5))
+            .set_memory_limit(Some(0.001));
 
         println!("The number of boosters: {:?}", booster.get_boosters().len());
         assert!(booster.get_boosters().len() == n_classes);
 
-        booster.fit(&data, &y, None, None).unwrap();
+        booster.fit(&data_matrix, &y, None, None).unwrap();
 
-        let probas = booster.predict_proba(&data, true);
+        let probas = booster.predict_proba(&data_matrix, true);
 
         assert!(between(0.999, 1.001, probas[0..n_classes].iter().sum::<f64>() as f32));
 

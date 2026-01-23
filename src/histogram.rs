@@ -89,7 +89,7 @@ impl<'a> FeatureHistogram<'a> {
                 self.data.iter().for_each(|b| {
                     let bin = b.get().as_mut().unwrap();
                     bin.g_folded = [f32::ZERO; 5];
-                    bin.h_folded = Some([f32::ZERO; 5]);
+                    bin.h_folded = [f32::ZERO; 5];
                     bin.counts = [0; 5];
                 });
                 index.iter().zip(sorted_grad).zip(sorted_hess).for_each(|((i, g), h)| {
@@ -97,8 +97,7 @@ impl<'a> FeatureHistogram<'a> {
                     let bin = b.as_mut().unwrap_unchecked();
                     let fold = i % 5;
                     bin.g_folded[fold] += *g;
-                    let k = bin.h_folded.as_mut().unwrap();
-                    k[fold] += *h;
+                    bin.h_folded[fold] += *h;
                     bin.counts[fold] += 1;
                 });
             }
@@ -106,6 +105,7 @@ impl<'a> FeatureHistogram<'a> {
                 self.data.iter().for_each(|b| {
                     let bin = b.get().as_mut().unwrap();
                     bin.g_folded = [f32::ZERO; 5];
+                    bin.h_folded = [f32::ZERO; 5];
                     bin.counts = [0; 5];
                 });
                 index.iter().zip(sorted_grad).for_each(|(i, g)| {
@@ -590,13 +590,9 @@ mod tests {
             b1.g_folded.iter().zip(b2.g_folded.iter()).for_each(|(g1, g2)| {
                 assert_relative_eq!(g1, g2);
             });
-            b1.h_folded
-                .unwrap()
-                .iter()
-                .zip(b2.h_folded.unwrap().iter())
-                .for_each(|(h1, h2)| {
-                    assert_relative_eq!(h1, h2);
-                });
+            b1.h_folded.iter().zip(b2.h_folded.iter()).for_each(|(h1, h2)| {
+                assert_relative_eq!(h1, h2);
+            });
         });
     }
 }

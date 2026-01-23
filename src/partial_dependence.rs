@@ -137,6 +137,7 @@ mod tests {
             None,
             &mut split_info_slice,
             n_nodes_alloc,
+            false,
         );
 
         let pdp1 = tree_partial_dependence(&tree, 0, 0, 1.0, 1.0, &f64::NAN);

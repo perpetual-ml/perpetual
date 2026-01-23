@@ -7,7 +7,7 @@ jobs:
   windows-build:
     strategy:
       matrix:
-        pyversion: ["3.9", "3.10", "3.11", "3.12", "3.13"]
+        pyversion: ["3.10", "3.11", "3.12", "3.13", "3.14"]
     runs-on: "windows-latest"
     steps:
       - uses: actions/checkout@v4
@@ -22,14 +22,23 @@ jobs:
       - name: Install deps
         run: pip install numpy pandas seaborn scikit-learn toml
       - run: |
-          cp README.md python-package/README.md
-          cp LICENSE python-package/LICENSE
+          cp README.md package-python/README.md
+          cp LICENSE package-python/LICENSE
+          cp LICENSE package-r/LICENSE
+      - name: Run PGO Optimization
+        shell: bash
+        run: |
+          bash pgo_optimize.sh
+          PGO_FILE=$(find target/pgo-profiles -name "*.profdata" | head -n 1)
+          echo "PGO_PROFILE=$PGO_FILE" >> $GITHUB_ENV
       - name: Build wheels with maturin
         uses: PyO3/maturin-action@v1
         with:
           target: x86_64
           command: build
-          args: --release --strip --interpreter python --manifest-path python-package/Cargo.toml --out dist --sdist
+          args: --release --strip --interpreter python --manifest-path package-python/Cargo.toml --out dist --sdist
+        env:
+          RUSTFLAGS: "-Cprofile-use=${{ env.PGO_PROFILE }}"
       - name: Save Artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -54,13 +63,22 @@ jobs:
       - name: Install deps
         run: pip install numpy pandas seaborn scikit-learn toml
       - run: |
-          cp README.md python-package/README.md
-          cp LICENSE python-package/LICENSE
+          cp README.md package-python/README.md
+          cp LICENSE package-python/LICENSE
+          cp LICENSE package-r/LICENSE
+      - name: Run PGO Optimization
+        shell: bash
+        run: |
+          bash pgo_optimize.sh
+          PGO_FILE=$(find target/pgo-profiles -name "*.profdata" | head -n 1)
+          echo "PGO_PROFILE=$PGO_FILE" >> $GITHUB_ENV
       - name: Build wheels with maturin
         uses: PyO3/maturin-action@v1
         with:
           command: build
-          args: --release --strip --interpreter python --manifest-path python-package/Cargo.toml --out dist --sdist
+          args: --release --strip --interpreter python --manifest-path package-python/Cargo.toml --out dist --sdist
+        env:
+          RUSTFLAGS: "-Cprofile-use=${{ env.PGO_PROFILE }}"
       - name: Save Artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -71,7 +89,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        pyversion: ["3.9", "3.10", "3.11", "3.12", "3.13"]
+        pyversion: ["3.10", "3.11", "3.12", "3.13", "3.14"]
     steps:
       - uses: actions/checkout@v4
       - name: Install latests stable Rust
@@ -85,15 +103,24 @@ jobs:
       - name: Install deps
         run: pip install numpy pandas seaborn scikit-learn toml
       - run: |
-          cp README.md python-package/README.md
-          cp LICENSE python-package/LICENSE
+          cp README.md package-python/README.md
+          cp LICENSE package-python/LICENSE
+          cp LICENSE package-r/LICENSE
+      - name: Run PGO Optimization
+        shell: bash
+        run: |
+          bash pgo_optimize.sh
+          PGO_FILE=$(find target/pgo-profiles -name "*.profdata" | head -n 1)
+          echo "PGO_PROFILE=$PGO_FILE" >> $GITHUB_ENV
       - name: Build wheels with maturin
         uses: PyO3/maturin-action@v1
         with:
           target: x86_64
           manylinux: auto
           command: build
-          args: --release --strip --interpreter python${{ matrix.pyversion }} --manifest-path python-package/Cargo.toml --out dist --sdist
+          args: --release --strip --interpreter python${{ matrix.pyversion }} --manifest-path package-python/Cargo.toml --out dist --sdist
+        env:
+          RUSTFLAGS: "-Cprofile-use=${{ env.PGO_PROFILE }}"
       - name: Save Artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -104,7 +131,7 @@ jobs:
     runs-on: ubuntu-24.04-arm
     strategy:
       matrix:
-        pyversion: ["3.9", "3.10", "3.11", "3.12", "3.13"]
+        pyversion: ["3.10", "3.11", "3.12", "3.13", "3.14"]
     steps:
       - uses: actions/checkout@v4
       - name: Install latests stable Rust
@@ -118,14 +145,23 @@ jobs:
       - name: Install deps
         run: pip install numpy pandas seaborn scikit-learn toml
       - run: |
-          cp README.md python-package/README.md
-          cp LICENSE python-package/LICENSE
+          cp README.md package-python/README.md
+          cp LICENSE package-python/LICENSE
+          cp LICENSE package-r/LICENSE
+      - name: Run PGO Optimization
+        shell: bash
+        run: |
+          bash pgo_optimize.sh
+          PGO_FILE=$(find target/pgo-profiles -name "*.profdata" | head -n 1)
+          echo "PGO_PROFILE=$PGO_FILE" >> $GITHUB_ENV
       - name: Build wheels with maturin
         uses: PyO3/maturin-action@v1
         with:
           manylinux: auto
           command: build
-          args: --release --strip --interpreter python${{ matrix.pyversion }} --manifest-path python-package/Cargo.toml --out dist --sdist
+          args: --release --strip --interpreter python${{ matrix.pyversion }} --manifest-path package-python/Cargo.toml --out dist --sdist
+        env:
+          RUSTFLAGS: "-Cprofile-use=${{ env.PGO_PROFILE }}"
       - name: Save Artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -147,8 +183,9 @@ jobs:
       - name: Install deps
         run: pip install numpy pandas seaborn scikit-learn toml
       - run: |
-          cp README.md python-package/README.md
-          cp LICENSE python-package/LICENSE
+          cp README.md package-python/README.md
+          cp LICENSE package-python/LICENSE
+          cp LICENSE package-r/LICENSE
       - name: Publish Crate
         run: cargo publish --token ${CRATES_TOKEN} --allow-dirty
         env:

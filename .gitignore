@@ -5,8 +5,44 @@ perpetual/__pycache__
 .venv
 resources/*
 !resources/perp_logo.png
-python-package/Cargo.lock
-python-package/LICENSE
-python-package/README.md
-python-package/target
-python-package/python/perpetual/__pycache__
+package-python/Cargo.lock
+package-python/LICENSE
+package-python/README.md
+package-python/target
+package-python/python/perpetual/__pycache__
+package-python/examples/ee
+
+# R package build artifacts
+r-lib/
+package-r/R_library/
+package-r/src/rust/target/
+package-r/src/*.o
+package-r/src/*.so
+package-r/src/*.a
+package-r/src/*.dll
+package-r/src/entrypoint.o
+
+# Log files
+*.log
+
+# Debug and temporary files
+debug_*.R
+check_symbols.R
+path_check.txt
+test_output.txt
+test_output_ascii.txt
+test_errors.txt
+test_failure.txt
+errors*.txt
+profile.json*
+typescript
+
+# WSL build scripts (temporary)
+wsl_*.sh
+
+# Rust vendoring artifacts
+package-r/src/rust/.cargo/
+package-r/src/rust/vendor/
+
+# Python cache
+.ruff_cache/
