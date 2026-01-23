@@ -47,4 +47,4 @@ jobs:
       - name: Check
         uses: r-lib/actions/check-r-package@v2
         with:
-          path: package-r
+          working-directory: package-r
