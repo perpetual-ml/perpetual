@@ -12,6 +12,10 @@ jobs:
         with:
           python-version: "3.11" # Choose a single, compatible python version
           architecture: x64
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
       - name: Install dependencies for resource creation
         # Note: 'perpetual.utils' suggests 'perpetual' is a dependency, 
         # so we install it in editable mode to get its dependencies (like .[dev]).
