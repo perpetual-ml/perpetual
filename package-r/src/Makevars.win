@@ -6,8 +6,14 @@ PKG_CFLAGS = -I./rust/target/$(TARGET)/release
 all: rust-target
 
 rust-target:
-	cd rust && cargo build --release --lib --manifest-path Cargo.toml --target $(TARGET)
-	cp rust/target/$(TARGET)/release/libperpetual_r.a .
+	@echo "Building Rust library for Windows (target: $(TARGET))..."
+	cd rust && cargo build --release --lib --manifest-path Cargo.toml --target $(TARGET) --verbose
+	@if [ -f rust/target/$(TARGET)/release/libperpetual_r.a ]; then \
+		cp rust/target/$(TARGET)/release/libperpetual_r.a .; \
+	else \
+		echo "ERROR: libperpetual_r.a not found!"; \
+		exit 1; \
+	fi
 
 clean:
 	rm -f libperpetual_r.a

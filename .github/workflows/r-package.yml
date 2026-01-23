@@ -49,6 +49,20 @@ jobs:
           needs: check
           working-directory: package-r
 
+      - name: Debug - List files before build
+        run: |
+          ls -R package-r/src/rust/core | head -n 20
+
+      - name: Manual Build
+        run: |
+          R CMD build package-r --no-manual --no-build-vignettes
+        shell: bash
+
+      - name: Manual Install Test
+        run: |
+          R CMD INSTALL perpetual_1.0.0.tar.gz --verbose --no-test-load
+        shell: bash
+
       - name: Dump all check files on failure
         if: failure()
         shell: bash
