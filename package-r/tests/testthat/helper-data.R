@@ -4,18 +4,26 @@
 library(perpetual)
 
 get_resources_dir <- function() {
-  # If we are in package-r, dirname(getwd()) is project root
-  # If we are in package-r/tests/testthat, we need more dirnames
-  curr_dir <- getwd()
-  if (basename(curr_dir) == "testthat") {
-    res <- file.path(dirname(dirname(dirname(curr_dir))), "resources")
-  } else if (basename(curr_dir) == "package-r") {
-    res <- file.path(dirname(curr_dir), "resources")
-  } else {
-    # Fallback to current dir if root contains resources
-    res <- file.path(curr_dir, "resources")
+  # During tests, resources are copied to tests/testthat/resources
+  # testthat tests run with getwd() as tests/testthat (usually)
+  
+  # Try current dir
+  if (dir.exists("resources")) {
+    return("resources")
   }
-  return(res)
+  
+  # Try relative to this file (helper-data.R) if sourced
+  # Note: This might be tricky in R CMD check, but usually the working dir is the test dir
+  
+  # Failback or check if we are in package root (manually run)
+  if (dir.exists("tests/testthat/resources")) {
+    return("tests/testthat/resources")
+  }
+  
+  # If we are installed, this won't work unless we used inst/extdata
+  # But these are unit tests running from source (or during check from source)
+  
+  stop("Could not find resources directory. Expected at 'resources' or 'tests/testthat/resources'. Working directory: ", getwd())
 }
 
 # Helper to convert flat data list to matrix for new API

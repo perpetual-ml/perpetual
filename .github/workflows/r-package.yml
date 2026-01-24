@@ -39,6 +39,12 @@ jobs:
           r-version: ${{ matrix.config.r }}
           use-public-rspm: true
 
+      - name: Copy Resources for Tests
+        run: |
+          mkdir -p package-r/tests/testthat/resources
+          cp -r resources/* package-r/tests/testthat/resources/
+        shell: bash
+
       - name: Vendor core Rust logic
         run: python scripts/vendor_r.py
 
