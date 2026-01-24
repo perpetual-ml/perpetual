@@ -709,6 +709,12 @@ def test_polars():
 
     assert np.allclose(pred_pl, pred_pd)
 
+    # Compare probabilities
+    prob_pl = model_pl.predict_proba(X_pl)
+    prob_pd = model_pd.predict_proba(X_pd)
+
+    assert np.allclose(prob_pl, prob_pd)
+
     model_pl.trees_to_dataframe()
     model_pd.trees_to_dataframe()
 

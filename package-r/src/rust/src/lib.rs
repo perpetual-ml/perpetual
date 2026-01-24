@@ -609,7 +609,8 @@ pub unsafe extern "C" fn PerpetualBooster_predict_intervals(
                 SET_STRING_ELT(names_vec, i as R_xlen_t, Rf_mkChar(s.as_ptr()));
 
                 // Set content
-                let alpha_vec = Rf_allocVector(REALSXP, preds.len() as R_xlen_t);
+                let total_len: usize = preds.iter().map(|v| v.len()).sum();
+                let alpha_vec = Rf_allocVector(REALSXP, total_len as R_xlen_t);
                 let r_alpha = REAL(alpha_vec);
                 for (j, p) in preds.into_iter().flatten().enumerate() {
                     *r_alpha.add(j) = p;
