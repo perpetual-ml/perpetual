@@ -64,5 +64,5 @@ test_that("perpetual() training function handles additional parameters", {
   model <- perpetual(X, y, objective = "LogLoss", budget = 1.0, max_bin = 128, log_iterations = 1)
   
   expect_s3_class(model, "PerpetualBooster")
-  expect_true(model$number_of_trees() > 0)
+  expect_true(perpetual_n_trees(model) > 0)
 })

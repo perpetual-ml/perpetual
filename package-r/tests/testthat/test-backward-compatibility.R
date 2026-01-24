@@ -16,10 +16,10 @@ test_that("Load v0.10.0 model and verify predictions", {
   
   # Verify model loaded correctly
   expect_true(!is.null(model))
-  n_trees <- model$number_of_trees()
+  n_trees <- perpetual_n_trees(model)
   expect_true(n_trees > 0)
   
-  base <- model$base_score()
+  base <- perpetual_base_score(model)
   expect_true(is.numeric(base))
 })
 
