@@ -1,6 +1,6 @@
 Package: perpetual
 Type: Package
-Title: Perpetual Boosting Machine
+Title: PerpetualBooster
 Version: 1.0.0
 Authors@R: c(
     person("Mutlu", "Simsek", email = "msimsek@perpetual-ml.com", role = c("aut", "cre")),
@@ -8,11 +8,13 @@ Authors@R: c(
     person("Pieter", "Pel", email = "pelpieter@gmail.com", role = "aut")
   )
 Description: A self-generalizing gradient boosting machine that doesn't need hyperparameter optimization.
-License: MIT + file LICENSE
+License: GPL-3
+Suggests: 
+    jsonlite,
+    testthat (>= 3.0.0)
+Config/testthat/edition: 3
 Encoding: UTF-8
 LazyData: true
 Biarch: true
 SystemRequirements: Cargo (Rust's package manager), rustc
-Imports:
-LinkingTo:
 RoxygenNote: 7.3.1

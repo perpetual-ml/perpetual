@@ -1,0 +1,6 @@
+^.*\.Rproj$
+^\.Rproj\.user$
+^_pkgdown\.yml$
+^examples$
+^LICENSE$
+^\.github$

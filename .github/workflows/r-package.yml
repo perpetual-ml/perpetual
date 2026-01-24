@@ -27,8 +27,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       
-      - name: Copy LICENSE
-        run: cp LICENSE package-r/LICENSE
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@master
@@ -46,9 +44,14 @@ jobs:
 
       - uses: r-lib/actions/setup-r-dependencies@v2
         with:
-          extra-packages: any::rcmdcheck, any::devtools, any::testthat
+          extra-packages: any::rcmdcheck, any::devtools, any::testthat, any::roxygen2, any::jsonlite
           needs: check
           working-directory: package-r
+
+      - name: Generate Documentation
+        run: |
+          Rscript -e "roxygen2::roxygenise('package-r')"
+        shell: bash
 
       - name: Debug - List files before build
         run: |

@@ -4,6 +4,27 @@
 #' hyperparameter optimization. It automatically finds the best configuration 
 #' based on the provided budget.
 #'
+#' @param x A matrix or data.frame of features.
+#' @param y A vector of targets (numeric for regression, factor/integer for classification).
+#' @param objective A string specifying the objective function. Default is "LogLoss".
+#' @param budget A numeric value ensuring the training time does not exceed this budget (in normalized units).
+#' @param iteration_limit An integer limit on the number of iterations.
+#' @param stopping_rounds An integer for early stopping.
+#' @param max_bin Integer, max number of bins for histograms.
+#' @param num_threads Integer, number of threads to use.
+#' @param missing Check documentation.
+#' @param allow_missing_splits Boolean.
+#' @param create_missing_branch Boolean.
+#' @param missing_node_treatment String.
+#' @param log_iterations Integer.
+#' @param quantile Numeric.
+#' @param reset Boolean.
+#' @param timeout Numeric.
+#' @param memory_limit Numeric.
+#' @param seed Integer seed for reproducibility.
+#' @param ... Additional arguments.
+#'
+#' @return A \code{PerpetualBooster} object.
 #' @export
 perpetual <- function(x, y, objective = "LogLoss", budget = NULL, 
                       iteration_limit = NULL, stopping_rounds = NULL, 
@@ -60,6 +81,14 @@ perpetual <- function(x, y, objective = "LogLoss", budget = NULL,
 }
 
 #' Predict using a PerpetualBooster model
+#'
+#' @param object A \code{PerpetualBooster} object.
+#' @param newdata A matrix or data.frame of new data to predict on.
+#' @param type Type of prediction: "class", "prob", "raw", "contribution", or "interval".
+#' @param method Method for prediction contributions. Default "average".
+#' @param ... Additional arguments.
+#'
+#' @return A vector or matrix of predictions.
 #' @export
 predict.PerpetualBooster <- function(object, newdata, type = c("class", "prob", "raw", "contribution", "interval"), method = "average", ...) {
   type <- match.arg(type)
@@ -129,6 +158,10 @@ predict.PerpetualBooster <- function(object, newdata, type = c("class", "prob", 
 }
 
 #' Print PerpetualBooster
+#'
+#' @param x A \code{PerpetualBooster} object.
+#' @param ... Additional arguments.
+#'
 #' @export
 print.PerpetualBooster <- function(x, ...) {
   n_trees <- .Call("PerpetualBooster_number_of_trees", x$.ptr, PACKAGE = "perpetual")
@@ -145,6 +178,10 @@ print.PerpetualBooster <- function(x, ...) {
 }
 
 #' Save a PerpetualBooster model
+#'
+#' @param model A \code{PerpetualBooster} object.
+#' @param path String, path to save the model.
+#'
 #' @export
 perpetual_save <- function(model, path) {
   if (!inherits(model, "PerpetualBooster")) {
@@ -154,6 +191,10 @@ perpetual_save <- function(model, path) {
 }
 
 #' Load a PerpetualBooster model
+#'
+#' @param path String, path to the saved model.
+#'
+#' @return A \code{PerpetualBooster} object.
 #' @export
 perpetual_load <- function(path) {
   if (!file.exists(path)) {
@@ -177,6 +218,14 @@ perpetual_load <- function(path) {
 }
 
 #' Calibrate a PerpetualBooster model
+#'
+#' @param model A \code{PerpetualBooster} object.
+#' @param x Validation features.
+#' @param y Validation targets.
+#' @param x_cal Calibration features.
+#' @param y_cal Calibration targets.
+#' @param alpha Calibration parameter.
+#'
 #' @export
 perpetual_calibrate <- function(model, x, y, x_cal, y_cal, alpha) {
   if (is.data.frame(x)) x <- as.matrix(x)
@@ -192,6 +241,12 @@ perpetual_calibrate <- function(model, x, y, x_cal, y_cal, alpha) {
 }
 
 #' Get feature importance
+#'
+#' @param model A \code{PerpetualBooster} object.
+#' @param method String, method for importance (e.g. "gain").
+#' @param normalize Boolean.
+#'
+#' @return A named vector of importances.
 #' @export
 perpetual_importance <- function(model, method = "gain", normalize = TRUE) {
   imp <- .Call("PerpetualBooster_calculate_feature_importance", model$.ptr, method, normalize, PACKAGE = "perpetual")
