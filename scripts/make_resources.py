@@ -190,6 +190,7 @@ print("Successfully generated resources/model_v0.10.0.json and predictions")
         )
     except subprocess.CalledProcessError as e:
         print(f"Failed to generate model: {e}")
+        raise e
     finally:
         if os.path.exists("temp_gen_model.py"):
             os.remove("temp_gen_model.py")

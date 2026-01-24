@@ -44,3 +44,9 @@ void R_init_perpetual(DllInfo *dll) {
     R_registerRoutines(dll, NULL, CallEntries, NULL, NULL);
     R_useDynamicSymbols(dll, FALSE);
 }
+
+// CRAN policy: Packages should not call abort().
+// We override it to call Rf_error instead, which handles the error broadly within R.
+void abort(void) {
+    Rf_error("Rust code attempted to abort (panic).");
+}
