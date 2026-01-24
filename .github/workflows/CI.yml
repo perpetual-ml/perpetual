@@ -388,7 +388,8 @@ jobs:
 
       - name: Manual Install Test
         run: |
-          R CMD INSTALL perpetual_1.0.0.tar.gz --verbose --no-test-load
+          tarball=$(ls perpetual_*.tar.gz | head -n 1)
+          R CMD INSTALL "$tarball" --verbose --no-test-load
         shell: bash
 
       - name: Dump all check files on failure

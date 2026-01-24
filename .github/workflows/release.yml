@@ -4,13 +4,51 @@ on:
     types: [published]
 
 jobs:
+  prepare-resources:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          architecture: x64
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - name: Install dependencies for resource creation
+        run: |
+          uv pip install --system numpy pandas seaborn scikit-learn toml
+          cp README.md package-python/README.md
+          cp LICENSE package-python/LICENSE  
+          cp LICENSE package-r/LICENSE
+          mkdir -p resources
+          cd package-python
+          uv pip install --system -e .[dev]
+          cd ..
+      - name: Build test data (create resources)
+        run: python scripts/make_resources.py
+      - name: Upload Resources Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: perpetual-resources
+          path: resources
+          retention-days: 1
+
   windows-build:
+    needs: prepare-resources
     strategy:
       matrix:
         pyversion: ["3.10", "3.11", "3.12", "3.13", "3.14"]
     runs-on: "windows-latest"
     steps:
       - uses: actions/checkout@v4
+      - name: Download Resources Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: perpetual-resources
+          path: resources
       - name: Install latests stable Rust
         uses: dtolnay/rust-toolchain@stable
         with:
@@ -46,13 +84,19 @@ jobs:
           path: dist
 
   macos-build:
+    needs: prepare-resources
     strategy:
       matrix:
-        pyversion: ["3.11", "3.12", "3.13"]
+        pyversion: ["3.11", "3.12", "3.13", "3.14"]
         os: [macos-latest, macos-latest-large]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
+      - name: Download Resources Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: perpetual-resources
+          path: resources
       - name: Install latest stable Rust
         uses: dtolnay/rust-toolchain@stable
         with:
@@ -86,12 +130,18 @@ jobs:
           path: dist
 
   linux-build:
+    needs: prepare-resources
     runs-on: ubuntu-latest
     strategy:
       matrix:
         pyversion: ["3.10", "3.11", "3.12", "3.13", "3.14"]
     steps:
       - uses: actions/checkout@v4
+      - name: Download Resources Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: perpetual-resources
+          path: resources
       - name: Install latests stable Rust
         uses: dtolnay/rust-toolchain@stable
         with:
@@ -128,12 +178,18 @@ jobs:
           path: dist
 
   linux-arm-build:
+    needs: prepare-resources
     runs-on: ubuntu-24.04-arm
     strategy:
       matrix:
         pyversion: ["3.10", "3.11", "3.12", "3.13", "3.14"]
     steps:
       - uses: actions/checkout@v4
+      - name: Download Resources Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: perpetual-resources
+          path: resources
       - name: Install latests stable Rust
         uses: dtolnay/rust-toolchain@stable
         with:
@@ -170,6 +226,7 @@ jobs:
 
   cargo-publish:
     runs-on: ubuntu-latest
+    needs: pypi-publish
     steps:
       - uses: actions/checkout@v4
       - name: Install latest stable Rust
