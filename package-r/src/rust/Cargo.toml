@@ -17,3 +17,5 @@ serde_plain = "1.0.2"
 
 [profile.release]
 strip = true
+lto = true
+codegen-units = 1
