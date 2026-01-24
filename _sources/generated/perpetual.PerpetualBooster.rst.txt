@@ -1,0 +1,54 @@
+﻿perpetual.PerpetualBooster
+==========================
+
+.. currentmodule:: perpetual
+
+.. autoclass:: PerpetualBooster
+
+   
+   .. automethod:: __init__
+
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+   
+      ~PerpetualBooster.__init__
+      ~PerpetualBooster.calculate_feature_importance
+      ~PerpetualBooster.calibrate
+      ~PerpetualBooster.fit
+      ~PerpetualBooster.get_metadata
+      ~PerpetualBooster.get_node_lists
+      ~PerpetualBooster.get_params
+      ~PerpetualBooster.insert_metadata
+      ~PerpetualBooster.json_dump
+      ~PerpetualBooster.load_booster
+      ~PerpetualBooster.partial_dependence
+      ~PerpetualBooster.predict
+      ~PerpetualBooster.predict_contributions
+      ~PerpetualBooster.predict_intervals
+      ~PerpetualBooster.predict_log_proba
+      ~PerpetualBooster.predict_nodes
+      ~PerpetualBooster.predict_proba
+      ~PerpetualBooster.prune
+      ~PerpetualBooster.save_as_onnx
+      ~PerpetualBooster.save_as_xgboost
+      ~PerpetualBooster.save_booster
+      ~PerpetualBooster.set_params
+      ~PerpetualBooster.text_dump
+      ~PerpetualBooster.trees_to_dataframe
+   
+   
+
+   
+   
+   .. rubric:: Attributes
+
+   .. autosummary::
+   
+      ~PerpetualBooster.base_score
+      ~PerpetualBooster.feature_importances_
+      ~PerpetualBooster.metadata_attributes
+      ~PerpetualBooster.number_of_trees
+   
+   
