@@ -67,6 +67,24 @@ unsafe fn r_error(msg: &str) -> ! {
     Rf_error(s.as_ptr());
 }
 
+macro_rules! r_safe {
+    ($body:expr) => {
+        match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| $body)) {
+            Ok(result) => result,
+            Err(e) => {
+                let msg = if let Some(s) = e.downcast_ref::<&str>() {
+                    *s
+                } else if let Some(s) = e.downcast_ref::<String>() {
+                    s.as_str()
+                } else {
+                    "Unknown panic in Rust code"
+                };
+                unsafe { r_error(&format!("Rust panic: {}", msg)) }
+            }
+        }
+    };
+}
+
 trait OrRError<T> {
     fn or_r_error(self, msg: &str) -> T;
 }
@@ -185,345 +203,363 @@ pub unsafe extern "C" fn PerpetualBooster_new(
     stopping_rounds: SEXP,
     seed: SEXP,
 ) -> SEXP {
-    let mut config = BoosterConfig::default();
+    r_safe!(unsafe {
+        let mut config = BoosterConfig::default();
 
-    if let Some(obj) = opt_str(objective) {
-        if let Ok(obj_enum) = serde_plain::from_str::<Objective>(&obj) {
-            config.objective = obj_enum;
-        } else if !obj.is_empty() {
-            let msg = CString::new(format!(
-                "Warning: Unknown objective '{}'. Using default LogLoss.\n",
-                obj
-            ))
-            .unwrap();
-            Rprintf(msg.as_ptr());
+        if let Some(obj) = opt_str(objective) {
+            if let Ok(obj_enum) = serde_plain::from_str::<Objective>(&obj) {
+                config.objective = obj_enum;
+            } else if !obj.is_empty() {
+                let msg = CString::new(format!(
+                    "Warning: Unknown objective '{}'. Using default LogLoss.\n",
+                    obj
+                ))
+                .unwrap();
+                Rprintf(msg.as_ptr());
+            }
         }
-    }
 
-    if let Some(b) = opt_f64(budget) {
-        config.budget = b as f32;
-    }
-    if let Some(mb) = opt_i32(max_bin) {
-        config.max_bin = mb as u16;
-    }
-    if let Some(nt) = opt_i32(num_threads) {
-        if nt > 0 {
-            config.num_threads = Some(nt as usize);
+        if let Some(b) = opt_f64(budget) {
+            config.budget = b as f32;
         }
-    }
-    if let Some(val) = opt_f64(missing) {
-        config.missing = val;
-    }
-    if let Some(val) = opt_bool(allow_missing_splits) {
-        config.allow_missing_splits = val;
-    }
-    if let Some(val) = opt_bool(create_missing_branch) {
-        config.create_missing_branch = val;
-    }
-
-    if let Some(treatment) = opt_str(missing_node_treatment) {
-        if let Ok(t) = serde_plain::from_str::<MissingNodeTreatment>(&treatment) {
-            config.missing_node_treatment = t;
+        if let Some(mb) = opt_i32(max_bin) {
+            config.max_bin = mb as u16;
         }
-    }
+        if let Some(nt) = opt_i32(num_threads) {
+            if nt > 0 {
+                config.num_threads = Some(nt as usize);
+            }
+        }
+        if let Some(val) = opt_f64(missing) {
+            config.missing = val;
+        }
+        if let Some(val) = opt_bool(allow_missing_splits) {
+            config.allow_missing_splits = val;
+        }
+        if let Some(val) = opt_bool(create_missing_branch) {
+            config.create_missing_branch = val;
+        }
 
-    if let Some(val) = opt_i32(log_iterations) {
-        config.log_iterations = val as usize;
-    }
-    if let Some(val) = opt_f64(quantile) {
-        config.quantile = Some(val);
-    }
-    if let Some(val) = opt_bool(reset) {
-        config.reset = Some(val);
-    }
-    if let Some(val) = opt_f64(timeout) {
-        config.timeout = Some(val as f32);
-    }
-    if let Some(val) = opt_i32(iteration_limit) {
-        config.iteration_limit = Some(val as usize);
-    }
-    if let Some(val) = opt_f64(memory_limit) {
-        config.memory_limit = Some(val as f32);
-    }
-    if let Some(val) = opt_i32(stopping_rounds) {
-        config.stopping_rounds = Some(val as usize);
-    }
-    if let Some(val) = opt_i32(seed) {
-        config.seed = val as u64;
-    }
+        if let Some(treatment) = opt_str(missing_node_treatment) {
+            if let Ok(t) = serde_plain::from_str::<MissingNodeTreatment>(&treatment) {
+                config.missing_node_treatment = t;
+            }
+        }
 
-    let booster = PerpetualBoosterWrapper {
-        internal: None,
-        config,
-        classes: Vec::new(),
-    };
+        if let Some(val) = opt_i32(log_iterations) {
+            config.log_iterations = val as usize;
+        }
+        if let Some(val) = opt_f64(quantile) {
+            config.quantile = Some(val);
+        }
+        if let Some(val) = opt_bool(reset) {
+            config.reset = Some(val);
+        }
+        if let Some(val) = opt_f64(timeout) {
+            config.timeout = Some(val as f32);
+        }
+        if let Some(val) = opt_i32(iteration_limit) {
+            config.iteration_limit = Some(val as usize);
+        }
+        if let Some(val) = opt_f64(memory_limit) {
+            config.memory_limit = Some(val as f32);
+        }
+        if let Some(val) = opt_i32(stopping_rounds) {
+            config.stopping_rounds = Some(val as usize);
+        }
+        if let Some(val) = opt_i32(seed) {
+            config.seed = val as u64;
+        }
 
-    let ptr = R_MakeExternalPtr(Box::into_raw(Box::new(booster)) as *mut _, R_NilValue, R_NilValue);
-    R_RegisterCFinalizerEx(ptr, Some(finalizer), 1);
-    ptr
+        let booster = PerpetualBoosterWrapper {
+            internal: None,
+            config,
+            classes: Vec::new(),
+        };
+
+        let ptr = R_MakeExternalPtr(Box::into_raw(Box::new(booster)) as *mut _, R_NilValue, R_NilValue);
+        R_RegisterCFinalizerEx(ptr, Some(finalizer), 1);
+        ptr
+    })
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn PerpetualBooster_fit(ptr: SEXP, flat_data: SEXP, rows: SEXP, cols: SEXP, y: SEXP) -> SEXP {
-    let booster = &mut *(R_ExternalPtrAddr(ptr) as *mut PerpetualBoosterWrapper);
+    r_safe!(unsafe {
+        let booster = &mut *(R_ExternalPtrAddr(ptr) as *mut PerpetualBoosterWrapper);
 
-    let rows_val = get_int(rows) as usize;
-    let cols_val = get_int(cols) as usize;
+        let rows_val = get_int(rows) as usize;
+        let cols_val = get_int(cols) as usize;
 
-    let data_slice = slice::from_raw_parts(REAL(flat_data), rows_val * cols_val);
-    let y_slice = slice::from_raw_parts(REAL(y), Rf_xlength(y) as usize);
+        let data_slice = slice::from_raw_parts(REAL(flat_data), rows_val * cols_val);
+        let y_slice = slice::from_raw_parts(REAL(y), Rf_xlength(y) as usize);
 
-    let _data_vec = data_slice.to_vec();
-    let matrix = Matrix::new(&_data_vec, rows_val, cols_val);
+        let _data_vec = data_slice.to_vec();
+        let matrix = Matrix::new(&_data_vec, rows_val, cols_val);
 
-    // Detect unique classes
-    let mut unique_classes: Vec<f64> = y_slice.iter().filter(|v| !v.is_nan()).cloned().collect();
-    unique_classes.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
-    unique_classes.dedup_by(|a, b| (*a - *b).abs() < f64::EPSILON);
-    booster.classes = unique_classes;
+        // Detect unique classes
+        let mut unique_classes: Vec<f64> = y_slice.iter().filter(|v| !v.is_nan()).cloned().collect();
+        unique_classes.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+        unique_classes.dedup_by(|a, b| (*a - *b).abs() < f64::EPSILON);
+        booster.classes = unique_classes;
 
-    if booster.classes.len() > 2 && matches!(booster.config.objective, Objective::LogLoss) {
-        // Multiclass logic
-        let n_classes = booster.classes.len();
-        let mut y_matrix_data = vec![0.0; rows_val * n_classes];
-        for (i, &val) in y_slice.iter().enumerate() {
-            if let Some(pos) = booster.classes.iter().position(|&c| (c - val).abs() < f64::EPSILON) {
-                y_matrix_data[pos * rows_val + i] = 1.0;
+        if booster.classes.len() > 2 && matches!(booster.config.objective, Objective::LogLoss) {
+            // Multiclass logic
+            let n_classes = booster.classes.len();
+            let mut y_matrix_data = vec![0.0; rows_val * n_classes];
+            for (i, &val) in y_slice.iter().enumerate() {
+                if let Some(pos) = booster.classes.iter().position(|&c| (c - val).abs() < f64::EPSILON) {
+                    y_matrix_data[pos * rows_val + i] = 1.0;
+                }
             }
-        }
-        let y_matrix = Matrix::new(&y_matrix_data, rows_val, n_classes);
+            let y_matrix = Matrix::new(&y_matrix_data, rows_val, n_classes);
 
-        let mut multi_booster = MultiOutputBooster::new(
-            n_classes,
-            booster.config.objective.clone(),
-            booster.config.budget,
-            booster.config.max_bin,
-            booster.config.num_threads,
-            booster.config.monotone_constraints.clone(),
-            booster.config.force_children_to_bound_parent,
-            booster.config.missing,
-            booster.config.allow_missing_splits,
-            booster.config.create_missing_branch,
-            booster.config.terminate_missing_features.clone(),
-            booster.config.missing_node_treatment,
-            booster.config.log_iterations,
-            booster.config.seed,
-            booster.config.quantile,
-            booster.config.reset,
-            booster.config.categorical_features.clone(),
-            booster.config.timeout,
-            booster.config.iteration_limit,
-            booster.config.memory_limit,
-            booster.config.stopping_rounds,
-        )
-        .or_r_error("Failed to create MultiOutputBooster");
+            let mut multi_booster = MultiOutputBooster::new(
+                n_classes,
+                booster.config.objective.clone(),
+                booster.config.budget,
+                booster.config.max_bin,
+                booster.config.num_threads,
+                booster.config.monotone_constraints.clone(),
+                booster.config.force_children_to_bound_parent,
+                booster.config.missing,
+                booster.config.allow_missing_splits,
+                booster.config.create_missing_branch,
+                booster.config.terminate_missing_features.clone(),
+                booster.config.missing_node_treatment,
+                booster.config.log_iterations,
+                booster.config.seed,
+                booster.config.quantile,
+                booster.config.reset,
+                booster.config.categorical_features.clone(),
+                booster.config.timeout,
+                booster.config.iteration_limit,
+                booster.config.memory_limit,
+                booster.config.stopping_rounds,
+            )
+            .or_r_error("Failed to create MultiOutputBooster");
 
-        multi_booster
-            .fit(&matrix, &y_matrix, None, None)
-            .or_r_error("Failed to fit MultiOutputBooster");
+            multi_booster
+                .fit(&matrix, &y_matrix, None, None)
+                .or_r_error("Failed to fit MultiOutputBooster");
 
-        let classes_str = booster
-            .classes
-            .iter()
-            .map(|c| c.to_string())
-            .collect::<Vec<_>>()
-            .join(",");
-        for b_ in &mut multi_booster.boosters {
-            b_.metadata.insert("classes".to_string(), classes_str.clone());
-        }
-        booster.internal = Some(InternalBooster::Multi(multi_booster));
-    } else {
-        // Single booster
-        let mut single_booster = CratePerpetualBooster::new(
-            booster.config.objective.clone(),
-            booster.config.budget,
-            f64::NAN,
-            booster.config.max_bin,
-            booster.config.num_threads,
-            booster.config.monotone_constraints.clone(),
-            booster.config.force_children_to_bound_parent,
-            booster.config.missing,
-            booster.config.allow_missing_splits,
-            booster.config.create_missing_branch,
-            booster.config.terminate_missing_features.clone(),
-            booster.config.missing_node_treatment,
-            booster.config.log_iterations,
-            booster.config.seed,
-            booster.config.quantile,
-            booster.config.reset,
-            booster.config.categorical_features.clone(),
-            booster.config.timeout,
-            booster.config.iteration_limit,
-            booster.config.memory_limit,
-            booster.config.stopping_rounds,
-        )
-        .or_r_error("Failed to create PerpetualBooster");
-
-        single_booster
-            .fit(&matrix, &y_slice.to_vec(), None, None::<&[u64]>)
-            .or_r_error("Failed to fit PerpetualBooster");
-
-        if !booster.classes.is_empty() {
             let classes_str = booster
                 .classes
                 .iter()
                 .map(|c| c.to_string())
                 .collect::<Vec<_>>()
                 .join(",");
-            single_booster.metadata.insert("classes".to_string(), classes_str);
-        }
-        booster.internal = Some(InternalBooster::Single(single_booster));
-    }
+            for b_ in &mut multi_booster.boosters {
+                b_.metadata.insert("classes".to_string(), classes_str.clone());
+            }
+            booster.internal = Some(InternalBooster::Multi(multi_booster));
+        } else {
+            // Single booster
+            let mut single_booster = CratePerpetualBooster::new(
+                booster.config.objective.clone(),
+                booster.config.budget,
+                f64::NAN,
+                booster.config.max_bin,
+                booster.config.num_threads,
+                booster.config.monotone_constraints.clone(),
+                booster.config.force_children_to_bound_parent,
+                booster.config.missing,
+                booster.config.allow_missing_splits,
+                booster.config.create_missing_branch,
+                booster.config.terminate_missing_features.clone(),
+                booster.config.missing_node_treatment,
+                booster.config.log_iterations,
+                booster.config.seed,
+                booster.config.quantile,
+                booster.config.reset,
+                booster.config.categorical_features.clone(),
+                booster.config.timeout,
+                booster.config.iteration_limit,
+                booster.config.memory_limit,
+                booster.config.stopping_rounds,
+            )
+            .or_r_error("Failed to create PerpetualBooster");
 
-    R_NilValue
+            single_booster
+                .fit(&matrix, &y_slice.to_vec(), None, None::<&[u64]>)
+                .or_r_error("Failed to fit PerpetualBooster");
+
+            if !booster.classes.is_empty() {
+                let classes_str = booster
+                    .classes
+                    .iter()
+                    .map(|c| c.to_string())
+                    .collect::<Vec<_>>()
+                    .join(",");
+                single_booster.metadata.insert("classes".to_string(), classes_str);
+            }
+            booster.internal = Some(InternalBooster::Single(single_booster));
+        }
+
+        R_NilValue
+    })
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn PerpetualBooster_predict(ptr: SEXP, flat_data: SEXP, rows: SEXP, cols: SEXP) -> SEXP {
-    let booster = &*(R_ExternalPtrAddr(ptr) as *const PerpetualBoosterWrapper);
-    let rows_val = get_int(rows) as usize;
-    let cols_val = get_int(cols) as usize;
-    let data_slice = slice::from_raw_parts(REAL(flat_data), rows_val * cols_val);
-    let _data_vec = data_slice.to_vec();
-    let matrix = Matrix::new(&_data_vec, rows_val, cols_val);
+    r_safe!(unsafe {
+        let booster = &*(R_ExternalPtrAddr(ptr) as *const PerpetualBoosterWrapper);
+        let rows_val = get_int(rows) as usize;
+        let cols_val = get_int(cols) as usize;
+        let data_slice = slice::from_raw_parts(REAL(flat_data), rows_val * cols_val);
+        let _data_vec = data_slice.to_vec();
+        let matrix = Matrix::new(&_data_vec, rows_val, cols_val);
 
-    let preds = match &booster.internal {
-        Some(InternalBooster::Single(b)) => b.predict(&matrix, true),
-        Some(InternalBooster::Multi(b)) => b.predict(&matrix, true),
-        None => unsafe { r_error("Booster not fitted") },
-    };
+        let preds = match &booster.internal {
+            Some(InternalBooster::Single(b)) => b.predict(&matrix, true),
+            Some(InternalBooster::Multi(b)) => b.predict(&matrix, true),
+            None => r_error("Booster not fitted"),
+        };
 
-    let result = Rf_protect(Rf_allocVector(REALSXP, preds.len() as R_xlen_t));
-    let r_data = REAL(result);
-    for (i, val) in preds.iter().enumerate() {
-        *r_data.add(i) = *val;
-    }
-    Rf_unprotect(1);
-    result
+        let result = Rf_protect(Rf_allocVector(REALSXP, preds.len() as R_xlen_t));
+        let r_data = REAL(result);
+        for (i, val) in preds.iter().enumerate() {
+            *r_data.add(i) = *val;
+        }
+        Rf_unprotect(1);
+        result
+    })
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn PerpetualBooster_predict_proba(ptr: SEXP, flat_data: SEXP, rows: SEXP, cols: SEXP) -> SEXP {
-    let booster = &*(R_ExternalPtrAddr(ptr) as *const PerpetualBoosterWrapper);
-    let rows_val = get_int(rows) as usize;
-    let cols_val = get_int(cols) as usize;
-    let data_slice = slice::from_raw_parts(REAL(flat_data), rows_val * cols_val);
-    let _data_vec = data_slice.to_vec();
-    let matrix = Matrix::new(&_data_vec, rows_val, cols_val);
+    r_safe!(unsafe {
+        let booster = &*(R_ExternalPtrAddr(ptr) as *const PerpetualBoosterWrapper);
+        let rows_val = get_int(rows) as usize;
+        let cols_val = get_int(cols) as usize;
+        let data_slice = slice::from_raw_parts(REAL(flat_data), rows_val * cols_val);
+        let _data_vec = data_slice.to_vec();
+        let matrix = Matrix::new(&_data_vec, rows_val, cols_val);
 
-    let preds = match &booster.internal {
-        Some(InternalBooster::Single(b)) => b.predict_proba(&matrix, true),
-        Some(InternalBooster::Multi(b)) => b.predict_proba(&matrix, true),
-        None => unsafe { r_error("Booster not fitted") },
-    };
+        let preds = match &booster.internal {
+            Some(InternalBooster::Single(b)) => b.predict_proba(&matrix, true),
+            Some(InternalBooster::Multi(b)) => b.predict_proba(&matrix, true),
+            None => r_error("Booster not fitted"),
+        };
 
-    let result = Rf_protect(Rf_allocVector(REALSXP, preds.len() as R_xlen_t));
-    let r_data = REAL(result);
-    for (i, val) in preds.iter().enumerate() {
-        *r_data.add(i) = *val;
-    }
-    Rf_unprotect(1);
-    result
+        let result = Rf_protect(Rf_allocVector(REALSXP, preds.len() as R_xlen_t));
+        let r_data = REAL(result);
+        for (i, val) in preds.iter().enumerate() {
+            *r_data.add(i) = *val;
+        }
+        Rf_unprotect(1);
+        result
+    })
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn PerpetualBooster_save_booster(ptr: SEXP, path: SEXP) -> SEXP {
-    let booster = &*(R_ExternalPtrAddr(ptr) as *const PerpetualBoosterWrapper);
-    let path_str = get_str(path);
-    match &booster.internal {
-        Some(InternalBooster::Single(b)) => b.save_booster(&path_str).or_r_error("Failed to save single booster"),
-        Some(InternalBooster::Multi(b)) => b.save_booster(&path_str).or_r_error("Failed to save multi booster"),
-        None => unsafe { r_error("Booster not fitted") },
-    }
-    R_NilValue
+    r_safe!(unsafe {
+        let booster = &*(R_ExternalPtrAddr(ptr) as *const PerpetualBoosterWrapper);
+        let path_str = get_str(path);
+        match &booster.internal {
+            Some(InternalBooster::Single(b)) => b.save_booster(&path_str).or_r_error("Failed to save single booster"),
+            Some(InternalBooster::Multi(b)) => b.save_booster(&path_str).or_r_error("Failed to save multi booster"),
+            None => r_error("Booster not fitted"),
+        }
+        R_NilValue
+    })
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn PerpetualBooster_load_booster(path: SEXP) -> SEXP {
-    let path_str = get_str(path);
-    let json_str = std::fs::read_to_string(path_str).or_r_error("Failed to read file");
-    let mut classes = Vec::new();
+    r_safe!(unsafe {
+        let path_str = get_str(path);
+        let json_str = std::fs::read_to_string(path_str).or_r_error("Failed to read file");
+        let mut classes = Vec::new();
 
-    let internal = if json_str.contains("\"boosters\":") {
-        let b = MultiOutputBooster::from_json(&json_str).or_r_error("Failed to parse MultiOutputBooster JSON");
-        if let Some(metadata) = b.boosters.first().map(|b_| &b_.metadata) {
-            if let Some(c_str) = metadata.get("classes") {
+        let internal = if json_str.contains("\"boosters\":") {
+            let b = MultiOutputBooster::from_json(&json_str).or_r_error("Failed to parse MultiOutputBooster JSON");
+            if let Some(metadata) = b.boosters.first().map(|b_| &b_.metadata) {
+                if let Some(c_str) = metadata.get("classes") {
+                    classes = c_str.split(',').filter_map(|s| s.parse::<f64>().ok()).collect();
+                }
+            }
+            Some(InternalBooster::Multi(b))
+        } else {
+            let b = CratePerpetualBooster::from_json(&json_str).or_r_error("Failed to parse PerpetualBooster JSON");
+            if let Some(c_str) = b.metadata.get("classes") {
                 classes = c_str.split(',').filter_map(|s| s.parse::<f64>().ok()).collect();
             }
-        }
-        Some(InternalBooster::Multi(b))
-    } else {
-        let b = CratePerpetualBooster::from_json(&json_str).or_r_error("Failed to parse PerpetualBooster JSON");
-        if let Some(c_str) = b.metadata.get("classes") {
-            classes = c_str.split(',').filter_map(|s| s.parse::<f64>().ok()).collect();
-        }
-        Some(InternalBooster::Single(b))
-    };
+            Some(InternalBooster::Single(b))
+        };
 
-    let config = match internal.as_ref().or_r_error("Internal error: internal booster is None") {
-        InternalBooster::Single(b) => b.cfg.clone(),
-        InternalBooster::Multi(b) => b.cfg.clone(),
-    };
+        let config = match internal.as_ref().or_r_error("Internal error: internal booster is None") {
+            InternalBooster::Single(b) => b.cfg.clone(),
+            InternalBooster::Multi(b) => b.cfg.clone(),
+        };
 
-    let booster = PerpetualBoosterWrapper {
-        internal,
-        config,
-        classes,
-    };
+        let booster = PerpetualBoosterWrapper {
+            internal,
+            config,
+            classes,
+        };
 
-    let ptr = R_MakeExternalPtr(Box::into_raw(Box::new(booster)) as *mut _, R_NilValue, R_NilValue);
-    R_RegisterCFinalizerEx(ptr, Some(finalizer), 1);
-    ptr
+        let ptr = R_MakeExternalPtr(Box::into_raw(Box::new(booster)) as *mut _, R_NilValue, R_NilValue);
+        R_RegisterCFinalizerEx(ptr, Some(finalizer), 1);
+        ptr
+    })
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn PerpetualBooster_json_dump(ptr: SEXP) -> SEXP {
-    let booster = &*(R_ExternalPtrAddr(ptr) as *const PerpetualBoosterWrapper);
-    let dump = match &booster.internal {
-        Some(InternalBooster::Single(b)) => b.json_dump().or_r_error("Failed to dump JSON"),
-        Some(InternalBooster::Multi(b)) => b.json_dump().or_r_error("Failed to dump JSON"),
-        None => unsafe { r_error("Booster not fitted") },
-    };
+    r_safe!(unsafe {
+        let booster = &*(R_ExternalPtrAddr(ptr) as *const PerpetualBoosterWrapper);
+        let dump = match &booster.internal {
+            Some(InternalBooster::Single(b)) => b.json_dump().or_r_error("Failed to dump JSON"),
+            Some(InternalBooster::Multi(b)) => b.json_dump().or_r_error("Failed to dump JSON"),
+            None => r_error("Booster not fitted"),
+        };
 
-    let result = Rf_protect(Rf_mkString(
-        CString::new(dump)
-            .or_r_error("Failed to convert JSON to CString")
-            .as_ptr(),
-    ));
-    Rf_unprotect(1);
-    result
+        let result = Rf_protect(Rf_mkString(
+            CString::new(dump)
+                .or_r_error("Failed to convert JSON to CString")
+                .as_ptr(),
+        ));
+        Rf_unprotect(1);
+        result
+    })
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn PerpetualBooster_number_of_trees(ptr: SEXP) -> SEXP {
-    let booster = &*(R_ExternalPtrAddr(ptr) as *const PerpetualBoosterWrapper);
-    let count = match &booster.internal {
-        Some(InternalBooster::Single(b)) => b.get_prediction_trees().len() as i32,
-        Some(InternalBooster::Multi(b)) => b
-            .boosters
-            .iter()
-            .map(|b_| b_.get_prediction_trees().len())
-            .sum::<usize>() as i32,
-        None => 0,
-    };
-    let result = Rf_protect(Rf_allocVector(INTSXP, 1));
-    *INTEGER(result) = count;
-    Rf_unprotect(1);
-    result
+    r_safe!(unsafe {
+        let booster = &*(R_ExternalPtrAddr(ptr) as *const PerpetualBoosterWrapper);
+        let count = match &booster.internal {
+            Some(InternalBooster::Single(b)) => b.get_prediction_trees().len() as i32,
+            Some(InternalBooster::Multi(b)) => b
+                .boosters
+                .iter()
+                .map(|b_| b_.get_prediction_trees().len())
+                .sum::<usize>() as i32,
+            None => 0,
+        };
+        let result = Rf_protect(Rf_allocVector(INTSXP, 1));
+        *INTEGER(result) = count;
+        Rf_unprotect(1);
+        result
+    })
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn PerpetualBooster_base_score(ptr: SEXP) -> SEXP {
-    let booster = &*(R_ExternalPtrAddr(ptr) as *const PerpetualBoosterWrapper);
-    let score = match &booster.internal {
-        Some(InternalBooster::Single(b)) => b.base_score,
-        Some(InternalBooster::Multi(b)) => b.boosters.first().map(|b_| b_.base_score).unwrap_or(f64::NAN),
-        None => f64::NAN,
-    };
-    let result = Rf_protect(Rf_allocVector(REALSXP, 1));
-    *REAL(result) = score;
-    Rf_unprotect(1);
-    result
+    r_safe!(unsafe {
+        let booster = &*(R_ExternalPtrAddr(ptr) as *const PerpetualBoosterWrapper);
+        let score = match &booster.internal {
+            Some(InternalBooster::Single(b)) => b.base_score,
+            Some(InternalBooster::Multi(b)) => b.boosters.first().map(|b_| b_.base_score).unwrap_or(f64::NAN),
+            None => f64::NAN,
+        };
+        let result = Rf_protect(Rf_allocVector(REALSXP, 1));
+        *REAL(result) = score;
+        Rf_unprotect(1);
+        result
+    })
 }
 
 #[no_mangle]
@@ -534,38 +570,40 @@ pub unsafe extern "C" fn PerpetualBooster_predict_contributions(
     cols: SEXP,
     method: SEXP,
 ) -> SEXP {
-    let booster = &*(R_ExternalPtrAddr(ptr) as *const PerpetualBoosterWrapper);
-    let rows_val = get_int(rows) as usize;
-    let cols_val = get_int(cols) as usize;
-    let data_slice = slice::from_raw_parts(REAL(flat_data), rows_val * cols_val);
-    let _data_vec = data_slice.to_vec();
-    let matrix = Matrix::new(&_data_vec, rows_val, cols_val);
-    let method_str = get_str(method);
+    r_safe!(unsafe {
+        let booster = &*(R_ExternalPtrAddr(ptr) as *const PerpetualBoosterWrapper);
+        let rows_val = get_int(rows) as usize;
+        let cols_val = get_int(cols) as usize;
+        let data_slice = slice::from_raw_parts(REAL(flat_data), rows_val * cols_val);
+        let _data_vec = data_slice.to_vec();
+        let matrix = Matrix::new(&_data_vec, rows_val, cols_val);
+        let method_str = get_str(method);
 
-    let method_enum = match method_str.to_lowercase().as_str() {
-        "weight" => ContributionsMethod::Weight,
-        "average" => ContributionsMethod::Average,
-        "branchdifference" | "branch_difference" => ContributionsMethod::BranchDifference,
-        "midpointdifference" | "midpoint_difference" => ContributionsMethod::MidpointDifference,
-        "modedifference" | "mode_difference" => ContributionsMethod::ModeDifference,
-        "probabilitychange" | "probability_change" => ContributionsMethod::ProbabilityChange,
-        "shapley" => ContributionsMethod::Shapley,
-        _ => ContributionsMethod::Average,
-    };
+        let method_enum = match method_str.to_lowercase().as_str() {
+            "weight" => ContributionsMethod::Weight,
+            "average" => ContributionsMethod::Average,
+            "branchdifference" | "branch_difference" => ContributionsMethod::BranchDifference,
+            "midpointdifference" | "midpoint_difference" => ContributionsMethod::MidpointDifference,
+            "modedifference" | "mode_difference" => ContributionsMethod::ModeDifference,
+            "probabilitychange" | "probability_change" => ContributionsMethod::ProbabilityChange,
+            "shapley" => ContributionsMethod::Shapley,
+            _ => ContributionsMethod::Average,
+        };
 
-    let contribs = match &booster.internal {
-        Some(InternalBooster::Single(b)) => b.predict_contributions(&matrix, method_enum, true),
-        Some(InternalBooster::Multi(b)) => b.predict_contributions(&matrix, method_enum, true),
-        None => unsafe { r_error("Booster not fitted") },
-    };
+        let contribs = match &booster.internal {
+            Some(InternalBooster::Single(b)) => b.predict_contributions(&matrix, method_enum, true),
+            Some(InternalBooster::Multi(b)) => b.predict_contributions(&matrix, method_enum, true),
+            None => r_error("Booster not fitted"),
+        };
 
-    let result = Rf_protect(Rf_allocVector(REALSXP, contribs.len() as R_xlen_t));
-    let r_data = REAL(result);
-    for (i, val) in contribs.iter().enumerate() {
-        *r_data.add(i) = *val;
-    }
-    Rf_unprotect(1);
-    result
+        let result = Rf_protect(Rf_allocVector(REALSXP, contribs.len() as R_xlen_t));
+        let r_data = REAL(result);
+        for (i, val) in contribs.iter().enumerate() {
+            *r_data.add(i) = *val;
+        }
+        Rf_unprotect(1);
+        result
+    })
 }
 
 #[no_mangle]
@@ -581,39 +619,41 @@ pub unsafe extern "C" fn PerpetualBooster_calibrate(
     y_cal: SEXP,
     alpha: SEXP,
 ) -> SEXP {
-    let booster = &mut *(R_ExternalPtrAddr(ptr) as *mut PerpetualBoosterWrapper);
-    let rows_val = get_int(rows) as usize;
-    let cols_val = get_int(cols) as usize;
-    let data_slice = slice::from_raw_parts(REAL(flat_data), rows_val * cols_val);
-    let y_slice = slice::from_raw_parts(REAL(y), Rf_xlength(y) as usize);
-    let _data_vec = data_slice.to_vec();
-    let matrix = Matrix::new(&_data_vec, rows_val, cols_val);
+    r_safe!(unsafe {
+        let booster = &mut *(R_ExternalPtrAddr(ptr) as *mut PerpetualBoosterWrapper);
+        let rows_val = get_int(rows) as usize;
+        let cols_val = get_int(cols) as usize;
+        let data_slice = slice::from_raw_parts(REAL(flat_data), rows_val * cols_val);
+        let y_slice = slice::from_raw_parts(REAL(y), Rf_xlength(y) as usize);
+        let _data_vec = data_slice.to_vec();
+        let matrix = Matrix::new(&_data_vec, rows_val, cols_val);
 
-    let rows_cal_val = get_int(rows_cal) as usize;
-    let cols_cal_val = get_int(cols_cal) as usize;
-    let data_cal_slice = slice::from_raw_parts(REAL(flat_data_cal), rows_cal_val * cols_cal_val);
-    let y_cal_slice = slice::from_raw_parts(REAL(y_cal), Rf_xlength(y_cal) as usize);
-    let alpha_slice = slice::from_raw_parts(REAL(alpha), Rf_xlength(alpha) as usize);
+        let rows_cal_val = get_int(rows_cal) as usize;
+        let cols_cal_val = get_int(cols_cal) as usize;
+        let data_cal_slice = slice::from_raw_parts(REAL(flat_data_cal), rows_cal_val * cols_cal_val);
+        let y_cal_slice = slice::from_raw_parts(REAL(y_cal), Rf_xlength(y_cal) as usize);
+        let alpha_slice = slice::from_raw_parts(REAL(alpha), Rf_xlength(alpha) as usize);
 
-    let _data_cal_vec = data_cal_slice.to_vec();
-    let matrix_cal = Matrix::new(&_data_cal_vec, rows_cal_val, cols_cal_val);
+        let _data_cal_vec = data_cal_slice.to_vec();
+        let matrix_cal = Matrix::new(&_data_cal_vec, rows_cal_val, cols_cal_val);
 
-    match &mut booster.internal {
-        Some(InternalBooster::Single(b)) => {
-            let _y_cal_vec = y_cal_slice.to_vec();
-            let _alpha_vec = alpha_slice.to_vec();
-            b.calibrate(
-                &matrix,
-                &y_slice.to_vec(),
-                None,
-                None,
-                (matrix_cal, &_y_cal_vec, &_alpha_vec),
-            )
-            .or_r_error("Failed to calibrate");
+        match &mut booster.internal {
+            Some(InternalBooster::Single(b)) => {
+                let _y_cal_vec = y_cal_slice.to_vec();
+                let _alpha_vec = alpha_slice.to_vec();
+                b.calibrate(
+                    &matrix,
+                    &y_slice.to_vec(),
+                    None,
+                    None,
+                    (matrix_cal, &_y_cal_vec, &_alpha_vec),
+                )
+                .or_r_error("Failed to calibrate");
+            }
+            _ => r_error("Calibration is only supported for single-output boosters currently"),
         }
-        _ => r_error("Calibration is only supported for single-output boosters currently"),
-    }
-    R_NilValue
+        R_NilValue
+    })
 }
 
 #[no_mangle]
@@ -623,60 +663,62 @@ pub unsafe extern "C" fn PerpetualBooster_predict_intervals(
     rows: SEXP,
     cols: SEXP,
 ) -> SEXP {
-    let booster = &*(R_ExternalPtrAddr(ptr) as *const PerpetualBoosterWrapper);
-    let rows_val = get_int(rows) as usize;
-    let cols_val = get_int(cols) as usize;
-    let data_slice = slice::from_raw_parts(REAL(flat_data), rows_val * cols_val);
-    let _data_vec = data_slice.to_vec();
-    let matrix = Matrix::new(&_data_vec, rows_val, cols_val);
+    r_safe!(unsafe {
+        let booster = &*(R_ExternalPtrAddr(ptr) as *const PerpetualBoosterWrapper);
+        let rows_val = get_int(rows) as usize;
+        let cols_val = get_int(cols) as usize;
+        let data_slice = slice::from_raw_parts(REAL(flat_data), rows_val * cols_val);
+        let _data_vec = data_slice.to_vec();
+        let matrix = Matrix::new(&_data_vec, rows_val, cols_val);
 
-    let result = match &booster.internal {
-        Some(InternalBooster::Single(b)) => {
-            let intervals = b.predict_intervals(&matrix, true);
-            let r_list = Rf_protect(Rf_allocVector(VECSXP, intervals.len() as R_xlen_t));
+        let result = match &booster.internal {
+            Some(InternalBooster::Single(b)) => {
+                let intervals = b.predict_intervals(&matrix, true);
+                let r_list = Rf_protect(Rf_allocVector(VECSXP, intervals.len() as R_xlen_t));
 
-            // Set names for the list (alphas)
-            let names_vec = Rf_allocVector(STRSXP, intervals.len() as R_xlen_t);
-            Rf_protect(names_vec);
+                // Set names for the list (alphas)
+                let names_vec = Rf_allocVector(STRSXP, intervals.len() as R_xlen_t);
+                Rf_protect(names_vec);
 
-            for (i, (alpha, preds)) in intervals.into_iter().enumerate() {
-                // Set name
-                let s = CString::new(alpha.to_string()).unwrap();
-                SET_STRING_ELT(names_vec, i as R_xlen_t, Rf_mkChar(s.as_ptr()));
+                for (i, (alpha, preds)) in intervals.into_iter().enumerate() {
+                    // Set name
+                    let s = CString::new(alpha.to_string()).unwrap();
+                    SET_STRING_ELT(names_vec, i as R_xlen_t, Rf_mkChar(s.as_ptr()));
 
-                // Set content
-                let total_len: usize = preds.iter().map(|v| v.len()).sum();
-                let alpha_vec = Rf_allocVector(REALSXP, total_len as R_xlen_t);
-                let r_alpha = REAL(alpha_vec);
-                for (j, p) in preds.into_iter().flatten().enumerate() {
-                    *r_alpha.add(j) = p;
+                    // Set content
+                    let total_len: usize = preds.iter().map(|v| v.len()).sum();
+                    let alpha_vec = Rf_allocVector(REALSXP, total_len as R_xlen_t);
+                    let r_alpha = REAL(alpha_vec);
+                    for (j, p) in preds.into_iter().flatten().enumerate() {
+                        *r_alpha.add(j) = p;
+                    }
+                    SET_VECTOR_ELT(r_list, i as R_xlen_t, alpha_vec);
                 }
-                SET_VECTOR_ELT(r_list, i as R_xlen_t, alpha_vec);
+
+                Rf_setAttrib(r_list, R_NamesSymbol, names_vec);
+                Rf_unprotect(2); // names_vec and r_list (wait, r_list must be protected until return if referenced, but here we return it)
+                                 // Actually Rf_unprotect pops items from stack.
+                                 // Stack: [r_list, names_vec] (top)
+                                 // Rf_unprotect(2) pops both.
+                                 // But we need to return r_list.
+                                 // If we unprotect, is it safe? Yes if we don't allocate more.
+                                 // BUT usually we return a protected value or it's implicitly part of result logic?
+                                 // In R extensions: "If you want to return a protected object, you should unprotect it first but better make sure it's safe."
+                                 // Typically: protect result -> do work -> unprotect(n) -> return result.
+                                 // If result is on stack, unprotecting it makes it vulnerable to GC if we allocate?
+                                 // No, we are returning immediately. And R function result is protected by caller.
+                                 // Rf_unprotect will happen at end
+                r_list
             }
+            _ => r_error("Prediction intervals not supported"),
+        };
 
-            Rf_setAttrib(r_list, R_NamesSymbol, names_vec);
-            Rf_unprotect(2); // names_vec and r_list (wait, r_list must be protected until return if referenced, but here we return it)
-                             // Actually Rf_unprotect pops items from stack.
-                             // Stack: [r_list, names_vec] (top)
-                             // Rf_unprotect(2) pops both.
-                             // But we need to return r_list.
-                             // If we unprotect, is it safe? Yes if we don't allocate more.
-                             // BUT usually we return a protected value or it's implicitly part of result logic?
-                             // In R extensions: "If you want to return a protected object, you should unprotect it first but better make sure it's safe."
-                             // Typically: protect result -> do work -> unprotect(n) -> return result.
-                             // If result is on stack, unprotecting it makes it vulnerable to GC if we allocate?
-                             // No, we are returning immediately. And R function result is protected by caller.
-                             // Rf_unprotect will happen at end
-            r_list
-        }
-        _ => unsafe { r_error("Prediction intervals not supported") },
-    };
+        // The previous code had Rf_unprotect(1) AFTER the match, assuming only r_list was protected.
+        // Now I do cleanup INSIDE the match for both r_list and names_vec.
+        // So I should remove the outer Rf_unprotect(1).
 
-    // The previous code had Rf_unprotect(1) AFTER the match, assuming only r_list was protected.
-    // Now I do cleanup INSIDE the match for both r_list and names_vec.
-    // So I should remove the outer Rf_unprotect(1).
-
-    result
+        result
+    })
 }
 
 #[no_mangle]
@@ -685,77 +727,86 @@ pub unsafe extern "C" fn PerpetualBooster_calculate_feature_importance(
     method: SEXP,
     normalize: SEXP,
 ) -> SEXP {
-    let booster = &*(R_ExternalPtrAddr(ptr) as *const PerpetualBoosterWrapper);
-    let method_str = get_str(method);
-    let normalize_val = get_bool(normalize);
+    r_safe!(unsafe {
+        let booster = &*(R_ExternalPtrAddr(ptr) as *const PerpetualBoosterWrapper);
+        let method_str = get_str(method);
+        let normalize_val = get_bool(normalize);
 
-    let method_enum = match method_str.to_lowercase().as_str() {
-        "weight" => ImportanceMethod::Weight,
-        "gain" => ImportanceMethod::Gain,
-        "totalgain" | "total_gain" => ImportanceMethod::TotalGain,
-        "cover" => ImportanceMethod::Cover,
-        "totalcover" | "total_cover" => ImportanceMethod::TotalCover,
-        _ => ImportanceMethod::Gain,
-    };
+        let method_enum = match method_str.to_lowercase().as_str() {
+            "weight" => ImportanceMethod::Weight,
+            "gain" => ImportanceMethod::Gain,
+            "totalgain" | "total_gain" => ImportanceMethod::TotalGain,
+            "cover" => ImportanceMethod::Cover,
+            "totalcover" | "total_cover" => ImportanceMethod::TotalCover,
+            _ => ImportanceMethod::Gain,
+        };
 
-    let importance = match &booster.internal {
-        Some(InternalBooster::Single(b)) => b.calculate_feature_importance(method_enum, normalize_val),
-        Some(InternalBooster::Multi(b)) => b.calculate_feature_importance(method_enum, normalize_val),
-        None => unsafe { r_error("Booster not fitted") },
-    };
+        let importance = match &booster.internal {
+            Some(InternalBooster::Single(b)) => b.calculate_feature_importance(method_enum, normalize_val),
+            Some(InternalBooster::Multi(b)) => b.calculate_feature_importance(method_enum, normalize_val),
+            None => r_error("Booster not fitted"),
+        };
 
-    let r_list = Rf_protect(Rf_allocVector(REALSXP, importance.len() as R_xlen_t));
-    let r_vals = REAL(r_list);
+        let r_list = Rf_protect(Rf_allocVector(REALSXP, importance.len() as R_xlen_t));
+        let r_vals = REAL(r_list);
 
-    // We want a named vector
-    let names_vec = Rf_allocVector(STRSXP, importance.len() as R_xlen_t);
-    Rf_protect(names_vec);
+        // We want a named vector
+        let names_vec = Rf_allocVector(STRSXP, importance.len() as R_xlen_t);
+        Rf_protect(names_vec);
 
-    for (i, (idx, val)) in importance.into_iter().enumerate() {
-        *r_vals.add(i) = val as f64;
-        let s = CString::new(idx.to_string()).unwrap();
-        SET_STRING_ELT(names_vec, i as R_xlen_t, Rf_mkChar(s.as_ptr()));
-    }
+        for (i, (idx, val)) in importance.into_iter().enumerate() {
+            *r_vals.add(i) = val as f64;
+            let s = CString::new(idx.to_string()).unwrap();
+            SET_STRING_ELT(names_vec, i as R_xlen_t, Rf_mkChar(s.as_ptr()));
+        }
 
-    Rf_setAttrib(r_list, R_NamesSymbol, names_vec);
-    Rf_unprotect(2); // names_vec and r_list
+        Rf_setAttrib(r_list, R_NamesSymbol, names_vec);
+        Rf_unprotect(2); // names_vec and r_list
 
-    r_list
+        r_list
+    })
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn PerpetualBooster_get_classes(ptr: SEXP) -> SEXP {
-    let booster = &*(R_ExternalPtrAddr(ptr) as *const PerpetualBoosterWrapper);
-    let result = Rf_protect(Rf_allocVector(REALSXP, booster.classes.len() as R_xlen_t));
-    let r_data = REAL(result);
-    for (i, val) in booster.classes.iter().enumerate() {
-        *r_data.add(i) = *val;
-    }
-    Rf_unprotect(1);
-    result
+    r_safe!(unsafe {
+        let booster = &*(R_ExternalPtrAddr(ptr) as *const PerpetualBoosterWrapper);
+        let result = Rf_protect(Rf_allocVector(REALSXP, booster.classes.len() as R_xlen_t));
+        let r_data = REAL(result);
+        for (i, val) in booster.classes.iter().enumerate() {
+            *r_data.add(i) = *val;
+        }
+        Rf_unprotect(1);
+        result
+    })
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn PerpetualBooster_get_objective(ptr: SEXP) -> SEXP {
-    let booster = &*(R_ExternalPtrAddr(ptr) as *const PerpetualBoosterWrapper);
-    let obj_str = match booster.config.objective {
-        Objective::LogLoss => "LogLoss",
-        Objective::SquaredLoss => "SquaredLoss",
-        Objective::QuantileLoss { .. } => "QuantileLoss",
-        Objective::HuberLoss { .. } => "HuberLoss",
-        Objective::AdaptiveHuberLoss { .. } => "AdaptiveHuberLoss",
-        Objective::ListNetLoss => "ListNetLoss",
-        Objective::Custom(_) => "Custom",
-    };
-    let result = Rf_protect(Rf_mkString(CString::new(obj_str).unwrap().as_ptr()));
-    Rf_unprotect(1);
-    result
+    r_safe!(unsafe {
+        let booster = &*(R_ExternalPtrAddr(ptr) as *const PerpetualBoosterWrapper);
+        let obj_str = match booster.config.objective {
+            Objective::LogLoss => "LogLoss",
+            Objective::SquaredLoss => "SquaredLoss",
+            Objective::QuantileLoss { .. } => "QuantileLoss",
+            Objective::HuberLoss { .. } => "HuberLoss",
+            Objective::AdaptiveHuberLoss { .. } => "AdaptiveHuberLoss",
+            Objective::ListNetLoss => "ListNetLoss",
+            Objective::Custom(_) => "Custom",
+        };
+        let result = Rf_protect(Rf_mkString(CString::new(obj_str).unwrap().as_ptr()));
+        Rf_unprotect(1);
+        result
+    })
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn test_binding() -> SEXP {
-    let msg = CString::new("Hello from New Rust V3 (No Extendr)!").unwrap();
-    let result = Rf_protect(Rf_mkString(msg.as_ptr()));
-    Rf_unprotect(1);
-    result
+    r_safe!(unsafe {
+        let msg = CString::new("Hello from New Rust V3 (No Extendr)!").unwrap();
+        let result = Rf_protect(Rf_mkString(msg.as_ptr()));
+        Rf_unprotect(1);
+        result
+    })
 }
+```
