@@ -40,6 +40,7 @@ jobs:
 
   # 2. Windows Build and Test Job (depends on resources)
   windows-build-test:
+    if: github.event_name != 'push'
     needs: prepare-resources # This job waits for prepare-resources to complete
     strategy:
       matrix:
@@ -99,6 +100,7 @@ jobs:
 
   # 3. macOS Build and Test Job (depends on resources)
   macos-build-test:
+    if: github.event_name != 'push'
     needs: prepare-resources
     strategy:
       matrix:
@@ -159,6 +161,7 @@ jobs:
 
   # 4. Linux x64 Build and Test Job (depends on resources)
   linux-build-test:
+    if: github.event_name != 'push'
     needs: prepare-resources
     runs-on: ubuntu-latest
     strategy:
@@ -219,6 +222,7 @@ jobs:
 
   # 5. Linux ARM Build and Test Job (depends on resources)
   linux-arm-build-test:
+    if: github.event_name != 'push'
     needs: prepare-resources
     runs-on: ubuntu-24.04-arm
     strategy:
@@ -278,6 +282,7 @@ jobs:
 
   # 6. Cargo Test Job (depends on resources)
   cargo-build-test:
+    if: github.event_name != 'push'
     needs: prepare-resources
     runs-on: ubuntu-latest
     steps:
