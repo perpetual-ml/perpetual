@@ -809,4 +809,3 @@ pub unsafe extern "C" fn test_binding() -> SEXP {
         result
     })
 }
-```
