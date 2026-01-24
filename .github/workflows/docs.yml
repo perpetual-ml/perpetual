@@ -25,6 +25,8 @@ jobs:
       - name: Install dependencies
         run: |
           cd package-python
+          python -m venv .venv
+          source .venv/bin/activate
           pip install maturin
           pip install .[dev]
           pip install sphinx sphinx_rtd_theme numpydoc
@@ -32,7 +34,9 @@ jobs:
 
       - name: Build Python Documentation
         run: |
-          cd package-python/docs
+          cd package-python
+          source .venv/bin/activate
+          cd docs
           sphinx-build -b html source build/html
 
       - name: Deploy to GitHub Pages

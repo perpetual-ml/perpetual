@@ -55,7 +55,14 @@ echo "Step 7: Validation..."
 # Find the optimized benchmark binary
 # It will be in target/<target-triple>/release/deps/ or target/release/deps/
 # We look for the most recent executable matching the benchmark name
-BENCH_BIN=$(find target -name "${BENCH_NAME}-*" -type f -executable | grep "release/deps" | sort -r | head -n 1)
+# Determine find flag for executables
+if find . -maxdepth 0 -executable > /dev/null 2>&1; then
+    FIND_EXEC_FLAG="-executable"
+else
+    FIND_EXEC_FLAG="-perm +111"
+fi
+
+BENCH_BIN=$(find target -name "${BENCH_NAME}-*" -type f $FIND_EXEC_FLAG | grep "release/deps" | sort -r | head -n 1)
 
 if [ -z "$BENCH_BIN" ]; then
     # Fallback for Windows if 'executable' check fails or extension is needed

@@ -88,7 +88,9 @@ jobs:
     strategy:
       matrix:
         pyversion: ["3.11", "3.12", "3.13", "3.14"]
-        os: [macos-latest, macos-latest-large]
+        # macos-13: Explicitly targeted as the Intel runner (Free).
+        # macos-14: Explicitly targeted as the Apple Silicon runner (Free).
+        os: [macos-13, macos-14]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -209,7 +211,7 @@ jobs:
         run: |
           bash pgo_optimize.sh
           PGO_FILE=$(find target/pgo-profiles -name "*.profdata" | head -n 1)
-          echo "PGO_PROFILE=/io/$PGO_FILE" >> $GITHUB_ENV
+          echo "PGO_PROFILE=$PWD/$PGO_FILE" >> $GITHUB_ENV
       - name: Build wheels with maturin
         uses: PyO3/maturin-action@v1
         with:
@@ -290,6 +292,12 @@ jobs:
         with:
           extra-packages: any::rcmdcheck, any::devtools
           working-directory: package-r
+
+      - name: Prepare Vendored Core Crate
+        run: |
+          mkdir -p package-r/src/rust/core
+          cp Cargo.toml package-r/src/rust/core/
+          cp -r src package-r/src/rust/core/
 
       - name: Vendor Rust Dependencies
         run: |
