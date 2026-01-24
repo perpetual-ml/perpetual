@@ -56,9 +56,39 @@ extern "C" {
 
     // Printing
     fn Rprintf(format: *const c_char, ...);
+
+    // Error Handling
+    fn Rf_error(msg: *const c_char, ...) -> !;
 }
 
 // Helpers
+unsafe fn r_error(msg: &str) -> ! {
+    let s = CString::new(msg).unwrap_or(CString::new("Unknown error").unwrap());
+    Rf_error(s.as_ptr());
+}
+
+trait OrRError<T> {
+    fn or_r_error(self, msg: &str) -> T;
+}
+
+impl<T, E: std::fmt::Display> OrRError<T> for Result<T, E> {
+    fn or_r_error(self, msg: &str) -> T {
+        match self {
+            Ok(v) => v,
+            Err(e) => unsafe { r_error(&format!("{}: {}", msg, e)) },
+        }
+    }
+}
+
+impl<T> OrRError<T> for Option<T> {
+    fn or_r_error(self, msg: &str) -> T {
+        match self {
+            Some(v) => v,
+            None => unsafe { r_error(msg) },
+        }
+    }
+}
+
 unsafe fn is_nil(sexp: SEXP) -> bool {
     sexp == R_NilValue
 }
@@ -286,9 +316,11 @@ pub unsafe extern "C" fn PerpetualBooster_fit(ptr: SEXP, flat_data: SEXP, rows: 
             booster.config.memory_limit,
             booster.config.stopping_rounds,
         )
-        .unwrap();
+        .or_r_error("Failed to create MultiOutputBooster");
 
-        multi_booster.fit(&matrix, &y_matrix, None, None).unwrap();
+        multi_booster
+            .fit(&matrix, &y_matrix, None, None)
+            .or_r_error("Failed to fit MultiOutputBooster");
 
         let classes_str = booster
             .classes
@@ -325,11 +357,11 @@ pub unsafe extern "C" fn PerpetualBooster_fit(ptr: SEXP, flat_data: SEXP, rows: 
             booster.config.memory_limit,
             booster.config.stopping_rounds,
         )
-        .unwrap();
+        .or_r_error("Failed to create PerpetualBooster");
 
         single_booster
             .fit(&matrix, &y_slice.to_vec(), None, None::<&[u64]>)
-            .unwrap();
+            .or_r_error("Failed to fit PerpetualBooster");
 
         if !booster.classes.is_empty() {
             let classes_str = booster
@@ -358,7 +390,7 @@ pub unsafe extern "C" fn PerpetualBooster_predict(ptr: SEXP, flat_data: SEXP, ro
     let preds = match &booster.internal {
         Some(InternalBooster::Single(b)) => b.predict(&matrix, true),
         Some(InternalBooster::Multi(b)) => b.predict(&matrix, true),
-        None => panic!("Booster not fitted"),
+        None => unsafe { r_error("Booster not fitted") },
     };
 
     let result = Rf_protect(Rf_allocVector(REALSXP, preds.len() as R_xlen_t));
@@ -382,7 +414,7 @@ pub unsafe extern "C" fn PerpetualBooster_predict_proba(ptr: SEXP, flat_data: SE
     let preds = match &booster.internal {
         Some(InternalBooster::Single(b)) => b.predict_proba(&matrix, true),
         Some(InternalBooster::Multi(b)) => b.predict_proba(&matrix, true),
-        None => panic!("Booster not fitted"),
+        None => unsafe { r_error("Booster not fitted") },
     };
 
     let result = Rf_protect(Rf_allocVector(REALSXP, preds.len() as R_xlen_t));
@@ -399,9 +431,9 @@ pub unsafe extern "C" fn PerpetualBooster_save_booster(ptr: SEXP, path: SEXP) ->
     let booster = &*(R_ExternalPtrAddr(ptr) as *const PerpetualBoosterWrapper);
     let path_str = get_str(path);
     match &booster.internal {
-        Some(InternalBooster::Single(b)) => b.save_booster(&path_str).unwrap(),
-        Some(InternalBooster::Multi(b)) => b.save_booster(&path_str).unwrap(),
-        None => panic!("Booster not fitted"),
+        Some(InternalBooster::Single(b)) => b.save_booster(&path_str).or_r_error("Failed to save single booster"),
+        Some(InternalBooster::Multi(b)) => b.save_booster(&path_str).or_r_error("Failed to save multi booster"),
+        None => unsafe { r_error("Booster not fitted") },
     }
     R_NilValue
 }
@@ -409,11 +441,11 @@ pub unsafe extern "C" fn PerpetualBooster_save_booster(ptr: SEXP, path: SEXP) ->
 #[no_mangle]
 pub unsafe extern "C" fn PerpetualBooster_load_booster(path: SEXP) -> SEXP {
     let path_str = get_str(path);
-    let json_str = std::fs::read_to_string(path_str).unwrap();
+    let json_str = std::fs::read_to_string(path_str).or_r_error("Failed to read file");
     let mut classes = Vec::new();
 
     let internal = if json_str.contains("\"boosters\":") {
-        let b = MultiOutputBooster::from_json(&json_str).unwrap();
+        let b = MultiOutputBooster::from_json(&json_str).or_r_error("Failed to parse MultiOutputBooster JSON");
         if let Some(metadata) = b.boosters.first().map(|b_| &b_.metadata) {
             if let Some(c_str) = metadata.get("classes") {
                 classes = c_str.split(',').filter_map(|s| s.parse::<f64>().ok()).collect();
@@ -421,14 +453,14 @@ pub unsafe extern "C" fn PerpetualBooster_load_booster(path: SEXP) -> SEXP {
         }
         Some(InternalBooster::Multi(b))
     } else {
-        let b = CratePerpetualBooster::from_json(&json_str).unwrap();
+        let b = CratePerpetualBooster::from_json(&json_str).or_r_error("Failed to parse PerpetualBooster JSON");
         if let Some(c_str) = b.metadata.get("classes") {
             classes = c_str.split(',').filter_map(|s| s.parse::<f64>().ok()).collect();
         }
         Some(InternalBooster::Single(b))
     };
 
-    let config = match internal.as_ref().unwrap() {
+    let config = match internal.as_ref().or_r_error("Internal error: internal booster is None") {
         InternalBooster::Single(b) => b.cfg.clone(),
         InternalBooster::Multi(b) => b.cfg.clone(),
     };
@@ -448,12 +480,16 @@ pub unsafe extern "C" fn PerpetualBooster_load_booster(path: SEXP) -> SEXP {
 pub unsafe extern "C" fn PerpetualBooster_json_dump(ptr: SEXP) -> SEXP {
     let booster = &*(R_ExternalPtrAddr(ptr) as *const PerpetualBoosterWrapper);
     let dump = match &booster.internal {
-        Some(InternalBooster::Single(b)) => b.json_dump().unwrap(),
-        Some(InternalBooster::Multi(b)) => b.json_dump().unwrap(),
-        None => panic!("Booster not fitted"),
+        Some(InternalBooster::Single(b)) => b.json_dump().or_r_error("Failed to dump JSON"),
+        Some(InternalBooster::Multi(b)) => b.json_dump().or_r_error("Failed to dump JSON"),
+        None => unsafe { r_error("Booster not fitted") },
     };
 
-    let result = Rf_protect(Rf_mkString(CString::new(dump).unwrap().as_ptr()));
+    let result = Rf_protect(Rf_mkString(
+        CString::new(dump)
+            .or_r_error("Failed to convert JSON to CString")
+            .as_ptr(),
+    ));
     Rf_unprotect(1);
     result
 }
@@ -520,7 +556,7 @@ pub unsafe extern "C" fn PerpetualBooster_predict_contributions(
     let contribs = match &booster.internal {
         Some(InternalBooster::Single(b)) => b.predict_contributions(&matrix, method_enum, true),
         Some(InternalBooster::Multi(b)) => b.predict_contributions(&matrix, method_enum, true),
-        None => panic!("Booster not fitted"),
+        None => unsafe { r_error("Booster not fitted") },
     };
 
     let result = Rf_protect(Rf_allocVector(REALSXP, contribs.len() as R_xlen_t));
@@ -573,9 +609,9 @@ pub unsafe extern "C" fn PerpetualBooster_calibrate(
                 None,
                 (matrix_cal, &_y_cal_vec, &_alpha_vec),
             )
-            .unwrap();
+            .or_r_error("Failed to calibrate");
         }
-        _ => panic!("Calibration is only supported for single-output boosters currently"),
+        _ => r_error("Calibration is only supported for single-output boosters currently"),
     }
     R_NilValue
 }
@@ -630,10 +666,10 @@ pub unsafe extern "C" fn PerpetualBooster_predict_intervals(
                              // Typically: protect result -> do work -> unprotect(n) -> return result.
                              // If result is on stack, unprotecting it makes it vulnerable to GC if we allocate?
                              // No, we are returning immediately. And R function result is protected by caller.
-                             // So unprotecting is correct.
+                             // Rf_unprotect will happen at end
             r_list
         }
-        _ => panic!("Prediction intervals not supported"),
+        _ => unsafe { r_error("Prediction intervals not supported") },
     };
 
     // The previous code had Rf_unprotect(1) AFTER the match, assuming only r_list was protected.
@@ -665,7 +701,7 @@ pub unsafe extern "C" fn PerpetualBooster_calculate_feature_importance(
     let importance = match &booster.internal {
         Some(InternalBooster::Single(b)) => b.calculate_feature_importance(method_enum, normalize_val),
         Some(InternalBooster::Multi(b)) => b.calculate_feature_importance(method_enum, normalize_val),
-        None => panic!("Booster not fitted"),
+        None => unsafe { r_error("Booster not fitted") },
     };
 
     let r_list = Rf_protect(Rf_allocVector(REALSXP, importance.len() as R_xlen_t));
