@@ -47,6 +47,7 @@ void R_init_perpetual(DllInfo *dll) {
 
 // CRAN policy: Packages should not call abort().
 // We override it to call Rf_error instead, which handles the error broadly within R.
-void abort(void) {
+// We mark it hidden to prevent R CMD check from flagging it as an exported forbidden symbol.
+__attribute__((visibility("hidden"))) void abort(void) {
     Rf_error("Rust code attempted to abort (panic).");
 }
