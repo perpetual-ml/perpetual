@@ -186,7 +186,20 @@ print("Successfully generated resources/model_v0.10.0.json and predictions")
 
     try:
         subprocess.check_call(
-            ["uv", "run", "--with", "perpetual==0.10.0", "python", "temp_gen_model.py"]
+            [
+                "uv",
+                "run",
+                "--with",
+                "perpetual==0.10.0",
+                "--with",
+                "pandas",
+                "--with",
+                "seaborn",
+                "--with",
+                "scikit-learn",
+                "python",
+                "temp_gen_model.py",
+            ]
         )
     except subprocess.CalledProcessError as e:
         print(f"Failed to generate model: {e}")
