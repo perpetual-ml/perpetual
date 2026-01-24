@@ -1,5 +1,7 @@
 name: Test and Deploy
-on: [pull_request]
+on:
+  pull_request:
+  workflow_dispatch:
 
 jobs:
   # 1. Job to create and upload the resources/data files
