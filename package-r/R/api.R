@@ -255,6 +255,33 @@ perpetual_importance <- function(model, method = "gain", normalize = TRUE) {
   return(imp)
 }
 
+#' Get the number of trees in the model
+#'
+#' @param model A \code{PerpetualBooster} object.
+#' @return Integer, number of trees.
+#' @export
+perpetual_n_trees <- function(model) {
+  .Call("PerpetualBooster_number_of_trees", model$.ptr, PACKAGE = "perpetual")
+}
+
+#' Get the base score of the model
+#'
+#' @param model A \code{PerpetualBooster} object.
+#' @return Numeric, base score.
+#' @export
+perpetual_base_score <- function(model) {
+  .Call("PerpetualBooster_base_score", model$.ptr, PACKAGE = "perpetual")
+}
+
+#' Dump model to JSON string
+#'
+#' @param model A \code{PerpetualBooster} object.
+#' @return String, JSON representation of the model.
+#' @export
+perpetual_to_json <- function(model) {
+  .Call("PerpetualBooster_json_dump", model$.ptr, PACKAGE = "perpetual")
+}
+
 # Compatibility for old R6 style usage (optional, but good for backward compat)
 PerpetualBooster <- list(
     new = function(...) {

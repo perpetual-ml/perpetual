@@ -81,7 +81,7 @@ test_that("Model JSON contains expected structure", {
   
   model <- perpetual(data$X, data$y, objective = "LogLoss")
   
-  json_str <- model$json_dump()
+  json_str <- perpetual_to_json(model)
   parsed <- jsonlite::fromJSON(json_str, simplifyVector = FALSE)
   
   # Check expected fields exist

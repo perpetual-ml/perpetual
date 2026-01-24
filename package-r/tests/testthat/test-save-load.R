@@ -107,16 +107,16 @@ test_that("number_of_trees and base_score preserved after load", {
   data <- as_matrix_data(load_titanic_test_data())
   
   model <- perpetual(data$X, data$y, objective = "LogLoss")
-  n_trees1 <- model$number_of_trees()
-  base1 <- model$base_score()
+  n_trees1 <- perpetual_n_trees(model)
+  base1 <- perpetual_base_score(model)
   
   tmp <- tempfile(fileext = ".json")
   perpetual_save(model, tmp)
   
   model2 <- perpetual_load(tmp)
   
-  expect_equal(n_trees1, model2$number_of_trees())
-  expect_equal(base1, model2$base_score())
+  expect_equal(n_trees1, perpetual_n_trees(model2))
+  expect_equal(base1, perpetual_base_score(model2))
   
   unlink(tmp)
 })
