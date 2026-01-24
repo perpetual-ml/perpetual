@@ -51,7 +51,7 @@ test_that("number_of_trees returns positive integer", {
   
   model <- perpetual(data$X, data$y, objective = "LogLoss")
   
-  n_trees <- model$number_of_trees()
+  n_trees <- perpetual_n_trees(model)
   expect_true(is.numeric(n_trees))
   expect_true(n_trees > 0)
 })
@@ -61,7 +61,7 @@ test_that("base_score returns numeric value", {
   
   model <- perpetual(data$X, data$y, objective = "LogLoss")
   
-  base <- model$base_score()
+  base <- perpetual_base_score(model)
   expect_true(is.numeric(base))
 })
 
@@ -70,7 +70,7 @@ test_that("json_dump returns valid JSON", {
   
   model <- perpetual(data$X, data$y, objective = "LogLoss")
   
-  json_str <- model$json_dump()
+  json_str <- perpetual_to_json(model)
   expect_true(nchar(json_str) > 0)
   
   # Should be valid JSON

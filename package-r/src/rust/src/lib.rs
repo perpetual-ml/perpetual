@@ -7,21 +7,17 @@ use perpetual_rs::MultiOutputBooster;
 use perpetual_rs::PerpetualBooster as CratePerpetualBooster;
 use std::ffi::{CStr, CString};
 use std::os::raw::{c_char, c_double, c_int, c_void};
-use std::ptr;
 use std::slice;
 
 // --- R API Definitions (Hand-Rolled) ---
 
 type SEXP = *mut c_void;
-type R_xlen_t = isize;
-
 #[allow(non_camel_case_types)]
-type Rbyte = std::os::raw::c_uchar;
+type R_xlen_t = isize;
 
 // SEXP Types
 const REALSXP: u32 = 14;
 const INTSXP: u32 = 13;
-const LGLSXP: u32 = 10;
 const STRSXP: u32 = 16;
 const VECSXP: u32 = 19;
 
@@ -602,7 +598,17 @@ pub unsafe extern "C" fn PerpetualBooster_predict_intervals(
         Some(InternalBooster::Single(b)) => {
             let intervals = b.predict_intervals(&matrix, true);
             let r_list = Rf_protect(Rf_allocVector(VECSXP, intervals.len() as R_xlen_t));
-            for (i, (_, preds)) in intervals.into_iter().enumerate() {
+
+            // Set names for the list (alphas)
+            let names_vec = Rf_allocVector(STRSXP, intervals.len() as R_xlen_t);
+            Rf_protect(names_vec);
+
+            for (i, (alpha, preds)) in intervals.into_iter().enumerate() {
+                // Set name
+                let s = CString::new(alpha.to_string()).unwrap();
+                SET_STRING_ELT(names_vec, i as R_xlen_t, Rf_mkChar(s.as_ptr()));
+
+                // Set content
                 let alpha_vec = Rf_allocVector(REALSXP, preds.len() as R_xlen_t);
                 let r_alpha = REAL(alpha_vec);
                 for (j, p) in preds.into_iter().flatten().enumerate() {
@@ -610,13 +616,29 @@ pub unsafe extern "C" fn PerpetualBooster_predict_intervals(
                 }
                 SET_VECTOR_ELT(r_list, i as R_xlen_t, alpha_vec);
             }
-            // Rf_unprotect will happen at end
+
+            Rf_setAttrib(r_list, R_NamesSymbol, names_vec);
+            Rf_unprotect(2); // names_vec and r_list (wait, r_list must be protected until return if referenced, but here we return it)
+                             // Actually Rf_unprotect pops items from stack.
+                             // Stack: [r_list, names_vec] (top)
+                             // Rf_unprotect(2) pops both.
+                             // But we need to return r_list.
+                             // If we unprotect, is it safe? Yes if we don't allocate more.
+                             // BUT usually we return a protected value or it's implicitly part of result logic?
+                             // In R extensions: "If you want to return a protected object, you should unprotect it first but better make sure it's safe."
+                             // Typically: protect result -> do work -> unprotect(n) -> return result.
+                             // If result is on stack, unprotecting it makes it vulnerable to GC if we allocate?
+                             // No, we are returning immediately. And R function result is protected by caller.
+                             // So unprotecting is correct.
             r_list
         }
         _ => panic!("Prediction intervals not supported"),
     };
 
-    Rf_unprotect(1);
+    // The previous code had Rf_unprotect(1) AFTER the match, assuming only r_list was protected.
+    // Now I do cleanup INSIDE the match for both r_list and names_vec.
+    // So I should remove the outer Rf_unprotect(1).
+
     result
 }
 

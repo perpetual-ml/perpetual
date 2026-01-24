@@ -44,6 +44,14 @@ perpetual <- function(x, y, objective = "LogLoss", budget = NULL,
   cols <- ncol(x)
   y <- as.numeric(y)
   
+  # Ensure integer types for optional parameters
+  if (!is.null(iteration_limit)) iteration_limit <- as.integer(iteration_limit)
+  if (!is.null(stopping_rounds)) stopping_rounds <- as.integer(stopping_rounds)
+  if (!is.null(max_bin)) max_bin <- as.integer(max_bin)
+  if (!is.null(num_threads)) num_threads <- as.integer(num_threads)
+  if (!is.null(log_iterations)) log_iterations <- as.integer(log_iterations)
+  if (!is.null(seed)) seed <- as.integer(seed)
+  
   # Detect classes for classification objectives
   classes <- sort(unique(y[!is.na(y)]))
   

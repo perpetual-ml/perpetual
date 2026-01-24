@@ -55,9 +55,9 @@ test_that("Regression save/load preserves predictions", {
   preds1 <- predict(model, X_test, type = "raw")
   
   tmp <- tempfile(fileext = ".json")
-  model$save_booster(tmp)
+  perpetual_save(model, tmp)
   
-  model2 <- PerpetualBooster$load_booster(tmp)
+  model2 <- perpetual_load(tmp)
   preds2 <- predict(model2, X_test, type = "raw")
   
   expect_equal(preds1, preds2)
