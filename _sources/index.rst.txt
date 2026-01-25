@@ -4,7 +4,7 @@ Perpetual Documentation
 .. image:: _static/perp_logo.png
    :align: center
    :alt: Perpetual Logo
-   :width: 400px
+   :width: 100px
 
 Perpetual is a self-generalizing gradient boosting machine that doesn't need hyperparameter optimization. It is designed to be easy to use while providing state-of-the-art predictive performance.
 
