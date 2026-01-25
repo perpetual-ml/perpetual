@@ -124,41 +124,64 @@ def prune_vendor(vendor_dir):
         "benches",
         "doc",
     ]
-    # More aggressive for windows crates which have insane depth
-    deep_prune_dirs = [
-        "src/Windows/Win32/UI",
-        "src/Windows/Win32/Management",
-        "src/Windows/Win32/NetworkManagement",
-        "src/Windows/Win32/Devices",
-        "src/Windows/Win32/System",
-        "src/Windows/Win32/Graphics",
-        "src/Windows/Win32/Security",
-        "src/Windows/Win32/Media",
-        "src/Windows/Win32/Storage",
-        "src/Windows/Wdk",
-    ]
-
     for root, dirs, files in os.walk(vendor_dir, topdown=False):
         for name in dirs:
             if name in to_remove_dirs:
                 shutil.rmtree(os.path.join(root, name))
 
-        # Additional deep prune for windows crates if we are inside one
-        if "windows" in root:
-            for deep_dir in deep_prune_dirs:
-                target = os.path.join(root, deep_dir)
-                if os.path.exists(target):
-                    shutil.rmtree(target)
-
-    # Remove ALL markdown files as they are often long and redundant
+    # Truncate documentation files to save space but keep them for include_str!
+    # Remove binaries and images
     for root, dirs, files in os.walk(vendor_dir):
         for name in files:
-            if name.lower().endswith(".md"):
-                os.remove(os.path.join(root, name))
+            lower_name = name.lower()
+            full_path = os.path.join(root, name)
+            if (
+                lower_name.endswith(".md")
+                or lower_name.endswith(".txt")
+                or lower_name.endswith(".html")
+                or lower_name.endswith(".pdf")
+            ):
+                # Truncate to zero size
+                open(full_path, "w", encoding="utf-8").close()
+            elif (
+                lower_name.endswith(".a")
+                or lower_name.endswith(".lib")
+                or lower_name.endswith(".png")
+                or lower_name.endswith(".jpg")
+                or lower_name.endswith(".jpeg")
+                or lower_name.endswith(".gif")
+            ):
+                os.remove(full_path)
+
+    # 6.5 Patch vendored Cargo.toml files
+    patch_vendored_cargo_tomls(vendor_dir)
+
+
+def patch_vendored_cargo_tomls(vendor_dir):
+    print(f"Patching Cargo.toml files in {vendor_dir}...")
+    for root, dirs, files in os.walk(vendor_dir):
+        if "Cargo.toml" in files:
+            cargo_path = os.path.join(root, "Cargo.toml")
+            with open(cargo_path, "r", encoding="utf-8") as f:
+                lines = f.readlines()
+
+            new_lines = []
+            changed = False
+            for line in lines:
+                if 'readme = "' in line or 'license-file = "' in line:
+                    new_lines.append("# " + line)
+                    changed = True
+                else:
+                    new_lines.append(line)
+
+            if changed:
+                with open(cargo_path, "w", encoding="utf-8") as f:
+                    f.writelines(new_lines)
 
 
 def fix_checksums(vendor_dir):
     print(f"Scanning {vendor_dir} for checksum issues...")
+    import hashlib
     import json
 
     if not os.path.exists(vendor_dir):
@@ -174,25 +197,25 @@ def fix_checksums(vendor_dir):
                 data = json.load(f)
 
             files_dict = data.get("files", {})
-            files_to_remove = []
+            new_files_dict = {}
 
             for file_rel_path in files_dict.keys():
                 # files_dict keys are relative to the crate root (which is 'root')
                 full_path = os.path.join(root, file_rel_path)
-                if not os.path.exists(full_path):
-                    # print(f"Missing file: {file_rel_path} in {root} -> Removing from checksums.")
-                    files_to_remove.append(file_rel_path)
+                if os.path.exists(full_path):
+                    # Re-calculate checksum in case we modified the file (like Cargo.toml)
+                    with open(full_path, "rb") as f:
+                        file_hash = hashlib.sha256(f.read()).hexdigest()
+                    new_files_dict[file_rel_path] = file_hash
+                # else: skip it
 
-            if files_to_remove:
-                for fpath in files_to_remove:
-                    del files_dict[fpath]
+            data["files"] = new_files_dict
 
-                # Write back
-                with open(checksum_path, "w", encoding="utf-8") as f:
-                    json.dump(data, f, indent=None, separators=(",", ":"))
+            # Write back
+            with open(checksum_path, "w", encoding="utf-8") as f:
+                json.dump(data, f, indent=None, separators=(",", ":"))
 
-                patched_count += 1
-                # print(f"Patched {checksum_path}")
+            patched_count += 1
 
     print(f"Done. Patched {patched_count} crates.")
 

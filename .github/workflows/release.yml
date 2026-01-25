@@ -3,56 +3,23 @@ on:
   release:
     types: [published]
 
-jobs:
-  prepare-resources:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-          architecture: x64
-      - name: Setup uv
-        uses: astral-sh/setup-uv@v5
-        with:
-          enable-cache: true
-      - name: Install dependencies for resource creation
-        run: |
-          uv pip install --system numpy pandas seaborn scikit-learn toml
-          cp README.md package-python/README.md
-          cp LICENSE package-python/LICENSE  
-          cp LICENSE package-r/LICENSE
-          mkdir -p resources
-          cd package-python
-          uv pip install --system -e .[dev]
-          cd ..
-      - name: Build test data (create resources)
-        run: python scripts/make_resources.py
-      - name: Upload Resources Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: perpetual-resources
-          path: resources
-          retention-days: 1
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
+jobs:
   windows-build:
-    needs: prepare-resources
     strategy:
       matrix:
         pyversion: ["3.10", "3.11", "3.12", "3.13", "3.14"]
     runs-on: "windows-latest"
     steps:
       - uses: actions/checkout@v4
-      - name: Download Resources Artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: perpetual-resources
-          path: resources
       - name: Install latests stable Rust
         uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: stable
+      - uses: Swatinem/rust-cache@v2
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.pyversion }}
@@ -74,9 +41,9 @@ jobs:
         with:
           name: dist-windows-${{ matrix.pyversion }}
           path: dist
+          retention-days: 1
 
   macos-build:
-    needs: prepare-resources
     strategy:
       matrix:
         pyversion: ["3.11", "3.12", "3.13", "3.14"]
@@ -86,15 +53,11 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
-      - name: Download Resources Artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: perpetual-resources
-          path: resources
       - name: Install latest stable Rust
         uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: stable
+      - uses: Swatinem/rust-cache@v2
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.pyversion }}
@@ -114,24 +77,20 @@ jobs:
         with:
           name: dist-${{ matrix.os }}-${{ matrix.pyversion }}
           path: dist
+          retention-days: 1
 
   linux-build:
-    needs: prepare-resources
     runs-on: ubuntu-latest
     strategy:
       matrix:
         pyversion: ["3.10", "3.11", "3.12", "3.13", "3.14"]
     steps:
       - uses: actions/checkout@v4
-      - name: Download Resources Artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: perpetual-resources
-          path: resources
       - name: Install latests stable Rust
         uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: stable
+      - uses: Swatinem/rust-cache@v2
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.pyversion }}
@@ -154,24 +113,20 @@ jobs:
         with:
           name: dist-linux-${{ matrix.pyversion }}
           path: dist
+          retention-days: 1
 
   linux-arm-build:
-    needs: prepare-resources
     runs-on: ubuntu-24.04-arm
     strategy:
       matrix:
         pyversion: ["3.10", "3.11", "3.12", "3.13", "3.14"]
     steps:
       - uses: actions/checkout@v4
-      - name: Download Resources Artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: perpetual-resources
-          path: resources
       - name: Install latests stable Rust
         uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: stable
+      - uses: Swatinem/rust-cache@v2
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.pyversion }}
@@ -193,34 +148,76 @@ jobs:
         with:
           name: dist-linux-arm-${{ matrix.pyversion }}
           path: dist
+          retention-days: 1
 
-  cargo-publish:
+  r-release:
     runs-on: ubuntu-latest
-    needs: pypi-publish
+    name: Build R Source Package (CRAN-ready)
+    env:
+      GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
+    
     steps:
       - uses: actions/checkout@v4
-      - name: Install latest stable Rust
+      
+      - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
-        with:
-          toolchain: stable
-      - uses: actions/setup-python@v5
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-          architecture: x64
-      - name: Install deps
-        run: pip install numpy pandas seaborn scikit-learn toml
-      - run: |
-          cp README.md package-python/README.md
-          cp LICENSE package-python/LICENSE
-          cp LICENSE package-r/LICENSE
-      - name: Publish Crate
-        run: cargo publish --token ${CRATES_TOKEN} --allow-dirty
+
+      - uses: r-lib/actions/setup-r@v2
+        with:
+          r-version: 'release'
+          
+      - uses: r-lib/actions/setup-pandoc@v2
+
+      - uses: r-lib/actions/setup-r-dependencies@v2
+        with:
+          extra-packages: any::rcmdcheck, any::devtools
+          working-directory: package-r
+
+      - name: Prepare and Vendor R Package
+        run: python scripts/vendor_r.py
+
+      - name: Build Source Package
+        run: |
+          R CMD build package-r
+          
+      - name: Check Package (as CRAN)
+        run: |
+          # Run check on the built tarball
+          tarball=$(ls perpetual_*.tar.gz)
+          echo "Checking $tarball"
+          Rscript -e "rcmdcheck::rcmdcheck(path = '$tarball', args = c('--as-cran'), error_on = 'error')"
+          
+      - name: Submit to CRAN
+        if: github.event.release.prerelease == false
+        run: |
+          tarball=$(ls perpetual_*.tar.gz)
+          echo "Submitting $tarball to CRAN"
+          Rscript -e "devtools::submit_cran(file = '$tarball')"
+          
+      - name: Upload Release Asset
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v1
+        with:
+          files: perpetual_*.tar.gz
         env:
-          CRATES_TOKEN: ${{ secrets.CRATES_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: perpetual-cran-source
+          path: perpetual_*.tar.gz
+          retention-days: 1
 
   pypi-publish:
     runs-on: ubuntu-latest
-    needs: ["windows-build", "macos-build", "linux-build", "linux-arm-build"]
+    needs: ["windows-build", "macos-build", "linux-build", "linux-arm-build", "r-release"]
     environment:
       name: Test and Deploy
       url: https://pypi.org/p/perpetual
@@ -236,94 +233,17 @@ jobs:
       - name: Publish release distributions to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
 
-  r-release:
+  cargo-publish:
     runs-on: ubuntu-latest
-    name: Build R Source Package (CRAN-ready)
-    env:
-      GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
-    
+    needs: pypi-publish
     steps:
       - uses: actions/checkout@v4
-      
-      # Removed Copy LICENSE step to avoid Invalid DCF error (same as in CI)
-
-      - name: Setup Rust
+      - name: Install latest stable Rust
         uses: dtolnay/rust-toolchain@stable
-
-      - uses: r-lib/actions/setup-r@v2
         with:
-          r-version: 'release'
-          
-      - uses: r-lib/actions/setup-pandoc@v2
-
-      - uses: r-lib/actions/setup-r-dependencies@v2
-        with:
-          extra-packages: any::rcmdcheck, any::devtools
-          working-directory: package-r
-
-      - name: Prepare Vendored Core Crate
-        run: |
-          mkdir -p package-r/src/rust/core
-          cp Cargo.toml package-r/src/rust/core/
-          # Remove [workspace] section from the core crate to avoid multiple workspace roots
-          sed -i '/^\[workspace\]/,/^$/d' package-r/src/rust/core/Cargo.toml
-          cp -r src package-r/src/rust/core/
-          # Remove [[bench]] section to avoid needing benches/ directory
-          # Using range from [[bench]] to end of file as it is the last section
-          sed -i '/^\[\[bench\]\]/,$d' package-r/src/rust/core/Cargo.toml
-
-      - name: Vendor Rust Dependencies
-        run: |
-          cd package-r/src/rust
-          mkdir -p .cargo
-          cargo vendor ../../v > .cargo/config.toml
-          
-          # Prune unnecessary files to check against CRAN path length limits
-          cd ../../v
-          find . -name "tests" -type d -exec rm -rf {} +
-          find . -name "examples" -type d -exec rm -rf {} +
-          find . -name "benches" -type d -exec rm -rf {} +
-          find . -name "*.md" -delete
-          
-          # Deep prune windows crates
-          find . -path "*windows*/src/Windows/Win32/UI" -type d -exec rm -rf {} +
-          find . -path "*windows*/src/Windows/Win32/Management" -type d -exec rm -rf {} +
-          find . -path "*windows*/src/Windows/Win32/NetworkManagement" -type d -exec rm -rf {} +
-          find . -path "*windows*/src/Windows/Win32/Devices" -type d -exec rm -rf {} +
-          find . -path "*windows*/src/Windows/Win32/System" -type d -exec rm -rf {} +
-          find . -path "*windows*/src/Windows/Win32/Graphics" -type d -exec rm -rf {} +
-          find . -path "*windows*/src/Windows/Win32/Security" -type d -exec rm -rf {} +
-          find . -path "*windows*/src/Windows/Win32/Media" -type d -exec rm -rf {} +
-          find . -path "*windows*/src/Windows/Win32/Storage" -type d -exec rm -rf {} +
-          find . -path "*windows*/src/Windows/Wdk" -type d -exec rm -rf {} +
-
-      - name: Build Source Package
-        run: |
-          R CMD build package-r
-          
-      - name: Check Package (as CRAN)
-        run: |
-          # Run check on the built tarball
-          tarball=$(ls perpetual_*.tar.gz)
-          echo "Checking $tarball"
-          Rscript -e "rcmdcheck::rcmdcheck(path = '$tarball', args = c('--as-cran'), error_on = 'error')"
-          
-      - name: Submit to CRAN
-        run: |
-          tarball=$(ls perpetual_*.tar.gz)
-          echo "Submitting $tarball to CRAN"
-          Rscript -e "devtools::submit_cran(file = '$tarball')"
-          
-      - name: Upload Release Asset
-        if: github.event_name == 'release'
-        uses: softprops/action-gh-release@v1
-        with:
-          files: perpetual_*.tar.gz
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Publish Crate
+        run: cargo publish --token ${CRATES_TOKEN} --allow-dirty
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Upload Artifact (for workflow dispatch/testing)
-        uses: actions/upload-artifact@v4
-        with:
-          name: perpetual-cran-source
-          path: perpetual_*.tar.gz
+          CRATES_TOKEN: ${{ secrets.CRATES_TOKEN }}
