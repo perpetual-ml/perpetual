@@ -74,7 +74,7 @@ fi
 if [ -f "$BENCH_BIN" ]; then
     echo "Found optimized benchmark binary: $BENCH_BIN"
     echo "Running comparison against baseline..."
-    "$BENCH_BIN" --noplot --baseline base
+    "$BENCH_BIN" --bench --noplot --baseline base
 else
     echo "Error: Could not find optimized benchmark binary."
     exit 1

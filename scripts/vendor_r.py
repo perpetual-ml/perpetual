@@ -1,5 +1,6 @@
 import os
 import shutil
+import subprocess
 
 
 def vendor_r():
@@ -62,6 +63,84 @@ def vendor_r():
         shutil.copy2(lock_path, os.path.join(target_dir, "Cargo.lock"))
 
     print("Vendoring complete.")
+
+    # 5. Vendor dependencies
+    vendor_dependencies(project_root)
+
+
+def vendor_dependencies(project_root):
+    rust_dir = os.path.join(project_root, "package-r", "src", "rust")
+    vendor_dir = os.path.join(rust_dir, "vendor")
+    config_dir = os.path.join(rust_dir, ".cargo")
+    config_file = os.path.join(config_dir, "config.toml")
+
+    print(f"Vendoring dependencies into {vendor_dir}...")
+
+    # Run cargo vendor
+    # We must run this in the directory containing the Cargo.toml (package-r/src/rust)
+    try:
+        result = subprocess.run(
+            ["cargo", "vendor", "vendor"],
+            cwd=rust_dir,
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+    except subprocess.CalledProcessError as e:
+        print(f"Error running cargo vendor: {e.stderr}")
+        raise e
+
+    # Create .cargo/config.toml with the output from cargo vendor
+    if not os.path.exists(config_dir):
+        os.makedirs(config_dir)
+
+    with open(config_file, "w", encoding="utf-8") as f:
+        f.write(result.stdout)
+
+    print(f"Created {config_file}")
+
+    # 6. Fix checksums for potential missing files (e.g. excluded by R/CRAN rules or path limits)
+    fix_checksums(vendor_dir)
+
+
+def fix_checksums(vendor_dir):
+    print(f"Scanning {vendor_dir} for checksum issues...")
+    import json
+
+    if not os.path.exists(vendor_dir):
+        print(f"Error: {vendor_dir} does not exist.")
+        return
+
+    patched_count = 0
+
+    for root, dirs, files in os.walk(vendor_dir):
+        if ".cargo-checksum.json" in files:
+            checksum_path = os.path.join(root, ".cargo-checksum.json")
+            with open(checksum_path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+
+            files_dict = data.get("files", {})
+            files_to_remove = []
+
+            for file_rel_path in files_dict.keys():
+                # files_dict keys are relative to the crate root (which is 'root')
+                full_path = os.path.join(root, file_rel_path)
+                if not os.path.exists(full_path):
+                    # print(f"Missing file: {file_rel_path} in {root} -> Removing from checksums.")
+                    files_to_remove.append(file_rel_path)
+
+            if files_to_remove:
+                for fpath in files_to_remove:
+                    del files_dict[fpath]
+
+                # Write back
+                with open(checksum_path, "w", encoding="utf-8") as f:
+                    json.dump(data, f, indent=None, separators=(",", ":"))
+
+                patched_count += 1
+                # print(f"Patched {checksum_path}")
+
+    print(f"Done. Patched {patched_count} crates.")
 
 
 if __name__ == "__main__":
