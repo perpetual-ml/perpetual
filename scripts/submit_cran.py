@@ -75,12 +75,42 @@ def submit_cran(tarball_path, package_dir):
         "upload": "Upload the package",
     }
 
-    print(f"Submitting {tarball_path} to CRAN...")
+    print(f"Submitting {tarball_path} to CRAN (Step 1: Upload)...")
     try:
-        response = requests.post(url, files=files, data=data)
+        session = requests.Session()
+        response = session.post(url, files=files, data=data)
         response.raise_for_status()
 
-        # Check for success message in response
+        # Step 2: Check for confirmation page and extract pkg_id
+        if "Please review and submit" in response.text:
+            print("Step 1 successful. Proceeding to Step 2 (Confirmation)...")
+
+            # Extract pkg_id
+            pkg_id_match = re.search(
+                r'name="pkg_id" type="hidden" value="([^"]+)"', response.text
+            )
+            if not pkg_id_match:
+                print("Error: Could not find pkg_id in confirmation page.")
+                print(response.text)
+                sys.exit(1)
+
+            pkg_id = pkg_id_match.group(1)
+            print(f"Found pkg_id: {pkg_id}")
+
+            # Prepare data for Step 2
+            confirm_data = {
+                "pkg_id": pkg_id,
+                "name": name,
+                "email": email,
+                "policy_check": "1",  # Policy check might be needed here or just implicit
+                "submit": "Submit package",
+            }
+
+            print("Submitting confirmation...")
+            response = session.post(url, data=confirm_data)
+            response.raise_for_status()
+
+        # Check for final success message
         if "The following package has been uploaded:" in response.text:
             print("Submission successful!")
             print("Check your email for the confirmation link.")
