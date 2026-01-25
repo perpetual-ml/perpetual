@@ -266,6 +266,7 @@ def patch_vendored_cargo_tomls(vendor_dir):
 
 def fix_checksums(vendor_dir):
     print(f"Scanning {vendor_dir} for checksum issues...")
+    import hashlib
     import json
 
     if not os.path.exists(vendor_dir):
@@ -288,11 +289,27 @@ def fix_checksums(vendor_dir):
             new_files_dict = {}
             changed = False
 
-            for file_rel_path, checksum in files_dict.items():
+            for file_rel_path, old_checksum in files_dict.items():
                 # files_dict keys are relative to the crate root (which is 'root')
                 full_path = os.path.join(root, file_rel_path)
                 if os.path.exists(full_path):
-                    new_files_dict[file_rel_path] = checksum
+                    # Re-calculate checksum in case we modified the file (like Cargo.toml)
+                    try:
+                        with open(full_path, "rb") as f:
+                            file_hash = hashlib.sha256(f.read()).hexdigest()
+
+                        if file_hash != old_checksum:
+                            print(
+                                f"Checksum mismatch for {full_path}: expected {old_checksum[:8]}..., got {file_hash[:8]}..."
+                            )
+                            changed = True
+
+                        new_files_dict[file_rel_path] = file_hash
+                    except Exception as e:
+                        print(f"Failed to calculate checksum for {full_path}: {e}")
+                        # Keep old one if we can't read it? Or skip?
+                        # Better to fail loud or keep old. Let's keep old to be safe-ish.
+                        new_files_dict[file_rel_path] = old_checksum
                 else:
                     # File was deleted (pruned), so remove from checksums
                     changed = True
