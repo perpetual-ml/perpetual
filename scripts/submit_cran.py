@@ -111,7 +111,10 @@ def submit_cran(tarball_path, package_dir):
             response.raise_for_status()
 
         # Check for final success message
-        if "The following package has been uploaded:" in response.text:
+        if (
+            "The following package has been uploaded:" in response.text
+            or "The maintainer of this package has been sent an email" in response.text
+        ):
             print("Submission successful!")
             print("Check your email for the confirmation link.")
         else:
