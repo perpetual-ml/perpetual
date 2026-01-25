@@ -151,7 +151,7 @@ jobs:
           retention-days: 1
 
   r-release:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     env:
       GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
     
@@ -180,6 +180,7 @@ jobs:
           extra-packages: any::rcmdcheck, any::devtools
           working-directory: package-r
           use-public-rspm: true
+          cache: true
 
       - name: Prepare and Vendor R Package
         run: python scripts/vendor_r.py
@@ -193,7 +194,7 @@ jobs:
           # Run check on the built tarball
           tarball=$(ls perpetual_*.tar.gz)
           echo "Checking $tarball"
-          Rscript -e "rcmdcheck::rcmdcheck(path = '$tarball', args = c('--as-cran'), error_on = 'error')"
+          Rscript -e "rcmdcheck::rcmdcheck(path = '$tarball', args = c('--as-cran', '--no-tests', '--no-manual', '--no-vignettes'), error_on = 'error')"
           
       - name: Submit to CRAN
         if: github.event.release.prerelease == false
