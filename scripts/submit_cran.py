@@ -60,7 +60,7 @@ def submit_cran(tarball_path, package_dir):
     url = "https://xmpalantir.wu.ac.at/cransubmit/index2.php"
 
     files = {
-        "pkg": (
+        "uploaded_file": (
             os.path.basename(tarball_path),
             open(tarball_path, "rb"),
             "application/x-gzip",
@@ -71,7 +71,6 @@ def submit_cran(tarball_path, package_dir):
         "pkg_id": "",
         "name": name,
         "email": email,
-        "policy_check": "1",  # "I have read and agree to the CRAN policies"
         "comment": comment,
         "upload": "Upload the package",
     }
