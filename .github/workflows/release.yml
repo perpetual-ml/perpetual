@@ -96,7 +96,7 @@ jobs:
           python-version: ${{ matrix.pyversion }}
           architecture: x64
       - name: Install deps
-        run: pip install numpy pandas seaborn scikit-learn toml
+        run: pip install numpy pandas seaborn scikit-learn toml requests
       - run: |
           cp README.md package-python/README.md
           cp LICENSE package-python/LICENSE
@@ -132,7 +132,7 @@ jobs:
           python-version: ${{ matrix.pyversion }}
           architecture: arm64
       - name: Install deps
-        run: pip install numpy pandas seaborn scikit-learn toml
+        run: pip install numpy pandas seaborn scikit-learn toml requests
       - run: |
           cp README.md package-python/README.md
           cp LICENSE package-python/LICENSE
@@ -174,10 +174,12 @@ jobs:
           r-version: 'release'
           
       - uses: r-lib/actions/setup-pandoc@v2
+        
+      - name: Install Python Requests
+        run: pip install requests
 
       - uses: r-lib/actions/setup-r-dependencies@v2
         with:
-          extra-packages: any::rcmdcheck, any::devtools
           working-directory: package-r
           use-public-rspm: true
           cache: true
@@ -194,14 +196,14 @@ jobs:
           # Run check on the built tarball
           tarball=$(ls perpetual_*.tar.gz)
           echo "Checking $tarball"
-          Rscript -e "rcmdcheck::rcmdcheck(path = '$tarball', args = c('--as-cran', '--no-tests', '--no-manual', '--no-vignettes'), error_on = 'error')"
+          R CMD check --as-cran --no-tests --no-manual --no-vignettes "$tarball"
           
       - name: Submit to CRAN
         if: github.event.release.prerelease == false
         run: |
           tarball=$(ls perpetual_*.tar.gz)
           echo "Submitting $tarball to CRAN"
-          Rscript -e "devtools::submit_cran(pkg = '$tarball')"
+          python scripts/submit_cran.py "$tarball"
           
       - name: Upload Release Asset
         if: github.event_name == 'release'

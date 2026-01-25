@@ -8,7 +8,7 @@ all: rust-target
 rust-target:
 	@echo "Building Rust library for Windows (target: $(TARGET))..."
 	rustc --version
-	cd rust && CARGO_HOME=../../inst/cargo_home cargo build --release --lib --manifest-path Cargo.toml --target $(TARGET) --verbose
+	cd rust && CARGO_HOME=../../inst/c cargo build --release --lib --manifest-path Cargo.toml --target $(TARGET) --verbose
 	@if [ -f rust/target/$(TARGET)/release/libperpetual_r.a ]; then \
 		cp rust/target/$(TARGET)/release/libperpetual_r.a .; \
 	else \

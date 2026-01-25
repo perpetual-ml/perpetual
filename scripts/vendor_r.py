@@ -76,8 +76,9 @@ def vendor_r():
 
 def vendor_dependencies(project_root):
     rust_dir = os.path.join(project_root, "package-r", "src", "rust")
-    vendor_dir = os.path.join(project_root, "package-r", "inst", "vendor")
-    config_dir = os.path.join(project_root, "package-r", "inst", "cargo_home")
+    # Use short paths to avoid 100 char limit for tarball
+    vendor_dir = os.path.join(project_root, "package-r", "inst", "v")
+    config_dir = os.path.join(project_root, "package-r", "inst", "c")
     config_file = os.path.join(config_dir, "config.toml")
 
     # Clean up old .cargo directory in rust_dir if it exists
@@ -85,13 +86,20 @@ def vendor_dependencies(project_root):
     if os.path.exists(old_config_dir):
         shutil.rmtree(old_config_dir)
 
+    # Clean up old vendor locations to avoid confusion/bloat
+    for old in ["inst/vendor", "inst/cargo_home", "v"]:
+        old_path = os.path.join(project_root, "package-r", old)
+        if os.path.exists(old_path):
+            shutil.rmtree(old_path)
+
     print(f"Vendoring dependencies into {vendor_dir}...")
 
     # Run cargo vendor
     # We must run this in the directory containing the Cargo.toml (package-r/src/rust)
     try:
-        result = subprocess.run(
-            ["cargo", "vendor", "../../inst/vendor"],
+        # We vendor to the short path
+        subprocess.run(
+            ["cargo", "vendor", "../../inst/v"],
             cwd=rust_dir,
             capture_output=True,
             text=True,
@@ -101,15 +109,23 @@ def vendor_dependencies(project_root):
         print(f"Error running cargo vendor: {e.stderr}")
         raise e
 
-    # Create .cargo/config.toml with the output from cargo vendor
+    # Create config.toml
     if not os.path.exists(config_dir):
         os.makedirs(config_dir)
 
-    # The output from cargo vendor is relative to the cwd where it was run
-    # Since we run it in rust_dir (package-r/src/rust) and vendor into "../../v" (package-r/v)
-    # The config should point to "../../v"
+    # We manually write the config to ensure the relative path is correct.
+    # config.toml will be in package-r/inst/c/config.toml
+    # vendor will be in package-r/inst/v
+    # So relative path is "../v"
+
+    config_content = """[source.crates-io]
+replace-with = "vendored-sources"
+
+[source.vendored-sources]
+directory = "../v"
+"""
     with open(config_file, "w", encoding="utf-8") as f:
-        f.write(result.stdout)
+        f.write(config_content)
 
     print(f"Created {config_file}")
 
