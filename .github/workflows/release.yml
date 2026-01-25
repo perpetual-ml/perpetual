@@ -163,8 +163,7 @@ jobs:
         run: |
           bash pgo_optimize.sh
           PGO_FILE=$(find target/pgo-profiles -name "*.profdata" | head -n 1)
-          cp "$PGO_FILE" "pgo_profile.profdata"
-          echo "PGO_PROFILE=/io/pgo_profile.profdata" >> $GITHUB_ENV
+          echo "PGO_PROFILE=$PWD/$PGO_FILE" >> $GITHUB_ENV
       - name: Build wheels with maturin
         uses: PyO3/maturin-action@v1
         with:

@@ -37,14 +37,14 @@ cp -r target/criterion criterion_backup
 echo "Step 3: Cleaning Target..."
 cargo clean
 
-echo "Step 4: Instrumenting Build (Stage 1)..."
-# Use -- to pass args to cargo
-cargo pgo build -- --bench $BENCH_NAME
 
-echo "Step 5: Profiling (Stage 2)..."
+
+echo "Step 4: Profiling (Stage 2)..."
+# Increase stack size to prevent segfaults during PGO instrumentation on macOS
+export RUST_MIN_STACK=8388608
 cargo pgo bench -- --bench $BENCH_NAME
 
-echo "Step 6: Optimizing Build (Stage 3)..."
+echo "Step 5: Optimizing Build (Stage 3)..."
 cargo pgo optimize -- --bench $BENCH_NAME
 
 echo "Restoring baseline data..."
@@ -53,7 +53,7 @@ mkdir -p target/criterion
 cp -r criterion_backup/* target/criterion/
 rm -rf criterion_backup
 
-echo "Step 7: Validation..."
+echo "Step 6: Validation..."
 # Find the optimized benchmark binary
 # It will be in target/<target-triple>/release/deps/ or target/release/deps/
 # We look for the most recent executable matching the benchmark name
