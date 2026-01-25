@@ -76,9 +76,14 @@ def vendor_r():
 
 def vendor_dependencies(project_root):
     rust_dir = os.path.join(project_root, "package-r", "src", "rust")
-    vendor_dir = os.path.join(project_root, "package-r", "v")
-    config_dir = os.path.join(rust_dir, ".cargo")
+    vendor_dir = os.path.join(project_root, "package-r", "inst", "vendor")
+    config_dir = os.path.join(project_root, "package-r", "inst", "cargo_home")
     config_file = os.path.join(config_dir, "config.toml")
+
+    # Clean up old .cargo directory in rust_dir if it exists
+    old_config_dir = os.path.join(rust_dir, ".cargo")
+    if os.path.exists(old_config_dir):
+        shutil.rmtree(old_config_dir)
 
     print(f"Vendoring dependencies into {vendor_dir}...")
 
@@ -86,7 +91,7 @@ def vendor_dependencies(project_root):
     # We must run this in the directory containing the Cargo.toml (package-r/src/rust)
     try:
         result = subprocess.run(
-            ["cargo", "vendor", "../../v"],
+            ["cargo", "vendor", "../../inst/vendor"],
             cwd=rust_dir,
             capture_output=True,
             text=True,

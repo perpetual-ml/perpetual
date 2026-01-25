@@ -7,7 +7,7 @@ $(SHLIB): $(STATLIB)
 $(STATLIB):
 	@echo "Building Rust library for Unix/macOS..."
 	rustc --version
-	cd rust && cargo build --release --lib --verbose
+	cd rust && CARGO_HOME=../../inst/cargo_home cargo build --release --lib --verbose
 
 clean:
 	rm -rf rust/target

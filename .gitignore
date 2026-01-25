@@ -42,7 +42,8 @@ wsl_*.sh
 
 # Rust vendoring artifacts
 package-r/src/rust/.cargo/
-package-r/v/
+package-r/inst/vendor/
+package-r/inst/cargo_home/
 package-r/src/rust/core/
 
 # Python cache

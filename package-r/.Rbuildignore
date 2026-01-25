@@ -5,5 +5,5 @@
 ^LICENSE$
 ^\.github$
 ^src/rust/target$
-^v$
+
 
