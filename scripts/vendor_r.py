@@ -183,6 +183,10 @@ def prune_vendor(vendor_dir):
 
             # Remove hidden files (e.g. .cargo-checksum.json, .travis.yml)
             if name.startswith("."):
+                # CRITICAL: Do NOT remove .cargo-checksum.json, otherwise cargo build fails
+                if name == ".cargo-checksum.json":
+                    continue
+
                 print(f"Removing hidden file: {full_path}")
                 force_remove(full_path)
                 continue

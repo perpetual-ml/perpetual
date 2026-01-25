@@ -53,8 +53,9 @@ def submit_cran(tarball_path, package_dir):
 
     # Read comment
     comment = f"Releasing version {version}"
-    if os.path.exists("cran-comments.md"):
-        with open("cran-comments.md", "r", encoding="utf-8") as f:
+    comments_path = os.path.join(package_dir, "cran-comments.md")
+    if os.path.exists(comments_path):
+        with open(comments_path, "r", encoding="utf-8") as f:
             comment = f.read()
 
     url = "https://xmpalantir.wu.ac.at/cransubmit/index2.php"
