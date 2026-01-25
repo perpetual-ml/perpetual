@@ -255,10 +255,10 @@ impl PerpetualBooster {
             Some(num_threads) => num_threads,
             None => n_threads_available,
         };
-        let pool = rayon::ThreadPoolBuilder::new()
-            .num_threads(num_threads)
-            .build()
-            .unwrap();
+        let builder = rayon::ThreadPoolBuilder::new().num_threads(num_threads);
+        #[cfg(target_os = "macos")]
+        let builder = builder.stack_size(4 * 1024 * 1024);
+        let pool = builder.build().unwrap();
 
         // If reset, reset the trees. Otherwise continue training.
         let mut yhat;
@@ -503,10 +503,10 @@ impl PerpetualBooster {
             Some(num_threads) => num_threads,
             None => n_threads_available,
         };
-        let pool = rayon::ThreadPoolBuilder::new()
-            .num_threads(num_threads)
-            .build()
-            .unwrap();
+        let builder = rayon::ThreadPoolBuilder::new().num_threads(num_threads);
+        #[cfg(target_os = "macos")]
+        let builder = builder.stack_size(4 * 1024 * 1024);
+        let pool = builder.build().unwrap();
 
         // If reset, reset the trees. Otherwise continue training.
         let mut yhat;

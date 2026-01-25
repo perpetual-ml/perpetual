@@ -47,7 +47,7 @@ def update_pyproject_toml(file_path, new_version, dry_run=False):
 def update_r_description(file_path, new_version, dry_run=False):
     # Pattern: Version: X.Y.Z
     pattern = r"(Version:\s*)[^\s]+"
-    replacement = f"\\1{new_version}"
+    replacement = f"\\g<1>{new_version}"
     update_file(file_path, pattern, replacement, dry_run)
 
 

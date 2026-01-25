@@ -68,7 +68,7 @@ jobs:
         run: |
           bash pgo_optimize.sh
           PGO_FILE=$(find target/pgo-profiles -name "*.profdata" | head -n 1)
-          echo "PGO_PROFILE=$PGO_FILE" >> $GITHUB_ENV
+          echo "PGO_PROFILE=$(pwd -W)/$PGO_FILE" >> $GITHUB_ENV
       - name: Build wheels with maturin
         uses: PyO3/maturin-action@v1
         with:
@@ -88,9 +88,9 @@ jobs:
     strategy:
       matrix:
         pyversion: ["3.11", "3.12", "3.13", "3.14"]
-        # macos-13: Explicitly targeted as the Intel runner (Free).
+        # macos-15-intel: Explicitly targeted as the Intel runner (Free).
         # macos-14: Explicitly targeted as the Apple Silicon runner (Free).
-        os: [macos-13, macos-14]
+        os: [macos-15-intel, macos-14]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -115,6 +115,7 @@ jobs:
       - name: Run PGO Optimization
         shell: bash
         run: |
+          export RUSTFLAGS="-C link-args=-Wl,-stack_size,0x4000000"
           bash pgo_optimize.sh
           PGO_FILE=$(find target/pgo-profiles -name "*.profdata" | head -n 1)
           echo "PGO_PROFILE=$PGO_FILE" >> $GITHUB_ENV
@@ -124,7 +125,7 @@ jobs:
           command: build
           args: --release --strip --interpreter python --manifest-path package-python/Cargo.toml --out dist --sdist
         env:
-          RUSTFLAGS: "-Cprofile-use=${{ env.PGO_PROFILE }}"
+          RUSTFLAGS: "-Cprofile-use=${{ env.PGO_PROFILE }} -C link-args=-Wl,-stack_size,0x4000000"
       - name: Save Artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -163,7 +164,8 @@ jobs:
         run: |
           bash pgo_optimize.sh
           PGO_FILE=$(find target/pgo-profiles -name "*.profdata" | head -n 1)
-          echo "PGO_PROFILE=/io/$PGO_FILE" >> $GITHUB_ENV
+          cp "$PGO_FILE" "pgo_profile.profdata"
+          echo "PGO_PROFILE=/io/pgo_profile.profdata" >> $GITHUB_ENV
       - name: Build wheels with maturin
         uses: PyO3/maturin-action@v1
         with:
@@ -297,6 +299,8 @@ jobs:
         run: |
           mkdir -p package-r/src/rust/core
           cp Cargo.toml package-r/src/rust/core/
+          # Remove [workspace] section from the core crate to avoid multiple workspace roots
+          sed -i '/^\[workspace\]/,/^$/d' package-r/src/rust/core/Cargo.toml
           cp -r src package-r/src/rust/core/
 
       - name: Vendor Rust Dependencies

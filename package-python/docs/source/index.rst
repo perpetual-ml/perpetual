@@ -1,7 +1,7 @@
 Perpetual Documentation
 =======================
 
-.. image:: https://raw.githubusercontent.com/jinlow/forust/main/resources/perpetual_logo.png
+.. image:: _static/perp_logo.png
    :align: center
    :alt: Perpetual Logo
    :width: 400px
