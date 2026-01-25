@@ -24,28 +24,33 @@ def vendor_r():
         lines = f.readlines()
 
     new_lines = []
-    skip_workspace = False
-    for line in lines:
-        if line.startswith("[workspace]"):
-            skip_workspace = True
-            continue
-        if skip_workspace:
-            if line.startswith("[") or line.strip() == "":
-                if line.startswith("["):
-                    skip_workspace = False
-                else:
-                    continue
-            else:
-                continue
+    skipping_section = False
 
-        # Stop at [dev-dependencies]
-        if line.startswith("[dev-dependencies]"):
-            new_lines.append("# Dev-dependencies and benches removed for vendoring\n")
-            break
+    for line in lines:
+        stripped = line.strip()
+        # Check for section headers
+        if stripped.startswith("[") and stripped.endswith("]"):
+            # Determine if this section should be skipped
+            if (
+                stripped == "[workspace]"
+                or stripped == "[dev-dependencies]"
+                or stripped.startswith("[[bench")
+            ):
+                skipping_section = True
+            else:
+                skipping_section = False
+
+        if skipping_section:
+            continue
 
         # Comment out license-file and readme
-        line = line.replace('license-file = "LICENSE"', '# license-file = "LICENSE"')
-        line = line.replace('readme = "README.md"', '# readme = "README.md"')
+        if 'license-file = "LICENSE"' in line:
+            line = line.replace(
+                'license-file = "LICENSE"', '# license-file = "LICENSE"'
+            )
+        if 'readme = "README.md"' in line:
+            line = line.replace('readme = "README.md"', '# readme = "README.md"')
+
         new_lines.append(line)
 
     with open(target_cargo_path, "w", encoding="utf-8") as f:

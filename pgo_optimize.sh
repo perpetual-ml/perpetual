@@ -12,6 +12,8 @@ echo "Step 1: Checking Tooling..."
 # Check for cargo-pgo
 if ! cargo pgo --version &> /dev/null; then
     echo "cargo-pgo not found. Installing..."
+    # Ensure RUSTFLAGS is unset for the installation to avoid linker issues with proc-macros
+    unset RUSTFLAGS
     cargo install cargo-pgo
 else
     echo "cargo-pgo is already installed."
