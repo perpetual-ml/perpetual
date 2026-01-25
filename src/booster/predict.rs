@@ -485,6 +485,8 @@ impl MultiOutputBooster {
 
     /// Predict with the fitted booster on new columnar data, returning the feature
     /// contribution matrix. The last column is the bias term.
+    /// Predict with the fitted booster on new columnar data, returning the feature
+    /// contribution matrix. The last column is the bias term.
     pub fn predict_contributions_columnar(
         &self,
         data: &ColumnarMatrix<f64>,

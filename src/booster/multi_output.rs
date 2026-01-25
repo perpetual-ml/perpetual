@@ -143,12 +143,14 @@ impl MultiOutputBooster {
         })
     }
 
+    /// Reset all boosters.
     pub fn reset(&mut self) {
         for b in &mut self.boosters {
             b.reset();
         }
     }
 
+    /// Fit the multi-output booster.
     pub fn fit(
         &mut self,
         data: &Matrix<f64>,
@@ -162,6 +164,7 @@ impl MultiOutputBooster {
         Ok(())
     }
 
+    /// Fit the multi-output booster on columnar data.
     pub fn fit_columnar(
         &mut self,
         data: &ColumnarMatrix<f64>,
@@ -175,6 +178,7 @@ impl MultiOutputBooster {
         Ok(())
     }
 
+    /// Prune the trees in the boosters.
     pub fn prune(
         &mut self,
         data: &Matrix<f64>,

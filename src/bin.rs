@@ -7,14 +7,20 @@ use serde::{Deserialize, Serialize};
 /// Struct to hold the information of a given bin.
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct Bin {
+    /// The bin number or index.
     pub num: u16,
+    /// The split value for this bin.
     pub cut_value: f64,
+    /// The folded gradient statistics.
     pub g_folded: [f32; 5],
+    /// The folded hessian statistics.
     pub h_folded: [f32; 5],
+    /// The folded count statistics.
     pub counts: [u32; 5],
 }
 
 impl Bin {
+    /// Create an empty bin with constant hessian.
     pub fn empty_const_hess(num: u16, cut_value: f64) -> Self {
         Bin {
             num,
@@ -24,6 +30,7 @@ impl Bin {
             counts: [0; 5],
         }
     }
+    /// Create an empty bin.
     pub fn empty(num: u16, cut_value: f64) -> Self {
         Bin {
             num,
@@ -107,12 +114,14 @@ impl Bin {
     }
 }
 
+/// Sort categorical bins by their bin number.
 pub fn sort_cat_bins_by_num(histogram: &mut [&UnsafeCell<Bin>]) {
     unsafe {
         histogram.sort_unstable_by_key(|bin| bin.get().as_ref().unwrap().num);
     }
 }
 
+/// Sort categorical bins by their statistics (gradient/hessian or gradient/count).
 pub fn sort_cat_bins_by_stat(histogram: &mut [&UnsafeCell<Bin>], is_const_hess: bool) {
     unsafe {
         if is_const_hess {

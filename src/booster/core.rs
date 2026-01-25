@@ -146,10 +146,12 @@ impl PerpetualBooster {
         Ok(booster)
     }
 
+    /// Validate the configuration parameters.
     pub fn validate_parameters(&self) -> Result<(), PerpetualError> {
         Ok(())
     }
 
+    /// Reset the booster, clearing all trained trees.
     pub fn reset(&mut self) {
         self.trees = Vec::new();
     }
@@ -256,8 +258,6 @@ impl PerpetualBooster {
             None => n_threads_available,
         };
         let builder = rayon::ThreadPoolBuilder::new().num_threads(num_threads);
-        #[cfg(target_os = "macos")]
-        let builder = builder.stack_size(64 * 1024 * 1024);
         let pool = builder.build().unwrap();
 
         // If reset, reset the trees. Otherwise continue training.
@@ -504,8 +504,6 @@ impl PerpetualBooster {
             None => n_threads_available,
         };
         let builder = rayon::ThreadPoolBuilder::new().num_threads(num_threads);
-        #[cfg(target_os = "macos")]
-        let builder = builder.stack_size(64 * 1024 * 1024);
         let pool = builder.build().unwrap();
 
         // If reset, reset the trees. Otherwise continue training.

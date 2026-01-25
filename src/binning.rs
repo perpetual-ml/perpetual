@@ -38,8 +38,11 @@ where
 // a split that is [feature < 5] would translate to [feature < 31.0 ]
 #[derive(Debug)]
 pub struct BinnedData<T> {
+    /// The binned data, where 0 represents missing values.
     pub binned_data: Vec<u16>,
+    /// The cut points for each feature.
     pub cuts: JaggedMatrix<T>,
+    /// The number of unique values (bins) for each feature.
     pub nunique: Vec<usize>,
 }
 

@@ -4,12 +4,15 @@ use crate::Matrix;
 use rayon::{prelude::*, ThreadPool};
 use std::cell::UnsafeCell;
 
+/// Owned Feature Histogram.
 #[derive(Debug)]
 pub struct FeatureHistogramOwned {
+    /// The histogram data (bins).
     pub data: Vec<Bin>,
 }
 
 impl FeatureHistogramOwned {
+    /// Create an empty histogram from cut points.
     pub fn empty_from_cuts(cuts: &[f64], is_const_hess: bool) -> Self {
         let mut histogram: Vec<Bin> = Vec::with_capacity(cuts.len());
         if is_const_hess {
@@ -32,6 +35,7 @@ impl FeatureHistogramOwned {
         FeatureHistogramOwned { data: histogram }
     }
 
+    /// Create an empty histogram with a maximum number of bins.
     pub fn empty(max_bin: u16, is_const_hess: bool) -> Self {
         let mut histogram: Vec<Bin> = Vec::with_capacity(max_bin.into());
         if is_const_hess {
@@ -45,8 +49,10 @@ impl FeatureHistogramOwned {
     }
 }
 
+/// Feature Histogram using UnsafeCell for concurrent mutation.
 #[derive(Copy, Clone, Debug)]
 pub struct FeatureHistogram<'a> {
+    /// Reference to the histogram data.
     pub data: &'a [UnsafeCell<Bin>],
 }
 
@@ -54,6 +60,7 @@ unsafe impl<'a> Send for FeatureHistogram<'a> {}
 unsafe impl<'a> Sync for FeatureHistogram<'a> {}
 
 impl<'a> FeatureHistogram<'a> {
+    /// Create a new FeatureHistogram from a mutable slice of bins.
     pub fn new(hist: &'a mut [Bin]) -> Self {
         let ptr = hist as *mut [Bin] as *const [UnsafeCell<Bin>];
         Self { data: unsafe { &*ptr } }
@@ -141,8 +148,10 @@ impl<'a> FeatureHistogram<'a> {
     }
 }
 
+/// Owned Node Histogram.
 #[derive(Debug)]
 pub struct NodeHistogramOwned {
+    /// The histograms for each feature in the node.
     pub data: Vec<FeatureHistogramOwned>,
 }
 
@@ -180,12 +189,15 @@ impl NodeHistogramOwned {
     }
 }
 
+/// Node Histogram.
 #[derive(Debug)]
 pub struct NodeHistogram<'a> {
+    /// The histograms for each feature in the node.
     pub data: Vec<FeatureHistogram<'a>>,
 }
 
 impl<'a> NodeHistogram<'a> {
+    /// Create a NodeHistogram from an owned one.
     pub fn from_owned(hist: &'a mut NodeHistogramOwned) -> NodeHistogram<'a> {
         let histograms = hist
             .data
@@ -264,6 +276,7 @@ impl<'a> NodeHistogram<'a> {
     }
 }
 
+/// Update the cut values in the histogram.
 #[allow(clippy::too_many_arguments)]
 pub fn update_cuts(hist: &NodeHistogram, col_index: &[usize], cuts: &JaggedMatrix<f64>, parallel: bool) {
     if parallel {
@@ -279,6 +292,7 @@ pub fn update_cuts(hist: &NodeHistogram, col_index: &[usize], cuts: &JaggedMatri
     }
 }
 
+/// Update the histogram with new data.
 #[allow(clippy::too_many_arguments)]
 pub fn update_histogram(
     hist: &NodeHistogram,

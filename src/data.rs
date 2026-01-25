@@ -23,16 +23,27 @@ pub trait FloatData<T>:
     + std::marker::Send
     + std::marker::Sync
 {
+    /// Zero value.
     const ZERO: T;
+    /// One value.
     const ONE: T;
+    /// Minimum value.
     const MIN: T;
+    /// Maximum value.
     const MAX: T;
+    /// Not a Number value.
     const NAN: T;
+    /// Infinity value.
     const INFINITY: T;
+    /// Convert from usize.
     fn from_usize(v: usize) -> T;
+    /// Convert from u16.
     fn from_u16(v: u16) -> T;
+    /// Check if value is NaN.
     fn is_nan(self) -> bool;
+    /// Natural logarithm.
     fn ln(self) -> T;
+    /// Exponential function.
     fn exp(self) -> T;
 }
 impl FloatData<f64> for f64 {
@@ -89,9 +100,13 @@ impl FloatData<f32> for f32 {
 /// used throughout the crate, to house both the user provided data
 /// as well as the binned data.
 pub struct Matrix<'a, T> {
+    /// The raw data stored in a single slice.
     pub data: &'a [T],
+    /// Indices into the data.
     pub index: Vec<usize>,
+    /// Number of rows in the matrix.
     pub rows: usize,
+    /// Number of columns in the matrix.
     pub cols: usize,
     stride1: usize,
     stride2: usize,
@@ -99,6 +114,7 @@ pub struct Matrix<'a, T> {
 
 impl<'a, T> Matrix<'a, T> {
     // Defaults to column major
+    /// Create a new Matrix.
     pub fn new(data: &'a [T], rows: usize, cols: usize) -> Self {
         Matrix {
             data,
@@ -162,14 +178,18 @@ where
 /// This enables true zero-copy data transfer from Arrow/Polars
 /// where each column is a separate memory allocation.
 pub struct ColumnarMatrix<'a, T> {
+    /// The columns of the matrix.
     pub columns: Vec<&'a [T]>,
     /// Optional validity mask for each column.
     /// Each mask is a byte slice representing a packed bitmap (1 bit per element).
     /// If the vector is present, it must have the same length as `columns`.
     /// If a specific column's mask is `None`, all values are considered valid.
     pub masks: Option<Vec<Option<&'a [u8]>>>,
+    /// Row indices.
     pub index: Vec<usize>,
+    /// Number of rows.
     pub rows: usize,
+    /// Number of columns.
     pub cols: usize,
 }
 
@@ -253,8 +273,11 @@ where
 /// faster to return to numpy.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct RowMajorMatrix<T> {
+    /// The raw data in row-major order.
     pub data: Vec<T>,
+    /// Number of rows.
     pub rows: usize,
+    /// Number of columns.
     pub cols: usize,
     stride1: usize,
     stride2: usize,
@@ -262,6 +285,7 @@ pub struct RowMajorMatrix<T> {
 
 impl<T> RowMajorMatrix<T> {
     // Defaults to column major
+    /// Create a new RowMajorMatrix.
     pub fn new(data: Vec<T>, rows: usize, cols: usize) -> Self {
         RowMajorMatrix {
             data,
