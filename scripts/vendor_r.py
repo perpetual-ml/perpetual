@@ -152,7 +152,7 @@ def vendor_dependencies(project_root):
     prune_vendor(vendor_dir)
 
     # 7. Fix checksums for potential missing files
-    # fix_checksums(vendor_dir)
+    fix_checksums(vendor_dir)
 
 
 def prune_vendor(vendor_dir):
@@ -260,10 +260,57 @@ def patch_vendored_cargo_tomls(vendor_dir):
                 except Exception:
                     pass
 
+    # 7. Fix checksums for potential missing files
+    fix_checksums(vendor_dir)
+
 
 def fix_checksums(vendor_dir):
-    # Disabled for now as we are deleting checkums
-    pass
+    print(f"Scanning {vendor_dir} for checksum issues...")
+    import json
+
+    if not os.path.exists(vendor_dir):
+        print(f"Error: {vendor_dir} does not exist.")
+        return
+
+    patched_count = 0
+
+    for root, dirs, files in os.walk(vendor_dir):
+        if ".cargo-checksum.json" in files:
+            checksum_path = os.path.join(root, ".cargo-checksum.json")
+            try:
+                with open(checksum_path, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+            except Exception as e:
+                print(f"Failed to load {checksum_path}: {e}")
+                continue
+
+            files_dict = data.get("files", {})
+            new_files_dict = {}
+            changed = False
+
+            for file_rel_path, checksum in files_dict.items():
+                # files_dict keys are relative to the crate root (which is 'root')
+                full_path = os.path.join(root, file_rel_path)
+                if os.path.exists(full_path):
+                    new_files_dict[file_rel_path] = checksum
+                else:
+                    # File was deleted (pruned), so remove from checksums
+                    changed = True
+
+            if changed:
+                data["files"] = new_files_dict
+                try:
+                    # Handle readonly files
+                    if not os.access(checksum_path, os.W_OK):
+                        os.chmod(checksum_path, stat.S_IWRITE)
+
+                    with open(checksum_path, "w", encoding="utf-8") as f:
+                        json.dump(data, f, separators=(",", ":"))
+                    patched_count += 1
+                except Exception as e:
+                    print(f"Failed to write {checksum_path}: {e}")
+
+    print(f"Done. Patched checksums in {patched_count} crates.")
 
 
 if __name__ == "__main__":
