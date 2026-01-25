@@ -6,7 +6,7 @@ members = [
 
 [package]
 name = "perpetual"
-version = "1.0.10"
+version = "1.0.11"
 edition = "2021"
 authors = ["Mutlu Simsek <msimsek@perpetual-ml.com>", "Serkan Korkmaz <serkor1@duck.com>", "Pieter Pel <pelpieter@gmail.com>"]
 homepage = "https://perpetual-ml.com"
@@ -29,7 +29,6 @@ strip = true
 debug = true          # Crucial for the agent to see function names in profile.json
 opt-level = 3
 lto = "fat"          # Gives the agent a realistic "Release" performance view
-panic = "abort"
 
 [dependencies]
 rayon = "1.11.0"
