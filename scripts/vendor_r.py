@@ -123,6 +123,8 @@ def prune_vendor(vendor_dir):
         "examples",
         "benches",
         "doc",
+        ".github",
+        ".vim",
     ]
     for root, dirs, files in os.walk(vendor_dir, topdown=False):
         for name in dirs:
@@ -140,11 +142,17 @@ def prune_vendor(vendor_dir):
                 or lower_name.endswith(".txt")
                 or lower_name.endswith(".html")
                 or lower_name.endswith(".pdf")
+                or lower_name.endswith(".yml")
+                or lower_name.endswith(".yaml")
             ):
                 # Truncate to zero size
                 open(full_path, "w", encoding="utf-8").close()
             elif (
-                lower_name.endswith(".a")
+                name == ".cargo_vcs_info.json"
+                or name == ".travis.yml"
+                or name == ".cirrus.yml"
+                or name == "AppVeyor.yml"
+                or lower_name.endswith(".a")
                 or lower_name.endswith(".lib")
                 or lower_name.endswith(".png")
                 or lower_name.endswith(".jpg")
