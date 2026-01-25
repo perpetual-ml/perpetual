@@ -79,7 +79,6 @@ def vendor_dependencies(project_root):
     # Use short paths to avoid 100 char limit for tarball
     vendor_dir = os.path.join(project_root, "package-r", "inst", "v")
     config_dir = os.path.join(project_root, "package-r", "inst", "c")
-    config_file = os.path.join(config_dir, "config.toml")
 
     # Clean up old .cargo directory in rust_dir if it exists
     old_config_dir = os.path.join(rust_dir, ".cargo")
@@ -109,25 +108,12 @@ def vendor_dependencies(project_root):
         print(f"Error running cargo vendor: {e.stderr}")
         raise e
 
-    # Create config.toml
-    if not os.path.exists(config_dir):
-        os.makedirs(config_dir)
+    # Create config.toml is NO LONGER NEEDED as we pass args via CLI
+    # But we ensure the directory structure is clean
+    if os.path.exists(config_dir):
+        shutil.rmtree(config_dir)
 
-    # We manually write the config to ensure the relative path is correct.
-    # config.toml will be in package-r/inst/c/config.toml
-    # vendor will be in package-r/inst/v
-    # So relative path is "../v"
-
-    config_content = """[source.crates-io]
-replace-with = "vendored-sources"
-
-[source.vendored-sources]
-directory = "../v"
-"""
-    with open(config_file, "w", encoding="utf-8") as f:
-        f.write(config_content)
-
-    print(f"Created {config_file}")
+    print("Vendoring complete. Config will be passed via CLI in Makevars.")
 
     # 6. Prune unnecessary large/deep files to stay under 100 char path limit
     prune_vendor(vendor_dir)

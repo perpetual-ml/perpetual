@@ -196,7 +196,7 @@ jobs:
           # Run check on the built tarball
           tarball=$(ls perpetual_*.tar.gz)
           echo "Checking $tarball"
-          R CMD check --as-cran --no-tests --no-manual --no-vignettes "$tarball"
+          R CMD check --as-cran --no-tests --no-manual --no-vignettes "$tarball" || (cat perpetual.Rcheck/00install.out && exit 1)
           
       - name: Submit to CRAN
         if: github.event.release.prerelease == false

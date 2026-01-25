@@ -8,7 +8,7 @@ all: rust-target
 rust-target:
 	@echo "Building Rust library for Windows (target: $(TARGET))..."
 	rustc --version
-	cd rust && CARGO_HOME=../../inst/c cargo build --release --lib --manifest-path Cargo.toml --target $(TARGET) --verbose
+	cd rust && cargo build --release --lib --manifest-path Cargo.toml --target $(TARGET) --verbose --config 'source.crates-io.replace-with="vendored-sources"' --config 'source.vendored-sources.directory="../../inst/v"'
 	@if [ -f rust/target/$(TARGET)/release/libperpetual_r.a ]; then \
 		cp rust/target/$(TARGET)/release/libperpetual_r.a .; \
 	else \
