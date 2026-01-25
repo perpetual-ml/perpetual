@@ -111,9 +111,11 @@ def submit_cran(tarball_path, package_dir):
             response.raise_for_status()
 
         # Check for final success message
+        # Success message contains HTML tags: "The <b>maintainer of this package</b> has been sent an email..."
+        # So we check for a unique substring without tags.
         if (
             "The following package has been uploaded:" in response.text
-            or "The maintainer of this package has been sent an email" in response.text
+            or "has been sent an email to confirm the submission" in response.text
         ):
             print("Submission successful!")
             print("Check your email for the confirmation link.")
