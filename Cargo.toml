@@ -6,7 +6,7 @@ members = [
 
 [package]
 name = "perpetual"
-version = "1.0.8"
+version = "1.0.9"
 edition = "2021"
 authors = ["Mutlu Simsek <msimsek@perpetual-ml.com>", "Serkan Korkmaz <serkor1@duck.com>", "Pieter Pel <pelpieter@gmail.com>"]
 homepage = "https://perpetual-ml.com"
@@ -22,13 +22,14 @@ categories = ["algorithms", "mathematics", "science"]
 [profile.release]
 lto = "fat"
 codegen-units = 1
-panic = "abort"   # Recommended for PGO to reduce binary size and overhead
-strip = false     # ensure symbols are kept if needed, though PGO handles this
+panic = "abort"
+strip = true
 
 [profile.bench]
 debug = true          # Crucial for the agent to see function names in profile.json
 opt-level = 3
-lto = "thin"          # Gives the agent a realistic "Release" performance view
+lto = "fat"          # Gives the agent a realistic "Release" performance view
+panic = "abort"
 
 [dependencies]
 rayon = "1.11.0"
@@ -49,3 +50,4 @@ chrono = "0.4.43"
 [[bench]]
 name = "training_benchmark"
 harness = false
+

@@ -63,20 +63,12 @@ jobs:
           cp README.md package-python/README.md
           cp LICENSE package-python/LICENSE
           cp LICENSE package-r/LICENSE
-      - name: Run PGO Optimization
-        shell: bash
-        run: |
-          bash pgo_optimize.sh
-          PGO_FILE=$(find target/pgo-profiles -name "*.profdata" | head -n 1)
-          echo "PGO_PROFILE=$(pwd -W)/$PGO_FILE" >> $GITHUB_ENV
       - name: Build wheels with maturin
         uses: PyO3/maturin-action@v1
         with:
           target: x86_64
           command: build
           args: --release --strip --interpreter python --manifest-path package-python/Cargo.toml --out dist --sdist
-        env:
-          RUSTFLAGS: "-Cprofile-use=${{ env.PGO_PROFILE }}"
       - name: Save Artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -150,12 +142,6 @@ jobs:
           cp README.md package-python/README.md
           cp LICENSE package-python/LICENSE
           cp LICENSE package-r/LICENSE
-      - name: Run PGO Optimization
-        shell: bash
-        run: |
-          bash pgo_optimize.sh
-          PGO_FILE=$(find target/pgo-profiles -name "*.profdata" | head -n 1)
-          echo "PGO_PROFILE=$PWD/$PGO_FILE" >> $GITHUB_ENV
       - name: Build wheels with maturin
         uses: PyO3/maturin-action@v1
         with:
@@ -163,8 +149,6 @@ jobs:
           manylinux: auto
           command: build
           args: --release --strip --interpreter python${{ matrix.pyversion }} --manifest-path package-python/Cargo.toml --out dist --sdist
-        env:
-          RUSTFLAGS: "-Cprofile-use=${{ env.PGO_PROFILE }}"
       - name: Save Artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -198,20 +182,12 @@ jobs:
           cp README.md package-python/README.md
           cp LICENSE package-python/LICENSE
           cp LICENSE package-r/LICENSE
-      - name: Run PGO Optimization
-        shell: bash
-        run: |
-          bash pgo_optimize.sh
-          PGO_FILE=$(find target/pgo-profiles -name "*.profdata" | head -n 1)
-          echo "PGO_PROFILE=$PWD/$PGO_FILE" >> $GITHUB_ENV
       - name: Build wheels with maturin
         uses: PyO3/maturin-action@v1
         with:
           manylinux: auto
           command: build
           args: --release --strip --interpreter python${{ matrix.pyversion }} --manifest-path package-python/Cargo.toml --out dist --sdist
-        env:
-          RUSTFLAGS: "-Cprofile-use=${{ env.PGO_PROFILE }}"
       - name: Save Artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -300,14 +276,26 @@ jobs:
         run: |
           cd package-r/src/rust
           mkdir -p .cargo
-          cargo vendor > .cargo/config.toml
-          # Append config to use vendored sources
-          cat .cargo/config.toml
+          cargo vendor ../../v > .cargo/config.toml
           
           # Prune unnecessary files to check against CRAN path length limits
-          find vendor -name "tests" -type d -exec rm -rf {} +
-          find vendor -name "examples" -type d -exec rm -rf {} +
-          find vendor -name "*.md" -delete
+          cd ../../v
+          find . -name "tests" -type d -exec rm -rf {} +
+          find . -name "examples" -type d -exec rm -rf {} +
+          find . -name "benches" -type d -exec rm -rf {} +
+          find . -name "*.md" -delete
+          
+          # Deep prune windows crates
+          find . -path "*windows*/src/Windows/Win32/UI" -type d -exec rm -rf {} +
+          find . -path "*windows*/src/Windows/Win32/Management" -type d -exec rm -rf {} +
+          find . -path "*windows*/src/Windows/Win32/NetworkManagement" -type d -exec rm -rf {} +
+          find . -path "*windows*/src/Windows/Win32/Devices" -type d -exec rm -rf {} +
+          find . -path "*windows*/src/Windows/Win32/System" -type d -exec rm -rf {} +
+          find . -path "*windows*/src/Windows/Win32/Graphics" -type d -exec rm -rf {} +
+          find . -path "*windows*/src/Windows/Win32/Security" -type d -exec rm -rf {} +
+          find . -path "*windows*/src/Windows/Win32/Media" -type d -exec rm -rf {} +
+          find . -path "*windows*/src/Windows/Win32/Storage" -type d -exec rm -rf {} +
+          find . -path "*windows*/src/Windows/Wdk" -type d -exec rm -rf {} +
 
       - name: Build Source Package
         run: |

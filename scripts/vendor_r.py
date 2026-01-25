@@ -6,8 +6,14 @@ import subprocess
 def vendor_r():
     project_root = os.getcwd()
     target_dir = os.path.join(project_root, "package-r", "src", "rust", "core")
+    old_vendor_dir = os.path.join(project_root, "package-r", "src", "rust", "vendor")
 
     print(f"Vendoring core Rust logic into {target_dir}...")
+
+    # 0. Clean up old vendor directory if it exists
+    if os.path.exists(old_vendor_dir):
+        print(f"Cleaning up old vendor directory {old_vendor_dir}...")
+        shutil.rmtree(old_vendor_dir)
 
     # 1. Clean up existing core directory
     if os.path.exists(target_dir):
@@ -70,7 +76,7 @@ def vendor_r():
 
 def vendor_dependencies(project_root):
     rust_dir = os.path.join(project_root, "package-r", "src", "rust")
-    vendor_dir = os.path.join(rust_dir, "vendor")
+    vendor_dir = os.path.join(project_root, "package-r", "v")
     config_dir = os.path.join(rust_dir, ".cargo")
     config_file = os.path.join(config_dir, "config.toml")
 
@@ -80,7 +86,7 @@ def vendor_dependencies(project_root):
     # We must run this in the directory containing the Cargo.toml (package-r/src/rust)
     try:
         result = subprocess.run(
-            ["cargo", "vendor", "vendor"],
+            ["cargo", "vendor", "../../v"],
             cwd=rust_dir,
             capture_output=True,
             text=True,
@@ -94,13 +100,61 @@ def vendor_dependencies(project_root):
     if not os.path.exists(config_dir):
         os.makedirs(config_dir)
 
+    # The output from cargo vendor is relative to the cwd where it was run
+    # Since we run it in rust_dir (package-r/src/rust) and vendor into "../../v" (package-r/v)
+    # The config should point to "../../v"
     with open(config_file, "w", encoding="utf-8") as f:
         f.write(result.stdout)
 
     print(f"Created {config_file}")
 
-    # 6. Fix checksums for potential missing files (e.g. excluded by R/CRAN rules or path limits)
+    # 6. Prune unnecessary large/deep files to stay under 100 char path limit
+    prune_vendor(vendor_dir)
+
+    # 7. Fix checksums for potential missing files
     fix_checksums(vendor_dir)
+
+
+def prune_vendor(vendor_dir):
+    print(f"Pruning unnecessary files in {vendor_dir}...")
+    # Patterns of directories to remove
+    to_remove_dirs = [
+        "tests",
+        "examples",
+        "benches",
+        "doc",
+    ]
+    # More aggressive for windows crates which have insane depth
+    deep_prune_dirs = [
+        "src/Windows/Win32/UI",
+        "src/Windows/Win32/Management",
+        "src/Windows/Win32/NetworkManagement",
+        "src/Windows/Win32/Devices",
+        "src/Windows/Win32/System",
+        "src/Windows/Win32/Graphics",
+        "src/Windows/Win32/Security",
+        "src/Windows/Win32/Media",
+        "src/Windows/Win32/Storage",
+        "src/Windows/Wdk",
+    ]
+
+    for root, dirs, files in os.walk(vendor_dir, topdown=False):
+        for name in dirs:
+            if name in to_remove_dirs:
+                shutil.rmtree(os.path.join(root, name))
+
+        # Additional deep prune for windows crates if we are inside one
+        if "windows" in root:
+            for deep_dir in deep_prune_dirs:
+                target = os.path.join(root, deep_dir)
+                if os.path.exists(target):
+                    shutil.rmtree(target)
+
+    # Remove ALL markdown files as they are often long and redundant
+    for root, dirs, files in os.walk(vendor_dir):
+        for name in files:
+            if name.lower().endswith(".md"):
+                os.remove(os.path.join(root, name))
 
 
 def fix_checksums(vendor_dir):
