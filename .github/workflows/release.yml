@@ -179,6 +179,7 @@ jobs:
         with:
           extra-packages: any::rcmdcheck, any::devtools
           working-directory: package-r
+          use-public-rspm: true
 
       - name: Prepare and Vendor R Package
         run: python scripts/vendor_r.py

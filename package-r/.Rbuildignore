@@ -5,8 +5,3 @@
 ^LICENSE$
 ^\.github$
 ^src/rust/target$
-^v/.*/\.
-^v/.*/\.cargo-checksum\.json$
-^v/.*/\.cargo_vcs_info\.json$
-^v/.*/\.travis\.yml$
-^v/.*/\.cirrus\.yml$
