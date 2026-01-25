@@ -3,7 +3,7 @@
 
 [package]
 name = "perpetual_r"
-version = "1.0.14"
+version = "1.0.15"
 edition = "2021"
 
 [lib]

@@ -201,7 +201,7 @@ jobs:
         run: |
           tarball=$(ls perpetual_*.tar.gz)
           echo "Submitting $tarball to CRAN"
-          Rscript -e "devtools::submit_cran(file = '$tarball')"
+          Rscript -e "devtools::submit_cran(pkg = '$tarball')"
           
       - name: Upload Release Asset
         if: github.event_name == 'release'
