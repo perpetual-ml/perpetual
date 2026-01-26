@@ -34,7 +34,7 @@ def force_rmtree(path):
         print(f"Failed to rmtree {path}: {e}")
 
 
-def vendor_r():
+def vendor_r(skip_deps=False):
     project_root = os.getcwd()
     target_dir = os.path.join(project_root, "package-r", "src", "rust", "core")
     old_vendor_dir = os.path.join(project_root, "package-r", "src", "rust", "vendor")
@@ -102,7 +102,10 @@ def vendor_r():
     print("Vendoring complete.")
 
     # 5. Vendor dependencies
-    vendor_dependencies(project_root)
+    if not skip_deps:
+        vendor_dependencies(project_root)
+    else:
+        print("Skipping dependency vendoring as requested.")
 
 
 def vendor_dependencies(project_root):
@@ -331,4 +334,14 @@ def fix_checksums(vendor_dir):
 
 
 if __name__ == "__main__":
-    vendor_r()
+    import argparse
+
+    parser = argparse.ArgumentParser(description="Vendor Rust code for R package.")
+    parser.add_argument(
+        "--no-deps",
+        action="store_true",
+        help="Skip vendoring dependencies (cargo vendor).",
+    )
+    args = parser.parse_args()
+
+    vendor_r(skip_deps=args.no_deps)
