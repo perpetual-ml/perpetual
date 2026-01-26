@@ -2,6 +2,7 @@ name: Publish
 on:
   release:
     types: [published]
+  workflow_dispatch:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -194,25 +195,34 @@ jobs:
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           
-          # Force create/switch to r-universe branch from current commit
-          git checkout -B r-universe
+          # Move package-r content to a temporary location
+          mkdir -p ../package_r_temp
+          cp -r package-r/* ../package_r_temp/
+          cp -r package-r/. ../package_r_temp/ 2>/dev/null || true
+          
+          # Checkout orphan branch and clean everything
+          git checkout --orphan r-universe
+          git rm -rf .
+          git clean -fdx
+          
+          # Move content back to root
+          cp -r ../package_r_temp/* .
+          cp -r ../package_r_temp/. . 2>/dev/null || true
+          rm -rf ../package_r_temp
 
           # Patch Makevars to remove local vendoring and allow network build
-          if [ -f "package-r/src/Makevars" ]; then
-             sed -i "s/ --config 'source.crates-io.replace-with=\"vendored-sources\"' --config 'source.vendored-sources.directory=\"..\/..\/inst\/v\"'//g" package-r/src/Makevars
-             echo "Patched package-r/src/Makevars to allow network build"
+          if [ -f "src/Makevars" ]; then
+             sed -i "s/ --config 'source.crates-io.replace-with=\"vendored-sources\"' --config 'source.vendored-sources.directory=\"..\/..\/inst\/v\"'//g" src/Makevars
+             echo "Patched src/Makevars to allow network build"
           fi
           
-          if [ -f "package-r/src/Makevars.win" ]; then
-             sed -i "s/ --config 'source.crates-io.replace-with=\"vendored-sources\"' --config 'source.vendored-sources.directory=\"..\/..\/inst\/v\"'//g" package-r/src/Makevars.win
-             echo "Patched package-r/src/Makevars.win to allow network build"
+          if [ -f "src/Makevars.win" ]; then
+             sed -i "s/ --config 'source.crates-io.replace-with=\"vendored-sources\"' --config 'source.vendored-sources.directory=\"..\/..\/inst\/v\"'//g" src/Makevars.win
+             echo "Patched src/Makevars.win to allow network build"
           fi
 
-          # Force add the package-r changes (including vendored source)
-          # We need to add src/rust/core which is usually ignored
-          git add -f package-r
-
-          # Commit and push
+          # Add and Push
+          git add .
           git commit -m "chore: vendor source for r-universe build [skip ci]"
           git push -f origin r-universe
 
