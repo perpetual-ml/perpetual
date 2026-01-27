@@ -3,6 +3,7 @@
 # Tests loading pre-saved model from v0.10.0
 
 test_that("Load v0.10.0 model and verify predictions", {
+  skip_if_no_resources()
   resources_dir <- get_resources_dir()
   model_path <- file.path(resources_dir, "model_v0.10.0.json")
   preds_path <- file.path(resources_dir, "model_v0.10.0_preds.csv")
@@ -24,6 +25,7 @@ test_that("Load v0.10.0 model and verify predictions", {
 })
 
 test_that("V0.10.0 model JSON is valid", {
+  skip_if_no_resources()
   resources_dir <- get_resources_dir()
   model_path <- file.path(resources_dir, "model_v0.10.0.json")
   
@@ -41,6 +43,7 @@ test_that("V0.10.0 model JSON is valid", {
 })
 
 test_that("Loaded model can make predictions with new API", {
+  skip_if_no_resources()
   resources_dir <- get_resources_dir()
   model_path <- file.path(resources_dir, "model_v0.10.0.json")
   

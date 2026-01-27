@@ -7,11 +7,11 @@
 
 <div align="center">
 
-[![Python Versions](https://img.shields.io/pypi/pyversions/perpetual.svg?logo=python&logoColor=white)](https://pypi.org/project/perpetual)
-[![PyPI Version](https://img.shields.io/pypi/v/perpetual.svg?logo=pypi&logoColor=white)](https://pypi.org/project/perpetual)
-[![Crates.io Version](https://img.shields.io/crates/v/perpetual?logo=rust&logoColor=white)](https://crates.io/crates/perpetual)
-[![R-Universe status](https://perpetual-ml.r-universe.dev/badges/perpetual?logo=R&logoColor=white)](https://perpetual-ml.r-universe.dev/perpetual)
-[![Static Badge](https://img.shields.io/badge/join-discord-blue?logo=discord)](https://discord.gg/AyUK7rr6wy)
+<a href="https://pypi.org/project/perpetual" target="_blank"><img src="https://img.shields.io/pypi/pyversions/perpetual.svg?logo=python&logoColor=white" alt="Python Versions"></a>
+<a href="https://pypi.org/project/perpetual" target="_blank"><img src="https://img.shields.io/pypi/v/perpetual.svg?logo=pypi&logoColor=white" alt="PyPI Version"></a>
+<a href="https://crates.io/crates/perpetual" target="_blank"><img src="https://img.shields.io/crates/v/perpetual?logo=rust&logoColor=white" alt="Crates.io Version"></a>
+<a href="https://perpetual-ml.r-universe.dev/perpetual" target="_blank"><img src="https://img.shields.io/badge/dynamic/json?url=https://perpetual-ml.r-universe.dev/api/packages/perpetual&query=$.Version&label=r-universe&logo=R&logoColor=white&color=brightgreen" alt="R-Universe status"></a>
+<a href="https://discord.gg/AyUK7rr6wy" target="_blank"><img src="https://img.shields.io/badge/join-discord-blue?logo=discord" alt="Static Badge"></a>
 ![PyPI - Downloads](https://img.shields.io/pypi/dm/perpetual)
 
 </div>
@@ -22,11 +22,11 @@ PerpetualBooster is a gradient boosting machine (GBM) algorithm that doesn't nee
 
 Perpetual is built in Rust and provides high-performance bindings for Python and R.
 
-| Language | Installation | Documentation | Repository |
-| :--- | :--- | :--- | :--- |
-| **Python** | `pip install perpetual` | [Python API](https://perpetual-ml.github.io/perpetual) | [`package-python`](./package-python) |
-| **Rust** | `cargo add perpetual` | [docs.rs](https://docs.rs/perpetual) | [`src`](./src) |
-| **R** | `install.packages("perpetual")` | [pkgdown Site](https://perpetual-ml.github.io/perpetual/r) | [`package-r`](./package-r) |
+| Language   | Installation                    | Documentation                                                                         | Repository                                                      |
+| :--------- | :------------------------------ | :------------------------------------------------------------------------------------ | :-------------------------------------------------------------- |
+| **Python** | `pip install perpetual`         | <a href="https://perpetual-ml.github.io/perpetual" target="_blank">Python API</a>     | <a href="./package-python" target="_blank">`package-python`</a> |
+| **Rust**   | `cargo add perpetual`           | <a href="https://docs.rs/perpetual" target="_blank">docs.rs</a>                       | <a href="./src" target="_blank">`src`</a>                       |
+| **R**      | `install.packages("perpetual")` | <a href="https://perpetual-ml.github.io/perpetual/r" target="_blank">pkgdown Site</a> | <a href="./package-r" target="_blank">`package-r`</a>           |
 
 ## Usage
 
@@ -43,9 +43,9 @@ model.fit(X, y)
 
 Comprehensive documentation for all supported languages is available:
 
-- **Python**: [API Reference & Guides](https://perpetual-ml.github.io/perpetual)
-- **Rust**: [docs.rs/perpetual](https://docs.rs/perpetual)
-- **R**: [pkgdown Documentation](https://perpetual-ml.github.io/perpetual/r)
+- **Python**: <a href="https://perpetual-ml.github.io/perpetual" target="_blank">API Reference & Guides</a>
+- **Rust**: <a href="https://docs.rs/perpetual" target="_blank">docs.rs/perpetual</a>
+- **R**: <a href="https://perpetual-ml.github.io/perpetual/r" target="_blank">pkgdown Documentation</a>
 
 ## Benchmark
 
@@ -53,7 +53,7 @@ Comprehensive documentation for all supported languages is available:
 
 Hyperparameter optimization usually takes 100 iterations with plain GBM algorithms. PerpetualBooster achieves the same accuracy in a single run. Thus, it achieves up to 100x speed-up at the same accuracy with different `budget` levels and with different datasets.
 
-The following table summarizes the results for the [California Housing](https://scikit-learn.org/stable/modules/generated/sklearn.datasets.fetch_california_housing.html) dataset (regression):
+The following table summarizes the results for the <a href="https://scikit-learn.org/stable/modules/generated/sklearn.datasets.fetch_california_housing.html" target="_blank">California Housing</a> dataset (regression):
 
 | Perpetual budget | LightGBM n_estimators | Perpetual mse | LightGBM mse | Speed-up wall time | Speed-up cpu time |
 | :--------------- | :-------------------- | :------------ | :----------- | :----------------- | :---------------- |
@@ -61,73 +61,73 @@ The following table summarizes the results for the [California Housing](https://
 | 1.5              | 300                   | 0.188         | 0.188        | 59x                | 58x               |
 | 2.1              | 1000                  | 0.185         | 0.186        | 42x                | 41x               |
 
-The following table summarizes the results for the [Cover Types](https://scikit-learn.org/stable/modules/generated/sklearn.datasets.fetch_covtype.html) dataset (classification):
+The following table summarizes the results for the <a href="https://scikit-learn.org/stable/modules/generated/sklearn.datasets.fetch_covtype.html" target="_blank">Cover Types</a> dataset (classification):
 
 | Perpetual budget | LightGBM n_estimators | Perpetual log loss | LightGBM log loss | Speed-up wall time | Speed-up cpu time |
 | :--------------- | :-------------------- | :----------------- | :---------------- | :----------------- | :---------------- |
 | 0.9              | 100                   | 0.091              | 0.084             | 72x                | 78x               |
 
-The results can be reproduced using the scripts in the [examples](./package-python/examples) folder.
+The results can be reproduced using the scripts in the <a href="./package-python/examples" target="_blank">examples</a> folder.
 
 ### PerpetualBooster vs. AutoGluon
 
-PerpetualBooster is a GBM but behaves like AutoML so it is benchmarked also against AutoGluon (v1.2, best quality preset), the current leader in [AutoML benchmark](https://automlbenchmark.streamlit.app/cd_diagram). Top 10 datasets with the most number of rows are selected from [OpenML datasets](https://www.openml.org/) for both regression and classification tasks.
+PerpetualBooster is a GBM but behaves like AutoML so it is benchmarked also against AutoGluon (v1.2, best quality preset), the current leader in <a href="https://automlbenchmark.streamlit.app/cd_diagram" target="_blank">AutoML benchmark</a>. Top 10 datasets with the most number of rows are selected from <a href="https://www.openml.org/" target="_blank">OpenML datasets</a> for both regression and classification tasks.
 
 The results are summarized in the following table for regression tasks:
 
-| OpenML Task                                              | Perpetual Training Duration | Perpetual Inference Duration | Perpetual RMSE      | AutoGluon Training Duration | AutoGluon Inference Duration | AutoGluon RMSE     |
-| :------------------------------------------------------- | :-------------------------- | :--------------------------- | :------------------ | :-------------------------- | :--------------------------- | :----------------- |
-| [Airlines_DepDelay_10M](https://www.openml.org/t/359929) | 518                         | 11.3                         | 29.0                | 520                         | 30.9                         | <ins> 28.8 </ins>  |
-| [bates_regr_100](https://www.openml.org/t/361940)        | 3421                        | 15.1                         | <ins> 1.084 </ins>  | OOM                         | OOM                          | OOM                |
-| [BNG(libras_move)](https://www.openml.org/t/7327)        | 1956                        | 4.2                          | <ins> 2.51 </ins>   | 1922                        | 97.6                         | 2.53               |
-| [BNG(satellite_image)](https://www.openml.org/t/7326)    | 334                         | 1.6                          | 0.731               | 337                         | 10.0                         | <ins> 0.721 </ins> |
-| [COMET_MC](https://www.openml.org/t/14949)               | 44                          | 1.0                          | <ins> 0.0615 </ins> | 47                          | 5.0                          | 0.0662             |
-| [friedman1](https://www.openml.org/t/361939)             | 275                         | 4.2                          | <ins> 1.047 </ins>  | 278                         | 5.1                          | 1.487              |
-| [poker](https://www.openml.org/t/10102)                  | 38                          | 0.6                          | <ins> 0.256 </ins>  | 41                          | 1.2                          | 0.722              |
-| [subset_higgs](https://www.openml.org/t/361955)          | 868                         | 10.6                         | <ins> 0.420 </ins>  | 870                         | 24.5                         | 0.421              |
-| [BNG(autoHorse)](https://www.openml.org/t/7319)          | 107                         | 1.1                          | <ins> 19.0 </ins>   | 107                         | 3.2                          | 20.5               |
-| [BNG(pbc)](https://www.openml.org/t/7318)                | 48                          | 0.6                          | <ins> 836.5 </ins>  | 51                          | 0.2                          | 957.1              |
-| average                                                  | 465                         | 3.9                          | -                   | 464                         | 19.7                         | -                  |
+| OpenML Task                                                                         | Perpetual Training Duration | Perpetual Inference Duration | Perpetual RMSE      | AutoGluon Training Duration | AutoGluon Inference Duration | AutoGluon RMSE     |
+| :---------------------------------------------------------------------------------- | :-------------------------- | :--------------------------- | :------------------ | :-------------------------- | :--------------------------- | :----------------- |
+| <a href="https://www.openml.org/t/359929" target="_blank">Airlines_DepDelay_10M</a> | 518                         | 11.3                         | 29.0                | 520                         | 30.9                         | <ins> 28.8 </ins>  |
+| <a href="https://www.openml.org/t/361940" target="_blank">bates_regr_100</a>        | 3421                        | 15.1                         | <ins> 1.084 </ins>  | OOM                         | OOM                          | OOM                |
+| <a href="https://www.openml.org/t/7327" target="_blank">BNG(libras_move)</a>        | 1956                        | 4.2                          | <ins> 2.51 </ins>   | 1922                        | 97.6                         | 2.53               |
+| <a href="https://www.openml.org/t/7326" target="_blank">BNG(satellite_image)</a>    | 334                         | 1.6                          | 0.731               | 337                         | 10.0                         | <ins> 0.721 </ins> |
+| <a href="https://www.openml.org/t/14949" target="_blank">COMET_MC</a>               | 44                          | 1.0                          | <ins> 0.0615 </ins> | 47                          | 5.0                          | 0.0662             |
+| <a href="https://www.openml.org/t/361939" target="_blank">friedman1</a>             | 275                         | 4.2                          | <ins> 1.047 </ins>  | 278                         | 5.1                          | 1.487              |
+| <a href="https://www.openml.org/t/10102" target="_blank">poker</a>                  | 38                          | 0.6                          | <ins> 0.256 </ins>  | 41                          | 1.2                          | 0.722              |
+| <a href="https://www.openml.org/t/361955" target="_blank">subset_higgs</a>          | 868                         | 10.6                         | <ins> 0.420 </ins>  | 870                         | 24.5                         | 0.421              |
+| <a href="https://www.openml.org/t/7319" target="_blank">BNG(autoHorse)</a>          | 107                         | 1.1                          | <ins> 19.0 </ins>   | 107                         | 3.2                          | 20.5               |
+| <a href="https://www.openml.org/t/7318" target="_blank">BNG(pbc)</a>                | 48                          | 0.6                          | <ins> 836.5 </ins>  | 51                          | 0.2                          | 957.1              |
+| average                                                                             | 465                         | 3.9                          | -                   | 464                         | 19.7                         | -                  |
 
 PerpetualBooster outperformed AutoGluon on 8 out of 10 regression tasks, training equally fast and inferring 5.1x faster.
 
 The results are summarized in the following table for classification tasks:
 
-| OpenML Task                                             | Perpetual Training Duration | Perpetual Inference Duration | Perpetual AUC      | AutoGluon Training Duration | AutoGluon Inference Duration | AutoGluon AUC |
-| :------------------------------------------------------ | :-------------------------- | :--------------------------- | :----------------- | :-------------------------- | :--------------------------- | :------------ |
-| [BNG(spambase)](https://www.openml.org/t/146163)        | 70.1                        | 2.1                          | <ins> 0.671 </ins> | 73.1                        | 3.7                          | 0.669         |
-| [BNG(trains)](https://www.openml.org/t/208)             | 89.5                        | 1.7                          | <ins> 0.996 </ins> | 106.4                       | 2.4                          | 0.994         |
-| [breast](https://www.openml.org/t/361942)               | 13699.3                     | 97.7                         | <ins> 0.991 </ins> | 13330.7                     | 79.7                         | 0.949         |
-| [Click_prediction_small](https://www.openml.org/t/7291) | 89.1                        | 1.0                          | <ins> 0.749 </ins> | 101.0                       | 2.8                          | 0.703         |
-| [colon](https://www.openml.org/t/361938)                | 12435.2                     | 126.7                        | <ins> 0.997 </ins> | 12356.2                     | 152.3                        | 0.997         |
-| [Higgs](https://www.openml.org/t/362113)                | 3485.3                      | 40.9                         | <ins> 0.843 </ins> | 3501.4                      | 67.9                         | 0.816         |
-| [SEA(50000)](https://www.openml.org/t/230)              | 21.9                        | 0.2                          | <ins> 0.936 </ins> | 25.6                        | 0.5                          | 0.935         |
-| [sf-police-incidents](https://www.openml.org/t/359994)  | 85.8                        | 1.5                          | <ins> 0.687 </ins> | 99.4                        | 2.8                          | 0.659         |
-| [bates_classif_100](https://www.openml.org/t/361941)    | 11152.8                     | 50.0                         | <ins> 0.864 </ins> | OOM                         | OOM                          | OOM           |
-| [prostate](https://www.openml.org/t/361945)             | 13699.9                     | 79.8                         | <ins> 0.987 </ins> | OOM                         | OOM                          | OOM           |
-| average                                                 | 3747.0                      | 34.0                         | -                  | 3699.2                      | 39.0                         | -             |
+| OpenML Task                                                                        | Perpetual Training Duration | Perpetual Inference Duration | Perpetual AUC      | AutoGluon Training Duration | AutoGluon Inference Duration | AutoGluon AUC |
+| :--------------------------------------------------------------------------------- | :-------------------------- | :--------------------------- | :----------------- | :-------------------------- | :--------------------------- | :------------ |
+| <a href="https://www.openml.org/t/146163" target="_blank">BNG(spambase)</a>        | 70.1                        | 2.1                          | <ins> 0.671 </ins> | 73.1                        | 3.7                          | 0.669         |
+| <a href="https://www.openml.org/t/208" target="_blank">BNG(trains)</a>             | 89.5                        | 1.7                          | <ins> 0.996 </ins> | 106.4                       | 2.4                          | 0.994         |
+| <a href="https://www.openml.org/t/361942" target="_blank">breast</a>               | 13699.3                     | 97.7                         | <ins> 0.991 </ins> | 13330.7                     | 79.7                         | 0.949         |
+| <a href="https://www.openml.org/t/7291" target="_blank">Click_prediction_small</a> | 89.1                        | 1.0                          | <ins> 0.749 </ins> | 101.0                       | 2.8                          | 0.703         |
+| <a href="https://www.openml.org/t/361938" target="_blank">colon</a>                | 12435.2                     | 126.7                        | <ins> 0.997 </ins> | 12356.2                     | 152.3                        | 0.997         |
+| <a href="https://www.openml.org/t/362113" target="_blank">Higgs</a>                | 3485.3                      | 40.9                         | <ins> 0.843 </ins> | 3501.4                      | 67.9                         | 0.816         |
+| <a href="https://www.openml.org/t/230" target="_blank">SEA(50000)</a>              | 21.9                        | 0.2                          | <ins> 0.936 </ins> | 25.6                        | 0.5                          | 0.935         |
+| <a href="https://www.openml.org/t/359994" target="_blank">sf-police-incidents</a>  | 85.8                        | 1.5                          | <ins> 0.687 </ins> | 99.4                        | 2.8                          | 0.659         |
+| <a href="https://www.openml.org/t/361941" target="_blank">bates_classif_100</a>    | 11152.8                     | 50.0                         | <ins> 0.864 </ins> | OOM                         | OOM                          | OOM           |
+| <a href="https://www.openml.org/t/361945" target="_blank">prostate</a>             | 13699.9                     | 79.8                         | <ins> 0.987 </ins> | OOM                         | OOM                          | OOM           |
+| average                                                                            | 3747.0                      | 34.0                         | -                  | 3699.2                      | 39.0                         | -             |
 
 PerpetualBooster outperformed AutoGluon on 10 out of 10 classification tasks, training equally fast and inferring 1.1x faster.
 
 PerpetualBooster demonstrates greater robustness compared to AutoGluon, successfully training on all 20 tasks, whereas AutoGluon encountered out-of-memory errors on 3 of those tasks.
 
-The results can be reproduced using the [automlbenchmark fork](https://github.com/deadsoul44/automlbenchmark).
+The results can be reproduced using the <a href="https://github.com/deadsoul44/automlbenchmark" target="_blank">automlbenchmark fork</a>.
 
 ## Contribution
 
-Contributions are welcome. Check [CONTRIBUTING.md](./CONTRIBUTING.md) for the guideline.
+Contributions are welcome. Check <a href="./CONTRIBUTING.md" target="_blank">CONTRIBUTING.md</a> for the guideline.
 
 ## Paper
 
-PerpetualBooster prevents overfitting with a generalization algorithm. The paper is work-in-progress to explain how the algorithm works. Check our [blog post](https://perpetual-ml.com/blog/how-perpetual-works) for a high level introduction to the algorithm.
+PerpetualBooster prevents overfitting with a generalization algorithm. The paper is work-in-progress to explain how the algorithm works. Check our <a href="https://perpetual-ml.com/blog/how-perpetual-works" target="_blank">blog post</a> for a high level introduction to the algorithm.
 
 ## Perpetual ML Suite
 
 The **Perpetual ML Suite** is a comprehensive, batteries-included ML platform designed to deliver maximum predictive power with minimal effort. It allows you to track experiments, monitor metrics, and manage model drift through an intuitive interface.
 
-For a fully managed, **serverless ML experience**, visit [app.perpetual-ml.com](https://app.perpetual-ml.com).
+For a fully managed, **serverless ML experience**, visit <a href="https://app.perpetual-ml.com" target="_blank">app.perpetual-ml.com</a>.
 
 - **Serverless Marimo Notebooks**: Run interactive, reactive notebooks without managing any infrastructure.
 - **Serverless ML Endpoints**: One-click deployment of models as production-ready endpoints for real-time inference.
 
-Perpetual is also designed to live where your data lives. It is available as a native application on the [Snowflake Marketplace](https://app.snowflake.com/marketplace/listing/GZSYZX0EMJ/perpetual-ml-perpetual-ml-suite), with support for Databricks and other major data warehouses coming soon.
+Perpetual is also designed to live where your data lives. It is available as a native application on the <a href="https://app.snowflake.com/marketplace/listing/GZSYZX0EMJ/perpetual-ml-perpetual-ml-suite" target="_blank">Snowflake Marketplace</a>, with support for Databricks and other major data warehouses coming soon.

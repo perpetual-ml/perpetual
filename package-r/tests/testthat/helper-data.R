@@ -25,15 +25,25 @@ get_resources_dir <- function() {
   # Failback or check if we are in package root (manually run)
   
   # Debug info for CI
-  msg <- paste0(
-    "Could not find resources directory.\n",
-    "Working directory: ", getwd(), "\n",
-    "Candidate paths checked: ", paste(candidates, collapse = ", "), "\n",
-    "Files in current dir:\n", paste(list.files(), collapse = "\n"), "\n",
-    "Files in parent dir:\n", paste(list.files(".."), collapse = "\n")
-  )
+  # msg <- paste0(
+  #   "Could not find resources directory.\n",
+  #   "Working directory: ", getwd(), "\n",
+  #   "Candidate paths checked: ", paste(candidates, collapse = ", "), "\n",
+  #   "Files in current dir:\n", paste(list.files(), collapse = "\n"), "\n",
+  #   "Files in parent dir:\n", paste(list.files(".."), collapse = "\n")
+  # )
   
-  stop(msg)
+  # stop(msg)
+  return(NULL)
+}
+
+skip_if_no_resources <- function() {
+  if (is.null(get_resources_dir())) {
+    if (Sys.getenv("PERPETUAL_REQ_RESOURCES") == "true") {
+      stop("Strict tests enabled (CI): Resources not found but required!")
+    }
+    testthat::skip("Test resources not found (skipped on R-universe/CRAN without data)")
+  }
 }
 
 # Helper to convert flat data list to matrix for new API
@@ -45,6 +55,7 @@ as_matrix_data <- function(data) {
 
 # Load Titanic test data (matches Python test_booster.py test_categorical)
 load_titanic_test_data <- function() {
+  skip_if_no_resources()
   resources_dir <- get_resources_dir()
   
   # Read the flat CSV (column-major values)
@@ -70,6 +81,7 @@ load_titanic_test_data <- function() {
 
 # Load Titanic training data
 load_titanic_train_data <- function() {
+  skip_if_no_resources()
   resources_dir <- get_resources_dir()
   
   flat_file <- file.path(resources_dir, "titanic_train_flat.csv")
@@ -93,6 +105,7 @@ load_titanic_train_data <- function() {
 
 # Load Cover Types data for multi-class classification (matches Python test_multi_output.py)
 load_cover_types_data <- function(n_samples = 1000, seed = 0) {
+  skip_if_no_resources()
   resources_dir <- get_resources_dir()
   
   train_file <- file.path(resources_dir, "cover_types_train.csv")
@@ -140,6 +153,7 @@ load_cover_types_data <- function(n_samples = 1000, seed = 0) {
 
 # Load California Housing data for regression (matches Python test_calibration)
 load_cal_housing_data <- function() {
+  skip_if_no_resources()
   resources_dir <- get_resources_dir()
   
   train_file <- file.path(resources_dir, "cal_housing_train.csv")

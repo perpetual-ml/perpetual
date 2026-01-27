@@ -1,8 +1,7 @@
 # Regression tests with cal_housing data using XGBoost/LightGBM style API
 
 test_that("Regression with cal_housing data works", {
-  skip_if_not(file.exists(file.path(get_resources_dir(), "cal_housing_train.csv")),
-              "Cal housing data not available")
+  skip_if_no_resources()
   
   data <- load_cal_housing_data()
   X_train <- matrix(data$train$flat_data, nrow = data$train$rows, ncol = data$train$cols, byrow = FALSE)
@@ -20,8 +19,7 @@ test_that("Regression with cal_housing data works", {
 })
 
 test_that("Regression predictions are reasonable", {
-  skip_if_not(file.exists(file.path(get_resources_dir(), "cal_housing_train.csv")),
-              "Cal housing data not available")
+  skip_if_no_resources()
   
   data <- load_cal_housing_data()
   X_train <- matrix(data$train$flat_data, nrow = data$train$rows, ncol = data$train$cols, byrow = FALSE)
@@ -42,8 +40,7 @@ test_that("Regression predictions are reasonable", {
 })
 
 test_that("Regression save/load preserves predictions", {
-  skip_if_not(file.exists(file.path(get_resources_dir(), "cal_housing_train.csv")),
-              "Cal housing data not available")
+  skip_if_no_resources()
   
   data <- load_cal_housing_data()
   X_train <- matrix(data$train$flat_data, nrow = data$train$rows, ncol = data$train$cols, byrow = FALSE)
