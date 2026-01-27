@@ -4,7 +4,7 @@ build-backend = "maturin"
 
 [project]
 name = "perpetual"
-version = "1.0.30"
+version = "1.0.31"
 description = "A self-generalizing gradient boosting machine that doesn't need hyperparameter optimization"
 readme = "README.md"
 keywords = [
@@ -36,7 +36,6 @@ classifiers = [
 dev = ["pandas", "polars", "pyarrow", "maturin", "pytest", "seaborn", "scikit-learn", "mkdocs-material", "mkdocstrings[python]", "mkdocs-autorefs", "ruff", "xgboost", "onnxmltools", "onnx", "onnxruntime; python_version < '3.14'"]
 
 [tool.maturin]
-sdist-include = ["LICENSE", "README.md"]
 python-source = "python"
 module-name = "perpetual.perpetual"
 
