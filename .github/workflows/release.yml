@@ -186,6 +186,9 @@ jobs:
           extra-packages: any::roxygen2
           cache: true
 
+      - name: Prepare R Package Source (No Deps)
+        run: python scripts/vendor_r.py --no-deps
+
       - name: Generate R Documentation
         shell: bash
         run: |
@@ -200,9 +203,6 @@ jobs:
             # Clean up compiled artifacts so they aren't committed to r-universe
             rm -rf package-r/src/rust/target
             rm -f package-r/src/*.o package-r/src/*.so package-r/src/*.dll
-
-      - name: Prepare R Package Source (No Deps)
-        run: python scripts/vendor_r.py --no-deps
 
       - name: Deploy to R-Universe Branch
         shell: bash
