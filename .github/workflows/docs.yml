@@ -50,6 +50,11 @@ jobs:
           Rscript -e 'pkgdown::build_site("package-r")'
         shell: bash
 
+      - name: Prepare Build Files
+        run: |
+          cp README.md package-python/README_PYTHON.md
+          cp LICENSE package-python/LICENSE
+
       - name: Build wheels with maturin
         uses: PyO3/maturin-action@v1
         with:
