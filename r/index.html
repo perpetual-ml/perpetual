@@ -22,7 +22,7 @@
 
     <a class="navbar-brand me-2" href="index.html">perpetual</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.0.41</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.0.42</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -40,8 +40,427 @@
   </div>
 </nav><div class="container template-home">
 <div class="row">
-  <main id="main" class="col-md-9">
-A self-generalizing gradient boosting machine that doesn't need hyperparameter optimization.
+  <main id="main" class="col-md-9"><div class="section level1">
+<div class="page-header"><h1 id="perpetual">Perpetual<a class="anchor" aria-label="anchor" href="#perpetual"></a>
+</h1></div>
+<p align="center">
+<img height="120" src="https://github.com/perpetual-ml/perpetual/raw/main/resources/perp_logo.png" alt="Perpetual Logo"></p>
+<div align="center">
+<p><a href="https://pypi.org/project/perpetual" target="_blank" class="external-link"><img src="https://img.shields.io/pypi/pyversions/perpetual.svg?logo=python&amp;logoColor=white" alt="Python Versions"></a> <a href="https://pypi.org/project/perpetual" target="_blank" class="external-link"><img src="https://img.shields.io/pypi/v/perpetual.svg?logo=pypi&amp;logoColor=white" alt="PyPI Version"></a> <a href="https://crates.io/crates/perpetual" target="_blank" class="external-link"><img src="https://img.shields.io/crates/v/perpetual?logo=rust&amp;logoColor=white" alt="Crates.io Version"></a> <a href="https://perpetual-ml.r-universe.dev/perpetual" target="_blank" class="external-link"><img src="https://img.shields.io/badge/dynamic/json?url=https://perpetual-ml.r-universe.dev/api/packages/perpetual&amp;query=%24.Version&amp;label=r-universe&amp;logo=R&amp;logoColor=white&amp;color=brightgreen" alt="R-Universe status"></a> <a href="https://discord.gg/AyUK7rr6wy" target="_blank" class="external-link"><img src="https://img.shields.io/badge/join-discord-blue?logo=discord" alt="Static Badge"></a> <img src="https://img.shields.io/pypi/dm/perpetual" alt="PyPI - Downloads"></p>
+</div>
+<p>PerpetualBooster is a gradient boosting machine (GBM) algorithm that doesn’t need hyperparameter optimization unlike other GBMs. Similar to AutoML libraries, it has a <code>budget</code> parameter. Increasing the <code>budget</code> parameter increases the predictive power of the algorithm and gives better results on unseen data. Start with a small budget (e.g. 0.5) and increase it (e.g. 1.0) once you are confident with your features. If you don’t see any improvement with further increasing the <code>budget</code>, it means that you are already extracting the most predictive power out of your data.</p>
+<div class="section level2">
+<h2 id="supported-languages">Supported Languages<a class="anchor" aria-label="anchor" href="#supported-languages"></a>
+</h2>
+<p>Perpetual is built in Rust and provides high-performance bindings for Python and R.</p>
+<table class="table">
+<colgroup>
+<col width="3%">
+<col width="11%">
+<col width="30%">
+<col width="22%">
+<col width="32%">
+</colgroup>
+<thead><tr class="header">
+<th align="left">Language</th>
+<th align="left">Installation</th>
+<th align="left">Documentation</th>
+<th align="left">Source</th>
+<th align="left">Package</th>
+</tr></thead>
+<tbody>
+<tr class="odd">
+<td align="left"><strong>Python</strong></td>
+<td align="left"><code>pip install perpetual</code></td>
+<td align="left"><a href="https://perpetual-ml.github.io/perpetual" target="_blank" class="external-link">Python API</a></td>
+<td align="left"><a href="./package-python" target="_blank"><code>package-python</code></a></td>
+<td align="left"><a href="https://pypi.org/project/perpetual" target="_blank" class="external-link">PyPI</a></td>
+</tr>
+<tr class="even">
+<td align="left"><strong>Rust</strong></td>
+<td align="left"><code>cargo add perpetual</code></td>
+<td align="left"><a href="https://docs.rs/perpetual" target="_blank" class="external-link">docs.rs</a></td>
+<td align="left"><a href="./src" target="_blank"><code>src</code></a></td>
+<td align="left"><a href="https://crates.io/crates/perpetual" target="_blank" class="external-link">crates.io</a></td>
+</tr>
+<tr class="odd">
+<td align="left"><strong>R</strong></td>
+<td align="left"><code>install.packages("perpetual")</code></td>
+<td align="left"><a href="https://perpetual-ml.github.io/perpetual/r" target="_blank">pkgdown Site</a></td>
+<td align="left"><a href="./package-r" target="_blank"><code>package-r</code></a></td>
+<td align="left"><a href="https://perpetual-ml.r-universe.dev/perpetual" target="_blank" class="external-link">R-universe</a></td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="section level2">
+<h2 id="usage">Usage<a class="anchor" aria-label="anchor" href="#usage"></a>
+</h2>
+<p>You can use the algorithm like in the example below. Check examples folders for both Rust and Python.</p>
+<div class="sourceCode" id="cb1"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" tabindex="-1"></a><span class="im">from</span> perpetual <span class="im">import</span> PerpetualBooster</span>
+<span id="cb1-2"><a href="#cb1-2" tabindex="-1"></a></span>
+<span id="cb1-3"><a href="#cb1-3" tabindex="-1"></a>model <span class="op">=</span> PerpetualBooster(objective<span class="op">=</span><span class="st">"SquaredLoss"</span>, budget<span class="op">=</span><span class="fl">0.5</span>)</span>
+<span id="cb1-4"><a href="#cb1-4" tabindex="-1"></a>model.fit(X, y)</span></code></pre></div>
+</div>
+<div class="section level2">
+<h2 id="benchmark">Benchmark<a class="anchor" aria-label="anchor" href="#benchmark"></a>
+</h2>
+<div class="section level3">
+<h3 id="perpetualbooster-vs-optuna--lightgbm">PerpetualBooster vs. Optuna + LightGBM<a class="anchor" aria-label="anchor" href="#perpetualbooster-vs-optuna--lightgbm"></a>
+</h3>
+<p>Hyperparameter optimization usually takes 100 iterations with plain GBM algorithms. PerpetualBooster achieves the same accuracy in a single run. Thus, it achieves up to 100x speed-up at the same accuracy with different <code>budget</code> levels and with different datasets.</p>
+<p>The following table summarizes the results for the <a href="https://scikit-learn.org/stable/modules/generated/sklearn.datasets.fetch_california_housing.html" target="_blank" class="external-link">California Housing</a> dataset (regression):</p>
+<table class="table">
+<colgroup>
+<col width="16%">
+<col width="21%">
+<col width="13%">
+<col width="12%">
+<col width="18%">
+<col width="17%">
+</colgroup>
+<thead><tr class="header">
+<th align="left">Perpetual budget</th>
+<th align="left">LightGBM n_estimators</th>
+<th align="left">Perpetual mse</th>
+<th align="left">LightGBM mse</th>
+<th align="left">Speed-up wall time</th>
+<th align="left">Speed-up cpu time</th>
+</tr></thead>
+<tbody>
+<tr class="odd">
+<td align="left">1.0</td>
+<td align="left">100</td>
+<td align="left">0.192</td>
+<td align="left">0.192</td>
+<td align="left">54x</td>
+<td align="left">56x</td>
+</tr>
+<tr class="even">
+<td align="left">1.5</td>
+<td align="left">300</td>
+<td align="left">0.188</td>
+<td align="left">0.188</td>
+<td align="left">59x</td>
+<td align="left">58x</td>
+</tr>
+<tr class="odd">
+<td align="left">2.1</td>
+<td align="left">1000</td>
+<td align="left">0.185</td>
+<td align="left">0.186</td>
+<td align="left">42x</td>
+<td align="left">41x</td>
+</tr>
+</tbody>
+</table>
+<p>The following table summarizes the results for the <a href="https://scikit-learn.org/stable/modules/generated/sklearn.datasets.fetch_covtype.html" target="_blank" class="external-link">Cover Types</a> dataset (classification):</p>
+<table class="table">
+<colgroup>
+<col width="14%">
+<col width="19%">
+<col width="16%">
+<col width="15%">
+<col width="16%">
+<col width="15%">
+</colgroup>
+<thead><tr class="header">
+<th align="left">Perpetual budget</th>
+<th align="left">LightGBM n_estimators</th>
+<th align="left">Perpetual log loss</th>
+<th align="left">LightGBM log loss</th>
+<th align="left">Speed-up wall time</th>
+<th align="left">Speed-up cpu time</th>
+</tr></thead>
+<tbody><tr class="odd">
+<td align="left">0.9</td>
+<td align="left">100</td>
+<td align="left">0.091</td>
+<td align="left">0.084</td>
+<td align="left">72x</td>
+<td align="left">78x</td>
+</tr></tbody>
+</table>
+<p>The results can be reproduced using the scripts in the <a href="./package-python/examples" target="_blank">examples</a> folder.</p>
+</div>
+<div class="section level3">
+<h3 id="perpetualbooster-vs-autogluon">PerpetualBooster vs. AutoGluon<a class="anchor" aria-label="anchor" href="#perpetualbooster-vs-autogluon"></a>
+</h3>
+<p>PerpetualBooster is a GBM but behaves like AutoML so it is benchmarked also against AutoGluon (v1.2, best quality preset), the current leader in <a href="https://automlbenchmark.streamlit.app/cd_diagram" target="_blank" class="external-link">AutoML benchmark</a>. Top 10 datasets with the most number of rows are selected from <a href="https://www.openml.org/" target="_blank" class="external-link">OpenML datasets</a> for both regression and classification tasks.</p>
+<p>The results are summarized in the following table for regression tasks:</p>
+<table style="width:100%;" class="table">
+<colgroup>
+<col width="36%">
+<col width="11%">
+<col width="12%">
+<col width="8%">
+<col width="11%">
+<col width="12%">
+<col width="7%">
+</colgroup>
+<thead><tr class="header">
+<th align="left">OpenML Task</th>
+<th align="left">Perpetual Training Duration</th>
+<th align="left">Perpetual Inference Duration</th>
+<th align="left">Perpetual RMSE</th>
+<th align="left">AutoGluon Training Duration</th>
+<th align="left">AutoGluon Inference Duration</th>
+<th align="left">AutoGluon RMSE</th>
+</tr></thead>
+<tbody>
+<tr class="odd">
+<td align="left"><a href="https://www.openml.org/t/359929" target="_blank" class="external-link">Airlines_DepDelay_10M</a></td>
+<td align="left">518</td>
+<td align="left">11.3</td>
+<td align="left">29.0</td>
+<td align="left">520</td>
+<td align="left">30.9</td>
+<td align="left"><ins> 28.8 </ins></td>
+</tr>
+<tr class="even">
+<td align="left"><a href="https://www.openml.org/t/361940" target="_blank" class="external-link">bates_regr_100</a></td>
+<td align="left">3421</td>
+<td align="left">15.1</td>
+<td align="left"><ins> 1.084 </ins></td>
+<td align="left">OOM</td>
+<td align="left">OOM</td>
+<td align="left">OOM</td>
+</tr>
+<tr class="odd">
+<td align="left"><a href="https://www.openml.org/t/7327" target="_blank" class="external-link">BNG(libras_move)</a></td>
+<td align="left">1956</td>
+<td align="left">4.2</td>
+<td align="left"><ins> 2.51 </ins></td>
+<td align="left">1922</td>
+<td align="left">97.6</td>
+<td align="left">2.53</td>
+</tr>
+<tr class="even">
+<td align="left"><a href="https://www.openml.org/t/7326" target="_blank" class="external-link">BNG(satellite_image)</a></td>
+<td align="left">334</td>
+<td align="left">1.6</td>
+<td align="left">0.731</td>
+<td align="left">337</td>
+<td align="left">10.0</td>
+<td align="left"><ins> 0.721 </ins></td>
+</tr>
+<tr class="odd">
+<td align="left"><a href="https://www.openml.org/t/14949" target="_blank" class="external-link">COMET_MC</a></td>
+<td align="left">44</td>
+<td align="left">1.0</td>
+<td align="left"><ins> 0.0615 </ins></td>
+<td align="left">47</td>
+<td align="left">5.0</td>
+<td align="left">0.0662</td>
+</tr>
+<tr class="even">
+<td align="left"><a href="https://www.openml.org/t/361939" target="_blank" class="external-link">friedman1</a></td>
+<td align="left">275</td>
+<td align="left">4.2</td>
+<td align="left"><ins> 1.047 </ins></td>
+<td align="left">278</td>
+<td align="left">5.1</td>
+<td align="left">1.487</td>
+</tr>
+<tr class="odd">
+<td align="left"><a href="https://www.openml.org/t/10102" target="_blank" class="external-link">poker</a></td>
+<td align="left">38</td>
+<td align="left">0.6</td>
+<td align="left"><ins> 0.256 </ins></td>
+<td align="left">41</td>
+<td align="left">1.2</td>
+<td align="left">0.722</td>
+</tr>
+<tr class="even">
+<td align="left"><a href="https://www.openml.org/t/361955" target="_blank" class="external-link">subset_higgs</a></td>
+<td align="left">868</td>
+<td align="left">10.6</td>
+<td align="left"><ins> 0.420 </ins></td>
+<td align="left">870</td>
+<td align="left">24.5</td>
+<td align="left">0.421</td>
+</tr>
+<tr class="odd">
+<td align="left"><a href="https://www.openml.org/t/7319" target="_blank" class="external-link">BNG(autoHorse)</a></td>
+<td align="left">107</td>
+<td align="left">1.1</td>
+<td align="left"><ins> 19.0 </ins></td>
+<td align="left">107</td>
+<td align="left">3.2</td>
+<td align="left">20.5</td>
+</tr>
+<tr class="even">
+<td align="left"><a href="https://www.openml.org/t/7318" target="_blank" class="external-link">BNG(pbc)</a></td>
+<td align="left">48</td>
+<td align="left">0.6</td>
+<td align="left"><ins> 836.5 </ins></td>
+<td align="left">51</td>
+<td align="left">0.2</td>
+<td align="left">957.1</td>
+</tr>
+<tr class="odd">
+<td align="left">average</td>
+<td align="left">465</td>
+<td align="left">3.9</td>
+<td align="left">-</td>
+<td align="left">464</td>
+<td align="left">19.7</td>
+<td align="left">-</td>
+</tr>
+</tbody>
+</table>
+<p>PerpetualBooster outperformed AutoGluon on 8 out of 10 regression tasks, training equally fast and inferring 5.1x faster.</p>
+<p>The results are summarized in the following table for classification tasks:</p>
+<table class="table">
+<colgroup>
+<col width="36%">
+<col width="12%">
+<col width="12%">
+<col width="8%">
+<col width="12%">
+<col width="12%">
+<col width="5%">
+</colgroup>
+<thead><tr class="header">
+<th align="left">OpenML Task</th>
+<th align="left">Perpetual Training Duration</th>
+<th align="left">Perpetual Inference Duration</th>
+<th align="left">Perpetual AUC</th>
+<th align="left">AutoGluon Training Duration</th>
+<th align="left">AutoGluon Inference Duration</th>
+<th align="left">AutoGluon AUC</th>
+</tr></thead>
+<tbody>
+<tr class="odd">
+<td align="left"><a href="https://www.openml.org/t/146163" target="_blank" class="external-link">BNG(spambase)</a></td>
+<td align="left">70.1</td>
+<td align="left">2.1</td>
+<td align="left"><ins> 0.671 </ins></td>
+<td align="left">73.1</td>
+<td align="left">3.7</td>
+<td align="left">0.669</td>
+</tr>
+<tr class="even">
+<td align="left"><a href="https://www.openml.org/t/208" target="_blank" class="external-link">BNG(trains)</a></td>
+<td align="left">89.5</td>
+<td align="left">1.7</td>
+<td align="left"><ins> 0.996 </ins></td>
+<td align="left">106.4</td>
+<td align="left">2.4</td>
+<td align="left">0.994</td>
+</tr>
+<tr class="odd">
+<td align="left"><a href="https://www.openml.org/t/361942" target="_blank" class="external-link">breast</a></td>
+<td align="left">13699.3</td>
+<td align="left">97.7</td>
+<td align="left"><ins> 0.991 </ins></td>
+<td align="left">13330.7</td>
+<td align="left">79.7</td>
+<td align="left">0.949</td>
+</tr>
+<tr class="even">
+<td align="left"><a href="https://www.openml.org/t/7291" target="_blank" class="external-link">Click_prediction_small</a></td>
+<td align="left">89.1</td>
+<td align="left">1.0</td>
+<td align="left"><ins> 0.749 </ins></td>
+<td align="left">101.0</td>
+<td align="left">2.8</td>
+<td align="left">0.703</td>
+</tr>
+<tr class="odd">
+<td align="left"><a href="https://www.openml.org/t/361938" target="_blank" class="external-link">colon</a></td>
+<td align="left">12435.2</td>
+<td align="left">126.7</td>
+<td align="left"><ins> 0.997 </ins></td>
+<td align="left">12356.2</td>
+<td align="left">152.3</td>
+<td align="left">0.997</td>
+</tr>
+<tr class="even">
+<td align="left"><a href="https://www.openml.org/t/362113" target="_blank" class="external-link">Higgs</a></td>
+<td align="left">3485.3</td>
+<td align="left">40.9</td>
+<td align="left"><ins> 0.843 </ins></td>
+<td align="left">3501.4</td>
+<td align="left">67.9</td>
+<td align="left">0.816</td>
+</tr>
+<tr class="odd">
+<td align="left"><a href="https://www.openml.org/t/230" target="_blank" class="external-link">SEA(50000)</a></td>
+<td align="left">21.9</td>
+<td align="left">0.2</td>
+<td align="left"><ins> 0.936 </ins></td>
+<td align="left">25.6</td>
+<td align="left">0.5</td>
+<td align="left">0.935</td>
+</tr>
+<tr class="even">
+<td align="left"><a href="https://www.openml.org/t/359994" target="_blank" class="external-link">sf-police-incidents</a></td>
+<td align="left">85.8</td>
+<td align="left">1.5</td>
+<td align="left"><ins> 0.687 </ins></td>
+<td align="left">99.4</td>
+<td align="left">2.8</td>
+<td align="left">0.659</td>
+</tr>
+<tr class="odd">
+<td align="left"><a href="https://www.openml.org/t/361941" target="_blank" class="external-link">bates_classif_100</a></td>
+<td align="left">11152.8</td>
+<td align="left">50.0</td>
+<td align="left"><ins> 0.864 </ins></td>
+<td align="left">OOM</td>
+<td align="left">OOM</td>
+<td align="left">OOM</td>
+</tr>
+<tr class="even">
+<td align="left"><a href="https://www.openml.org/t/361945" target="_blank" class="external-link">prostate</a></td>
+<td align="left">13699.9</td>
+<td align="left">79.8</td>
+<td align="left"><ins> 0.987 </ins></td>
+<td align="left">OOM</td>
+<td align="left">OOM</td>
+<td align="left">OOM</td>
+</tr>
+<tr class="odd">
+<td align="left">average</td>
+<td align="left">3747.0</td>
+<td align="left">34.0</td>
+<td align="left">-</td>
+<td align="left">3699.2</td>
+<td align="left">39.0</td>
+<td align="left">-</td>
+</tr>
+</tbody>
+</table>
+<p>PerpetualBooster outperformed AutoGluon on 10 out of 10 classification tasks, training equally fast and inferring 1.1x faster.</p>
+<p>PerpetualBooster demonstrates greater robustness compared to AutoGluon, successfully training on all 20 tasks, whereas AutoGluon encountered out-of-memory errors on 3 of those tasks.</p>
+<p>The results can be reproduced using the <a href="https://github.com/deadsoul44/automlbenchmark" target="_blank" class="external-link">automlbenchmark fork</a>.</p>
+</div>
+</div>
+<div class="section level2">
+<h2 id="contribution">Contribution<a class="anchor" aria-label="anchor" href="#contribution"></a>
+</h2>
+<p>Contributions are welcome. Check <a href="./CONTRIBUTING.html" target="_blank">CONTRIBUTING.md</a> for the guideline.</p>
+</div>
+<div class="section level2">
+<h2 id="paper">Paper<a class="anchor" aria-label="anchor" href="#paper"></a>
+</h2>
+<p>PerpetualBooster prevents overfitting with a generalization algorithm. The paper is work-in-progress to explain how the algorithm works. Check our <a href="https://perpetual-ml.com/blog/how-perpetual-works" target="_blank" class="external-link">blog post</a> for a high level introduction to the algorithm.</p>
+</div>
+<div class="section level2">
+<h2 id="perpetual-ml-suite">Perpetual ML Suite<a class="anchor" aria-label="anchor" href="#perpetual-ml-suite"></a>
+</h2>
+<p>The <strong>Perpetual ML Suite</strong> is a comprehensive, batteries-included ML platform designed to deliver maximum predictive power with minimal effort. It allows you to track experiments, monitor metrics, and manage model drift through an intuitive interface.</p>
+<p>For a fully managed, <strong>serverless ML experience</strong>, visit <a href="https://app.perpetual-ml.com" target="_blank" class="external-link">app.perpetual-ml.com</a>.</p>
+<ul>
+<li>
+<strong>Serverless Marimo Notebooks</strong>: Run interactive, reactive notebooks without managing any infrastructure.</li>
+<li>
+<strong>Serverless ML Endpoints</strong>: One-click deployment of models as production-ready endpoints for real-time inference.</li>
+</ul>
+<p>Perpetual is also designed to live where your data lives. It is available as a native application on the <a href="https://app.snowflake.com/marketplace/listing/GZSYZX0EMJ/perpetual-ml-perpetual-ml-suite" target="_blank" class="external-link">Snowflake Marketplace</a>, with support for Databricks and other major data warehouses coming soon.</p>
+</div>
+</div>
   </main><aside class="col-md-3"><div class="license">
 <h2 data-toc-skip>License</h2>
 <ul class="list-unstyled">

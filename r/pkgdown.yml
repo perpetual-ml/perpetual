@@ -2,7 +2,7 @@ pandoc: 3.1.11
 pkgdown: 2.2.0
 pkgdown_sha: ~
 articles: {}
-last_built: 2026-01-27T20:30Z
+last_built: 2026-01-27T21:32Z
 urls:
   reference: https://perpetual-ml.github.io/perpetual/r/reference
   article: https://perpetual-ml.github.io/perpetual/r/articles
