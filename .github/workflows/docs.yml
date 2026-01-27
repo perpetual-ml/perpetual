@@ -36,8 +36,13 @@ jobs:
       - name: Install R dependencies
         uses: r-lib/actions/setup-r-dependencies@v2
         with:
-          extra-packages: any::pkgdown, any::devtools
+          extra-packages: any::pkgdown, any::devtools, any::roxygen2
           working-directory: package-r
+      
+      - name: Generate R Documentation
+        run: |
+          Rscript -e 'roxygen2::roxygenise("package-r")'
+        shell: bash
 
       - name: Build R Documentation
         run: |
