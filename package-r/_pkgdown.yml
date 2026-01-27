@@ -14,6 +14,8 @@ reference:
       - perpetual
   - title: Prediction and Interpretation
     contents:
+      - predict.PerpetualBooster
+      - print.PerpetualBooster
       - perpetual_importance
   - title: Calibration
     contents:
