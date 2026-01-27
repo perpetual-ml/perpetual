@@ -60,7 +60,10 @@ jobs:
           # Install dependencies manually to avoid pip build isolation issues with relative paths
           pip install numpy typing-extensions pandas polars pyarrow pytest seaborn scikit-learn mkdocs-material "mkdocstrings[python]" mkdocs-autorefs ruff xgboost onnxmltools onnx onnxruntime
           pip install sphinx sphinx_rtd_theme numpydoc
-          maturin build --release --out dist
+          # Build from root to resolve workspace paths correctly
+          cd ..
+          maturin build --release --out package-python/dist --manifest-path package-python/Cargo.toml
+          cd package-python
           pip install dist/*.whl
 
       - name: Build Python Documentation
