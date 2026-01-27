@@ -24,7 +24,7 @@ help: ## List all options
 
 init: venv ## Initialise local resources for testing the software
 	@echo "Installing Python dependencies..."
-	@cp "README.md" "package-python/README.md"
+	@cp "README.md" "package-python/README_PYTHON.md"
 	@cp "LICENSE" "package-python/LICENSE"
 	@source $(VENV_ACTIVATE) && \
 	    cd package-python && \

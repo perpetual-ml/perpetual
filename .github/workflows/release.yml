@@ -28,7 +28,7 @@ jobs:
       - name: Install deps
         run: pip install numpy pandas seaborn scikit-learn toml
       - run: |
-          cp README.md package-python/README.md
+          cp README.md package-python/README_PYTHON.md
           cp LICENSE package-python/LICENSE
           cp LICENSE package-r/LICENSE
       - name: Build wheels with maturin
@@ -65,7 +65,7 @@ jobs:
       - name: Install deps
         run: pip install numpy pandas seaborn scikit-learn toml
       - run: |
-          cp README.md package-python/README.md
+          cp README.md package-python/README_PYTHON.md
           cp LICENSE package-python/LICENSE
           cp LICENSE package-r/LICENSE
       - name: Build wheels with maturin
@@ -99,7 +99,7 @@ jobs:
       - name: Install deps
         run: pip install numpy pandas seaborn scikit-learn toml requests
       - run: |
-          cp README.md package-python/README.md
+          cp README.md package-python/README_PYTHON.md
           cp LICENSE package-python/LICENSE
           cp LICENSE package-r/LICENSE
       - name: Build wheels with maturin
@@ -135,7 +135,7 @@ jobs:
       - name: Install deps
         run: pip install numpy pandas seaborn scikit-learn toml requests
       - run: |
-          cp README.md package-python/README.md
+          cp README.md package-python/README_PYTHON.md
           cp LICENSE package-python/LICENSE
           cp LICENSE package-r/LICENSE
       - name: Build wheels with maturin
