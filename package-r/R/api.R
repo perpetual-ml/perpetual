@@ -12,10 +12,10 @@
 #' @param stopping_rounds An integer for early stopping.
 #' @param max_bin Integer, max number of bins for histograms.
 #' @param num_threads Integer, number of threads to use.
-#' @param missing Check documentation.
+#' @param missing Value to consider as missing data. Default is NaN.
 #' @param allow_missing_splits Boolean.
-#' @param create_missing_branch Boolean.
-#' @param missing_node_treatment String.
+#' @param create_missing_branch Boolean. Whether to create a separate branch for missing values (ternary trees).
+#' @param missing_node_treatment String. How to handle weights for missing nodes if create_missing_branch is True. Options: "None", "AssignToParent", "AverageLeafWeight", "AverageNodeWeight".
 #' @param log_iterations Integer.
 #' @param quantile Numeric.
 #' @param reset Boolean.

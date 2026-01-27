@@ -14,7 +14,6 @@ reference:
       - perpetual
   - title: Prediction and Interpretation
     contents:
-      - predict.PerpetualBooster
       - perpetual_importance
   - title: Calibration
     contents:
@@ -23,3 +22,8 @@ reference:
     contents:
       - perpetual_save
       - perpetual_load
+      - perpetual_to_json
+  - title: Model Inspection
+    contents:
+      - perpetual_n_trees
+      - perpetual_base_score
