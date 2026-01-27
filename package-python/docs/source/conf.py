@@ -1,9 +1,7 @@
-import os
-import sys
 from datetime import datetime
 
 # Add the package-python/python directory to sys.path so autodoc can find the module
-sys.path.insert(0, os.path.abspath("../../python"))
+# sys.path.insert(0, os.path.abspath("../../python"))
 
 project = "Perpetual"
 copyright = f"{datetime.now().year}, Mutlu Simsek, Serkan Korkmaz, Pieter Pel"
