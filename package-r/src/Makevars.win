@@ -6,14 +6,27 @@ PKG_CFLAGS = -I./rust/target/$(TARGET)/release
 all: rust-target
 
 rust-target:
-	@echo "Building Rust library for Windows (target: $(TARGET))..."
-	rustup target add $(TARGET) || echo "rustup not found or failed, hoping target exists..."
-	rustc --version
-	cd rust && cargo build --release --lib --manifest-path Cargo.toml --target $(TARGET) --verbose --config 'source.crates-io.replace-with="vendored-sources"' --config 'source.vendored-sources.directory="../../inst/v"'
-	@if [ -f rust/target/$(TARGET)/release/libperpetual_r.a ]; then \
-		cp rust/target/$(TARGET)/release/libperpetual_r.a .; \
+	@echo "Building Rust library for Windows..."
+	@echo "Attempting to add $(TARGET) target..."
+	-rustup target add $(TARGET)
+	@if rustup target list --installed 2>/dev/null | grep -q "$(TARGET)"; then \
+		echo "Target $(TARGET) available. Building with explicit target..."; \
+		cd rust && cargo build --release --lib --manifest-path Cargo.toml --target $(TARGET) --verbose --config 'source.crates-io.replace-with="vendored-sources"' --config 'source.vendored-sources.directory="../../inst/v"'; \
 	else \
-		echo "ERROR: libperpetual_r.a not found!"; \
+		echo "Target $(TARGET) NOT found. Falling back to default host target..."; \
+		cd rust && cargo build --release --lib --manifest-path Cargo.toml --verbose --config 'source.crates-io.replace-with="vendored-sources"' --config 'source.vendored-sources.directory="../../inst/v"'; \
+	fi
+	@if [ -f rust/target/$(TARGET)/release/libperpetual_r.a ]; then \
+		echo "Found target artifact: rust/target/$(TARGET)/release/libperpetual_r.a"; \
+		cp rust/target/$(TARGET)/release/libperpetual_r.a .; \
+	elif [ -f rust/target/release/libperpetual_r.a ]; then \
+		echo "Found host artifact: rust/target/release/libperpetual_r.a"; \
+		cp rust/target/release/libperpetual_r.a .; \
+	elif [ -f rust/target/release/perpetual_r.lib ]; then \
+		echo "Found host artifact (MSVC): rust/target/release/perpetual_r.lib"; \
+		cp rust/target/release/perpetual_r.lib ./libperpetual_r.a; \
+	else \
+		echo "ERROR: libperpetual_r.a (or .lib) not found in expected locations!"; \
 		exit 1; \
 	fi
 

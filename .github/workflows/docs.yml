@@ -56,7 +56,7 @@ jobs:
           python -m venv .venv
           source .venv/bin/activate
           pip install maturin
-          pip install .[dev]
+          pip install -e .[dev]
           pip install sphinx sphinx_rtd_theme numpydoc
           maturin develop --release
 
