@@ -1,7 +1,7 @@
 Package: perpetual
 Type: Package
 Title: PerpetualBooster
-Version: 1.0.41
+Version: 1.0.42
 Authors@R: c(
     person("Mutlu", "Simsek", email = "msimsek@perpetual-ml.com", role = c("aut", "cre")),
     person("Serkan", "Korkmaz", email = "serkor1@duck.com", role = "aut"),
@@ -18,4 +18,4 @@ Encoding: UTF-8
 LazyData: true
 Biarch: true
 SystemRequirements: Cargo (Rust's package manager), rustc
-RoxygenNote: 7.3.1
+RoxygenNote: 7.3.3

@@ -22,11 +22,11 @@ PerpetualBooster is a gradient boosting machine (GBM) algorithm that doesn't nee
 
 Perpetual is built in Rust and provides high-performance bindings for Python and R.
 
-| Language   | Installation                    | Documentation                                                                         | Source                                                          | Package                                                                                     |
-| :--------- | :------------------------------ | :------------------------------------------------------------------------------------ | :-------------------------------------------------------------- | :------------------------------------------------------------------------------------------ |
-| **Python** | `pip install perpetual`         | <a href="https://perpetual-ml.github.io/perpetual" target="_blank">Python API</a>     | <a href="./package-python" target="_blank">`package-python`</a> | <a href="https://pypi.org/project/perpetual" target="_blank">PyPI</a>                       |
-| **Rust**   | `cargo add perpetual`           | <a href="https://docs.rs/perpetual" target="_blank">docs.rs</a>                       | <a href="./src" target="_blank">`src`</a>                       | <a href="https://crates.io/crates/perpetual" target="_blank">crates.io</a>                  |
-| **R**      | `install.packages("perpetual")` | <a href="https://perpetual-ml.github.io/perpetual/r" target="_blank">pkgdown Site</a> | <a href="./package-r" target="_blank">`package-r`</a>           | <a href="https://perpetual-ml.r-universe.dev/perpetual" target="_blank">R-universe</a>      |
+| Language   | Installation                    | Documentation                                                                         | Repository                                                      |
+| :--------- | :------------------------------ | :------------------------------------------------------------------------------------ | :-------------------------------------------------------------- |
+| **Python** | `pip install perpetual`         | <a href="https://perpetual-ml.github.io/perpetual" target="_blank">Python API</a>     | <a href="./package-python" target="_blank">`package-python`</a> |
+| **Rust**   | `cargo add perpetual`           | <a href="https://docs.rs/perpetual" target="_blank">docs.rs</a>                       | <a href="./src" target="_blank">`src`</a>                       |
+| **R**      | `install.packages("perpetual")` | <a href="https://perpetual-ml.github.io/perpetual/r" target="_blank">pkgdown Site</a> | <a href="./package-r" target="_blank">`package-r`</a>           |
 
 ## Usage
 
@@ -38,6 +38,14 @@ from perpetual import PerpetualBooster
 model = PerpetualBooster(objective="SquaredLoss", budget=0.5)
 model.fit(X, y)
 ```
+
+## Documentation
+
+Comprehensive documentation for all supported languages is available:
+
+- **Python**: <a href="https://perpetual-ml.github.io/perpetual" target="_blank">API Reference & Guides</a>
+- **Rust**: <a href="https://docs.rs/perpetual" target="_blank">docs.rs/perpetual</a>
+- **R**: <a href="https://perpetual-ml.github.io/perpetual/r" target="_blank">pkgdown Documentation</a>
 
 ## Benchmark
 

@@ -183,7 +183,23 @@ jobs:
         with:
           working-directory: package-r
           use-public-rspm: true
+          extra-packages: any::roxygen2
           cache: true
+
+      - name: Generate R Documentation
+        shell: bash
+        run: |
+            # Temporarily patch Makevars to allow network build for roxygen2
+            if [ -f "package-r/src/Makevars" ]; then
+                sed -i "s/ --config 'source.crates-io.replace-with=\"vendored-sources\"' --config 'source.vendored-sources.directory=\"..\/..\/inst\/v\"'//g" package-r/src/Makevars
+            fi
+            
+            # Generate documentation
+            Rscript -e 'roxygen2::roxygenise("package-r")'
+            
+            # Clean up compiled artifacts so they aren't committed to r-universe
+            rm -rf package-r/src/rust/target
+            rm -f package-r/src/*.o package-r/src/*.so package-r/src/*.dll
 
       - name: Prepare R Package Source (No Deps)
         run: python scripts/vendor_r.py --no-deps

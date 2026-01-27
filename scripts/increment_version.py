@@ -3,7 +3,7 @@ import re
 import subprocess
 from pathlib import Path
 
-# python scripts/increment_version.py 1.0.41 --dry-run
+# python scripts/increment_version.py 1.0.42 --dry-run
 
 
 def update_file(file_path, pattern, replacement, dry_run=False):

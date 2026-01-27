@@ -42,6 +42,7 @@ jobs:
       
       - name: Generate R Documentation
         run: |
+          cp README.md package-r/README.md
           Rscript -e 'roxygen2::roxygenise("package-r")'
         shell: bash
 

@@ -92,3 +92,8 @@ fmt: ## Format the project using cargo
 vendor-r: ## Vendor core Rust logic into the R package
 	@echo "Vendoring core Rust logic..."
 	$(PYTHON) scripts/vendor_r.py
+
+
+gen-r-docs: ## Generate R documentation using roxygen2
+	@echo "Generating R documentation..."
+	Rscript scripts/generate_r_docs.R
