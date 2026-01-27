@@ -52,6 +52,7 @@ jobs:
       - name: Install dependencies
         run: |
           cd package-python
+          cp ../README.md README_PYTHON.md
           python -m venv .venv
           source .venv/bin/activate
           pip install maturin
