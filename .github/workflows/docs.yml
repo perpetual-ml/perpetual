@@ -2,6 +2,7 @@ name: docs
 on:
   release:
     types: [published]
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -59,7 +60,8 @@ jobs:
           # Install dependencies manually to avoid pip build isolation issues with relative paths
           pip install numpy typing-extensions pandas polars pyarrow pytest seaborn scikit-learn mkdocs-material "mkdocstrings[python]" mkdocs-autorefs ruff xgboost onnxmltools onnx onnxruntime
           pip install sphinx sphinx_rtd_theme numpydoc
-          maturin develop --release
+          maturin build --release --out dist
+          pip install dist/*.whl
 
       - name: Build Python Documentation
         run: |
