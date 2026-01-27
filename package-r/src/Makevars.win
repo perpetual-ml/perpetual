@@ -9,11 +9,11 @@ rust-target:
 	@echo "Building Rust library for Windows..."
 	@echo "Attempting to add $(TARGET) target..."
 	-rustup target add $(TARGET)
-	@if rustup target list --installed 2>/dev/null | grep -q "$(TARGET)"; then \
-		echo "Target $(TARGET) available. Building with explicit target..."; \
-		cd rust && cargo build --release --lib --manifest-path Cargo.toml --target $(TARGET) --verbose --config 'source.crates-io.replace-with="vendored-sources"' --config 'source.vendored-sources.directory="../../inst/v"'; \
+	@if rustup target list --installed 2>/dev/null | grep -q "$(TARGET)" && \
+		cd rust && cargo build --release --lib --manifest-path Cargo.toml --target $(TARGET) --verbose --config 'source.crates-io.replace-with="vendored-sources"' --config 'source.vendored-sources.directory="../../inst/v"'; then \
+		echo "Target $(TARGET) build successful."; \
 	else \
-		echo "Target $(TARGET) NOT found. Falling back to default host target..."; \
+		echo "Target $(TARGET) build failed or target not found. Falling back to default host target..."; \
 		cd rust && cargo build --release --lib --manifest-path Cargo.toml --verbose --config 'source.crates-io.replace-with="vendored-sources"' --config 'source.vendored-sources.directory="../../inst/v"'; \
 	fi
 	@if [ -f rust/target/$(TARGET)/release/libperpetual_r.a ]; then \

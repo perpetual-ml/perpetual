@@ -4,7 +4,7 @@ build-backend = "maturin"
 
 [project]
 name = "perpetual"
-version = "1.0.40"
+version = "1.0.41"
 description = "A self-generalizing gradient boosting machine that doesn't need hyperparameter optimization"
 readme = "README_PYTHON.md"
 keywords = [
