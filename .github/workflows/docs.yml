@@ -50,21 +50,22 @@ jobs:
           Rscript -e 'pkgdown::build_site("package-r")'
         shell: bash
 
+      - name: Build wheels with maturin
+        uses: PyO3/maturin-action@v1
+        with:
+          command: build
+          args: --release --out dist --interpreter python3.11 --manifest-path package-python/Cargo.toml
+
       - name: Install dependencies
         run: |
           cd package-python
           cp ../README.md README_PYTHON.md
           python -m venv .venv
           source .venv/bin/activate
-          pip install maturin
           # Install dependencies manually to avoid pip build isolation issues with relative paths
           pip install numpy typing-extensions pandas polars pyarrow pytest seaborn scikit-learn mkdocs-material "mkdocstrings[python]" mkdocs-autorefs ruff xgboost onnxmltools onnx onnxruntime
           pip install sphinx sphinx_rtd_theme numpydoc
-          # Build from root to resolve workspace paths correctly
-          cd ..
-          maturin build --release --out package-python/dist --manifest-path package-python/Cargo.toml
-          cd package-python
-          pip install dist/*.whl
+          pip install ../dist/*.whl
 
       - name: Build Python Documentation
         run: |
