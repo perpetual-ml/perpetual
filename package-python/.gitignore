@@ -1,4 +1,6 @@
 /target
+README.md
+LICENSE
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

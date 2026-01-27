@@ -4,9 +4,9 @@ build-backend = "maturin"
 
 [project]
 name = "perpetual"
-version = "1.0.31"
+version = "1.0.32"
 description = "A self-generalizing gradient boosting machine that doesn't need hyperparameter optimization"
-readme = "README.md"
+readme = "../README.md"
 keywords = [
   "rust",
   "perpetual",
