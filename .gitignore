@@ -10,7 +10,6 @@ package-python/LICENSE
 package-python/README.md
 package-python/target
 package-python/python/perpetual/__pycache__
-package-python/examples/ee
 
 # R package build artifacts
 r-lib/
@@ -24,6 +23,9 @@ package-r/src/entrypoint.o
 
 # Log files
 *.log
+
+# CSV files
+*.csv
 
 # Debug and temporary files
 debug_*.R

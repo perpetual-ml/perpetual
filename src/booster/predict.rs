@@ -13,10 +13,18 @@ use rayon::prelude::*;
 use std::collections::{HashMap, HashSet};
 
 impl PerpetualBooster {
-    /// Generate predictions on data using the gradient booster.
+    /// Generate predictions for the given data.
     ///
-    /// * `data` -  Either a Polars or Pandas DataFrame, or a 2 dimensional Numpy array.
-    /// * `parallel` -  Predict in parallel.
+    /// # Arguments
+    ///
+    /// * `data` - The feature matrix.
+    /// * `parallel` - If `true`, predictions are computed in parallel using Rayon.
+    ///
+    /// # Returns
+    ///
+    /// A vector of predicted values.
+    /// * For regression/ranking: The raw predicted score.
+    /// * For classification: The log-odds (logit). Apply sigmoid to get probabilities.
     pub fn predict(&self, data: &Matrix<f64>, parallel: bool) -> Vec<f64> {
         let mut init_preds = vec![self.base_score; data.rows];
         self.get_prediction_trees().iter().for_each(|tree| {
@@ -30,10 +38,12 @@ impl PerpetualBooster {
         init_preds
     }
 
-    /// Generate predictions on columnar data using the gradient booster (zero-copy from Polars).
+    /// Generate predictions for columnar data (Zero-Copy).
     ///
-    /// * `data` -  ColumnarMatrix where each column is a separate slice.
-    /// * `parallel` -  Predict in parallel.
+    /// # Arguments
+    ///
+    /// * `data` - The columnar feature matrix.
+    /// * `parallel` - If `true`, predictions are computed in parallel.
     pub fn predict_columnar(&self, data: &ColumnarMatrix<f64>, parallel: bool) -> Vec<f64> {
         let mut init_preds = vec![self.base_score; data.rows];
         self.get_prediction_trees().iter().for_each(|tree| {
@@ -73,7 +83,17 @@ impl PerpetualBooster {
         }
     }
 
-    /// Predict the contributions matrix for the provided dataset.
+    /// Calculate Feature Contributions (SHAP-like values).
+    ///
+    /// Computes how much each feature contributed to the prediction for each sample.
+    /// - The sum of contributions + bias equals the prediction.
+    /// - The last column in the returned matrix is the bias term.
+    ///
+    /// # Arguments
+    ///
+    /// * `data` - Feature matrix.
+    /// * `method` - Method to calculate contributions (`Average` is the standard TreeSHAP approximation).
+    /// * `parallel` - Run in parallel.
     pub fn predict_contributions(&self, data: &Matrix<f64>, method: ContributionsMethod, parallel: bool) -> Vec<f64> {
         match method {
             ContributionsMethod::Average => self.predict_contributions_average(data, parallel),
@@ -436,7 +456,9 @@ impl MultiOutputBooster {
         let data_log_odds = Matrix::new(&log_odds, data.rows, self.n_boosters);
         let mut preds = Vec::with_capacity(log_odds.len());
         for row in 0..data.rows {
-            let y_p_exp = data_log_odds.get_row(row).iter().map(|e| e.exp()).collect::<Vec<f64>>();
+            let row_values = data_log_odds.get_row(row);
+            let max_val = row_values.iter().fold(f64::NEG_INFINITY, |a, &b| a.max(b));
+            let y_p_exp = row_values.iter().map(|e| (e - max_val).exp()).collect::<Vec<f64>>();
             let y_p_exp_sum = y_p_exp.iter().sum::<f64>();
             let probabilities = y_p_exp.iter().map(|e| e / y_p_exp_sum).collect::<Vec<f64>>();
             preds.extend(probabilities);
@@ -450,7 +472,9 @@ impl MultiOutputBooster {
         let data_log_odds = Matrix::new(&log_odds, data.rows, self.n_boosters);
         let mut preds = Vec::with_capacity(log_odds.len());
         for row in 0..data.rows {
-            let y_p_exp = data_log_odds.get_row(row).iter().map(|e| e.exp()).collect::<Vec<f64>>();
+            let row_values = data_log_odds.get_row(row);
+            let max_val = row_values.iter().fold(f64::NEG_INFINITY, |a, &b| a.max(b));
+            let y_p_exp = row_values.iter().map(|e| (e - max_val).exp()).collect::<Vec<f64>>();
             let y_p_exp_sum = y_p_exp.iter().sum::<f64>();
             let probabilities = y_p_exp.iter().map(|e| e / y_p_exp_sum).collect::<Vec<f64>>();
             preds.extend(probabilities);
@@ -483,10 +507,7 @@ impl MultiOutputBooster {
             .collect::<Vec<f64>>()
     }
 
-    /// Predict with the fitted booster on new columnar data, returning the feature
-    /// contribution matrix. The last column is the bias term.
-    /// Predict with the fitted booster on new columnar data, returning the feature
-    /// contribution matrix. The last column is the bias term.
+    /// Calculate Feature Contributions for columnar data.
     pub fn predict_contributions_columnar(
         &self,
         data: &ColumnarMatrix<f64>,

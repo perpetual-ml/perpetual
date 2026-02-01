@@ -5,8 +5,25 @@ use crate::{
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
+/// Trait defining a custom objective function.
+///
+/// Implement this trait to define your own loss function and gradient calculation.
 pub trait ObjectiveFunction: Send + Sync {
+    /// Calculate the loss for each sample.
+    ///
+    /// # Arguments
+    /// * `y` - True target values.
+    /// * `yhat` - Predicted values (log-odds or raw scores).
+    /// * `sample_weight` - Optional weights for each sample.
+    /// * `group` - Optional group IDs (for ranking).
     fn loss(&self, y: &[f64], yhat: &[f64], sample_weight: Option<&[f64]>, group: Option<&[u64]>) -> Vec<f32>;
+
+    /// Calculate the gradient and hessian for each sample.
+    ///
+    /// # Returns
+    /// A tuple `(gradient, hessian)`.
+    /// * `gradient`: First derivative of loss w.r.t prediction.
+    /// * `hessian`: Second derivative. If `None`, constant hessian is assumed (optimized path).
     fn gradient(
         &self,
         y: &[f64],
@@ -14,24 +31,55 @@ pub trait ObjectiveFunction: Send + Sync {
         sample_weight: Option<&[f64]>,
         group: Option<&[u64]>,
     ) -> (Vec<f32>, Option<Vec<f32>>);
+
+    /// Calculate the initial prediction value (base_score).
+    ///
+    /// Usually the mean of targets (for regression) or log-odds of mean (for classification).
     fn initial_value(&self, y: &[f64], sample_weight: Option<&[f64]>, group: Option<&[u64]>) -> f64;
+
+    /// Return the default evaluation metric for this objective.
     fn default_metric(&self) -> Metric;
 }
 
+/// The Objective function to minimize during training.
+///
+/// Each objective corresponds to a specific loss function and gradient calculation.
+/// Choose the objective that best matches your problem type.
 #[derive(Serialize, Deserialize, Clone)]
 pub enum Objective {
+    /// LogLoss for binary classification.
+    /// Minimizes `- (y * log(p) + (1-y) * log(1-p))`.
+    /// Target `y` should be 0 or 1.
     LogLoss,
+    /// Squared Error Loss for regression.
+    /// Minimizes `0.5 * (y - yhat)^2`.
+    /// The derivative is `yhat - y` (gradient) and `1` (hessian).
     SquaredLoss,
+    /// Quantile Loss for regression.
+    /// Minimizes `quantile * |y - yhat|` when `y >= yhat`, and `(1 - quantile) * |y - yhat|` when `y < yhat`.
+    /// Useful for predicting specific percentiles (e.g., median with quantile=0.5).
     QuantileLoss {
+        /// Target quantile (e.g., 0.5 for median).
         quantile: Option<f64>,
     },
+    /// Huber Loss for robust regression.
+    /// A combination of Squared Loss (near 0) and Absolute Loss (far from 0).
+    /// Effectively ignores outliers beyond `delta`.
     HuberLoss {
+        /// The threshold where the loss function transitions from quadratic to linear.
         delta: Option<f64>,
     },
+    /// Adaptive Huber Loss for robust regression.
+    /// Automatically adjusts `delta` based on the quantile of the absolute error distribution.
     AdaptiveHuberLoss {
+        /// Quantile used to determine the adaptive delta (e.g., 0.95).
         quantile: Option<f64>,
     },
+    /// ListNet Loss for Learning-to-Rank.
+    /// Optimizes for list-wise ranking metrics.
+    /// Requires `group` parameter in `fit` to define query groups.
     ListNetLoss,
+    /// Custom user-defined objective.
     #[serde(skip)]
     Custom(Arc<dyn ObjectiveFunction>),
 }

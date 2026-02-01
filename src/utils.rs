@@ -188,7 +188,7 @@ pub fn odds(v: f64) -> f64 {
 /// of the gradient, and the hessians in a node.
 #[inline]
 pub fn weight(gradient_sum: f32, hessian_sum: f32) -> f32 {
-    -gradient_sum / (hessian_sum + 1.0)
+    -gradient_sum / (hessian_sum + HESSIAN_EPS)
 }
 #[inline]
 pub fn weight_const_hess(gradient_sum: f32, count_sum: usize) -> f32 {

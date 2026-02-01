@@ -96,13 +96,18 @@ impl FloatData<f32> for f32 {
     }
 }
 
-/// Contigious Column major matrix data container. This is
-/// used throughout the crate, to house both the user provided data
-/// as well as the binned data.
+/// Contiguous Column Major Matrix data container.
+///
+/// This structure holds a dense matrix of values in a single contiguous memory block.
+/// By default, it follows column-major order (Fortran-style), which is common in scientific computing
+/// and allows for efficient column slicing.
+///
+/// # Type Parameters
+/// * `T` - The numeric type of the data (e.g., `f32`, `f64`).
 pub struct Matrix<'a, T> {
     /// The raw data stored in a single slice.
     pub data: &'a [T],
-    /// Indices into the data.
+    /// Indices into the data row-wise.
     pub index: Vec<usize>,
     /// Number of rows in the matrix.
     pub rows: usize,
@@ -175,15 +180,22 @@ where
 }
 
 /// Columnar matrix storing columns as separate slices.
-/// This enables true zero-copy data transfer from Arrow/Polars
-/// where each column is a separate memory allocation.
+///
+/// This structure enables **Zero-Copy** data transfer from columnar data formats like
+/// [Apache Arrow](https://arrow.apache.org/) or [Polars](https://pola.rs/).
+/// Instead of forcing memory validation and copying into a contiguous buffer, `ColumnarMatrix`
+/// simply holds references to the existing memory buffers for each column.
+///
+/// It also supports validity masks (bitmaps) to handle missing values without checking
+/// specific NaN patterns, which is standard in Arrow systems.
 pub struct ColumnarMatrix<'a, T> {
-    /// The columns of the matrix.
+    /// The columns of the matrix. Each element is a slice representing one column.
     pub columns: Vec<&'a [T]>,
     /// Optional validity mask for each column.
     /// Each mask is a byte slice representing a packed bitmap (1 bit per element).
-    /// If the vector is present, it must have the same length as `columns`.
-    /// If a specific column's mask is `None`, all values are considered valid.
+    /// * If the vector is present, it must have the same length as `columns`.
+    /// * If a specific column's mask is `None`, all values are considered valid.
+    /// * Bit set (1) means valid, bit unset (0) means null/missing.
     pub masks: Option<Vec<Option<&'a [u8]>>>,
     /// Row indices.
     pub index: Vec<usize>,

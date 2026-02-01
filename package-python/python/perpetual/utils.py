@@ -50,10 +50,11 @@ def convert_input_array(x, objective, is_target=False, is_int=False) -> np.ndarr
         x_ = x.to_numpy()
 
     if is_target and objective == "LogLoss" and len(x_.shape) == 1:
-        classes_ = np.unique(x_)
-        x_index = np.array([np.where(classes_ == i) for i in x_])
+        classes_, x_index = np.unique(x_, return_inverse=True)
         if len(classes_) > 2:
-            x_ = np.squeeze(np.eye(len(classes_))[x_index])
+            x_ = np.eye(len(classes_))[x_index]
+        else:
+            x_ = x_index.astype("float64")
 
     if is_int and not np.issubdtype(x_.dtype, "uint64"):
         x_ = x_.astype(dtype="uint64", copy=False)

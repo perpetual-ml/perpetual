@@ -62,7 +62,7 @@ def test_xgboost_export_binary(data_binary, tmp_path):
 
 def test_xgboost_export_multiclass(data_multiclass, tmp_path):
     X, y = data_multiclass
-    model = PerpetualBooster(objective="LogLoss", iteration_limit=5)
+    model = PerpetualBooster(objective="LogLoss", iteration_limit=5, budget=0.6)
     model.fit(X, y)
 
     xgb_path = tmp_path / "model_multi.json"

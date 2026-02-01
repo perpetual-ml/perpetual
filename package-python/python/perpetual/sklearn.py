@@ -32,6 +32,68 @@ class PerpetualClassifier(PerpetualBooster, ClassifierMixin):
         # Capture all parameters in a way that BaseEstimator can handle
         **kwargs,
     ):
+        """
+        Gradient Boosting Machine with Perpetual Learning.
+
+        A self-generalizing gradient boosting machine that doesn't need hyperparameter
+        optimization. It automatically finds the best configuration based on the provided budget.
+
+        Parameters
+        ----------
+        objective : str or tuple, default="LogLoss"
+            Learning objective function to be used for optimization. Valid options are:
+
+            - "LogLoss": logistic loss for binary classification.
+            - custom objective: a tuple of (grad, hess, init) functions.
+
+        budget : float, default=0.5
+            A positive number for fitting budget. Increasing this number will more likely result
+            in more boosting rounds and increased predictive power.
+        num_threads : int, optional
+            Number of threads to be used during training and prediction.
+        monotone_constraints : dict, optional
+            Constraints to enforce a specific relationship between features and target.
+            Keys are feature indices or names, values are -1, 1, or 0.
+        force_children_to_bound_parent : bool, default=False
+            Whether to restrict children nodes to be within the parent's range.
+        missing : float, default=np.nan
+            Value to consider as missing data.
+        allow_missing_splits : bool, default=True
+            Whether to allow splits that separate missing from non-missing values.
+        create_missing_branch : bool, default=False
+            Whether to create a separate branch for missing values (ternary trees).
+        terminate_missing_features : iterable, optional
+            Features for which missing branches will always be terminated if
+            ``create_missing_branch`` is True.
+        missing_node_treatment : str, default="None"
+            How to handle weights for missing nodes if ``create_missing_branch`` is True.
+            Options: "None", "AssignToParent", "AverageLeafWeight", "AverageNodeWeight".
+        log_iterations : int, default=0
+            Logging frequency (every N iterations). 0 disables logging.
+        feature_importance_method : str, default="Gain"
+            Method for calculating feature importance. Options: "Gain", "Weight", "Cover",
+            "TotalGain", "TotalCover".
+        quantile : float, optional
+            Target quantile for quantile regression (objective="QuantileLoss").
+        reset : bool, optional
+            Whether to reset the model or continue training on subsequent calls to fit.
+        categorical_features : str or iterable, default="auto"
+            Feature indices or names to treat as categorical.
+        timeout : float, optional
+            Time limit for fitting in seconds.
+        iteration_limit : int, optional
+            Maximum number of boosting iterations.
+        memory_limit : float, optional
+            Memory limit for training in GB.
+        stopping_rounds : int, optional
+            Early stopping rounds.
+        max_bin : int, default=256
+            Maximum number of bins for feature discretization.
+        max_cat : int, default=1000
+            Maximum unique categories before a feature is treated as numerical.
+        **kwargs
+            Arbitrary keyword arguments to be passed to the base class.
+        """
         # Ensure the objective is one of the valid classification objectives
         valid_objectives = {
             "LogLoss"
@@ -91,6 +153,71 @@ class PerpetualRegressor(PerpetualBooster, RegressorMixin):
         max_cat: int = 1000,
         **kwargs,
     ):
+        """
+        Gradient Boosting Machine with Perpetual Learning.
+
+        A self-generalizing gradient boosting machine that doesn't need hyperparameter
+        optimization. It automatically finds the best configuration based on the provided budget.
+
+        Parameters
+        ----------
+        objective : str or tuple, default="SquaredLoss"
+            Learning objective function to be used for optimization. Valid options are:
+
+            - "SquaredLoss": squared error for regression.
+            - "QuantileLoss": quantile error for quantile regression.
+            - "HuberLoss": Huber loss for robust regression.
+            - "AdaptiveHuberLoss": adaptive Huber loss for robust regression.
+            - custom objective: a tuple of (grad, hess, init) functions.
+
+        budget : float, default=0.5
+            A positive number for fitting budget. Increasing this number will more likely result
+            in more boosting rounds and increased predictive power.
+        num_threads : int, optional
+            Number of threads to be used during training and prediction.
+        monotone_constraints : dict, optional
+            Constraints to enforce a specific relationship between features and target.
+            Keys are feature indices or names, values are -1, 1, or 0.
+        force_children_to_bound_parent : bool, default=False
+            Whether to restrict children nodes to be within the parent's range.
+        missing : float, default=np.nan
+            Value to consider as missing data.
+        allow_missing_splits : bool, default=True
+            Whether to allow splits that separate missing from non-missing values.
+        create_missing_branch : bool, default=False
+            Whether to create a separate branch for missing values (ternary trees).
+        terminate_missing_features : iterable, optional
+            Features for which missing branches will always be terminated if
+            ``create_missing_branch`` is True.
+        missing_node_treatment : str, default="None"
+            How to handle weights for missing nodes if ``create_missing_branch`` is True.
+            Options: "None", "AssignToParent", "AverageLeafWeight", "AverageNodeWeight".
+        log_iterations : int, default=0
+            Logging frequency (every N iterations). 0 disables logging.
+        feature_importance_method : str, default="Gain"
+            Method for calculating feature importance. Options: "Gain", "Weight", "Cover",
+            "TotalGain", "TotalCover".
+        quantile : float, optional
+            Target quantile for quantile regression (objective="QuantileLoss").
+        reset : bool, optional
+            Whether to reset the model or continue training on subsequent calls to fit.
+        categorical_features : str or iterable, default="auto"
+            Feature indices or names to treat as categorical.
+        timeout : float, optional
+            Time limit for fitting in seconds.
+        iteration_limit : int, optional
+            Maximum number of boosting iterations.
+        memory_limit : float, optional
+            Memory limit for training in GB.
+        stopping_rounds : int, optional
+            Early stopping rounds.
+        max_bin : int, default=256
+            Maximum number of bins for feature discretization.
+        max_cat : int, default=1000
+            Maximum unique categories before a feature is treated as numerical.
+        **kwargs
+            Arbitrary keyword arguments to be passed to the base class.
+        """
         # Enforce or warn about regression objectives
         valid_objectives = {
             "SquaredLoss",
@@ -156,6 +283,68 @@ class PerpetualRanker(
         max_cat: int = 1000,
         **kwargs,
     ):
+        """
+        Gradient Boosting Machine with Perpetual Learning.
+
+        A self-generalizing gradient boosting machine that doesn't need hyperparameter
+        optimization. It automatically finds the best configuration based on the provided budget.
+
+        Parameters
+        ----------
+        objective : str or tuple, default="ListNetLoss"
+            Learning objective function to be used for optimization. Valid options are:
+
+            - "ListNetLoss": ListNet loss for ranking.
+            - custom objective: a tuple of (grad, hess, init) functions.
+
+        budget : float, default=0.5
+            A positive number for fitting budget. Increasing this number will more likely result
+            in more boosting rounds and increased predictive power.
+        num_threads : int, optional
+            Number of threads to be used during training and prediction.
+        monotone_constraints : dict, optional
+            Constraints to enforce a specific relationship between features and target.
+            Keys are feature indices or names, values are -1, 1, or 0.
+        force_children_to_bound_parent : bool, default=False
+            Whether to restrict children nodes to be within the parent's range.
+        missing : float, default=np.nan
+            Value to consider as missing data.
+        allow_missing_splits : bool, default=True
+            Whether to allow splits that separate missing from non-missing values.
+        create_missing_branch : bool, default=False
+            Whether to create a separate branch for missing values (ternary trees).
+        terminate_missing_features : iterable, optional
+            Features for which missing branches will always be terminated if
+            ``create_missing_branch`` is True.
+        missing_node_treatment : str, default="None"
+            How to handle weights for missing nodes if ``create_missing_branch`` is True.
+            Options: "None", "AssignToParent", "AverageLeafWeight", "AverageNodeWeight".
+        log_iterations : int, default=0
+            Logging frequency (every N iterations). 0 disables logging.
+        feature_importance_method : str, default="Gain"
+            Method for calculating feature importance. Options: "Gain", "Weight", "Cover",
+            "TotalGain", "TotalCover".
+        quantile : float, optional
+            Target quantile for quantile regression (objective="QuantileLoss").
+        reset : bool, optional
+            Whether to reset the model or continue training on subsequent calls to fit.
+        categorical_features : str or iterable, default="auto"
+            Feature indices or names to treat as categorical.
+        timeout : float, optional
+            Time limit for fitting in seconds.
+        iteration_limit : int, optional
+            Maximum number of boosting iterations.
+        memory_limit : float, optional
+            Memory limit for training in GB.
+        stopping_rounds : int, optional
+            Early stopping rounds.
+        max_bin : int, default=256
+            Maximum number of bins for feature discretization.
+        max_cat : int, default=1000
+            Maximum unique categories before a feature is treated as numerical.
+        **kwargs
+            Arbitrary keyword arguments to be passed to the base class.
+        """
         if isinstance(objective, str) and objective not in {"ListNetLoss"}:
             warnings.warn(
                 f"Objective '{objective}' may not be suitable for PerpetualRanker. Consider 'ListNetLoss'."

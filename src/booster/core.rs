@@ -28,22 +28,28 @@ type ImportanceFn = fn(&Tree, &mut HashMap<usize, (f32, usize)>);
 
 /// A self-generalizing Gradient Boosting Machine (GBM) with Perpetual Learning.
 ///
-/// `PerpetualBooster` is the main object for training and prediction. It automatically
-/// finds the best configuration (learning rate, tree complexity, etc.) based on a single
-/// `budget` parameter.
+/// `PerpetualBooster` is the main entry point for training and prediction. It implements the
+/// Perpetual boosting algorithm which simplifies hyperparameter tuning by adhering to a
+/// computational `budget`.
+///
+/// The booster manages an ensemble of decision trees (`trees`) and automatically adjusts
+/// the learning rate `eta` based on the provided budget.
 #[derive(Clone, Serialize, Deserialize)]
 pub struct PerpetualBooster {
-    /// Configuration for the booster.
+    /// Configuration parameter set for the booster.
     pub cfg: BoosterConfig,
-    /// The initial prediction value of the model.
+    /// The initial prediction value of the model (bias term).
+    /// If not provided, this is usually initialized to the mean (or log-odds) of the target.
     pub base_score: f64,
-    /// The global learning rate (eta) derived from the budget.
+    /// The global learning rate (step size) derived from the budget.
+    /// A higher budget implies a smaller eta, allowing for more fine-grained learning steps.
     pub eta: f32,
-    /// The collection of decision trees in the ensemble.
+    /// The ensemble of trained `Tree` structures.
     pub trees: Vec<Tree>,
-    /// Calibration models for prediction intervals.
+    /// Calibration models used for conformal prediction / prediction intervals.
+    /// Stores tuples of (Booster, threshold) for different calibration levels.
     pub cal_models: HashMap<String, [(PerpetualBooster, f64); 2]>,
-    /// Arbitrary metadata saved with the model.
+    /// Arbitrary metadata key-value pairs associated with the model.
     pub metadata: HashMap<String, String>,
 }
 
@@ -61,30 +67,54 @@ impl Default for PerpetualBooster {
 }
 
 impl PerpetualBooster {
-    /// Create a new `PerpetualBooster` instance.
+    /// Create a new `PerpetualBooster` instance with the specified configuration.
     ///
     /// # Arguments
-    /// * `objective` - Learning objective (e.g., LogLoss, SquaredLoss).
-    /// * `budget` - A positive number for fitting budget. Higher values result in more boosting rounds.
-    /// * `base_score` - Initial prediction value. If NaN, it's calculated from data.
-    /// * `max_bin` - Maximum number of bins for feature discretization.
-    /// * `num_threads` - Number of threads for parallel execution.
-    /// * `monotone_constraints` - Constraints to enforce monotonic relationships.
-    /// * `force_children_to_bound_parent` - Restrict child node weights to the parent range.
-    /// * `missing` - Value used to represent missing data.
-    /// * `allow_missing_splits` - Allow splits that isolate missing values.
-    /// * `create_missing_branch` - Create ternary trees with an explicit missing branch.
-    /// * `terminate_missing_features` - Features for which missing branches are always leaves.
-    /// * `missing_node_treatment` - Strategy for calculating missing node weights.
-    /// * `log_iterations` - Logging frequency (every N iterations).
-    /// * `seed` - Random seed for reproducibility.
-    /// * `quantile` - Target quantile for QuantileLoss.
-    /// * `reset` - Whether to reset or continue training on subsequent fit calls.
-    /// * `categorical_features` - Indices of features to treat as categorical.
-    /// * `timeout` - Time limit for fitting in seconds.
-    /// * `iteration_limit` - Maximum number of boosting rounds.
-    /// * `memory_limit` - Memory limit for the ensemble in GB.
+    ///
+    /// * `objective` - The loss function to minimize.
+    ///   * Regression: `Objective::SquaredLoss`, `Objective::QuantileLoss`, `Objective::HuberLoss`.
+    ///   * Classification: `Objective::LogLoss`.
+    ///   * Ranking: `Objective::ListNetLoss`.
+    /// * `budget` - The complexity budget for the model. This is the primary hyperparameter.
+    ///   * Examples: `0.5`, `1.0`, `1.5`. Higher values allow more complex models (more iterations/trees).
+    ///   * Small values (e.g., 0.3) produce simple, underfit models.
+    ///   * Large values (e.g., 2.0+) produce complex, potentially overfit models.
+    /// * `base_score` - The initial prediction score (global bias).
+    ///   * Pass `f64::NAN` to let the booster calculate it automatically from the data (recommended).
+    /// * `max_bin` - Maximum number of bins used for feature discretization.
+    ///   * Typical values: 63 or 255. Lower values are faster but less precise.
+    /// * `num_threads` - Number of parallel threads to use.
+    ///   * If `None`, defaults to the number of available logical cores.
+    /// * `monotone_constraints` - Optional constraints to enforce monotonic relationships between features and target.
+    ///   * Map from feature index to constraint value: `1` (increasing), `-1` (decreasing), `0` (no constraint).
+    /// * `force_children_to_bound_parent` - If `true`, restricts child node predictions to be within the parent's range.
+    ///   * Helps prevent wild predictions, acting as a regularization form.
+    /// * `missing` - The floating-point value representing missing data (e.g., `f64::NAN`).
+    /// * `allow_missing_splits` - If `true`, allows the algorithm to learn how to split missing values specifically.
+    /// * `create_missing_branch` - If `true`, enables ternary splits (Left, Right, Missing).
+    ///   * Adds a dedicated branch for missing values, which can be more powerful than default direction handling.
+    /// * `terminate_missing_features` - Set of feature indices where missing modifications should terminate splitting.
+    /// * `missing_node_treatment` - Strategy for handling calculations in nodes with missing values.
+    ///   * `MissingNodeTreatment::Average` is a common choice.
+    /// * `log_iterations` - Logging frequency.
+    ///   * `0` disables logging. `100` checks/logs every 100 iterations.
+    /// * `seed` - Random seed for reproducibility of column sampling and other stochastic processes.
+    /// * `quantile` - Required ONLY for `Objective::QuantileLoss`. Specifies the target quantile (e.g., `0.5` for median).
+    /// * `reset` - If `true` (default), calling `fit` clears previous trees. If `false`, `fit` continues training from existing trees (warm start).
+    /// * `categorical_features` - Optional set of feature indices to treat as categorical.
+    ///   * The algorithm handles categorical features using specialized split finding.
+    /// * `timeout` - Max training time in seconds.
+    ///   * If provided, training stops after this duration even if budget allows more.
+    /// * `iteration_limit` - Hard limit on total boosting rounds.
+    ///   * Useful for safety or restricted compute environments.
+    /// * `memory_limit` - Memory usage limit in GB.
+    ///   * Approximate check to prevent OOM.
     /// * `stopping_rounds` - Early stopping rounds.
+    ///   * If validation metric doesn't improve for this many rounds, training stops.
+    ///
+    /// # Returns
+    ///
+    /// A `Result` containing the initialized `PerpetualBooster` or a `PerpetualError` if validation fails.
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         objective: Objective,
@@ -156,13 +186,24 @@ impl PerpetualBooster {
         self.trees = Vec::new();
     }
 
-    /// Fit the booster on a provided dataset.
+    /// Train the model on the provided dataset.
+    ///
+    /// This method performs the boosting iterations, adding trees to the ensemble until
+    /// the budget is exhausted, stopping criteria are met, or timeout occurs.
     ///
     /// # Arguments
-    /// * `data` - Feature matrix (row-major).
-    /// * `y` - Target vector.
-    /// * `sample_weight` - Optional per-sample weights.
-    /// * `group` - Optional group labels for ranking.
+    ///
+    /// * `data` - The feature matrix. Can be a standard `Matrix`.
+    /// * `y` - The target vector. Length must match `data.rows`.
+    /// * `sample_weight` - Optional weights for each sample. Higher weight = more importance in loss.
+    /// * `group` - Optional group ID array. Required for ranking objectives (`ListNetLoss`) to delineate list boundaries.
+    ///
+    /// # Errors
+    ///
+    /// Returns `PerpetualError` if:
+    /// * Data dimensions mismatch (e.g. `y` length != `data.rows`).
+    /// * Invalid parameter values.
+    /// * Binning fails.
     pub fn fit(
         &mut self,
         data: &Matrix<f64>,
@@ -197,13 +238,17 @@ impl PerpetualBooster {
         Ok(())
     }
 
-    /// Fit the booster on columnar data (zero-copy path).
+    /// Train the model on columnar data (Zero-Copy).
+    ///
+    /// This is the preferred method when working with dataframes (like Polars or Arrow) where
+    /// columns are stored contiguously in memory. It avoids copying data into a single row-major buffer.
     ///
     /// # Arguments
-    /// * `data` - Columnar feature matrix.
-    /// * `y` - Target vector.
-    /// * `sample_weight` - Optional per-sample weights.
-    /// * `group` - Optional group labels for ranking.
+    ///
+    /// * `data` - The `ColumnarMatrix` containing column pointers.
+    /// * `y` - The target vector.
+    /// * `sample_weight` - Optional sample weights.
+    /// * `group` - Optional group IDs for ranking.
     pub fn fit_columnar(
         &mut self,
         data: &ColumnarMatrix<f64>,
@@ -1263,7 +1308,7 @@ mod perpetual_booster_test {
 
         let trees = model.get_prediction_trees();
         println!("trees = {}", trees.len());
-        assert_eq!(trees.len(), 45);
+        assert_eq!(trees.len(), 41);
 
         Ok(())
     }
@@ -1288,7 +1333,7 @@ mod perpetual_booster_test {
 
         let trees = model.get_prediction_trees();
         println!("trees = {}", trees.len());
-        assert_eq!(trees.len(), 31);
+        assert_eq!(trees.len(), 9);
 
         Ok(())
     }

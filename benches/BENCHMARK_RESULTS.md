@@ -27,7 +27,6 @@ Date: 2026-01-19
 | Benchmark | Branch | Result (Time) | confidence interval | Notes |
 | :--- | :--- | :--- | :--- | :--- |
 | `cal_housing` | `decisioning + opt 4 (bin refactor)` | **1.19s** | `[1.15s - 1.25s]` | **~42% faster** than baseline |
-
 | `cal_housing` | `decisioning + opt 1 (hoist bin sums)` | 1.73s | `[1.69s - 1.78s]` | ~16% faster than baseline |
 | `cal_housing` | `decisioning + polars removal, cargo test fixes` | 2.26s | `[2.1828s - 2.3434s]` | Regression from decisioning |
 | `cal_housing` | `decisioning` | 1.96s | `[1.8850s - 2.0485s]` | ~5% faster than baseline |

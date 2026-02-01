@@ -15,4 +15,4 @@ pub const GENERALIZATION_THRESHOLD_RELAXED: f32 = 0.99;
 /// Minimum amount of columns to sample.
 pub const MIN_COL_AMOUNT: usize = 40;
 /// Epsilon value for Hessian to prevent division by zero.
-pub const HESSIAN_EPS: f32 = 1e-3;
+pub const HESSIAN_EPS: f32 = 1e-8;

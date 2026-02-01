@@ -381,7 +381,6 @@ def test_booster_contributions(X_y):
 
     contribs_weight = model.predict_contributions(X, method="Weight")
     assert np.allclose(contribs_weight.sum(1), preds)
-    # assert not np.allclose(contribs_weight, contribs_average)
 
     contribs_difference = model.predict_contributions(X, method="BranchDifference")
     assert not np.allclose(contribs_difference.sum(1), preds)
@@ -395,7 +394,7 @@ def test_booster_contributions(X_y):
 def test_booster_contributions_shapley(X_y):
     X, y = X_y
     X = X.round(0)
-    model = PerpetualBooster(objective="LogLoss")
+    model = PerpetualBooster(objective="LogLoss", budget=0.6)
     model.fit(X, y)
     preds = model.predict_log_proba(X)
     contribs_average = model.predict_contributions(X)
@@ -411,7 +410,6 @@ def test_booster_contributions_shapley(X_y):
 
 def test_missing_branch_with_contributions(X_y):
     X, y = X_y
-    X = X
     model_miss_leaf = PerpetualBooster(
         objective="LogLoss", allow_missing_splits=False, create_missing_branch=True
     )
@@ -460,7 +458,6 @@ def test_text_dump(X_y):
 
 def test_booster_terminate_missing_features(X_y):
     X, y = X_y
-    X = X.copy()
     missing_mask = np.random.default_rng(0).uniform(0, 1, size=X.shape)
     X = X.mask(missing_mask < 0.3)
     model = PerpetualBooster(
@@ -518,7 +515,6 @@ def test_booster_terminate_missing_features(X_y):
 
 def test_missing_treatment(X_y):
     X, y = X_y
-    X = X.copy()
     missing_mask = np.random.default_rng(0).uniform(0, 1, size=X.shape)
     X = X.mask(missing_mask < 0.3)
     model = PerpetualBooster(

@@ -1,6 +1,10 @@
 Tutorials
 =========
 
-Coming soon!
+.. toctree::
+   :maxdepth: 1
+   :caption: Tutorials
 
-In the meantime, check out the :doc:`../quickstart` guide.
+   categorical_data
+   toy_datasets
+   benchmark

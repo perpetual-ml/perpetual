@@ -441,7 +441,6 @@ mod tests {
             Some(f32::MAX),
             &loss,
             &y,
-            //loss_fn.clone(),
             &yhat,
             None,
             None,
@@ -456,7 +455,7 @@ mod tests {
         println!("{}", tree);
         let preds = tree.predict(&data, false, &f64::NAN);
         println!("{:?}", &preds[0..10]);
-        assert_eq!(27, tree.nodes.len());
+        assert_eq!(37, tree.nodes.len());
         // Test contributions prediction...
         let weights = tree.distribute_leaf_weights();
         let mut contribs = vec![0.; (data.cols + 1) * data.rows];
@@ -544,7 +543,6 @@ mod tests {
             Some(f32::MAX),
             &loss,
             &y,
-            //loss_fn.clone(),
             &yhat,
             None,
             None,
@@ -612,7 +610,6 @@ mod tests {
         let b = bin_matrix(&data, None, 300, f64::NAN, None).unwrap();
         let bdata = Matrix::new(&b.binned_data, data.rows, data.cols);
         let col_index: Vec<usize> = (0..data.cols).collect();
-        //let is_const_hess = false;
 
         let n_nodes_alloc = 100;
 
@@ -642,7 +639,6 @@ mod tests {
             Some(f32::MAX),
             &loss,
             &y,
-            //loss_fn.clone(),
             &yhat,
             None,
             None,
@@ -720,7 +716,6 @@ mod tests {
         let b = bin_matrix(&data, None, n_bins, f64::NAN, Some(&cat_index)).unwrap();
         let bdata = Matrix::new(&b.binned_data, data.rows, data.cols);
         let col_index: Vec<usize> = (0..data.cols).collect();
-        //let is_const_hess = false;
 
         let n_nodes_alloc = 100;
 
@@ -751,7 +746,6 @@ mod tests {
             Some(f32::MAX),
             &loss,
             &y,
-            //loss_fn.clone(),
             &yhat,
             None,
             None,
