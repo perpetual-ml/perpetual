@@ -6,21 +6,24 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Architecture &mdash; Perpetual 1.0.43 documentation</title>
+  <title>Architecture &mdash; Perpetual 1.1.2 documentation</title>
       <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=9edc463e" />
 
   
       <script src="_static/jquery.js?v=5d32c60e"></script>
       <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="_static/documentation_options.js?v=2c076bcf"></script>
+      <script src="_static/documentation_options.js?v=6f037312"></script>
       <script src="_static/doctools.js?v=fd6eb6e6"></script>
       <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
+      <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+      <script>window.MathJax = {"tex": {"inlineMath": [["$", "$"], ["\\(", "\\)"]], "processEscapes": true}, "options": {"ignoreHtmlClass": "tex2jax_ignore|mathjax_ignore|document", "processHtmlClass": "tex2jax_process|mathjax_process|math|output_area"}}</script>
+      <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@4/tex-mml-chtml.js"></script>
     <script src="_static/js/theme.js"></script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
     <link rel="next" title="Parameters Tuning" href="parameters_tuning.html" />
-    <link rel="prev" title="Tutorials" href="tutorials/index.html" /> 
+    <link rel="prev" title="Custom Objective Tutorial" href="tutorials/custom_objective.html" /> 
 </head>
 
 <body class="wy-body-for-nav"> 
@@ -49,16 +52,24 @@
 <li class="toctree-l1"><a class="reference internal" href="api.html">API Reference</a></li>
 <li class="toctree-l1"><a class="reference internal" href="tutorials/index.html">Tutorials</a></li>
 <li class="toctree-l1 current"><a class="current reference internal" href="#">Architecture</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="#rust-core">Rust Core</a></li>
-<li class="toctree-l2"><a class="reference internal" href="#zero-copy-interface">Zero-Copy Interface</a></li>
-<li class="toctree-l2"><a class="reference internal" href="#self-generalization">Self-Generalization</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#system-overview">System Overview</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#rust-core">Rust Core</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#key-components">Key Components</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#python-interface">Python Interface</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#pyo3-bindings">PyO3 Bindings</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#zero-copy-data-transfer">Zero-Copy Data Transfer</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#perpetualbooster-algorithm">PerpetualBooster Algorithm</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#budget-and-self-generalization">Budget and Self-Generalization</a></li>
+</ul>
+</li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="parameters_tuning.html">Parameters Tuning</a></li>
 <li class="toctree-l1"><a class="reference internal" href="faq.html">Frequently Asked Questions</a></li>
-</ul>
-<ul>
-<li class="toctree-l1"><a class="reference internal" href="generated/perpetual.PerpetualBooster.html">perpetual.PerpetualBooster</a></li>
 </ul>
 
         </div>
@@ -87,18 +98,56 @@
              
   <section id="architecture">
 <h1>Architecture<a class="headerlink" href="#architecture" title="Link to this heading"></a></h1>
-<p>Perpetual is built on top of a high-performance Rust core.</p>
+<p>Perpetual is designed as a high-performance gradient boosting machine with a clean separation between its compute-intensive core and its user-facing API.</p>
+<section id="system-overview">
+<h2>System Overview<a class="headerlink" href="#system-overview" title="Link to this heading"></a></h2>
+<p>The system consists of two main layers:</p>
+<ol class="arabic simple">
+<li><p><strong>Rust Core (`perpetual-rs`)</strong>: A pure Rust crate that implements the gradient boosting algorithm, histogram construction, and tree learning logic.</p></li>
+<li><p><strong>Python Interface (`py-perpetual`)</strong>: A Python extension module built with PyO3 that exposes the Rust core to Python users, handling data conversion and API bindings.</p></li>
+</ol>
+</section>
 <section id="rust-core">
 <h2>Rust Core<a class="headerlink" href="#rust-core" title="Link to this heading"></a></h2>
-<p>The core algorithm is implemented in Rust to ensure memory safety and high performance. It uses thread-parallelism for histogram building and prediction.</p>
+<p>The core logic resides in the <cite>src/</cite> directory of the repository. It is built for performance and memory safety.</p>
+<section id="key-components">
+<h3>Key Components<a class="headerlink" href="#key-components" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p><strong>PerpetualBooster</strong>: The central struct (<cite>src/booster/core.rs</cite>) that manages the ensemble of decision trees. It handles the training loop, including gradient calculation, tree growing, and prediction.</p></li>
+<li><p><strong>Histogram-Based Learning</strong>: Perpetual uses a histogram-based algorithm for finding optimal splits. Continuous features are discretized into bins (<cite>src/binning.rs</cite>), significantly reducing the computational complexity of finding splits.</p></li>
+<li><p><strong>Parallelism</strong>: The core heavily utilizes <cite>rayon</cite> for data parallelism. Operations like histogram building, partial dependence calculations, and predictions are multi-threaded.</p></li>
+<li><p><strong>Generic Objectives</strong>: The <cite>Objective</cite> trait (<cite>src/objective_functions/objective.rs</cite>) allows for a flexible implementation of loss functions. Perpetual supports standard objectives like LogLoss and SquaredLoss, as well as complex ones like QuantileLoss and custom user-defined objectives.</p></li>
+</ul>
 </section>
-<section id="zero-copy-interface">
-<h2>Zero-Copy Interface<a class="headerlink" href="#zero-copy-interface" title="Link to this heading"></a></h2>
-<p>The Python package communicates with the Rust core using PyO3. For Polars DataFrames, Perpetual uses a zero-copy columnar path, meaning data is not duplicated when passed from Python to Rust.</p>
 </section>
-<section id="self-generalization">
-<h2>Self-Generalization<a class="headerlink" href="#self-generalization" title="Link to this heading"></a></h2>
-<p>The key innovation in Perpetual is its self-generalization capability. By linking the learning rate and stopping criteria to a single “budget” parameter, Perpetual eliminates the need for expensive hyperparameter optimization (HPO) loops.</p>
+<section id="python-interface">
+<h2>Python Interface<a class="headerlink" href="#python-interface" title="Link to this heading"></a></h2>
+<p>The Python package is a thin wrapper around the Rust core, ensuring that the heavy lifting is done in native code.</p>
+<section id="pyo3-bindings">
+<h3>PyO3 Bindings<a class="headerlink" href="#pyo3-bindings" title="Link to this heading"></a></h3>
+<p>We use <cite>PyO3</cite> to generate the Python extension module. The <cite>PerpetualBooster</cite> class in Python (<cite>package-python/python/perpetual/booster.py</cite>) holds a reference to the Rust <cite>PerpetualBooster</cite> struct (<cite>package-python/src/booster.rs</cite>). Method calls in Python are directly forwarded to their Rust counterparts.</p>
+</section>
+<section id="zero-copy-data-transfer">
+<h3>Zero-Copy Data Transfer<a class="headerlink" href="#zero-copy-data-transfer" title="Link to this heading"></a></h3>
+<p>One of the key architectural features is the zero-copy interface for columnar data.</p>
+<ul class="simple">
+<li><p><strong>Polars Integration</strong>: When a Polars DataFrame is passed to <cite>fit</cite> or <cite>predict</cite>, Perpetual uses the <cite>fit_columnar</cite> path. This path reads the underlying memory buffers of the DataFrame directly from Rust without copying the data.</p></li>
+<li><p><strong>Numpy/Pandas</strong>: Standard Numpy arrays and Pandas DataFrames are handled via the contiguous array interface, which may involve copying if the data is not already in the expected memory layout (e.g., C-contiguous vs F-contiguous).</p></li>
+</ul>
+</section>
+</section>
+<section id="perpetualbooster-algorithm">
+<h2>PerpetualBooster Algorithm<a class="headerlink" href="#perpetualbooster-algorithm" title="Link to this heading"></a></h2>
+<p>The <cite>PerpetualBooster</cite> is a specialized implementation that removes the need for hyperparameter optimization.</p>
+<section id="budget-and-self-generalization">
+<h3>Budget and Self-Generalization<a class="headerlink" href="#budget-and-self-generalization" title="Link to this heading"></a></h3>
+<p>Instead of tuning learning rate, tree depth, and other regularization parameters individually, Perpetual links them to a single <strong>budget</strong> parameter.</p>
+<ul class="simple">
+<li><p><strong>Learning Rate (`eta`)</strong>: The learning rate is deterministically calculated from the budget: <span class="math notranslate nohighlight">\(\eta = 10^{-\text{budget}}\)</span>.</p></li>
+<li><p><strong>Stopping Criteria</strong>: The algorithm monitors the generalization error of the trees during training. If the trees start to overfit (generalization capability drops below a threshold), the training stops early.</p></li>
+</ul>
+<p>For a comprehensive explanation of the self-generalization algorithm, please refer to our blog post: <a class="reference external" href="https://perpetual-ml.com/blog/how-perpetual-works">How Perpetual Works</a>.</p>
+</section>
 </section>
 </section>
 
@@ -106,7 +155,7 @@
            </div>
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
-        <a href="tutorials/index.html" class="btn btn-neutral float-left" title="Tutorials" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="tutorials/custom_objective.html" class="btn btn-neutral float-left" title="Custom Objective Tutorial" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
         <a href="parameters_tuning.html" class="btn btn-neutral float-right" title="Parameters Tuning" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 

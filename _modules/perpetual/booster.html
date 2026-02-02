@@ -5,16 +5,17 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>perpetual.booster &mdash; Perpetual 1.0.43 documentation</title>
+  <title>perpetual.booster &mdash; Perpetual 1.1.2 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
 
   
       <script src="../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../_static/documentation_options.js?v=2c076bcf"></script>
+      <script src="../../_static/documentation_options.js?v=6f037312"></script>
       <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+      <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
     <script src="../../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../../genindex.html" />
     <link rel="search" title="Search" href="../../search.html" /> 
@@ -48,9 +49,6 @@
 <li class="toctree-l1"><a class="reference internal" href="../../architecture.html">Architecture</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../parameters_tuning.html">Parameters Tuning</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../faq.html">Frequently Asked Questions</a></li>
-</ul>
-<ul>
-<li class="toctree-l1"><a class="reference internal" href="../../generated/perpetual.PerpetualBooster.html">perpetual.PerpetualBooster</a></li>
 </ul>
 
         </div>
@@ -108,7 +106,7 @@
 
 
 <div class="viewcode-block" id="PerpetualBooster">
-<a class="viewcode-back" href="../../generated/perpetual.PerpetualBooster.html#perpetual.PerpetualBooster">[docs]</a>
+<a class="viewcode-back" href="../../api.html#perpetual.PerpetualBooster">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">PerpetualBooster</span><span class="p">:</span>
     <span class="c1"># Define the metadata parameters</span>
     <span class="c1"># that are present on all instances of this class</span>
@@ -124,7 +122,7 @@
     <span class="p">}</span>
 
 <div class="viewcode-block" id="PerpetualBooster.__init__">
-<a class="viewcode-back" href="../../generated/perpetual.PerpetualBooster.html#perpetual.PerpetualBooster.__init__">[docs]</a>
+<a class="viewcode-back" href="../../api.html#perpetual.PerpetualBooster.__init__">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
         <span class="o">*</span><span class="p">,</span>
@@ -169,7 +167,13 @@
 <span class="sd">            - &quot;HuberLoss&quot;: Huber loss for robust regression.</span>
 <span class="sd">            - &quot;AdaptiveHuberLoss&quot;: adaptive Huber loss for robust regression.</span>
 <span class="sd">            - &quot;ListNetLoss&quot;: ListNet loss for ranking.</span>
-<span class="sd">            - custom objective: a tuple of (grad, hess, init) functions.</span>
+<span class="sd">            - custom objective: a tuple of (loss, grad, init) functions.</span>
+<span class="sd">              Each function should have the following signature:</span>
+
+<span class="sd">              - ``loss(y, pred, weight, group)``: returns the loss value for each sample.</span>
+<span class="sd">              - ``grad(y, pred, weight, group)``: returns a tuple of (gradient, hessian).</span>
+<span class="sd">                If the hessian is None, the machine will use a default value.</span>
+<span class="sd">              - ``init(y, weight, group)``: returns the initial value for the booster.</span>
 
 <span class="sd">        budget : float, default=0.5</span>
 <span class="sd">            A positive number for fitting budget. Increasing this number will more likely result</span>
@@ -243,6 +247,17 @@
 <span class="sd">        &gt;&gt;&gt; model = PerpetualBooster(objective=&quot;LogLoss&quot;)</span>
 <span class="sd">        &gt;&gt;&gt; model.fit(X, y)</span>
 <span class="sd">        &gt;&gt;&gt; preds = model.predict(X[:5])</span>
+
+<span class="sd">        Custom objective example:</span>
+
+<span class="sd">        &gt;&gt;&gt; def loss(y, pred, weight, group):</span>
+<span class="sd">        ...     return (y - pred) ** 2</span>
+<span class="sd">        &gt;&gt;&gt; def gradient(y, pred, weight, group):</span>
+<span class="sd">        ...     return (pred - y), None</span>
+<span class="sd">        &gt;&gt;&gt; def initial_value(y, weight, group):</span>
+<span class="sd">        ...     return np.mean(y)</span>
+<span class="sd">        &gt;&gt;&gt; model = PerpetualBooster(objective=(loss, gradient, initial_value))</span>
+<span class="sd">        &gt;&gt;&gt; model.fit(X, y)</span>
 <span class="sd">        &quot;&quot;&quot;</span>
 
         <span class="n">terminate_missing_features_</span> <span class="o">=</span> <span class="p">(</span>
@@ -311,7 +326,7 @@
 
 
 <div class="viewcode-block" id="PerpetualBooster.fit">
-<a class="viewcode-back" href="../../generated/perpetual.PerpetualBooster.html#perpetual.PerpetualBooster.fit">[docs]</a>
+<a class="viewcode-back" href="../../api.html#perpetual.PerpetualBooster.fit">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">fit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">X</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">sample_weight</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">group</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Self</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Fit the gradient booster on a provided dataset.</span>
@@ -472,7 +487,7 @@
 
 
 <div class="viewcode-block" id="PerpetualBooster.prune">
-<a class="viewcode-back" href="../../generated/perpetual.PerpetualBooster.html#perpetual.PerpetualBooster.prune">[docs]</a>
+<a class="viewcode-back" href="../../api.html#perpetual.PerpetualBooster.prune">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">prune</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">X</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">sample_weight</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">group</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Self</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Prune the gradient booster on a provided dataset.</span>
@@ -524,7 +539,7 @@
 
 
 <div class="viewcode-block" id="PerpetualBooster.calibrate">
-<a class="viewcode-back" href="../../generated/perpetual.PerpetualBooster.html#perpetual.PerpetualBooster.calibrate">[docs]</a>
+<a class="viewcode-back" href="../../api.html#perpetual.PerpetualBooster.calibrate">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">calibrate</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span> <span class="n">X_train</span><span class="p">,</span> <span class="n">y_train</span><span class="p">,</span> <span class="n">X_cal</span><span class="p">,</span> <span class="n">y_cal</span><span class="p">,</span> <span class="n">alpha</span><span class="p">,</span> <span class="n">sample_weight</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">group</span><span class="o">=</span><span class="kc">None</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Self</span><span class="p">:</span>
@@ -631,7 +646,7 @@
                     <span class="p">)</span>
 
 <div class="viewcode-block" id="PerpetualBooster.predict_intervals">
-<a class="viewcode-back" href="../../generated/perpetual.PerpetualBooster.html#perpetual.PerpetualBooster.predict_intervals">[docs]</a>
+<a class="viewcode-back" href="../../api.html#perpetual.PerpetualBooster.predict_intervals">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">predict_intervals</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">X</span><span class="p">,</span> <span class="n">parallel</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">bool</span><span class="p">,</span> <span class="kc">None</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Predict intervals with the fitted booster on new data.</span>
@@ -670,7 +685,7 @@
 
 
 <div class="viewcode-block" id="PerpetualBooster.predict">
-<a class="viewcode-back" href="../../generated/perpetual.PerpetualBooster.html#perpetual.PerpetualBooster.predict">[docs]</a>
+<a class="viewcode-back" href="../../api.html#perpetual.PerpetualBooster.predict">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">predict</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">X</span><span class="p">,</span> <span class="n">parallel</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">bool</span><span class="p">,</span> <span class="kc">None</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Predict with the fitted booster on new data.</span>
@@ -733,7 +748,7 @@
 
 
 <div class="viewcode-block" id="PerpetualBooster.predict_proba">
-<a class="viewcode-back" href="../../generated/perpetual.PerpetualBooster.html#perpetual.PerpetualBooster.predict_proba">[docs]</a>
+<a class="viewcode-back" href="../../api.html#perpetual.PerpetualBooster.predict_proba">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">predict_proba</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">X</span><span class="p">,</span> <span class="n">parallel</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">bool</span><span class="p">,</span> <span class="kc">None</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Predict class probabilities with the fitted booster on new data.</span>
@@ -794,7 +809,7 @@
 
 
 <div class="viewcode-block" id="PerpetualBooster.predict_log_proba">
-<a class="viewcode-back" href="../../generated/perpetual.PerpetualBooster.html#perpetual.PerpetualBooster.predict_log_proba">[docs]</a>
+<a class="viewcode-back" href="../../api.html#perpetual.PerpetualBooster.predict_log_proba">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">predict_log_proba</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">X</span><span class="p">,</span> <span class="n">parallel</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">bool</span><span class="p">,</span> <span class="kc">None</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Predict class log-probabilities with the fitted booster on new data.</span>
@@ -854,7 +869,7 @@
 
 
 <div class="viewcode-block" id="PerpetualBooster.predict_nodes">
-<a class="viewcode-back" href="../../generated/perpetual.PerpetualBooster.html#perpetual.PerpetualBooster.predict_nodes">[docs]</a>
+<a class="viewcode-back" href="../../api.html#perpetual.PerpetualBooster.predict_nodes">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">predict_nodes</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">X</span><span class="p">,</span> <span class="n">parallel</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">bool</span><span class="p">,</span> <span class="kc">None</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Predict leaf node indices with the fitted booster on new data.</span>
@@ -903,7 +918,7 @@
             <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="n">vals</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">ft</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">)</span> <span class="k">for</span> <span class="n">ft</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">n_features_</span><span class="p">)])</span>
 
 <div class="viewcode-block" id="PerpetualBooster.predict_contributions">
-<a class="viewcode-back" href="../../generated/perpetual.PerpetualBooster.html#perpetual.PerpetualBooster.predict_contributions">[docs]</a>
+<a class="viewcode-back" href="../../api.html#perpetual.PerpetualBooster.predict_contributions">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">predict_contributions</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span> <span class="n">X</span><span class="p">,</span> <span class="n">method</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;Average&quot;</span><span class="p">,</span> <span class="n">parallel</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">bool</span><span class="p">,</span> <span class="kc">None</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
@@ -971,7 +986,7 @@
 
 
 <div class="viewcode-block" id="PerpetualBooster.partial_dependence">
-<a class="viewcode-back" href="../../generated/perpetual.PerpetualBooster.html#perpetual.PerpetualBooster.partial_dependence">[docs]</a>
+<a class="viewcode-back" href="../../api.html#perpetual.PerpetualBooster.partial_dependence">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">partial_dependence</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">X</span><span class="p">,</span>
@@ -1069,7 +1084,7 @@
 
 
 <div class="viewcode-block" id="PerpetualBooster.calculate_feature_importance">
-<a class="viewcode-back" href="../../generated/perpetual.PerpetualBooster.html#perpetual.PerpetualBooster.calculate_feature_importance">[docs]</a>
+<a class="viewcode-back" href="../../api.html#perpetual.PerpetualBooster.calculate_feature_importance">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">calculate_feature_importance</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span> <span class="n">method</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;Gain&quot;</span><span class="p">,</span> <span class="n">normalize</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Union</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">float</span><span class="p">],</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">float</span><span class="p">]]:</span>
@@ -1108,7 +1123,7 @@
 
 
 <div class="viewcode-block" id="PerpetualBooster.text_dump">
-<a class="viewcode-back" href="../../generated/perpetual.PerpetualBooster.html#perpetual.PerpetualBooster.text_dump">[docs]</a>
+<a class="viewcode-back" href="../../api.html#perpetual.PerpetualBooster.text_dump">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">text_dump</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Return the booster model in a human-readable text format.</span>
@@ -1122,7 +1137,7 @@
 
 
 <div class="viewcode-block" id="PerpetualBooster.json_dump">
-<a class="viewcode-back" href="../../generated/perpetual.PerpetualBooster.html#perpetual.PerpetualBooster.json_dump">[docs]</a>
+<a class="viewcode-back" href="../../api.html#perpetual.PerpetualBooster.json_dump">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">json_dump</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Return the booster model in JSON format.</span>
@@ -1136,7 +1151,7 @@
 
 
 <div class="viewcode-block" id="PerpetualBooster.load_booster">
-<a class="viewcode-back" href="../../generated/perpetual.PerpetualBooster.html#perpetual.PerpetualBooster.load_booster">[docs]</a>
+<a class="viewcode-back" href="../../api.html#perpetual.PerpetualBooster.load_booster">[docs]</a>
     <span class="nd">@classmethod</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">load_booster</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">path</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Self</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
@@ -1182,7 +1197,7 @@
 
 
 <div class="viewcode-block" id="PerpetualBooster.save_booster">
-<a class="viewcode-back" href="../../generated/perpetual.PerpetualBooster.html#perpetual.PerpetualBooster.save_booster">[docs]</a>
+<a class="viewcode-back" href="../../api.html#perpetual.PerpetualBooster.save_booster">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">save_booster</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">path</span><span class="p">:</span> <span class="nb">str</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Save the booster model to a file.</span>
@@ -1218,7 +1233,7 @@
             <span class="k">return</span> <span class="nb">set</span><span class="p">(</span><span class="n">feature_map</span><span class="p">[</span><span class="n">f</span><span class="p">]</span> <span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">terminate_missing_features</span><span class="p">)</span>
 
 <div class="viewcode-block" id="PerpetualBooster.insert_metadata">
-<a class="viewcode-back" href="../../generated/perpetual.PerpetualBooster.html#perpetual.PerpetualBooster.insert_metadata">[docs]</a>
+<a class="viewcode-back" href="../../api.html#perpetual.PerpetualBooster.insert_metadata">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">insert_metadata</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="nb">str</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Insert metadata into the model.</span>
@@ -1236,7 +1251,7 @@
 
 
 <div class="viewcode-block" id="PerpetualBooster.get_metadata">
-<a class="viewcode-back" href="../../generated/perpetual.PerpetualBooster.html#perpetual.PerpetualBooster.get_metadata">[docs]</a>
+<a class="viewcode-back" href="../../api.html#perpetual.PerpetualBooster.get_metadata">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">get_metadata</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Get metadata associated with a given key.</span>
@@ -1318,7 +1333,7 @@
     <span class="c1"># Functions for scikit-learn compatibility, will feel out adding these manually,</span>
     <span class="c1"># and then if that feels too unwieldy will add scikit-learn as a dependency.</span>
 <div class="viewcode-block" id="PerpetualBooster.get_params">
-<a class="viewcode-back" href="../../generated/perpetual.PerpetualBooster.html#perpetual.PerpetualBooster.get_params">[docs]</a>
+<a class="viewcode-back" href="../../api.html#perpetual.PerpetualBooster.get_params">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">get_params</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">deep</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Get parameters for this booster.</span>
@@ -1338,7 +1353,7 @@
 
 
 <div class="viewcode-block" id="PerpetualBooster.set_params">
-<a class="viewcode-back" href="../../generated/perpetual.PerpetualBooster.html#perpetual.PerpetualBooster.set_params">[docs]</a>
+<a class="viewcode-back" href="../../api.html#perpetual.PerpetualBooster.set_params">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">set_params</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">**</span><span class="n">params</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Self</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Set parameters for this booster.</span>
@@ -1360,7 +1375,7 @@
 
 
 <div class="viewcode-block" id="PerpetualBooster.get_node_lists">
-<a class="viewcode-back" href="../../generated/perpetual.PerpetualBooster.html#perpetual.PerpetualBooster.get_node_lists">[docs]</a>
+<a class="viewcode-back" href="../../api.html#perpetual.PerpetualBooster.get_node_lists">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">get_node_lists</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">map_features_names</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="n">Node</span><span class="p">]]:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Return tree structures as lists of node objects.</span>
@@ -1406,7 +1421,7 @@
 
 
 <div class="viewcode-block" id="PerpetualBooster.trees_to_dataframe">
-<a class="viewcode-back" href="../../generated/perpetual.PerpetualBooster.html#perpetual.PerpetualBooster.trees_to_dataframe">[docs]</a>
+<a class="viewcode-back" href="../../api.html#perpetual.PerpetualBooster.trees_to_dataframe">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">trees_to_dataframe</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Return the tree structures as a DataFrame.</span>
@@ -1784,7 +1799,7 @@
                 <span class="n">base_weights</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">+=</span> <span class="n">adjustment</span>
 
 <div class="viewcode-block" id="PerpetualBooster.save_as_xgboost">
-<a class="viewcode-back" href="../../generated/perpetual.PerpetualBooster.html#perpetual.PerpetualBooster.save_as_xgboost">[docs]</a>
+<a class="viewcode-back" href="../../api.html#perpetual.PerpetualBooster.save_as_xgboost">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">save_as_xgboost</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">path</span><span class="p">:</span> <span class="nb">str</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Save the model in XGBoost JSON format.</span>
@@ -1800,7 +1815,7 @@
 
 
 <div class="viewcode-block" id="PerpetualBooster.save_as_onnx">
-<a class="viewcode-back" href="../../generated/perpetual.PerpetualBooster.html#perpetual.PerpetualBooster.save_as_onnx">[docs]</a>
+<a class="viewcode-back" href="../../api.html#perpetual.PerpetualBooster.save_as_onnx">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">save_as_onnx</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">name</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;perpetual_model&quot;</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Save the model in ONNX format.</span>

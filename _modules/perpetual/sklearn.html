@@ -5,16 +5,17 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>perpetual.sklearn &mdash; Perpetual 1.0.43 documentation</title>
+  <title>perpetual.sklearn &mdash; Perpetual 1.1.2 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
 
   
       <script src="../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../_static/documentation_options.js?v=2c076bcf"></script>
+      <script src="../../_static/documentation_options.js?v=6f037312"></script>
       <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+      <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
     <script src="../../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../../genindex.html" />
     <link rel="search" title="Search" href="../../search.html" /> 
@@ -48,9 +49,6 @@
 <li class="toctree-l1"><a class="reference internal" href="../../architecture.html">Architecture</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../parameters_tuning.html">Parameters Tuning</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../faq.html">Frequently Asked Questions</a></li>
-</ul>
-<ul>
-<li class="toctree-l1"><a class="reference internal" href="../../generated/perpetual.PerpetualBooster.html">perpetual.PerpetualBooster</a></li>
 </ul>
 
         </div>
@@ -116,6 +114,68 @@
         <span class="c1"># Capture all parameters in a way that BaseEstimator can handle</span>
         <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
     <span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Gradient Boosting Machine with Perpetual Learning.</span>
+
+<span class="sd">        A self-generalizing gradient boosting machine that doesn&#39;t need hyperparameter</span>
+<span class="sd">        optimization. It automatically finds the best configuration based on the provided budget.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        objective : str or tuple, default=&quot;LogLoss&quot;</span>
+<span class="sd">            Learning objective function to be used for optimization. Valid options are:</span>
+
+<span class="sd">            - &quot;LogLoss&quot;: logistic loss for binary classification.</span>
+<span class="sd">            - custom objective: a tuple of (grad, hess, init) functions.</span>
+
+<span class="sd">        budget : float, default=0.5</span>
+<span class="sd">            A positive number for fitting budget. Increasing this number will more likely result</span>
+<span class="sd">            in more boosting rounds and increased predictive power.</span>
+<span class="sd">        num_threads : int, optional</span>
+<span class="sd">            Number of threads to be used during training and prediction.</span>
+<span class="sd">        monotone_constraints : dict, optional</span>
+<span class="sd">            Constraints to enforce a specific relationship between features and target.</span>
+<span class="sd">            Keys are feature indices or names, values are -1, 1, or 0.</span>
+<span class="sd">        force_children_to_bound_parent : bool, default=False</span>
+<span class="sd">            Whether to restrict children nodes to be within the parent&#39;s range.</span>
+<span class="sd">        missing : float, default=np.nan</span>
+<span class="sd">            Value to consider as missing data.</span>
+<span class="sd">        allow_missing_splits : bool, default=True</span>
+<span class="sd">            Whether to allow splits that separate missing from non-missing values.</span>
+<span class="sd">        create_missing_branch : bool, default=False</span>
+<span class="sd">            Whether to create a separate branch for missing values (ternary trees).</span>
+<span class="sd">        terminate_missing_features : iterable, optional</span>
+<span class="sd">            Features for which missing branches will always be terminated if</span>
+<span class="sd">            ``create_missing_branch`` is True.</span>
+<span class="sd">        missing_node_treatment : str, default=&quot;None&quot;</span>
+<span class="sd">            How to handle weights for missing nodes if ``create_missing_branch`` is True.</span>
+<span class="sd">            Options: &quot;None&quot;, &quot;AssignToParent&quot;, &quot;AverageLeafWeight&quot;, &quot;AverageNodeWeight&quot;.</span>
+<span class="sd">        log_iterations : int, default=0</span>
+<span class="sd">            Logging frequency (every N iterations). 0 disables logging.</span>
+<span class="sd">        feature_importance_method : str, default=&quot;Gain&quot;</span>
+<span class="sd">            Method for calculating feature importance. Options: &quot;Gain&quot;, &quot;Weight&quot;, &quot;Cover&quot;,</span>
+<span class="sd">            &quot;TotalGain&quot;, &quot;TotalCover&quot;.</span>
+<span class="sd">        quantile : float, optional</span>
+<span class="sd">            Target quantile for quantile regression (objective=&quot;QuantileLoss&quot;).</span>
+<span class="sd">        reset : bool, optional</span>
+<span class="sd">            Whether to reset the model or continue training on subsequent calls to fit.</span>
+<span class="sd">        categorical_features : str or iterable, default=&quot;auto&quot;</span>
+<span class="sd">            Feature indices or names to treat as categorical.</span>
+<span class="sd">        timeout : float, optional</span>
+<span class="sd">            Time limit for fitting in seconds.</span>
+<span class="sd">        iteration_limit : int, optional</span>
+<span class="sd">            Maximum number of boosting iterations.</span>
+<span class="sd">        memory_limit : float, optional</span>
+<span class="sd">            Memory limit for training in GB.</span>
+<span class="sd">        stopping_rounds : int, optional</span>
+<span class="sd">            Early stopping rounds.</span>
+<span class="sd">        max_bin : int, default=256</span>
+<span class="sd">            Maximum number of bins for feature discretization.</span>
+<span class="sd">        max_cat : int, default=1000</span>
+<span class="sd">            Maximum unique categories before a feature is treated as numerical.</span>
+<span class="sd">        **kwargs</span>
+<span class="sd">            Arbitrary keyword arguments to be passed to the base class.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="c1"># Ensure the objective is one of the valid classification objectives</span>
         <span class="n">valid_objectives</span> <span class="o">=</span> <span class="p">{</span>
             <span class="s2">&quot;LogLoss&quot;</span>
@@ -187,6 +247,71 @@
         <span class="n">max_cat</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1000</span><span class="p">,</span>
         <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
     <span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Gradient Boosting Machine with Perpetual Learning.</span>
+
+<span class="sd">        A self-generalizing gradient boosting machine that doesn&#39;t need hyperparameter</span>
+<span class="sd">        optimization. It automatically finds the best configuration based on the provided budget.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        objective : str or tuple, default=&quot;SquaredLoss&quot;</span>
+<span class="sd">            Learning objective function to be used for optimization. Valid options are:</span>
+
+<span class="sd">            - &quot;SquaredLoss&quot;: squared error for regression.</span>
+<span class="sd">            - &quot;QuantileLoss&quot;: quantile error for quantile regression.</span>
+<span class="sd">            - &quot;HuberLoss&quot;: Huber loss for robust regression.</span>
+<span class="sd">            - &quot;AdaptiveHuberLoss&quot;: adaptive Huber loss for robust regression.</span>
+<span class="sd">            - custom objective: a tuple of (grad, hess, init) functions.</span>
+
+<span class="sd">        budget : float, default=0.5</span>
+<span class="sd">            A positive number for fitting budget. Increasing this number will more likely result</span>
+<span class="sd">            in more boosting rounds and increased predictive power.</span>
+<span class="sd">        num_threads : int, optional</span>
+<span class="sd">            Number of threads to be used during training and prediction.</span>
+<span class="sd">        monotone_constraints : dict, optional</span>
+<span class="sd">            Constraints to enforce a specific relationship between features and target.</span>
+<span class="sd">            Keys are feature indices or names, values are -1, 1, or 0.</span>
+<span class="sd">        force_children_to_bound_parent : bool, default=False</span>
+<span class="sd">            Whether to restrict children nodes to be within the parent&#39;s range.</span>
+<span class="sd">        missing : float, default=np.nan</span>
+<span class="sd">            Value to consider as missing data.</span>
+<span class="sd">        allow_missing_splits : bool, default=True</span>
+<span class="sd">            Whether to allow splits that separate missing from non-missing values.</span>
+<span class="sd">        create_missing_branch : bool, default=False</span>
+<span class="sd">            Whether to create a separate branch for missing values (ternary trees).</span>
+<span class="sd">        terminate_missing_features : iterable, optional</span>
+<span class="sd">            Features for which missing branches will always be terminated if</span>
+<span class="sd">            ``create_missing_branch`` is True.</span>
+<span class="sd">        missing_node_treatment : str, default=&quot;None&quot;</span>
+<span class="sd">            How to handle weights for missing nodes if ``create_missing_branch`` is True.</span>
+<span class="sd">            Options: &quot;None&quot;, &quot;AssignToParent&quot;, &quot;AverageLeafWeight&quot;, &quot;AverageNodeWeight&quot;.</span>
+<span class="sd">        log_iterations : int, default=0</span>
+<span class="sd">            Logging frequency (every N iterations). 0 disables logging.</span>
+<span class="sd">        feature_importance_method : str, default=&quot;Gain&quot;</span>
+<span class="sd">            Method for calculating feature importance. Options: &quot;Gain&quot;, &quot;Weight&quot;, &quot;Cover&quot;,</span>
+<span class="sd">            &quot;TotalGain&quot;, &quot;TotalCover&quot;.</span>
+<span class="sd">        quantile : float, optional</span>
+<span class="sd">            Target quantile for quantile regression (objective=&quot;QuantileLoss&quot;).</span>
+<span class="sd">        reset : bool, optional</span>
+<span class="sd">            Whether to reset the model or continue training on subsequent calls to fit.</span>
+<span class="sd">        categorical_features : str or iterable, default=&quot;auto&quot;</span>
+<span class="sd">            Feature indices or names to treat as categorical.</span>
+<span class="sd">        timeout : float, optional</span>
+<span class="sd">            Time limit for fitting in seconds.</span>
+<span class="sd">        iteration_limit : int, optional</span>
+<span class="sd">            Maximum number of boosting iterations.</span>
+<span class="sd">        memory_limit : float, optional</span>
+<span class="sd">            Memory limit for training in GB.</span>
+<span class="sd">        stopping_rounds : int, optional</span>
+<span class="sd">            Early stopping rounds.</span>
+<span class="sd">        max_bin : int, default=256</span>
+<span class="sd">            Maximum number of bins for feature discretization.</span>
+<span class="sd">        max_cat : int, default=1000</span>
+<span class="sd">            Maximum unique categories before a feature is treated as numerical.</span>
+<span class="sd">        **kwargs</span>
+<span class="sd">            Arbitrary keyword arguments to be passed to the base class.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="c1"># Enforce or warn about regression objectives</span>
         <span class="n">valid_objectives</span> <span class="o">=</span> <span class="p">{</span>
             <span class="s2">&quot;SquaredLoss&quot;</span><span class="p">,</span>
@@ -237,6 +362,8 @@
 
 
 
+<div class="viewcode-block" id="PerpetualRanker">
+<a class="viewcode-back" href="../../api.html#perpetual.sklearn.PerpetualRanker">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">PerpetualRanker</span><span class="p">(</span>
     <span class="n">PerpetualBooster</span><span class="p">,</span> <span class="n">RegressorMixin</span>
 <span class="p">):</span>  <span class="c1"># Ranking models sometimes inherit from RegressorMixin for compatibility</span>
@@ -246,6 +373,8 @@
 <span class="sd">    Requires the &#39;group&#39; parameter to be passed to fit.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
+<div class="viewcode-block" id="PerpetualRanker.__init__">
+<a class="viewcode-back" href="../../api.html#perpetual.sklearn.PerpetualRanker.__init__">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
         <span class="o">*</span><span class="p">,</span>
@@ -260,6 +389,68 @@
         <span class="n">max_cat</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1000</span><span class="p">,</span>
         <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
     <span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Gradient Boosting Machine with Perpetual Learning.</span>
+
+<span class="sd">        A self-generalizing gradient boosting machine that doesn&#39;t need hyperparameter</span>
+<span class="sd">        optimization. It automatically finds the best configuration based on the provided budget.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        objective : str or tuple, default=&quot;ListNetLoss&quot;</span>
+<span class="sd">            Learning objective function to be used for optimization. Valid options are:</span>
+
+<span class="sd">            - &quot;ListNetLoss&quot;: ListNet loss for ranking.</span>
+<span class="sd">            - custom objective: a tuple of (grad, hess, init) functions.</span>
+
+<span class="sd">        budget : float, default=0.5</span>
+<span class="sd">            A positive number for fitting budget. Increasing this number will more likely result</span>
+<span class="sd">            in more boosting rounds and increased predictive power.</span>
+<span class="sd">        num_threads : int, optional</span>
+<span class="sd">            Number of threads to be used during training and prediction.</span>
+<span class="sd">        monotone_constraints : dict, optional</span>
+<span class="sd">            Constraints to enforce a specific relationship between features and target.</span>
+<span class="sd">            Keys are feature indices or names, values are -1, 1, or 0.</span>
+<span class="sd">        force_children_to_bound_parent : bool, default=False</span>
+<span class="sd">            Whether to restrict children nodes to be within the parent&#39;s range.</span>
+<span class="sd">        missing : float, default=np.nan</span>
+<span class="sd">            Value to consider as missing data.</span>
+<span class="sd">        allow_missing_splits : bool, default=True</span>
+<span class="sd">            Whether to allow splits that separate missing from non-missing values.</span>
+<span class="sd">        create_missing_branch : bool, default=False</span>
+<span class="sd">            Whether to create a separate branch for missing values (ternary trees).</span>
+<span class="sd">        terminate_missing_features : iterable, optional</span>
+<span class="sd">            Features for which missing branches will always be terminated if</span>
+<span class="sd">            ``create_missing_branch`` is True.</span>
+<span class="sd">        missing_node_treatment : str, default=&quot;None&quot;</span>
+<span class="sd">            How to handle weights for missing nodes if ``create_missing_branch`` is True.</span>
+<span class="sd">            Options: &quot;None&quot;, &quot;AssignToParent&quot;, &quot;AverageLeafWeight&quot;, &quot;AverageNodeWeight&quot;.</span>
+<span class="sd">        log_iterations : int, default=0</span>
+<span class="sd">            Logging frequency (every N iterations). 0 disables logging.</span>
+<span class="sd">        feature_importance_method : str, default=&quot;Gain&quot;</span>
+<span class="sd">            Method for calculating feature importance. Options: &quot;Gain&quot;, &quot;Weight&quot;, &quot;Cover&quot;,</span>
+<span class="sd">            &quot;TotalGain&quot;, &quot;TotalCover&quot;.</span>
+<span class="sd">        quantile : float, optional</span>
+<span class="sd">            Target quantile for quantile regression (objective=&quot;QuantileLoss&quot;).</span>
+<span class="sd">        reset : bool, optional</span>
+<span class="sd">            Whether to reset the model or continue training on subsequent calls to fit.</span>
+<span class="sd">        categorical_features : str or iterable, default=&quot;auto&quot;</span>
+<span class="sd">            Feature indices or names to treat as categorical.</span>
+<span class="sd">        timeout : float, optional</span>
+<span class="sd">            Time limit for fitting in seconds.</span>
+<span class="sd">        iteration_limit : int, optional</span>
+<span class="sd">            Maximum number of boosting iterations.</span>
+<span class="sd">        memory_limit : float, optional</span>
+<span class="sd">            Memory limit for training in GB.</span>
+<span class="sd">        stopping_rounds : int, optional</span>
+<span class="sd">            Early stopping rounds.</span>
+<span class="sd">        max_bin : int, default=256</span>
+<span class="sd">            Maximum number of bins for feature discretization.</span>
+<span class="sd">        max_cat : int, default=1000</span>
+<span class="sd">            Maximum unique categories before a feature is treated as numerical.</span>
+<span class="sd">        **kwargs</span>
+<span class="sd">            Arbitrary keyword arguments to be passed to the base class.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">objective</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span> <span class="ow">and</span> <span class="n">objective</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">{</span><span class="s2">&quot;ListNetLoss&quot;</span><span class="p">}:</span>
             <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span>
                 <span class="sa">f</span><span class="s2">&quot;Objective &#39;</span><span class="si">{</span><span class="n">objective</span><span class="si">}</span><span class="s2">&#39; may not be suitable for PerpetualRanker. Consider &#39;ListNetLoss&#39;.&quot;</span>
@@ -274,8 +465,11 @@
             <span class="n">max_bin</span><span class="o">=</span><span class="n">max_bin</span><span class="p">,</span>
             <span class="n">max_cat</span><span class="o">=</span><span class="n">max_cat</span><span class="p">,</span>
             <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
-        <span class="p">)</span>
+        <span class="p">)</span></div>
 
+
+<div class="viewcode-block" id="PerpetualRanker.fit">
+<a class="viewcode-back" href="../../api.html#perpetual.sklearn.PerpetualRanker.fit">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">fit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">X</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">group</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">sample_weight</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="o">**</span><span class="n">fit_params</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Self</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Fit the ranker. Requires the &#39;group&#39; parameter.</span>
@@ -295,7 +489,9 @@
                 <span class="s2">&quot;The &#39;group&#39; parameter must be provided when using the &#39;ListNetLoss&#39; objective for ranking.&quot;</span>
             <span class="p">)</span>
 
-        <span class="k">return</span> <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">sample_weight</span><span class="o">=</span><span class="n">sample_weight</span><span class="p">,</span> <span class="n">group</span><span class="o">=</span><span class="n">group</span><span class="p">,</span> <span class="o">**</span><span class="n">fit_params</span><span class="p">)</span>
+        <span class="k">return</span> <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">sample_weight</span><span class="o">=</span><span class="n">sample_weight</span><span class="p">,</span> <span class="n">group</span><span class="o">=</span><span class="n">group</span><span class="p">,</span> <span class="o">**</span><span class="n">fit_params</span><span class="p">)</span></div>
+</div>
+
 </pre></div>
 
            </div>

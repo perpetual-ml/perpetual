@@ -22,7 +22,7 @@
 
     <a class="navbar-brand me-2" href="index.html">perpetual</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.0.43</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.1.2</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -48,18 +48,19 @@
 <div align="center">
 <p><a href="https://pypi.org/project/perpetual" target="_blank" class="external-link"><img src="https://img.shields.io/pypi/pyversions/perpetual.svg?logo=python&amp;logoColor=white" alt="Python Versions"></a> <a href="https://pypi.org/project/perpetual" target="_blank" class="external-link"><img src="https://img.shields.io/pypi/v/perpetual.svg?logo=pypi&amp;logoColor=white" alt="PyPI Version"></a> <a href="https://crates.io/crates/perpetual" target="_blank" class="external-link"><img src="https://img.shields.io/crates/v/perpetual?logo=rust&amp;logoColor=white" alt="Crates.io Version"></a> <a href="https://perpetual-ml.r-universe.dev/perpetual" target="_blank" class="external-link"><img src="https://img.shields.io/badge/dynamic/json?url=https://perpetual-ml.r-universe.dev/api/packages/perpetual&amp;query=%24.Version&amp;label=r-universe&amp;logo=R&amp;logoColor=white&amp;color=brightgreen" alt="R-Universe status"></a> <a href="https://discord.gg/AyUK7rr6wy" target="_blank" class="external-link"><img src="https://img.shields.io/badge/join-discord-blue?logo=discord" alt="Static Badge"></a> <img src="https://img.shields.io/pypi/dm/perpetual" alt="PyPI - Downloads"></p>
 </div>
-<p>PerpetualBooster is a gradient boosting machine (GBM) algorithm that doesn’t need hyperparameter optimization unlike other GBMs. Similar to AutoML libraries, it has a <code>budget</code> parameter. Increasing the <code>budget</code> parameter increases the predictive power of the algorithm and gives better results on unseen data. Start with a small budget (e.g. 0.5) and increase it (e.g. 1.0) once you are confident with your features. If you don’t see any improvement with further increasing the <code>budget</code>, it means that you are already extracting the most predictive power out of your data.</p>
+<p>PerpetualBooster is a gradient boosting machine (GBM) that doesn’t need hyperparameter optimization unlike other GBMs. Similar to AutoML libraries, it has a <code>budget</code> parameter. Increasing the <code>budget</code> parameter increases the predictive power of the algorithm and gives better results on unseen data. Start with a small budget (e.g. 0.5) and increase it (e.g. 1.0) once you are confident with your features. If you don’t see any improvement with further increasing the <code>budget</code>, it means that you are already extracting the most predictive power out of your data.</p>
 <div class="section level2">
 <h2 id="supported-languages">Supported Languages<a class="anchor" aria-label="anchor" href="#supported-languages"></a>
 </h2>
 <p>Perpetual is built in Rust and provides high-performance bindings for Python and R.</p>
+<!-- markdownlint-disable MD060 -->
 <table class="table">
 <colgroup>
-<col width="3%">
-<col width="11%">
-<col width="30%">
-<col width="22%">
-<col width="32%">
+<col width="2%">
+<col width="19%">
+<col width="23%">
+<col width="17%">
+<col width="36%">
 </colgroup>
 <thead><tr class="header">
 <th align="left">Language</th>
@@ -71,10 +72,14 @@
 <tbody>
 <tr class="odd">
 <td align="left"><strong>Python</strong></td>
-<td align="left"><code>pip install perpetual</code></td>
+<td align="left">
+<code>pip install perpetual</code><br><br><code>conda install -c conda-forge perpetual</code>
+</td>
 <td align="left"><a href="https://perpetual-ml.github.io/perpetual" target="_blank" class="external-link">Python API</a></td>
 <td align="left"><a href="./package-python" target="_blank"><code>package-python</code></a></td>
-<td align="left"><a href="https://pypi.org/project/perpetual" target="_blank" class="external-link">PyPI</a></td>
+<td align="left">
+<a href="https://pypi.org/project/perpetual" target="_blank" class="external-link">PyPI</a><br><br><a href="https://anaconda.org/conda-forge/perpetual" target="_blank" class="external-link">Conda Forge</a>
+</td>
 </tr>
 <tr class="even">
 <td align="left"><strong>Rust</strong></td>
@@ -92,6 +97,22 @@
 </tr>
 </tbody>
 </table>
+<div class="section level3">
+<h3 id="optional-dependencies">Optional Dependencies<a class="anchor" aria-label="anchor" href="#optional-dependencies"></a>
+</h3>
+<ul>
+<li>
+<code>pandas</code>: Enables support for training directly on Pandas DataFrames.</li>
+<li>
+<code>polars</code>: Enables zero-copy training support for Polars DataFrames.</li>
+<li>
+<code>scikit-learn</code>: Provides a scikit-learn compatible wrapper interface.</li>
+<li>
+<code>xgboost</code>: Enables saving and loading models in XGBoost format for interoperability.</li>
+<li>
+<code>onnxruntime</code>: Enables exporting and loading models in ONNX standard format.</li>
+</ul>
+</div>
 </div>
 <div class="section level2">
 <h2 id="usage">Usage<a class="anchor" aria-label="anchor" href="#usage"></a>
@@ -129,28 +150,28 @@
 </tr></thead>
 <tbody>
 <tr class="odd">
-<td align="left">1.0</td>
-<td align="left">100</td>
-<td align="left">0.192</td>
-<td align="left">0.192</td>
-<td align="left">54x</td>
-<td align="left">56x</td>
+<td align="left">0.76</td>
+<td align="left">50</td>
+<td align="left">0.201</td>
+<td align="left">0.201</td>
+<td align="left">39x</td>
+<td align="left">57x</td>
 </tr>
 <tr class="even">
-<td align="left">1.5</td>
-<td align="left">300</td>
-<td align="left">0.188</td>
-<td align="left">0.188</td>
-<td align="left">59x</td>
-<td align="left">58x</td>
+<td align="left">0.85</td>
+<td align="left">100</td>
+<td align="left">0.196</td>
+<td align="left">0.196</td>
+<td align="left">60x</td>
+<td align="left">87x</td>
 </tr>
 <tr class="odd">
-<td align="left">2.1</td>
-<td align="left">1000</td>
-<td align="left">0.185</td>
-<td align="left">0.186</td>
-<td align="left">42x</td>
-<td align="left">41x</td>
+<td align="left">1.15</td>
+<td align="left">200</td>
+<td align="left">0.190</td>
+<td align="left">0.190</td>
+<td align="left">230x</td>
+<td align="left">259x</td>
 </tr>
 </tbody>
 </table>
@@ -167,18 +188,18 @@
 <thead><tr class="header">
 <th align="left">Perpetual budget</th>
 <th align="left">LightGBM n_estimators</th>
-<th align="left">Perpetual log loss</th>
-<th align="left">LightGBM log loss</th>
+<th align="left">Perpetual ROC AUC</th>
+<th align="left">LightGBM ROC AUC</th>
 <th align="left">Speed-up wall time</th>
 <th align="left">Speed-up cpu time</th>
 </tr></thead>
 <tbody><tr class="odd">
-<td align="left">0.9</td>
+<td align="left">1.0</td>
 <td align="left">100</td>
-<td align="left">0.091</td>
-<td align="left">0.084</td>
-<td align="left">72x</td>
-<td align="left">78x</td>
+<td align="left">0.944</td>
+<td align="left">0.945</td>
+<td align="left">39x</td>
+<td align="left">130x</td>
 </tr></tbody>
 </table>
 <p>The results can be reproduced using the scripts in the <a href="./package-python/examples" target="_blank">examples</a> folder.</p>

@@ -22,3 +22,7 @@ Sklearn Interface
 .. autoclass:: perpetual.sklearn.PerpetualRegressor
    :members:
    :show-inheritance:
+
+.. autoclass:: perpetual.sklearn.PerpetualRanker
+   :members:
+   :show-inheritance:

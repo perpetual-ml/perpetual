@@ -6,16 +6,17 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Quickstart &mdash; Perpetual 1.0.43 documentation</title>
+  <title>Quickstart &mdash; Perpetual 1.1.2 documentation</title>
       <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=9edc463e" />
 
   
       <script src="_static/jquery.js?v=5d32c60e"></script>
       <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="_static/documentation_options.js?v=2c076bcf"></script>
+      <script src="_static/documentation_options.js?v=6f037312"></script>
       <script src="_static/doctools.js?v=fd6eb6e6"></script>
       <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
+      <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
     <script src="_static/js/theme.js"></script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
@@ -48,6 +49,8 @@
 <li class="toctree-l1 current"><a class="current reference internal" href="#">Quickstart</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="#classification">Classification</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#regression">Regression</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#ranking">Ranking</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#more-examples">More Examples</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="api.html">API Reference</a></li>
@@ -55,9 +58,6 @@
 <li class="toctree-l1"><a class="reference internal" href="architecture.html">Architecture</a></li>
 <li class="toctree-l1"><a class="reference internal" href="parameters_tuning.html">Parameters Tuning</a></li>
 <li class="toctree-l1"><a class="reference internal" href="faq.html">Frequently Asked Questions</a></li>
-</ul>
-<ul>
-<li class="toctree-l1"><a class="reference internal" href="generated/perpetual.PerpetualBooster.html">perpetual.PerpetualBooster</a></li>
 </ul>
 
         </div>
@@ -115,6 +115,35 @@
 <span class="n">predictions</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="n">X</span><span class="p">)</span>
 </pre></div>
 </div>
+</section>
+<section id="ranking">
+<h2>Ranking<a class="headerlink" href="#ranking" title="Link to this heading"></a></h2>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">perpetual</span><span class="w"> </span><span class="kn">import</span> <span class="n">PerpetualBooster</span>
+
+<span class="c1"># Generate synthetic ranking data</span>
+<span class="c1"># 100 queries, each with 10 documents</span>
+<span class="n">n_queries</span> <span class="o">=</span> <span class="mi">100</span>
+<span class="n">n_docs_per_query</span> <span class="o">=</span> <span class="mi">10</span>
+<span class="n">total_docs</span> <span class="o">=</span> <span class="n">n_queries</span> <span class="o">*</span> <span class="n">n_docs_per_query</span>
+
+<span class="n">X</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">rand</span><span class="p">(</span><span class="n">total_docs</span><span class="p">,</span> <span class="mi">5</span><span class="p">)</span>  <span class="c1"># 5 features</span>
+<span class="n">y</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">rand</span><span class="p">(</span><span class="n">total_docs</span><span class="p">)</span>     <span class="c1"># Relevance scores</span>
+
+<span class="c1"># helper to create groups</span>
+<span class="c1"># The &#39;group&#39; parameter tells the booster which rows belong to the same query</span>
+<span class="n">group</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">full</span><span class="p">(</span><span class="n">n_queries</span><span class="p">,</span> <span class="n">n_docs_per_query</span><span class="p">)</span>
+
+<span class="n">model</span> <span class="o">=</span> <span class="n">PerpetualBooster</span><span class="p">(</span><span class="n">objective</span><span class="o">=</span><span class="s2">&quot;ListNetLoss&quot;</span><span class="p">)</span>
+<span class="n">model</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">group</span><span class="o">=</span><span class="n">group</span><span class="p">)</span>
+
+<span class="n">predictions</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="n">X</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="more-examples">
+<h2>More Examples<a class="headerlink" href="#more-examples" title="Link to this heading"></a></h2>
+<p>You can find more examples in the <a class="reference external" href="https://github.com/perpetual-ml/perpetual/tree/main/package-python/examples">package-python/examples</a> directory on GitHub.</p>
 </section>
 </section>
 

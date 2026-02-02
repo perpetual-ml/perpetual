@@ -6,16 +6,17 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Perpetual Documentation &mdash; Perpetual 1.0.43 documentation</title>
+  <title>Perpetual Documentation &mdash; Perpetual 1.1.2 documentation</title>
       <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=9edc463e" />
 
   
       <script src="_static/jquery.js?v=5d32c60e"></script>
       <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="_static/documentation_options.js?v=2c076bcf"></script>
+      <script src="_static/documentation_options.js?v=6f037312"></script>
       <script src="_static/doctools.js?v=fd6eb6e6"></script>
       <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
+      <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
     <script src="_static/js/theme.js"></script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
@@ -50,9 +51,6 @@
 <li class="toctree-l1"><a class="reference internal" href="architecture.html">Architecture</a></li>
 <li class="toctree-l1"><a class="reference internal" href="parameters_tuning.html">Parameters Tuning</a></li>
 <li class="toctree-l1"><a class="reference internal" href="faq.html">Frequently Asked Questions</a></li>
-</ul>
-<ul>
-<li class="toctree-l1"><a class="reference internal" href="generated/perpetual.PerpetualBooster.html">perpetual.PerpetualBooster</a></li>
 </ul>
 
         </div>
@@ -103,6 +101,8 @@
 <li class="toctree-l1"><a class="reference internal" href="quickstart.html">Quickstart</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="quickstart.html#classification">Classification</a></li>
 <li class="toctree-l2"><a class="reference internal" href="quickstart.html#regression">Regression</a></li>
+<li class="toctree-l2"><a class="reference internal" href="quickstart.html#ranking">Ranking</a></li>
+<li class="toctree-l2"><a class="reference internal" href="quickstart.html#more-examples">More Examples</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="api.html">API Reference</a><ul>
@@ -110,11 +110,18 @@
 <li class="toctree-l2"><a class="reference internal" href="api.html#sklearn-interface">Sklearn Interface</a></li>
 </ul>
 </li>
-<li class="toctree-l1"><a class="reference internal" href="tutorials/index.html">Tutorials</a></li>
+<li class="toctree-l1"><a class="reference internal" href="tutorials/index.html">Tutorials</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="tutorials/categorical_data.html">Handling Categorical Data</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tutorials/toy_datasets.html">Quick Start with Toy Datasets</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tutorials/benchmark.html">Performance Benchmarking</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tutorials/custom_objective.html">Custom Objective Tutorial</a></li>
+</ul>
+</li>
 <li class="toctree-l1"><a class="reference internal" href="architecture.html">Architecture</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="architecture.html#system-overview">System Overview</a></li>
 <li class="toctree-l2"><a class="reference internal" href="architecture.html#rust-core">Rust Core</a></li>
-<li class="toctree-l2"><a class="reference internal" href="architecture.html#zero-copy-interface">Zero-Copy Interface</a></li>
-<li class="toctree-l2"><a class="reference internal" href="architecture.html#self-generalization">Self-Generalization</a></li>
+<li class="toctree-l2"><a class="reference internal" href="architecture.html#python-interface">Python Interface</a></li>
+<li class="toctree-l2"><a class="reference internal" href="architecture.html#perpetualbooster-algorithm">PerpetualBooster Algorithm</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="parameters_tuning.html">Parameters Tuning</a><ul>
@@ -133,13 +140,7 @@
 </section>
 <section id="api-reference">
 <h2>API Reference<a class="headerlink" href="#api-reference" title="Link to this heading"></a></h2>
-<table class="autosummary longtable docutils align-default">
-<tbody>
-<tr class="row-odd"><td><p><a class="reference internal" href="generated/perpetual.PerpetualBooster.html#perpetual.PerpetualBooster" title="perpetual.PerpetualBooster"><code class="xref py py-obj docutils literal notranslate"><span class="pre">perpetual.PerpetualBooster</span></code></a>(*[, objective, ...])</p></td>
-<td><p></p></td>
-</tr>
-</tbody>
-</table>
+<p>See the <a class="reference internal" href="api.html"><span class="doc">API Reference</span></a> for the detailed API reference.</p>
 </section>
 </section>
 <section id="indices-and-tables">

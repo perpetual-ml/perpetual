@@ -15,9 +15,9 @@ status](https://img.shields.io/badge/dynamic/json?url=https://perpetual-ml.r-uni
 Badge](https://img.shields.io/badge/join-discord-blue?logo=discord)](https://discord.gg/AyUK7rr6wy)
 ![PyPI - Downloads](https://img.shields.io/pypi/dm/perpetual)
 
-PerpetualBooster is a gradient boosting machine (GBM) algorithm that
-doesn’t need hyperparameter optimization unlike other GBMs. Similar to
-AutoML libraries, it has a `budget` parameter. Increasing the `budget`
+PerpetualBooster is a gradient boosting machine (GBM) that doesn’t need
+hyperparameter optimization unlike other GBMs. Similar to AutoML
+libraries, it has a `budget` parameter. Increasing the `budget`
 parameter increases the predictive power of the algorithm and gives
 better results on unseen data. Start with a small budget (e.g. 0.5) and
 increase it (e.g. 1.0) once you are confident with your features. If you
@@ -30,11 +30,17 @@ data.
 Perpetual is built in Rust and provides high-performance bindings for
 Python and R.
 
-| Language   | Installation                    | Documentation                                              | Source                                                                        | Package                                                     |
-|:-----------|:--------------------------------|:-----------------------------------------------------------|:------------------------------------------------------------------------------|:------------------------------------------------------------|
-| **Python** | `pip install perpetual`         | [Python API](https://perpetual-ml.github.io/perpetual)     | [`package-python`](https://perpetual-ml.github.io/perpetual/r/package-python) | [PyPI](https://pypi.org/project/perpetual)                  |
-| **Rust**   | `cargo add perpetual`           | [docs.rs](https://docs.rs/perpetual)                       | [`src`](https://perpetual-ml.github.io/perpetual/r/src)                       | [crates.io](https://crates.io/crates/perpetual)             |
-| **R**      | `install.packages("perpetual")` | [pkgdown Site](https://perpetual-ml.github.io/perpetual/r) | [`package-r`](https://perpetual-ml.github.io/perpetual/r/package-r)           | [R-universe](https://perpetual-ml.r-universe.dev/perpetual) |
+[TABLE]
+
+### Optional Dependencies
+
+- `pandas`: Enables support for training directly on Pandas DataFrames.
+- `polars`: Enables zero-copy training support for Polars DataFrames.
+- `scikit-learn`: Provides a scikit-learn compatible wrapper interface.
+- `xgboost`: Enables saving and loading models in XGBoost format for
+  interoperability.
+- `onnxruntime`: Enables exporting and loading models in ONNX standard
+  format.
 
 ## Usage
 
@@ -63,17 +69,17 @@ dataset (regression):
 
 | Perpetual budget | LightGBM n_estimators | Perpetual mse | LightGBM mse | Speed-up wall time | Speed-up cpu time |
 |:-----------------|:----------------------|:--------------|:-------------|:-------------------|:------------------|
-| 1.0              | 100                   | 0.192         | 0.192        | 54x                | 56x               |
-| 1.5              | 300                   | 0.188         | 0.188        | 59x                | 58x               |
-| 2.1              | 1000                  | 0.185         | 0.186        | 42x                | 41x               |
+| 0.76             | 50                    | 0.201         | 0.201        | 39x                | 57x               |
+| 0.85             | 100                   | 0.196         | 0.196        | 60x                | 87x               |
+| 1.15             | 200                   | 0.190         | 0.190        | 230x               | 259x              |
 
 The following table summarizes the results for the [Cover
 Types](https://scikit-learn.org/stable/modules/generated/sklearn.datasets.fetch_covtype.html)
 dataset (classification):
 
-| Perpetual budget | LightGBM n_estimators | Perpetual log loss | LightGBM log loss | Speed-up wall time | Speed-up cpu time |
-|:-----------------|:----------------------|:-------------------|:------------------|:-------------------|:------------------|
-| 0.9              | 100                   | 0.091              | 0.084             | 72x                | 78x               |
+| Perpetual budget | LightGBM n_estimators | Perpetual ROC AUC | LightGBM ROC AUC | Speed-up wall time | Speed-up cpu time |
+|:-----------------|:----------------------|:------------------|:-----------------|:-------------------|:------------------|
+| 1.0              | 100                   | 0.944             | 0.945            | 39x                | 130x              |
 
 The results can be reproduced using the scripts in the
 [examples](https://perpetual-ml.github.io/perpetual/r/package-python/examples)

@@ -31,10 +31,7 @@ Key Features
 API Reference
 -------------
 
-.. autosummary::
-   :toctree: generated
-
-   perpetual.PerpetualBooster
+See the :doc:`api` for the detailed API reference.
 
 Indices and tables
 ==================
