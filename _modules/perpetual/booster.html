@@ -167,13 +167,13 @@
 <span class="sd">            - &quot;HuberLoss&quot;: Huber loss for robust regression.</span>
 <span class="sd">            - &quot;AdaptiveHuberLoss&quot;: adaptive Huber loss for robust regression.</span>
 <span class="sd">            - &quot;ListNetLoss&quot;: ListNet loss for ranking.</span>
-<span class="sd">            - custom objective: a tuple of (loss, grad, init) functions.</span>
+<span class="sd">            - custom objective: a tuple of (loss, gradient, initial_value) functions.</span>
 <span class="sd">              Each function should have the following signature:</span>
 
-<span class="sd">              - ``loss(y, pred, weight, group)``: returns the loss value for each sample.</span>
-<span class="sd">              - ``grad(y, pred, weight, group)``: returns a tuple of (gradient, hessian).</span>
-<span class="sd">                If the hessian is None, the machine will use a default value.</span>
-<span class="sd">              - ``init(y, weight, group)``: returns the initial value for the booster.</span>
+<span class="sd">              - ``loss(y, pred, weight, group)`` : returns the loss value for each sample.</span>
+<span class="sd">              - ``gradient(y, pred, weight, group)`` : returns a tuple of (gradient, hessian).</span>
+<span class="sd">                If the hessian is constant (e.g., 1.0 for SquaredLoss), return ``None`` to improve performance.</span>
+<span class="sd">              - ``initial_value(y, weight, group)`` : returns the initial value for the booster.</span>
 
 <span class="sd">        budget : float, default=0.5</span>
 <span class="sd">            A positive number for fitting budget. Increasing this number will more likely result</span>
