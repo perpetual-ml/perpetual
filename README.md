@@ -62,7 +62,7 @@ The following table summarizes the results for the <a href="https://scikit-learn
 | 0.85             | 100                   | 0.196         | 0.196        | 60x                | 87x               |
 | 1.15             | 200                   | 0.190         | 0.190        | 230x               | 259x              |
 
-The following table summarizes the results for the <a href="https://scikit-learn.org/stable/modules/generated/sklearn.datasets.fetch_covtype.html" target="_blank">Cover Types</a> dataset (classification):
+The following table summarizes the results for the <a href="https://www.openml.org/search?type=data&status=active&id=46951" target="_blank">Pumpkin Seeds</a> dataset (classification):
 
 | Perpetual budget | LightGBM n_estimators | Perpetual ROC AUC  | LightGBM ROC AUC  | Speed-up wall time | Speed-up cpu time |
 | :--------------- | :-------------------- | :----------------- | :---------------- | :----------------- | :---------------- |
