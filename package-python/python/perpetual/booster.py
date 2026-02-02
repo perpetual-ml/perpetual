@@ -88,10 +88,10 @@ class PerpetualBooster:
             - custom objective: a tuple of (loss, gradient, initial_value) functions.
               Each function should have the following signature:
 
-              - ``loss(y, pred, weight, group)`` : returns the loss value for each sample.
-              - ``gradient(y, pred, weight, group)`` : returns a tuple of (gradient, hessian).
+              - **loss(y, pred, weight, group)** : returns the loss value for each sample.
+              - **gradient(y, pred, weight, group)** : returns a tuple of (gradient, hessian).
                 If the hessian is constant (e.g., 1.0 for SquaredLoss), return ``None`` to improve performance.
-              - ``initial_value(y, weight, group)`` : returns the initial value for the booster.
+              - **initial_value(y, weight, group)** : returns the initial value for the booster.
 
         budget : float, default=0.5
             A positive number for fitting budget. Increasing this number will more likely result
