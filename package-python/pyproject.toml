@@ -33,7 +33,7 @@ classifiers = [
 ]
 
 [project.optional-dependencies]
-dev = ["pandas", "polars", "pyarrow", "maturin", "pytest", "seaborn", "scikit-learn", "mkdocs-material", "mkdocstrings[python]", "mkdocs-autorefs", "ruff", "xgboost", "onnxmltools", "onnx", "onnxruntime; python_version < '3.14'", "nbsphinx", "ucimlrepo"]
+dev = ["pandas", "polars", "pyarrow", "maturin", "pytest", "seaborn", "scikit-learn", "mkdocs-material", "mkdocstrings[python]", "mkdocs-autorefs", "ruff", "xgboost", "onnxmltools", "onnx", "onnxruntime; python_version < '3.14'", "nbsphinx"]
 xgboost = ["xgboost"]
 onnx = ["onnxmltools", "onnx", "onnxruntime"]
 

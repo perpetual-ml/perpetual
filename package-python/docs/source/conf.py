@@ -22,6 +22,9 @@ extensions = [
     "nbsphinx",
 ]
 
+# nbsphinx configuration
+nbsphinx_execute = "never"
+
 # numpydoc config
 numpydoc_show_class_members = False
 
