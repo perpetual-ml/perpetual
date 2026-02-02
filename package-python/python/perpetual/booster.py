@@ -85,7 +85,13 @@ class PerpetualBooster:
             - "HuberLoss": Huber loss for robust regression.
             - "AdaptiveHuberLoss": adaptive Huber loss for robust regression.
             - "ListNetLoss": ListNet loss for ranking.
-            - custom objective: a tuple of (grad, hess, init) functions.
+            - custom objective: a tuple of (loss, grad, init) functions.
+              Each function should have the following signature:
+
+              - ``loss(y, pred, weight, group)``: returns the loss value for each sample.
+              - ``grad(y, pred, weight, group)``: returns a tuple of (gradient, hessian).
+                If the hessian is None, the machine will use a default value.
+              - ``init(y, weight, group)``: returns the initial value for the booster.
 
         budget : float, default=0.5
             A positive number for fitting budget. Increasing this number will more likely result
@@ -159,6 +165,17 @@ class PerpetualBooster:
         >>> model = PerpetualBooster(objective="LogLoss")
         >>> model.fit(X, y)
         >>> preds = model.predict(X[:5])
+
+        Custom objective example:
+
+        >>> def loss(y, pred, weight, group):
+        ...     return (y - pred) ** 2
+        >>> def gradient(y, pred, weight, group):
+        ...     return (pred - y), None
+        >>> def initial_value(y, weight, group):
+        ...     return np.mean(y)
+        >>> model = PerpetualBooster(objective=(loss, gradient, initial_value))
+        >>> model.fit(X, y)
         """
 
         terminate_missing_features_ = (
