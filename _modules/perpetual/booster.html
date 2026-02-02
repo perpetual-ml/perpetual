@@ -170,10 +170,10 @@
 <span class="sd">            - custom objective: a tuple of (loss, gradient, initial_value) functions.</span>
 <span class="sd">              Each function should have the following signature:</span>
 
-<span class="sd">              - ``loss(y, pred, weight, group)`` : returns the loss value for each sample.</span>
-<span class="sd">              - ``gradient(y, pred, weight, group)`` : returns a tuple of (gradient, hessian).</span>
+<span class="sd">              - **loss(y, pred, weight, group)** : returns the loss value for each sample.</span>
+<span class="sd">              - **gradient(y, pred, weight, group)** : returns a tuple of (gradient, hessian).</span>
 <span class="sd">                If the hessian is constant (e.g., 1.0 for SquaredLoss), return ``None`` to improve performance.</span>
-<span class="sd">              - ``initial_value(y, weight, group)`` : returns the initial value for the booster.</span>
+<span class="sd">              - **initial_value(y, weight, group)** : returns the initial value for the booster.</span>
 
 <span class="sd">        budget : float, default=0.5</span>
 <span class="sd">            A positive number for fitting budget. Increasing this number will more likely result</span>

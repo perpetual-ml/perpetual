@@ -127,9 +127,9 @@
 <h2>2. Defining a Custom Objective<a class="headerlink" href="#2.-Defining-a-Custom-Objective" title="Link to this heading"></a></h2>
 <p>A custom objective in Perpetual is a tuple of three functions:</p>
 <ol class="arabic simple">
-<li><p><code class="docutils literal notranslate"><span class="pre">loss(y,</span> <span class="pre">pred,</span> <span class="pre">weight,</span> <span class="pre">group)</span></code>: Computes the loss for each sample.</p></li>
-<li><p><code class="docutils literal notranslate"><span class="pre">gradient(y,</span> <span class="pre">pred,</span> <span class="pre">weight,</span> <span class="pre">group)</span></code>: Computes the gradient and hessian for each sample. It should return a tuple <code class="docutils literal notranslate"><span class="pre">(gradient,</span> <span class="pre">hessian)</span></code>. If <code class="docutils literal notranslate"><span class="pre">hessian</span></code> is constant (e.g., 1.0 for SquaredLoss), return <code class="docutils literal notranslate"><span class="pre">None</span></code> to improve performance.</p></li>
-<li><p><code class="docutils literal notranslate"><span class="pre">initial_value(y,</span> <span class="pre">weight,</span> <span class="pre">group)</span></code>: Computes the initial prediction for the model (usually the mean or median of the target).</p></li>
+<li><p><strong>loss(y, pred, weight, group)</strong>: Computes the loss for each sample.</p></li>
+<li><p><strong>gradient(y, pred, weight, group)</strong>: Computes the gradient and hessian for each sample. It should return a tuple <code class="docutils literal notranslate"><span class="pre">(gradient,</span> <span class="pre">hessian)</span></code>. If <code class="docutils literal notranslate"><span class="pre">hessian</span></code> is constant (e.g., 1.0 for SquaredLoss), return <code class="docutils literal notranslate"><span class="pre">None</span></code> to improve performance.</p></li>
+<li><p><strong>initial_value(y, weight, group)</strong>: Computes the initial prediction for the model (usually the mean or median of the target).</p></li>
 </ol>
 <p>Let’s implement a simple Squared Error objective as an example.</p>
 <div class="nbinput nblast docutils container">

@@ -168,10 +168,10 @@ It automatically finds the best configuration based on the provided budget.</p>
 <li><p>custom objective: a tuple of (loss, gradient, initial_value) functions.
 Each function should have the following signature:</p>
 <ul>
-<li><p><code class="docutils literal notranslate"><span class="pre">loss(y,</span> <span class="pre">pred,</span> <span class="pre">weight,</span> <span class="pre">group)</span></code> : returns the loss value for each sample.</p></li>
-<li><p><code class="docutils literal notranslate"><span class="pre">gradient(y,</span> <span class="pre">pred,</span> <span class="pre">weight,</span> <span class="pre">group)</span></code> : returns a tuple of (gradient, hessian).
+<li><p><strong>loss(y, pred, weight, group)</strong> : returns the loss value for each sample.</p></li>
+<li><p><strong>gradient(y, pred, weight, group)</strong> : returns a tuple of (gradient, hessian).
 If the hessian is constant (e.g., 1.0 for SquaredLoss), return <code class="docutils literal notranslate"><span class="pre">None</span></code> to improve performance.</p></li>
-<li><p><code class="docutils literal notranslate"><span class="pre">initial_value(y,</span> <span class="pre">weight,</span> <span class="pre">group)</span></code> : returns the initial value for the booster.</p></li>
+<li><p><strong>initial_value(y, weight, group)</strong> : returns the initial value for the booster.</p></li>
 </ul>
 </li>
 </ul>
@@ -776,75 +776,53 @@ Uses ‘LogLoss’ as the default objective.</p>
 <dl class="py method">
 <dt class="sig sig-object py" id="perpetual.sklearn.PerpetualClassifier.__init__">
 <span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="keyword-only-separator o"><abbr title="Keyword-only parameters separator (PEP 3102)"><span class="pre">*</span></abbr></span></em>, <em class="sig-param"><span class="n"><span class="pre">objective</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><span class="pre">str</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Tuple" title="(in Python v3.14)"><span class="pre">Tuple</span></a><span class="p"><span class="pre">[</span></span><span class="pre">LambdaType</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">LambdaType</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">LambdaType</span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'LogLoss'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">budget</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><span class="pre">float</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">0.5</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">num_threads</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">monotone_constraints</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Dict" title="(in Python v3.14)"><span class="pre">Dict</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Any" title="(in Python v3.14)"><span class="pre">Any</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">max_bin</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">256</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">max_cat</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">1000</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/perpetual/sklearn.html#PerpetualClassifier.__init__"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#perpetual.sklearn.PerpetualClassifier.__init__" title="Link to this definition"></a></dt>
-<dd><blockquote>
-<div><p>Gradient Boosting Machine with Perpetual Learning.</p>
+<dd><p>Gradient Boosting Machine with Perpetual Learning.</p>
 <p>A self-generalizing gradient boosting machine that doesn’t need hyperparameter
 optimization. It automatically finds the best configuration based on the provided budget.</p>
-</div></blockquote>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><dl class="simple">
-<dt><strong>objective</strong><span class="classifier">str or tuple, default=”LogLoss”</span></dt><dd><p>Learning objective function to be used for optimization. Valid options are:</p>
-<ul class="simple">
-<li><p>“LogLoss”: logistic loss for binary classification.</p></li>
-<li><p>custom objective: a tuple of (loss, gradient, initial_value) functions.</p></li>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>objective</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em> or </em><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#tuple" title="(in Python v3.14)"><em>tuple</em></a><em>, </em><em>default=&quot;LogLoss&quot;</em>) – <p>Learning objective function to be used for optimization. Valid options are:</p>
+<ul>
+<li><p>”LogLoss”: logistic loss for binary classification.</p></li>
+<li><p>custom objective: a tuple of (loss, gradient, initial_value) functions.
+Each function should have the following signature:</p>
+<ul>
+<li><p><strong>loss(y, pred, weight, group)</strong> : returns the loss value for each sample.</p></li>
+<li><p><strong>gradient(y, pred, weight, group)</strong> : returns a tuple of (gradient, hessian).
+If the hessian is constant (e.g., 1.0 for SquaredLoss), return <code class="docutils literal notranslate"><span class="pre">None</span></code> to improve performance.</p></li>
+<li><p><strong>initial_value(y, weight, group)</strong> : returns the initial value for the booster.</p></li>
 </ul>
-</dd>
-<dt><strong>Each function should have the following signature:</strong></dt><dd></dd>
-<dt><strong>- ``loss(y, pred, weight, group)``</strong><span class="classifier">returns the loss value for each sample.</span></dt><dd></dd>
-<dt><strong>- ``gradient(y, pred, weight, group)``</strong><span class="classifier">returns a tuple of (gradient, hessian).</span></dt><dd><p>If the hessian is constant (e.g., 1.0 for SquaredLoss), return <code class="docutils literal notranslate"><span class="pre">None</span></code> to improve performance.</p>
-</dd>
-<dt><strong>- ``initial_value(y, weight, group)``</strong><span class="classifier">returns the initial value for the booster.</span></dt><dd><dl class="simple">
-<dt>budget<span class="classifier">float, default=0.5</span></dt><dd><p>A positive number for fitting budget. Increasing this number will more likely result
-in more boosting rounds and increased predictive power.</p>
-</dd>
-<dt>num_threads<span class="classifier">int, optional</span></dt><dd><p>Number of threads to be used during training and prediction.</p>
-</dd>
-<dt>monotone_constraints<span class="classifier">dict, optional</span></dt><dd><p>Constraints to enforce a specific relationship between features and target.
-Keys are feature indices or names, values are -1, 1, or 0.</p>
-</dd>
-<dt>force_children_to_bound_parent<span class="classifier">bool, default=False</span></dt><dd><p>Whether to restrict children nodes to be within the parent’s range.</p>
-</dd>
-<dt>missing<span class="classifier">float, default=np.nan</span></dt><dd><p>Value to consider as missing data.</p>
-</dd>
-<dt>allow_missing_splits<span class="classifier">bool, default=True</span></dt><dd><p>Whether to allow splits that separate missing from non-missing values.</p>
-</dd>
-<dt>create_missing_branch<span class="classifier">bool, default=False</span></dt><dd><p>Whether to create a separate branch for missing values (ternary trees).</p>
-</dd>
-<dt>terminate_missing_features<span class="classifier">iterable, optional</span></dt><dd><p>Features for which missing branches will always be terminated if
-<code class="docutils literal notranslate"><span class="pre">create_missing_branch</span></code> is True.</p>
-</dd>
-<dt>missing_node_treatment<span class="classifier">str, default=”None”</span></dt><dd><p>How to handle weights for missing nodes if <code class="docutils literal notranslate"><span class="pre">create_missing_branch</span></code> is True.
-Options: “None”, “AssignToParent”, “AverageLeafWeight”, “AverageNodeWeight”.</p>
-</dd>
-<dt>log_iterations<span class="classifier">int, default=0</span></dt><dd><p>Logging frequency (every N iterations). 0 disables logging.</p>
-</dd>
-<dt>feature_importance_method<span class="classifier">str, default=”Gain”</span></dt><dd><p>Method for calculating feature importance. Options: “Gain”, “Weight”, “Cover”,
-“TotalGain”, “TotalCover”.</p>
-</dd>
-<dt>quantile<span class="classifier">float, optional</span></dt><dd><p>Target quantile for quantile regression (objective=”QuantileLoss”).</p>
-</dd>
-<dt>reset<span class="classifier">bool, optional</span></dt><dd><p>Whether to reset the model or continue training on subsequent calls to fit.</p>
-</dd>
-<dt>categorical_features<span class="classifier">str or iterable, default=”auto”</span></dt><dd><p>Feature indices or names to treat as categorical.</p>
-</dd>
-<dt>timeout<span class="classifier">float, optional</span></dt><dd><p>Time limit for fitting in seconds.</p>
-</dd>
-<dt>iteration_limit<span class="classifier">int, optional</span></dt><dd><p>Maximum number of boosting iterations.</p>
-</dd>
-<dt>memory_limit<span class="classifier">float, optional</span></dt><dd><p>Memory limit for training in GB.</p>
-</dd>
-<dt>stopping_rounds<span class="classifier">int, optional</span></dt><dd><p>Early stopping rounds.</p>
-</dd>
-<dt>max_bin<span class="classifier">int, default=256</span></dt><dd><p>Maximum number of bins for feature discretization.</p>
-</dd>
-<dt>max_cat<span class="classifier">int, default=1000</span></dt><dd><p>Maximum unique categories before a feature is treated as numerical.</p>
-</dd>
-<dt><a href="#id1"><span class="problematic" id="id2">**</span></a>kwargs</dt><dd><p>Arbitrary keyword arguments to be passed to the base class.</p>
-</dd>
-</dl>
-</dd>
-</dl>
+</li>
+</ul>
+</p></li>
+<li><p><strong>budget</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><em>float</em></a><em>, </em><em>default=0.5</em>) – A positive number for fitting budget. Increasing this number will more likely result
+in more boosting rounds and increased predictive power.</p></li>
+<li><p><strong>num_threads</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a><em>, </em><em>optional</em>) – Number of threads to be used during training and prediction.</p></li>
+<li><p><strong>monotone_constraints</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.14)"><em>dict</em></a><em>, </em><em>optional</em>) – Constraints to enforce a specific relationship between features and target.
+Keys are feature indices or names, values are -1, 1, or 0.</p></li>
+<li><p><strong>force_children_to_bound_parent</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><em>bool</em></a><em>, </em><em>default=False</em>) – Whether to restrict children nodes to be within the parent’s range.</p></li>
+<li><p><strong>missing</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><em>float</em></a><em>, </em><em>default=np.nan</em>) – Value to consider as missing data.</p></li>
+<li><p><strong>allow_missing_splits</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><em>bool</em></a><em>, </em><em>default=True</em>) – Whether to allow splits that separate missing from non-missing values.</p></li>
+<li><p><strong>create_missing_branch</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><em>bool</em></a><em>, </em><em>default=False</em>) – Whether to create a separate branch for missing values (ternary trees).</p></li>
+<li><p><strong>terminate_missing_features</strong> (<em>iterable</em><em>, </em><em>optional</em>) – Features for which missing branches will always be terminated if
+<code class="docutils literal notranslate"><span class="pre">create_missing_branch</span></code> is True.</p></li>
+<li><p><strong>missing_node_treatment</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em>, </em><em>default=&quot;None&quot;</em>) – How to handle weights for missing nodes if <code class="docutils literal notranslate"><span class="pre">create_missing_branch</span></code> is True.
+Options: “None”, “AssignToParent”, “AverageLeafWeight”, “AverageNodeWeight”.</p></li>
+<li><p><strong>log_iterations</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a><em>, </em><em>default=0</em>) – Logging frequency (every N iterations). 0 disables logging.</p></li>
+<li><p><strong>feature_importance_method</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em>, </em><em>default=&quot;Gain&quot;</em>) – Method for calculating feature importance. Options: “Gain”, “Weight”, “Cover”,
+“TotalGain”, “TotalCover”.</p></li>
+<li><p><strong>quantile</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><em>float</em></a><em>, </em><em>optional</em>) – Target quantile for quantile regression (objective=”QuantileLoss”).</p></li>
+<li><p><strong>reset</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><em>bool</em></a><em>, </em><em>optional</em>) – Whether to reset the model or continue training on subsequent calls to fit.</p></li>
+<li><p><strong>categorical_features</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em> or </em><em>iterable</em><em>, </em><em>default=&quot;auto&quot;</em>) – Feature indices or names to treat as categorical.</p></li>
+<li><p><strong>timeout</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><em>float</em></a><em>, </em><em>optional</em>) – Time limit for fitting in seconds.</p></li>
+<li><p><strong>iteration_limit</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a><em>, </em><em>optional</em>) – Maximum number of boosting iterations.</p></li>
+<li><p><strong>memory_limit</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><em>float</em></a><em>, </em><em>optional</em>) – Memory limit for training in GB.</p></li>
+<li><p><strong>stopping_rounds</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a><em>, </em><em>optional</em>) – Early stopping rounds.</p></li>
+<li><p><strong>max_bin</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a><em>, </em><em>default=256</em>) – Maximum number of bins for feature discretization.</p></li>
+<li><p><strong>max_cat</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a><em>, </em><em>default=1000</em>) – Maximum unique categories before a feature is treated as numerical.</p></li>
+<li><p><strong>**kwargs</strong> – Arbitrary keyword arguments to be passed to the base class.</p></li>
+</ul>
 </dd>
 </dl>
 </dd></dl>
@@ -872,78 +850,56 @@ Uses ‘SquaredLoss’ as the default objective.</p>
 <dl class="py method">
 <dt class="sig sig-object py" id="perpetual.sklearn.PerpetualRegressor.__init__">
 <span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="keyword-only-separator o"><abbr title="Keyword-only parameters separator (PEP 3102)"><span class="pre">*</span></abbr></span></em>, <em class="sig-param"><span class="n"><span class="pre">objective</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><span class="pre">str</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Tuple" title="(in Python v3.14)"><span class="pre">Tuple</span></a><span class="p"><span class="pre">[</span></span><span class="pre">LambdaType</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">LambdaType</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">LambdaType</span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'SquaredLoss'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">budget</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><span class="pre">float</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">0.5</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">num_threads</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">monotone_constraints</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Dict" title="(in Python v3.14)"><span class="pre">Dict</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Any" title="(in Python v3.14)"><span class="pre">Any</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">max_bin</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">256</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">max_cat</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">1000</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/perpetual/sklearn.html#PerpetualRegressor.__init__"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#perpetual.sklearn.PerpetualRegressor.__init__" title="Link to this definition"></a></dt>
-<dd><blockquote>
-<div><p>Gradient Boosting Machine with Perpetual Learning.</p>
+<dd><p>Gradient Boosting Machine with Perpetual Learning.</p>
 <p>A self-generalizing gradient boosting machine that doesn’t need hyperparameter
 optimization. It automatically finds the best configuration based on the provided budget.</p>
-</div></blockquote>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><dl class="simple">
-<dt><strong>objective</strong><span class="classifier">str or tuple, default=”SquaredLoss”</span></dt><dd><p>Learning objective function to be used for optimization. Valid options are:</p>
-<ul class="simple">
-<li><p>“SquaredLoss”: squared error for regression.</p></li>
-<li><p>“QuantileLoss”: quantile error for quantile regression.</p></li>
-<li><p>“HuberLoss”: Huber loss for robust regression.</p></li>
-<li><p>“AdaptiveHuberLoss”: adaptive Huber loss for robust regression.</p></li>
-<li><p>custom objective: a tuple of (loss, gradient, initial_value) functions.</p></li>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>objective</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em> or </em><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#tuple" title="(in Python v3.14)"><em>tuple</em></a><em>, </em><em>default=&quot;SquaredLoss&quot;</em>) – <p>Learning objective function to be used for optimization. Valid options are:</p>
+<ul>
+<li><p>”SquaredLoss”: squared error for regression.</p></li>
+<li><p>”QuantileLoss”: quantile error for quantile regression.</p></li>
+<li><p>”HuberLoss”: Huber loss for robust regression.</p></li>
+<li><p>”AdaptiveHuberLoss”: adaptive Huber loss for robust regression.</p></li>
+<li><p>custom objective: a tuple of (loss, gradient, initial_value) functions.
+Each function should have the following signature:</p>
+<ul>
+<li><p><strong>loss(y, pred, weight, group)</strong> : returns the loss value for each sample.</p></li>
+<li><p><strong>gradient(y, pred, weight, group)</strong> : returns a tuple of (gradient, hessian).
+If the hessian is constant (e.g., 1.0 for SquaredLoss), return <code class="docutils literal notranslate"><span class="pre">None</span></code> to improve performance.</p></li>
+<li><p><strong>initial_value(y, weight, group)</strong> : returns the initial value for the booster.</p></li>
 </ul>
-</dd>
-<dt><strong>Each function should have the following signature:</strong></dt><dd></dd>
-<dt><strong>- ``loss(y, pred, weight, group)``</strong><span class="classifier">returns the loss value for each sample.</span></dt><dd></dd>
-<dt><strong>- ``gradient(y, pred, weight, group)``</strong><span class="classifier">returns a tuple of (gradient, hessian).</span></dt><dd><p>If the hessian is constant (e.g., 1.0 for SquaredLoss), return <code class="docutils literal notranslate"><span class="pre">None</span></code> to improve performance.</p>
-</dd>
-<dt><strong>- ``initial_value(y, weight, group)``</strong><span class="classifier">returns the initial value for the booster.</span></dt><dd><dl class="simple">
-<dt>budget<span class="classifier">float, default=0.5</span></dt><dd><p>A positive number for fitting budget. Increasing this number will more likely result
-in more boosting rounds and increased predictive power.</p>
-</dd>
-<dt>num_threads<span class="classifier">int, optional</span></dt><dd><p>Number of threads to be used during training and prediction.</p>
-</dd>
-<dt>monotone_constraints<span class="classifier">dict, optional</span></dt><dd><p>Constraints to enforce a specific relationship between features and target.
-Keys are feature indices or names, values are -1, 1, or 0.</p>
-</dd>
-<dt>force_children_to_bound_parent<span class="classifier">bool, default=False</span></dt><dd><p>Whether to restrict children nodes to be within the parent’s range.</p>
-</dd>
-<dt>missing<span class="classifier">float, default=np.nan</span></dt><dd><p>Value to consider as missing data.</p>
-</dd>
-<dt>allow_missing_splits<span class="classifier">bool, default=True</span></dt><dd><p>Whether to allow splits that separate missing from non-missing values.</p>
-</dd>
-<dt>create_missing_branch<span class="classifier">bool, default=False</span></dt><dd><p>Whether to create a separate branch for missing values (ternary trees).</p>
-</dd>
-<dt>terminate_missing_features<span class="classifier">iterable, optional</span></dt><dd><p>Features for which missing branches will always be terminated if
-<code class="docutils literal notranslate"><span class="pre">create_missing_branch</span></code> is True.</p>
-</dd>
-<dt>missing_node_treatment<span class="classifier">str, default=”None”</span></dt><dd><p>How to handle weights for missing nodes if <code class="docutils literal notranslate"><span class="pre">create_missing_branch</span></code> is True.
-Options: “None”, “AssignToParent”, “AverageLeafWeight”, “AverageNodeWeight”.</p>
-</dd>
-<dt>log_iterations<span class="classifier">int, default=0</span></dt><dd><p>Logging frequency (every N iterations). 0 disables logging.</p>
-</dd>
-<dt>feature_importance_method<span class="classifier">str, default=”Gain”</span></dt><dd><p>Method for calculating feature importance. Options: “Gain”, “Weight”, “Cover”,
-“TotalGain”, “TotalCover”.</p>
-</dd>
-<dt>quantile<span class="classifier">float, optional</span></dt><dd><p>Target quantile for quantile regression (objective=”QuantileLoss”).</p>
-</dd>
-<dt>reset<span class="classifier">bool, optional</span></dt><dd><p>Whether to reset the model or continue training on subsequent calls to fit.</p>
-</dd>
-<dt>categorical_features<span class="classifier">str or iterable, default=”auto”</span></dt><dd><p>Feature indices or names to treat as categorical.</p>
-</dd>
-<dt>timeout<span class="classifier">float, optional</span></dt><dd><p>Time limit for fitting in seconds.</p>
-</dd>
-<dt>iteration_limit<span class="classifier">int, optional</span></dt><dd><p>Maximum number of boosting iterations.</p>
-</dd>
-<dt>memory_limit<span class="classifier">float, optional</span></dt><dd><p>Memory limit for training in GB.</p>
-</dd>
-<dt>stopping_rounds<span class="classifier">int, optional</span></dt><dd><p>Early stopping rounds.</p>
-</dd>
-<dt>max_bin<span class="classifier">int, default=256</span></dt><dd><p>Maximum number of bins for feature discretization.</p>
-</dd>
-<dt>max_cat<span class="classifier">int, default=1000</span></dt><dd><p>Maximum unique categories before a feature is treated as numerical.</p>
-</dd>
-<dt><a href="#id3"><span class="problematic" id="id4">**</span></a>kwargs</dt><dd><p>Arbitrary keyword arguments to be passed to the base class.</p>
-</dd>
-</dl>
-</dd>
-</dl>
+</li>
+</ul>
+</p></li>
+<li><p><strong>budget</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><em>float</em></a><em>, </em><em>default=0.5</em>) – A positive number for fitting budget. Increasing this number will more likely result
+in more boosting rounds and increased predictive power.</p></li>
+<li><p><strong>num_threads</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a><em>, </em><em>optional</em>) – Number of threads to be used during training and prediction.</p></li>
+<li><p><strong>monotone_constraints</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.14)"><em>dict</em></a><em>, </em><em>optional</em>) – Constraints to enforce a specific relationship between features and target.
+Keys are feature indices or names, values are -1, 1, or 0.</p></li>
+<li><p><strong>force_children_to_bound_parent</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><em>bool</em></a><em>, </em><em>default=False</em>) – Whether to restrict children nodes to be within the parent’s range.</p></li>
+<li><p><strong>missing</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><em>float</em></a><em>, </em><em>default=np.nan</em>) – Value to consider as missing data.</p></li>
+<li><p><strong>allow_missing_splits</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><em>bool</em></a><em>, </em><em>default=True</em>) – Whether to allow splits that separate missing from non-missing values.</p></li>
+<li><p><strong>create_missing_branch</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><em>bool</em></a><em>, </em><em>default=False</em>) – Whether to create a separate branch for missing values (ternary trees).</p></li>
+<li><p><strong>terminate_missing_features</strong> (<em>iterable</em><em>, </em><em>optional</em>) – Features for which missing branches will always be terminated if
+<code class="docutils literal notranslate"><span class="pre">create_missing_branch</span></code> is True.</p></li>
+<li><p><strong>missing_node_treatment</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em>, </em><em>default=&quot;None&quot;</em>) – How to handle weights for missing nodes if <code class="docutils literal notranslate"><span class="pre">create_missing_branch</span></code> is True.
+Options: “None”, “AssignToParent”, “AverageLeafWeight”, “AverageNodeWeight”.</p></li>
+<li><p><strong>log_iterations</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a><em>, </em><em>default=0</em>) – Logging frequency (every N iterations). 0 disables logging.</p></li>
+<li><p><strong>feature_importance_method</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em>, </em><em>default=&quot;Gain&quot;</em>) – Method for calculating feature importance. Options: “Gain”, “Weight”, “Cover”,
+“TotalGain”, “TotalCover”.</p></li>
+<li><p><strong>quantile</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><em>float</em></a><em>, </em><em>optional</em>) – Target quantile for quantile regression (objective=”QuantileLoss”).</p></li>
+<li><p><strong>reset</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><em>bool</em></a><em>, </em><em>optional</em>) – Whether to reset the model or continue training on subsequent calls to fit.</p></li>
+<li><p><strong>categorical_features</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em> or </em><em>iterable</em><em>, </em><em>default=&quot;auto&quot;</em>) – Feature indices or names to treat as categorical.</p></li>
+<li><p><strong>timeout</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><em>float</em></a><em>, </em><em>optional</em>) – Time limit for fitting in seconds.</p></li>
+<li><p><strong>iteration_limit</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a><em>, </em><em>optional</em>) – Maximum number of boosting iterations.</p></li>
+<li><p><strong>memory_limit</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><em>float</em></a><em>, </em><em>optional</em>) – Memory limit for training in GB.</p></li>
+<li><p><strong>stopping_rounds</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a><em>, </em><em>optional</em>) – Early stopping rounds.</p></li>
+<li><p><strong>max_bin</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a><em>, </em><em>default=256</em>) – Maximum number of bins for feature discretization.</p></li>
+<li><p><strong>max_cat</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a><em>, </em><em>default=1000</em>) – Maximum unique categories before a feature is treated as numerical.</p></li>
+<li><p><strong>**kwargs</strong> – Arbitrary keyword arguments to be passed to the base class.</p></li>
+</ul>
 </dd>
 </dl>
 </dd></dl>
@@ -972,75 +928,53 @@ Requires the ‘group’ parameter to be passed to fit.</p>
 <dl class="py method">
 <dt class="sig sig-object py" id="perpetual.sklearn.PerpetualRanker.__init__">
 <span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="keyword-only-separator o"><abbr title="Keyword-only parameters separator (PEP 3102)"><span class="pre">*</span></abbr></span></em>, <em class="sig-param"><span class="n"><span class="pre">objective</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><span class="pre">str</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Tuple" title="(in Python v3.14)"><span class="pre">Tuple</span></a><span class="p"><span class="pre">[</span></span><span class="pre">LambdaType</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">LambdaType</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">LambdaType</span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'ListNetLoss'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">budget</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><span class="pre">float</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">0.5</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">num_threads</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">monotone_constraints</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Dict" title="(in Python v3.14)"><span class="pre">Dict</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Any" title="(in Python v3.14)"><span class="pre">Any</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">max_bin</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">256</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">max_cat</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">1000</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/perpetual/sklearn.html#PerpetualRanker.__init__"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#perpetual.sklearn.PerpetualRanker.__init__" title="Link to this definition"></a></dt>
-<dd><blockquote>
-<div><p>Gradient Boosting Machine with Perpetual Learning.</p>
+<dd><p>Gradient Boosting Machine with Perpetual Learning.</p>
 <p>A self-generalizing gradient boosting machine that doesn’t need hyperparameter
 optimization. It automatically finds the best configuration based on the provided budget.</p>
-</div></blockquote>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><dl class="simple">
-<dt><strong>objective</strong><span class="classifier">str or tuple, default=”ListNetLoss”</span></dt><dd><p>Learning objective function to be used for optimization. Valid options are:</p>
-<ul class="simple">
-<li><p>“ListNetLoss”: ListNet loss for ranking.</p></li>
-<li><p>custom objective: a tuple of (loss, gradient, initial_value) functions.</p></li>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>objective</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em> or </em><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#tuple" title="(in Python v3.14)"><em>tuple</em></a><em>, </em><em>default=&quot;ListNetLoss&quot;</em>) – <p>Learning objective function to be used for optimization. Valid options are:</p>
+<ul>
+<li><p>”ListNetLoss”: ListNet loss for ranking.</p></li>
+<li><p>custom objective: a tuple of (loss, gradient, initial_value) functions.
+Each function should have the following signature:</p>
+<ul>
+<li><p><strong>loss(y, pred, weight, group)</strong> : returns the loss value for each sample.</p></li>
+<li><p><strong>gradient(y, pred, weight, group)</strong> : returns a tuple of (gradient, hessian).
+If the hessian is constant (e.g., 1.0 for SquaredLoss), return <code class="docutils literal notranslate"><span class="pre">None</span></code> to improve performance.</p></li>
+<li><p><strong>initial_value(y, weight, group)</strong> : returns the initial value for the booster.</p></li>
 </ul>
-</dd>
-<dt><strong>Each function should have the following signature:</strong></dt><dd></dd>
-<dt><strong>- ``loss(y, pred, weight, group)``</strong><span class="classifier">returns the loss value for each sample.</span></dt><dd></dd>
-<dt><strong>- ``gradient(y, pred, weight, group)``</strong><span class="classifier">returns a tuple of (gradient, hessian).</span></dt><dd><p>If the hessian is constant (e.g., 1.0 for SquaredLoss), return <code class="docutils literal notranslate"><span class="pre">None</span></code> to improve performance.</p>
-</dd>
-<dt><strong>- ``initial_value(y, weight, group)``</strong><span class="classifier">returns the initial value for the booster.</span></dt><dd><dl class="simple">
-<dt>budget<span class="classifier">float, default=0.5</span></dt><dd><p>A positive number for fitting budget. Increasing this number will more likely result
-in more boosting rounds and increased predictive power.</p>
-</dd>
-<dt>num_threads<span class="classifier">int, optional</span></dt><dd><p>Number of threads to be used during training and prediction.</p>
-</dd>
-<dt>monotone_constraints<span class="classifier">dict, optional</span></dt><dd><p>Constraints to enforce a specific relationship between features and target.
-Keys are feature indices or names, values are -1, 1, or 0.</p>
-</dd>
-<dt>force_children_to_bound_parent<span class="classifier">bool, default=False</span></dt><dd><p>Whether to restrict children nodes to be within the parent’s range.</p>
-</dd>
-<dt>missing<span class="classifier">float, default=np.nan</span></dt><dd><p>Value to consider as missing data.</p>
-</dd>
-<dt>allow_missing_splits<span class="classifier">bool, default=True</span></dt><dd><p>Whether to allow splits that separate missing from non-missing values.</p>
-</dd>
-<dt>create_missing_branch<span class="classifier">bool, default=False</span></dt><dd><p>Whether to create a separate branch for missing values (ternary trees).</p>
-</dd>
-<dt>terminate_missing_features<span class="classifier">iterable, optional</span></dt><dd><p>Features for which missing branches will always be terminated if
-<code class="docutils literal notranslate"><span class="pre">create_missing_branch</span></code> is True.</p>
-</dd>
-<dt>missing_node_treatment<span class="classifier">str, default=”None”</span></dt><dd><p>How to handle weights for missing nodes if <code class="docutils literal notranslate"><span class="pre">create_missing_branch</span></code> is True.
-Options: “None”, “AssignToParent”, “AverageLeafWeight”, “AverageNodeWeight”.</p>
-</dd>
-<dt>log_iterations<span class="classifier">int, default=0</span></dt><dd><p>Logging frequency (every N iterations). 0 disables logging.</p>
-</dd>
-<dt>feature_importance_method<span class="classifier">str, default=”Gain”</span></dt><dd><p>Method for calculating feature importance. Options: “Gain”, “Weight”, “Cover”,
-“TotalGain”, “TotalCover”.</p>
-</dd>
-<dt>quantile<span class="classifier">float, optional</span></dt><dd><p>Target quantile for quantile regression (objective=”QuantileLoss”).</p>
-</dd>
-<dt>reset<span class="classifier">bool, optional</span></dt><dd><p>Whether to reset the model or continue training on subsequent calls to fit.</p>
-</dd>
-<dt>categorical_features<span class="classifier">str or iterable, default=”auto”</span></dt><dd><p>Feature indices or names to treat as categorical.</p>
-</dd>
-<dt>timeout<span class="classifier">float, optional</span></dt><dd><p>Time limit for fitting in seconds.</p>
-</dd>
-<dt>iteration_limit<span class="classifier">int, optional</span></dt><dd><p>Maximum number of boosting iterations.</p>
-</dd>
-<dt>memory_limit<span class="classifier">float, optional</span></dt><dd><p>Memory limit for training in GB.</p>
-</dd>
-<dt>stopping_rounds<span class="classifier">int, optional</span></dt><dd><p>Early stopping rounds.</p>
-</dd>
-<dt>max_bin<span class="classifier">int, default=256</span></dt><dd><p>Maximum number of bins for feature discretization.</p>
-</dd>
-<dt>max_cat<span class="classifier">int, default=1000</span></dt><dd><p>Maximum unique categories before a feature is treated as numerical.</p>
-</dd>
-<dt><a href="#id5"><span class="problematic" id="id6">**</span></a>kwargs</dt><dd><p>Arbitrary keyword arguments to be passed to the base class.</p>
-</dd>
-</dl>
-</dd>
-</dl>
+</li>
+</ul>
+</p></li>
+<li><p><strong>budget</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><em>float</em></a><em>, </em><em>default=0.5</em>) – A positive number for fitting budget. Increasing this number will more likely result
+in more boosting rounds and increased predictive power.</p></li>
+<li><p><strong>num_threads</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a><em>, </em><em>optional</em>) – Number of threads to be used during training and prediction.</p></li>
+<li><p><strong>monotone_constraints</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.14)"><em>dict</em></a><em>, </em><em>optional</em>) – Constraints to enforce a specific relationship between features and target.
+Keys are feature indices or names, values are -1, 1, or 0.</p></li>
+<li><p><strong>force_children_to_bound_parent</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><em>bool</em></a><em>, </em><em>default=False</em>) – Whether to restrict children nodes to be within the parent’s range.</p></li>
+<li><p><strong>missing</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><em>float</em></a><em>, </em><em>default=np.nan</em>) – Value to consider as missing data.</p></li>
+<li><p><strong>allow_missing_splits</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><em>bool</em></a><em>, </em><em>default=True</em>) – Whether to allow splits that separate missing from non-missing values.</p></li>
+<li><p><strong>create_missing_branch</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><em>bool</em></a><em>, </em><em>default=False</em>) – Whether to create a separate branch for missing values (ternary trees).</p></li>
+<li><p><strong>terminate_missing_features</strong> (<em>iterable</em><em>, </em><em>optional</em>) – Features for which missing branches will always be terminated if
+<code class="docutils literal notranslate"><span class="pre">create_missing_branch</span></code> is True.</p></li>
+<li><p><strong>missing_node_treatment</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em>, </em><em>default=&quot;None&quot;</em>) – How to handle weights for missing nodes if <code class="docutils literal notranslate"><span class="pre">create_missing_branch</span></code> is True.
+Options: “None”, “AssignToParent”, “AverageLeafWeight”, “AverageNodeWeight”.</p></li>
+<li><p><strong>log_iterations</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a><em>, </em><em>default=0</em>) – Logging frequency (every N iterations). 0 disables logging.</p></li>
+<li><p><strong>feature_importance_method</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em>, </em><em>default=&quot;Gain&quot;</em>) – Method for calculating feature importance. Options: “Gain”, “Weight”, “Cover”,
+“TotalGain”, “TotalCover”.</p></li>
+<li><p><strong>quantile</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><em>float</em></a><em>, </em><em>optional</em>) – Target quantile for quantile regression (objective=”QuantileLoss”).</p></li>
+<li><p><strong>reset</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><em>bool</em></a><em>, </em><em>optional</em>) – Whether to reset the model or continue training on subsequent calls to fit.</p></li>
+<li><p><strong>categorical_features</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em> or </em><em>iterable</em><em>, </em><em>default=&quot;auto&quot;</em>) – Feature indices or names to treat as categorical.</p></li>
+<li><p><strong>timeout</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><em>float</em></a><em>, </em><em>optional</em>) – Time limit for fitting in seconds.</p></li>
+<li><p><strong>iteration_limit</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a><em>, </em><em>optional</em>) – Maximum number of boosting iterations.</p></li>
+<li><p><strong>memory_limit</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><em>float</em></a><em>, </em><em>optional</em>) – Memory limit for training in GB.</p></li>
+<li><p><strong>stopping_rounds</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a><em>, </em><em>optional</em>) – Early stopping rounds.</p></li>
+<li><p><strong>max_bin</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a><em>, </em><em>default=256</em>) – Maximum number of bins for feature discretization.</p></li>
+<li><p><strong>max_cat</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a><em>, </em><em>default=1000</em>) – Maximum unique categories before a feature is treated as numerical.</p></li>
+<li><p><strong>**kwargs</strong> – Arbitrary keyword arguments to be passed to the base class.</p></li>
+</ul>
 </dd>
 </dl>
 </dd></dl>
