@@ -85,13 +85,13 @@ class PerpetualBooster:
             - "HuberLoss": Huber loss for robust regression.
             - "AdaptiveHuberLoss": adaptive Huber loss for robust regression.
             - "ListNetLoss": ListNet loss for ranking.
-            - custom objective: a tuple of (loss, grad, init) functions.
+            - custom objective: a tuple of (loss, gradient, initial_value) functions.
               Each function should have the following signature:
 
-              - ``loss(y, pred, weight, group)``: returns the loss value for each sample.
-              - ``grad(y, pred, weight, group)``: returns a tuple of (gradient, hessian).
-                If the hessian is None, the machine will use a default value.
-              - ``init(y, weight, group)``: returns the initial value for the booster.
+              - ``loss(y, pred, weight, group)`` : returns the loss value for each sample.
+              - ``gradient(y, pred, weight, group)`` : returns a tuple of (gradient, hessian).
+                If the hessian is constant (e.g., 1.0 for SquaredLoss), return ``None`` to improve performance.
+              - ``initial_value(y, weight, group)`` : returns the initial value for the booster.
 
         budget : float, default=0.5
             A positive number for fitting budget. Increasing this number will more likely result
