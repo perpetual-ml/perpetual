@@ -1,3 +1,7 @@
+//! Objective Functions
+//!
+//! This module defines the various loss functions and their gradients/hessians
+//! used by the GBM to optimize the model's performance.
 // import modules
 mod adaptive_huber_loss;
 mod huber_loss;

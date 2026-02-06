@@ -51,6 +51,7 @@
 //!     255,        // max_bin
 //!     None,       // num_threads (None = all cores)
 //!     None,       // monotone_constraints
+//!     None,       // interaction_constraints
 //!     false,      // force_children_to_bound_parent
 //!     f64::NAN,   // missing value representation
 //!     true,       // allow_missing_splits
@@ -84,6 +85,7 @@ mod shapley;
 pub mod bin;
 pub mod binning;
 pub mod booster;
+pub mod causal;
 pub mod conformal;
 pub mod constants;
 pub mod constraints;

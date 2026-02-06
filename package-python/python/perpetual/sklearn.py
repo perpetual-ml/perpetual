@@ -96,6 +96,8 @@ class PerpetualClassifier(PerpetualBooster, ClassifierMixin):
             Maximum number of bins for feature discretization.
         max_cat : int, default=1000
             Maximum unique categories before a feature is treated as numerical.
+        interaction_constraints : list of list of int, optional
+            Interaction constraints.
         **kwargs
             Arbitrary keyword arguments to be passed to the base class.
         """
@@ -225,6 +227,8 @@ class PerpetualRegressor(PerpetualBooster, RegressorMixin):
             Maximum number of bins for feature discretization.
         max_cat : int, default=1000
             Maximum unique categories before a feature is treated as numerical.
+        interaction_constraints : list of list of int, optional
+            Interaction constraints.
         **kwargs
             Arbitrary keyword arguments to be passed to the base class.
         """
@@ -357,6 +361,8 @@ class PerpetualRanker(
             Maximum number of bins for feature discretization.
         max_cat : int, default=1000
             Maximum unique categories before a feature is treated as numerical.
+        interaction_constraints : list of list of int, optional
+            Interaction constraints.
         **kwargs
             Arbitrary keyword arguments to be passed to the base class.
         """

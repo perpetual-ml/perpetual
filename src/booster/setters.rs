@@ -51,6 +51,13 @@ impl PerpetualBooster {
         self
     }
 
+    /// Set the interaction_constraints on the booster.
+    /// * `interaction_constraints` - The interaction constraints of the booster.
+    pub fn set_interaction_constraints(mut self, interaction_constraints: Option<Vec<Vec<usize>>>) -> Self {
+        self.cfg.interaction_constraints = interaction_constraints;
+        self
+    }
+
     /// Set the force_children_to_bound_parent on the booster.
     /// * `force_children_to_bound_parent` - Set force children to bound parent.
     pub fn set_force_children_to_bound_parent(mut self, force_children_to_bound_parent: bool) -> Self {

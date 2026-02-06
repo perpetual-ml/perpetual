@@ -67,6 +67,7 @@ class PerpetualBooster:
         stopping_rounds: Optional[int] = None,
         max_bin: int = 256,
         max_cat: int = 1000,
+        interaction_constraints: Optional[List[List[int]]] = None,
     ):
         """
         Gradient Boosting Machine with Perpetual Learning.
@@ -138,6 +139,8 @@ class PerpetualBooster:
             Maximum number of bins for feature discretization.
         max_cat : int, default=1000
             Maximum unique categories before a feature is treated as numerical.
+        interaction_constraints : list of list of int, optional
+            Interaction constraints.
 
         Attributes
         ----------
@@ -215,6 +218,7 @@ class PerpetualBooster:
         self.stopping_rounds = stopping_rounds
         self.max_bin = max_bin
         self.max_cat = max_cat
+        self.interaction_constraints = interaction_constraints
 
         booster = CratePerpetualBooster(
             objective=self.objective,
@@ -222,6 +226,7 @@ class PerpetualBooster:
             max_bin=self.max_bin,
             num_threads=self.num_threads,
             monotone_constraints=dict(),
+            interaction_constraints=self.interaction_constraints,
             force_children_to_bound_parent=self.force_children_to_bound_parent,
             missing=self.missing,
             allow_missing_splits=self.allow_missing_splits,
@@ -334,6 +339,7 @@ class PerpetualBooster:
                 iteration_limit=self.iteration_limit,
                 memory_limit=self.memory_limit,
                 stopping_rounds=self.stopping_rounds,
+                interaction_constraints=self.interaction_constraints,
                 loss=self.loss,
                 grad=self.grad,
                 init=self.init,
@@ -361,6 +367,7 @@ class PerpetualBooster:
                 iteration_limit=self.iteration_limit,
                 memory_limit=self.memory_limit,
                 stopping_rounds=self.stopping_rounds,
+                interaction_constraints=self.interaction_constraints,
                 loss=self.loss,
                 grad=self.grad,
                 init=self.init,

@@ -24,6 +24,7 @@ Key Features
    quickstart
    api
    tutorials/index
+   verticals/index
    architecture
    parameters_tuning
    faq

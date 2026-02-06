@@ -82,6 +82,7 @@ impl MultiOutputBooster {
         max_bin: u16,
         num_threads: Option<usize>,
         monotone_constraints: Option<ConstraintMap>,
+        interaction_constraints: Option<Vec<Vec<usize>>>,
         force_children_to_bound_parent: bool,
         missing: f64,
         allow_missing_splits: bool,
@@ -105,6 +106,7 @@ impl MultiOutputBooster {
             max_bin,
             num_threads,
             monotone_constraints: monotone_constraints.clone(),
+            interaction_constraints: interaction_constraints.clone(),
             force_children_to_bound_parent,
             missing,
             allow_missing_splits,
@@ -262,6 +264,18 @@ impl MultiOutputBooster {
             .boosters
             .iter()
             .map(|b| b.clone().set_monotone_constraints(monotone_constraints.clone()))
+            .collect();
+        self
+    }
+
+    /// Set the interaction_constraints on the booster.
+    /// * `interaction_constraints` - The interaction constraints of the booster.
+    pub fn set_interaction_constraints(mut self, interaction_constraints: Option<Vec<Vec<usize>>>) -> Self {
+        self.cfg.interaction_constraints = interaction_constraints.clone();
+        self.boosters = self
+            .boosters
+            .iter()
+            .map(|b| b.clone().set_interaction_constraints(interaction_constraints.clone()))
             .collect();
         self
     }

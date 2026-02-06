@@ -1,3 +1,7 @@
+//! Node
+//!
+//! Internal structures for representing nodes in a decision tree.
+//! This includes `SplittableNode` used during training and `Node` used for inference.
 use crate::data::FloatData;
 use crate::splitter::{MissingInfo, NodeInfo, SplitInfo};
 use crate::utils::is_missing;

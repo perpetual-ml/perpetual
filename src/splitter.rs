@@ -7,14 +7,14 @@ use crate::decision_tree::tree::Tree;
 use crate::histogram::{update_histogram, FeatureHistogram, NodeHistogram};
 use crate::node::{NodeType, SplittableNode};
 use crate::utils::{
-    between, bound_to_parent, constrained_weight, constrained_weight_const_hess, cull_gain, gain_given_weight,
+    bound_to_parent, constrained_weight, constrained_weight_const_hess, cull_gain, gain_given_weight,
     gain_given_weight_const_hess, pivot_on_split, pivot_on_split_const_hess, pivot_on_split_exclude_missing,
     pivot_on_split_exclude_missing_const_hess,
 };
 use rayon::ThreadPool;
 use std::borrow::BorrowMut;
 use std::cell::UnsafeCell;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 
 #[inline]
 fn average(numbers: &[f32]) -> f32 {
@@ -140,6 +140,7 @@ pub trait Splitter {
     }
     fn get_constraint(&self, feature: &usize) -> Option<&Constraint>;
     fn get_constraint_map(&self) -> &ConstraintMap;
+    fn get_interaction_constraints(&self) -> Option<&Vec<Vec<usize>>>;
     fn get_allow_missing_splits(&self) -> bool;
     fn get_create_missing_branch(&self) -> bool;
     fn get_eta(&self) -> f32;
@@ -163,6 +164,7 @@ pub trait Splitter {
         pool: &ThreadPool,
         cat_index: Option<&HashSet<usize>>,
         split_info_slice: &mut SplitInfoSlice,
+        allowed_features: Option<&HashSet<usize>>,
     ) {
         let allow_missing_splits = self.get_allow_missing_splits();
         let constraint_map = self.get_constraint_map();
@@ -172,13 +174,25 @@ pub trait Splitter {
 
         let hist_node = unsafe { hist_tree.get_unchecked(node.num) };
 
+        // Resolve function pointer once, outside the loop
         let best_feature_split = best_feature_split_callables(is_const_hess);
 
-        let feature_index = (0..col_index.len()).collect::<Vec<_>>();
+        let feature_index: Vec<usize> = (0..col_index.len()).collect();
 
-        if pool.current_num_threads() > 1 {
+        if pool.current_num_threads() > 1 && col_index.len() > 1 {
             pool.scope(|s| {
                 for (feature, feat_idx) in col_index.iter().zip(feature_index.iter()) {
+                    // Check interaction constraints - skip disallowed features
+                    if let Some(allowed) = allowed_features {
+                        if !allowed.contains(feature) {
+                            unsafe {
+                                let split_info = split_info_slice.get_mut(*feat_idx);
+                                split_info.split_gain = -1.0;
+                            }
+                            continue;
+                        }
+                    }
+
                     s.spawn(|_| {
                         best_feature_split(
                             node,
@@ -198,14 +212,23 @@ pub trait Splitter {
             });
         } else {
             for (feature, feat_idx) in col_index.iter().zip(feature_index.iter()) {
-                let constraint = self.get_constraint(feature);
+                // Check interaction constraints - skip disallowed features
+                if let Some(allowed) = allowed_features {
+                    if !allowed.contains(feature) {
+                        unsafe {
+                            let split_info = split_info_slice.get_mut(*feat_idx);
+                            split_info.split_gain = -1.0;
+                        }
+                        continue;
+                    }
+                }
                 best_feature_split(
                     node,
                     *feat_idx,
                     *feature,
                     hist_node.data.get(*feat_idx).unwrap(),
                     cat_index,
-                    constraint,
+                    constraint_map.get(feature),
                     force_children_to_bound_parent,
                     missing_node_treatment,
                     allow_missing_splits,
@@ -251,6 +274,7 @@ pub trait Splitter {
         hist_tree: &[NodeHistogram],
         cat_index: Option<&HashSet<usize>>,
         split_info_slice: &mut SplitInfoSlice,
+        allowed_features: Option<&HashSet<usize>>,
     ) -> Vec<SplittableNode> {
         self.best_split(
             node,
@@ -260,6 +284,7 @@ pub trait Splitter {
             pool,
             cat_index,
             split_info_slice,
+            allowed_features,
         );
 
         let split_info = unsafe { split_info_slice.best_split_info() };
@@ -373,8 +398,11 @@ impl Splitter for MissingBranchSplitter {
     fn get_constraint(&self, feature: &usize) -> Option<&Constraint> {
         self.constraints_map.get(feature)
     }
-    fn get_constraint_map(&self) -> &HashMap<usize, Constraint> {
+    fn get_constraint_map(&self) -> &ConstraintMap {
         &self.constraints_map
+    }
+    fn get_interaction_constraints(&self) -> Option<&Vec<Vec<usize>>> {
+        None
     }
     fn get_allow_missing_splits(&self) -> bool {
         self.allow_missing_splits
@@ -651,6 +679,7 @@ pub struct MissingImputerSplitter {
     pub eta: f32,
     pub allow_missing_splits: bool,
     pub constraints_map: ConstraintMap,
+    pub interaction_constraints: Option<Vec<Vec<usize>>>,
     pub missing_node_treatment: MissingNodeTreatment,
     pub force_children_to_bound_parent: bool,
 }
@@ -658,12 +687,18 @@ pub struct MissingImputerSplitter {
 impl MissingImputerSplitter {
     /// Generate a new missing imputer splitter object.
     #[allow(clippy::too_many_arguments)]
-    pub fn new(eta: f32, allow_missing_splits: bool, constraints_map: ConstraintMap) -> Self {
+    pub fn new(
+        eta: f32,
+        allow_missing_splits: bool,
+        constraints_map: ConstraintMap,
+        interaction_constraints: Option<Vec<Vec<usize>>>,
+    ) -> Self {
         MissingImputerSplitter {
             create_missing_branch: false,
             eta,
             allow_missing_splits,
             constraints_map,
+            interaction_constraints,
             missing_node_treatment: MissingNodeTreatment::None,
             force_children_to_bound_parent: false,
         }
@@ -674,8 +709,11 @@ impl Splitter for MissingImputerSplitter {
     fn get_constraint(&self, feature: &usize) -> Option<&Constraint> {
         self.constraints_map.get(feature)
     }
-    fn get_constraint_map(&self) -> &HashMap<usize, Constraint> {
+    fn get_constraint_map(&self) -> &ConstraintMap {
         &self.constraints_map
+    }
+    fn get_interaction_constraints(&self) -> Option<&Vec<Vec<usize>>> {
+        self.interaction_constraints.as_ref()
     }
     fn get_allow_missing_splits(&self) -> bool {
         self.allow_missing_splits
@@ -1862,10 +1900,8 @@ fn best_feature_split_var_hess(
     }
 }
 
-// Evaluate types removed.
-
-#[allow(clippy::too_many_arguments)]
 #[inline]
+#[allow(clippy::too_many_arguments)]
 fn evaluate_impute_split_const_hess(
     left_gradient: f32,
     _left_hessian: f32,
@@ -1912,10 +1948,6 @@ fn evaluate_impute_split_const_hess(
     // Don't even worry about it, if there are no missing values
     // in this bin.
     if (missing_gradient != 0.0) || (missing_counts != 0) {
-        // If
-        // TODO: Consider making this safer, by casting to f64, summing, and then
-        // back to f32...
-        // The weight if missing went left
         let missing_left_weight = constrained_weight_const_hess(
             left_gradient + missing_gradient,
             left_counts + missing_counts,
@@ -1923,16 +1955,13 @@ fn evaluate_impute_split_const_hess(
             upper_bound,
             constraint,
         );
-        // The gain if missing went left
         let missing_left_gain = gain_given_weight_const_hess(
             left_gradient + missing_gradient,
             left_counts + missing_counts,
             missing_left_weight,
         );
-        // Confirm this wouldn't break monotonicity.
         let missing_left_gain = cull_gain(missing_left_gain, missing_left_weight, right_weight, constraint);
 
-        // The gain if missing went right
         let missing_right_weight = constrained_weight_const_hess(
             right_gradient + missing_gradient,
             right_counts + missing_counts,
@@ -1940,13 +1969,11 @@ fn evaluate_impute_split_const_hess(
             upper_bound,
             constraint,
         );
-        // The gain is missing went right
         let missing_right_gain = gain_given_weight_const_hess(
             right_gradient + missing_gradient,
             right_counts + missing_counts,
             missing_right_weight,
         );
-        // Confirm this wouldn't break monotonicity.
         let missing_right_gain = cull_gain(missing_right_gain, left_weight, missing_right_weight, constraint);
 
         if (missing_right_gain - right_gain) < (missing_left_gain - left_gain) {
@@ -2035,10 +2062,6 @@ fn evaluate_impute_split_var_hess(
     // Don't even worry about it, if there are no missing values
     // in this bin.
     if (missing_gradient != 0.0) || (missing_hessian != 0.0) {
-        // If
-        // TODO: Consider making this safer, by casting to f64, summing, and then
-        // back to f32...
-        // The weight if missing went left
         let missing_left_weight = constrained_weight(
             left_gradient + missing_gradient,
             left_hessian + missing_hessian,
@@ -2046,16 +2069,13 @@ fn evaluate_impute_split_var_hess(
             upper_bound,
             constraint,
         );
-        // The gain if missing went left
         let missing_left_gain = gain_given_weight(
             left_gradient + missing_gradient,
             left_hessian + missing_hessian,
             missing_left_weight,
         );
-        // Confirm this wouldn't break monotonicity.
         let missing_left_gain = cull_gain(missing_left_gain, missing_left_weight, right_weight, constraint);
 
-        // The gain if missing went right
         let missing_right_weight = constrained_weight(
             right_gradient + missing_gradient,
             right_hessian + missing_hessian,
@@ -2063,13 +2083,11 @@ fn evaluate_impute_split_var_hess(
             upper_bound,
             constraint,
         );
-        // The gain is missing went right
         let missing_right_gain = gain_given_weight(
             right_gradient + missing_gradient,
             right_hessian + missing_hessian,
             missing_right_weight,
         );
-        // Confirm this wouldn't break monotonicity.
         let missing_right_gain = cull_gain(missing_right_gain, left_weight, missing_right_weight, constraint);
 
         if (missing_right_gain - right_gain) < (missing_left_gain - left_gain) {
@@ -2132,10 +2150,7 @@ fn evaluate_branch_split_const_hess(
     missing_node_treatment: MissingNodeTreatment,
     allow_missing_splits: bool,
 ) -> Option<(NodeInfo, NodeInfo, MissingInfo)> {
-    // If there is no info right, or there is no
-    // info left, there is nothing to split on,
-    // and so we should continue.
-    if (left_gradient == 0.0) && (left_counts == 0) || (right_gradient == 0.0) && (right_counts == 0) {
+    if (left_counts == 0 || right_counts == 0) && !allow_missing_splits {
         return None;
     }
 
@@ -2146,19 +2161,11 @@ fn evaluate_branch_split_const_hess(
 
     if force_children_to_bound_parent {
         (left_weight, right_weight) = bound_to_parent(parent_weight, left_weight, right_weight);
-        assert!(between(lower_bound, upper_bound, left_weight));
-        assert!(between(lower_bound, upper_bound, right_weight));
     }
 
     let left_gain = gain_given_weight_const_hess(left_gradient, left_counts, left_weight);
     let right_gain = gain_given_weight_const_hess(right_gradient, right_counts, right_weight);
 
-    // We have not considered missing at all up until this point, we could if we wanted
-    // to give more predictive power probably to missing.
-    // If we don't want to allow the missing branch to be split further,
-    // we will default to creating an empty branch.
-
-    // Set weight based on the missing node treatment.
     let missing_weight = match missing_node_treatment {
         MissingNodeTreatment::AssignToParent => constrained_weight_const_hess(
             missing_gradient + left_gradient + right_gradient,
@@ -2167,19 +2174,19 @@ fn evaluate_branch_split_const_hess(
             upper_bound,
             constraint,
         ),
-        // Calculate the local leaf average for now, after training the tree.
-        // Recursively assign to the leaf weights underneath.
         MissingNodeTreatment::AverageLeafWeight | MissingNodeTreatment::AverageNodeWeight => {
-            (right_weight * right_counts as f32 + left_weight * left_counts as f32)
-                / (right_counts + left_counts) as f32
+            if left_counts + right_counts > 0 {
+                (left_weight * left_counts as f32 + right_weight * right_counts as f32)
+                    / (left_counts + right_counts) as f32
+            } else {
+                parent_weight
+            }
         }
         MissingNodeTreatment::None => {
-            // If there are no missing records, just default
-            // to the parent weight.
-            if missing_counts == 0 || missing_gradient == 0. {
-                parent_weight
-            } else {
+            if missing_counts > 0 {
                 constrained_weight_const_hess(missing_gradient, missing_counts, lower_bound, upper_bound, constraint)
+            } else {
+                parent_weight
             }
         }
     };
@@ -2190,27 +2197,19 @@ fn evaluate_branch_split_const_hess(
         cover: missing_counts as f32,
         counts: missing_counts,
         weight: missing_weight,
-        // Constrain to the same bounds as the parent.
-        // This will ensure that splits further down in the missing only
-        // branch are monotonic.
         bounds: (lower_bound, upper_bound),
         weights: [0.0; 5],
     };
-    let missing_node = // Check Missing direction
-        if ((missing_gradient != 0.0) || (missing_counts != 0)) && allow_missing_splits {
-            MissingInfo::Branch(
-                missing_info
-            )
-        } else {
-            MissingInfo::Leaf(
-                missing_info
-            )
-        };
+    let missing_node = if missing_counts > 0 && allow_missing_splits {
+        MissingInfo::Branch(missing_info)
+    } else {
+        MissingInfo::Leaf(missing_info)
+    };
 
     Some((
         NodeInfo {
-            gain: left_gain,
             grad: left_gradient,
+            gain: left_gain,
             cover: left_counts as f32,
             counts: left_counts,
             weight: left_weight,
@@ -2218,8 +2217,8 @@ fn evaluate_branch_split_const_hess(
             weights: [0.0; 5],
         },
         NodeInfo {
-            gain: right_gain,
             grad: right_gradient,
+            gain: right_gain,
             cover: right_counts as f32,
             counts: right_counts,
             weight: right_weight,
@@ -2250,10 +2249,7 @@ fn evaluate_branch_split_var_hess(
     missing_node_treatment: MissingNodeTreatment,
     allow_missing_splits: bool,
 ) -> Option<(NodeInfo, NodeInfo, MissingInfo)> {
-    // If there is no info right, or there is no
-    // info left, there is nothing to split on,
-    // and so we should continue.
-    if (left_gradient == 0.0) && (left_hessian == 0.0) || (right_gradient == 0.0) && (right_hessian == 0.0) {
+    if (left_hessian == 0.0 || right_hessian == 0.0) && !allow_missing_splits {
         return None;
     }
 
@@ -2262,19 +2258,11 @@ fn evaluate_branch_split_var_hess(
 
     if force_children_to_bound_parent {
         (left_weight, right_weight) = bound_to_parent(parent_weight, left_weight, right_weight);
-        assert!(between(lower_bound, upper_bound, left_weight));
-        assert!(between(lower_bound, upper_bound, right_weight));
     }
 
     let left_gain = gain_given_weight(left_gradient, left_hessian, left_weight);
     let right_gain = gain_given_weight(right_gradient, right_hessian, right_weight);
 
-    // We have not considered missing at all up until this point, we could if we wanted
-    // to give more predictive power probably to missing.
-    // If we don't want to allow the missing branch to be split further,
-    // we will default to creating an empty branch.
-
-    // Set weight based on the missing node treatment.
     let missing_weight = match missing_node_treatment {
         MissingNodeTreatment::AssignToParent => constrained_weight(
             missing_gradient + left_gradient + right_gradient,
@@ -2283,22 +2271,21 @@ fn evaluate_branch_split_var_hess(
             upper_bound,
             constraint,
         ),
-        // Calculate the local leaf average for now, after training the tree.
-        // Recursively assign to the leaf weights underneath.
         MissingNodeTreatment::AverageLeafWeight | MissingNodeTreatment::AverageNodeWeight => {
-            (right_weight * right_hessian + left_weight * left_hessian) / (right_hessian + left_hessian)
+            if left_hessian + right_hessian > 0.0 {
+                (left_weight * left_hessian + right_weight * right_hessian) / (left_hessian + right_hessian)
+            } else {
+                parent_weight
+            }
         }
         MissingNodeTreatment::None => {
-            // If there are no missing records, just default
-            // to the parent weight.
-            if missing_hessian == 0. || missing_gradient == 0. {
-                parent_weight
-            } else {
+            if missing_hessian > 0.0 || missing_gradient != 0.0 {
                 constrained_weight(missing_gradient, missing_hessian, lower_bound, upper_bound, constraint)
+            } else {
+                parent_weight
             }
         }
     };
-
     let missing_gain = gain_given_weight(missing_gradient, missing_hessian, missing_weight);
     let missing_info = NodeInfo {
         gain: missing_gain,
@@ -2306,27 +2293,19 @@ fn evaluate_branch_split_var_hess(
         cover: missing_hessian,
         counts: missing_counts,
         weight: missing_weight,
-        // Constrain to the same bounds as the parent.
-        // This will ensure that splits further down in the missing only
-        // branch are monotonic.
         bounds: (lower_bound, upper_bound),
         weights: [0.0; 5],
     };
-    let missing_node = // Check Missing direction
-        if ((missing_gradient != 0.0) || (missing_hessian != 0.0)) && allow_missing_splits {
-            MissingInfo::Branch(
-                missing_info
-            )
-        } else {
-            MissingInfo::Leaf(
-                missing_info
-            )
-        };
+    let missing_node = if (missing_hessian > 0.0 || missing_gradient != 0.0) && allow_missing_splits {
+        MissingInfo::Branch(missing_info)
+    } else {
+        MissingInfo::Leaf(missing_info)
+    };
 
     Some((
         NodeInfo {
-            gain: left_gain,
             grad: left_gradient,
+            gain: left_gain,
             cover: left_hessian,
             counts: left_counts,
             weight: left_weight,
@@ -2334,8 +2313,8 @@ fn evaluate_branch_split_var_hess(
             weights: [0.0; 5],
         },
         NodeInfo {
-            gain: right_gain,
             grad: right_gradient,
+            gain: right_gain,
             cover: right_hessian,
             counts: right_counts,
             weight: right_weight,
@@ -2355,8 +2334,8 @@ mod tests {
     use crate::histogram::NodeHistogramOwned;
     use crate::node::SplittableNode;
     use crate::objective_functions::objective::{Objective, ObjectiveFunction};
-    use crate::utils::gain;
     use crate::utils::weight;
+    use crate::utils::{between, gain};
     // use polars::prelude::*; // Removed
     use std::error::Error;
     use std::fs;
@@ -2378,7 +2357,7 @@ mod tests {
 
         let (grad, hess) = objective_function.gradient(&y, &yhat, None, None);
 
-        let splitter = MissingImputerSplitter::new(0.3, true, ConstraintMap::new());
+        let splitter = MissingImputerSplitter::new(0.3, true, ConstraintMap::new(), None);
         let gradient_sum = grad.iter().sum();
         let hessian_sum = match hess {
             Some(ref hess) => hess.iter().sum(),
@@ -2451,6 +2430,7 @@ mod tests {
             &pool,
             None,
             &mut split_info_slice,
+            None,
         );
         let s = unsafe { split_info_slice.best_split_info() };
         println!("{:?}", s);
@@ -2532,7 +2512,7 @@ mod tests {
         let yhat = vec![y_test_avg; y_test.len()];
         let (grad, hess) = objective_function.gradient(&y_test, &yhat, None, None);
 
-        let splitter = MissingImputerSplitter::new(0.3, false, ConstraintMap::new());
+        let splitter = MissingImputerSplitter::new(0.3, false, ConstraintMap::new(), None);
 
         let data = Matrix::new(&data_test, y_test.len(), n_cols);
 
@@ -2581,6 +2561,7 @@ mod tests {
             &pool,
             None,
             &mut split_info_slice,
+            None,
         );
         let s = unsafe { split_info_slice.best_split_info() };
         println!("{:?}", s);
@@ -2616,7 +2597,7 @@ mod tests {
         let yhat = vec![y_avg; y.len()];
         let (grad, hess) = objective_function.gradient(&y, &yhat, None, None);
 
-        let splitter = MissingImputerSplitter::new(eta, false, ConstraintMap::new());
+        let splitter = MissingImputerSplitter::new(eta, false, ConstraintMap::new(), None);
 
         let gradient_sum = grad.iter().copied().sum();
         let hessian_sum = match hess {
@@ -2687,6 +2668,7 @@ mod tests {
             &pool,
             Some(&cat_index),
             &mut split_info_slice,
+            None,
         );
         let s = unsafe { split_info_slice.best_split_info() };
 
@@ -2729,7 +2711,7 @@ mod tests {
         let yhat = vec![y_avg; y.len()];
         let (grad, hess) = objective_function.gradient(&y, &yhat, None, None);
 
-        let splitter = MissingImputerSplitter::new(eta, false, ConstraintMap::new());
+        let splitter = MissingImputerSplitter::new(eta, false, ConstraintMap::new(), None);
 
         let b = bin_matrix(&data, None, n_bins, f64::NAN, Some(&cat_index)).unwrap();
         let bdata = Matrix::new(&b.binned_data, data.rows, data.cols);
@@ -2774,6 +2756,7 @@ mod tests {
             &pool,
             Some(&cat_index),
             &mut split_info_slice,
+            None,
         );
 
         println!("split_info_slice:");

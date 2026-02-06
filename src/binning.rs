@@ -1,3 +1,7 @@
+//! Binning
+//!
+//! This module handles the conversion of continuous and categorical data into discrete buckets (bins).
+//! Binning is a crucial step for the histogram-based GBM algorithm to speed up split finding.
 use std::collections::HashSet;
 
 use crate::data::{ColumnarMatrix, FloatData, JaggedMatrix, Matrix};

@@ -1,3 +1,7 @@
+//! Constraints
+//!
+//! This module handles monotonicity and interaction constraints, which allow for
+//! incorporating domain knowledge into the model.
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 

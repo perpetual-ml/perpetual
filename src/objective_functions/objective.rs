@@ -80,8 +80,28 @@ pub enum Objective {
     /// Requires `group` parameter in `fit` to define query groups.
     ListNetLoss,
     /// Custom user-defined objective.
-    #[serde(skip)]
+    #[serde(with = "objective_custom_serde")]
     Custom(Arc<dyn ObjectiveFunction>),
+}
+
+mod objective_custom_serde {
+    use super::*;
+    use serde::{Deserializer, Serializer};
+
+    pub fn serialize<S>(_: &Arc<dyn ObjectiveFunction>, s: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        s.serialize_str("Custom")
+    }
+
+    pub fn deserialize<'de, D>(d: D) -> Result<Arc<dyn ObjectiveFunction>, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let _: String = Deserialize::deserialize(d)?;
+        Ok(Arc::new(SquaredLoss::default()))
+    }
 }
 
 impl Objective {

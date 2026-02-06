@@ -1,3 +1,7 @@
+//! Shapley
+//!
+//! Implementation of the TreeSHAP algorithm for explaining model predictions
+//! by calculating feature contributions.
 use crate::{decision_tree::tree::Tree, node::Node};
 
 #[derive(Debug, Clone, Copy)]

@@ -1,3 +1,6 @@
+//! Partial Dependence
+//!
+//! Utilities for calculating partial dependence of features in a decision tree model.
 use crate::{decision_tree::tree::Tree, utils::is_missing};
 
 fn get_node_cover(tree: &Tree, node_idx: usize) -> f32 {
@@ -93,7 +96,7 @@ mod tests {
         let loss = objective_function.loss(&y, &yhat, None, None);
 
         let data = Matrix::new(&data_vec, 891, 5);
-        let splitter = MissingImputerSplitter::new(0.3, true, ConstraintMap::new());
+        let splitter = MissingImputerSplitter::new(0.3, true, ConstraintMap::new(), None);
         let mut tree = Tree::new();
 
         let b = bin_matrix(&data, None, 300, f64::NAN, None).unwrap();
@@ -128,7 +131,6 @@ mod tests {
             Some(f32::MAX),
             &loss,
             &y,
-            //loss_fn.clone(),
             &yhat,
             None,
             None,

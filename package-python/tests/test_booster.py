@@ -690,29 +690,42 @@ def test_polars():
         "deck",
         "embark_town",
     ]
-    X_pl = X_pl.with_columns(pl.col(cols).cast(pl.String).cast(pl.Categorical))
+    X_pl = X_pl.with_columns(pl.col(cols).cast(pl.Categorical))
     X_pd[cols] = X_pd[cols].astype("category")
 
-    model_pl = PerpetualBooster(objective="LogLoss", budget=0.1)
-    model_pl.fit(X_pl, y)
-
-    model_pd = PerpetualBooster(objective="LogLoss", budget=0.1)
-    model_pd.fit(X_pd, y)
+    model_pl_mt = PerpetualBooster(objective="LogLoss", budget=0.1)
+    model_pl_mt.fit(X_pl, y)
+    model_pl_st = PerpetualBooster(objective="LogLoss", budget=0.1, num_threads=1)
+    model_pl_st.fit(X_pl, y)
+    model_pd_mt = PerpetualBooster(objective="LogLoss", budget=0.1)
+    model_pd_mt.fit(X_pd, y)
+    model_pd_st = PerpetualBooster(objective="LogLoss", budget=0.1, num_threads=1)
+    model_pd_st.fit(X_pd, y)
 
     # Compare predictions
-    pred_pl = model_pl.predict(X_pl)
-    pred_pd = model_pd.predict(X_pd)
+    pred_pl_mt = model_pl_mt.predict(X_pl)
+    pred_pl_st = model_pl_st.predict(X_pl)
+    pred_pd_mt = model_pd_mt.predict(X_pd)
+    pred_pd_st = model_pd_st.predict(X_pd)
 
-    assert np.allclose(pred_pl, pred_pd)
+    assert np.allclose(pred_pl_mt, pred_pd_mt)
+    assert np.allclose(pred_pl_st, pred_pd_st)
+    assert np.allclose(pred_pl_mt, pred_pl_st)
+    assert np.allclose(pred_pd_mt, pred_pd_st)
 
     # Compare probabilities
-    prob_pl = model_pl.predict_proba(X_pl)
-    prob_pd = model_pd.predict_proba(X_pd)
+    prob_pl_mt = model_pl_mt.predict_proba(X_pl)
+    prob_pl_st = model_pl_st.predict_proba(X_pl)
+    prob_pd_mt = model_pd_mt.predict_proba(X_pd)
+    prob_pd_st = model_pd_st.predict_proba(X_pd)
 
-    assert np.allclose(prob_pl, prob_pd)
+    assert np.allclose(prob_pl_mt, prob_pd_mt)
+    assert np.allclose(prob_pl_st, prob_pd_st)
+    assert np.allclose(prob_pl_mt, prob_pl_st)
+    assert np.allclose(prob_pd_mt, prob_pd_st)
 
-    model_pl.trees_to_dataframe()
-    model_pd.trees_to_dataframe()
+    model_pl_mt.trees_to_dataframe()
+    model_pd_mt.trees_to_dataframe()
 
 
 def test_calibration():

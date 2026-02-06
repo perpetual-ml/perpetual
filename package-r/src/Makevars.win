@@ -10,11 +10,17 @@ rust-target:
 	@echo "Attempting to add $(TARGET) target..."
 	-rustup target add $(TARGET)
 	@if rustup target list --installed 2>/dev/null | grep -q "$(TARGET)" && \
-		cd rust && cargo build --release --lib --manifest-path Cargo.toml --target $(TARGET) --verbose --config 'source.crates-io.replace-with="vendored-sources"' --config 'source.vendored-sources.directory="../../inst/v"'; then \
+		cd rust && cargo build --release --lib --manifest-path Cargo.toml --target $(TARGET) --verbose --config 'source.crates-io.replace-with="vendored-sources"' --config 'source.vendored-sources.directory="../../inst/v"' > cargo_build.log 2>&1; then \
 		echo "Target $(TARGET) build successful."; \
 	else \
-		echo "Target $(TARGET) build failed or target not found. Falling back to default host target..."; \
-		cd rust && cargo build --release --lib --manifest-path Cargo.toml --verbose --config 'source.crates-io.replace-with="vendored-sources"' --config 'source.vendored-sources.directory="../../inst/v"'; \
+		echo "Target $(TARGET) build failed. Detailed log:"; \
+		cat rust/cargo_build.log || true; \
+		echo "Falling back to default host target..."; \
+		cd rust && cargo build --release --lib --manifest-path Cargo.toml --verbose --config 'source.crates-io.replace-with="vendored-sources"' --config 'source.vendored-sources.directory="../../inst/v"' >> cargo_build.log 2>&1; \
+	fi
+	@if [ ! -f rust/target/$(TARGET)/release/libperpetual_r.a ] && [ ! -f rust/target/release/libperpetual_r.a ] && [ ! -f rust/target/release/perpetual_r.lib ]; then \
+		echo "ERROR: Detailed build log follow:"; \
+		cat rust/cargo_build.log || true; \
 	fi
 	@if [ -f rust/target/$(TARGET)/release/libperpetual_r.a ]; then \
 		echo "Found target artifact: rust/target/$(TARGET)/release/libperpetual_r.a"; \

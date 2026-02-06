@@ -44,6 +44,69 @@ impl Tree {
         }
     }
 
+    fn get_interaction_constraints_allowed_features(
+        &self,
+        node: &SplittableNode,
+        interaction_constraints: &Vec<Vec<usize>>,
+    ) -> Option<HashSet<usize>> {
+        // If Root, no constraints
+        if node.num == 0 {
+            return None;
+        }
+
+        let mut ancestor_features = HashSet::new();
+        let mut curr_node_idx = node.parent_node;
+
+        // Traverse up
+        while let Some(curr_node) = self.nodes.get(&curr_node_idx) {
+            ancestor_features.insert(curr_node.split_feature);
+            if curr_node.num == 0 || curr_node.num == curr_node.parent_node {
+                break;
+            }
+            curr_node_idx = curr_node.parent_node;
+        }
+
+        if ancestor_features.is_empty() {
+            return None;
+        }
+
+        // Find allowed features
+        let mut final_allowed: HashSet<usize> = HashSet::new();
+        let mut found_valid_group = false;
+
+        // 1. Explicit groups
+        for group in interaction_constraints {
+            let group_set: HashSet<usize> = group.iter().cloned().collect();
+            if ancestor_features.is_subset(&group_set) {
+                final_allowed.extend(group.iter());
+                found_valid_group = true;
+            }
+        }
+
+        // 2. Implicit singletons
+        let mut constrained_universe: HashSet<usize> = HashSet::new();
+        for g in interaction_constraints {
+            constrained_universe.extend(g.iter().cloned());
+        }
+
+        for &anc in &ancestor_features {
+            if !constrained_universe.contains(&anc) {
+                // Ancestor is unlisted. Its group is {anc}.
+                // Check if `ancestor_features` is subset of {anc} -> means `ancestor_features` == {anc}.
+                if ancestor_features.len() == 1 && ancestor_features.contains(&anc) {
+                    final_allowed.insert(anc);
+                    found_valid_group = true;
+                }
+            }
+        }
+
+        if !found_valid_group {
+            return Some(HashSet::new());
+        }
+
+        Some(final_allowed)
+    }
+
     #[allow(clippy::too_many_arguments)]
     pub fn fit<T: Splitter>(
         &mut self,
@@ -124,6 +187,13 @@ impl Tree {
             // more, then just add 1 back to n_leaves
             self.n_leaves -= 1;
 
+            // Get allowed features from interaction constraints (if configured)
+            let allowed = if let Some(constraints) = splitter.get_interaction_constraints() {
+                self.get_interaction_constraints_allowed_features(&node, constraints)
+            } else {
+                None
+            };
+
             let new_nodes = splitter.split_node(
                 &n_nodes,
                 &mut node,
@@ -137,6 +207,7 @@ impl Tree {
                 hist_tree,
                 cat_index,
                 split_info_slice,
+                allowed.as_ref(),
             );
 
             let n_new_nodes = new_nodes.len();
@@ -405,7 +476,7 @@ mod tests {
         let loss = objective_function.loss(&y, &yhat, None, None);
 
         let data = Matrix::new(&data_vec, 891, 5);
-        let splitter = MissingImputerSplitter::new(0.3, true, ConstraintMap::new());
+        let splitter = MissingImputerSplitter::new(0.3, true, ConstraintMap::new(), None);
         let mut tree = Tree::new();
 
         let b = bin_matrix(&data, None, 300, f64::NAN, None).unwrap();
@@ -507,7 +578,7 @@ mod tests {
         let data_ = Matrix::new(&data_vec, 891, 5);
         let data = Matrix::new(data_.get_col(1), 891, 1);
         let map = ConstraintMap::from([(0, Constraint::Negative)]);
-        let splitter = MissingImputerSplitter::new(0.3, true, map);
+        let splitter = MissingImputerSplitter::new(0.3, true, map, None);
         let mut tree = Tree::new();
 
         let b = bin_matrix(&data, None, 100, f64::NAN, None).unwrap();
@@ -604,7 +675,7 @@ mod tests {
         let loss = objective_function.loss(&y, &yhat, None, None);
 
         let data = Matrix::new(&data_vec, 891, 5);
-        let splitter = MissingImputerSplitter::new(0.3, true, ConstraintMap::new());
+        let splitter = MissingImputerSplitter::new(0.3, true, ConstraintMap::new(), None);
         let mut tree = Tree::new();
 
         let b = bin_matrix(&data, None, 300, f64::NAN, None).unwrap();
@@ -709,7 +780,7 @@ mod tests {
         let is_const_hess = hess.is_none();
         let loss = objective_function.loss(&y, &yhat, None, None);
 
-        let splitter = MissingImputerSplitter::new(0.3, true, ConstraintMap::new());
+        let splitter = MissingImputerSplitter::new(0.3, true, ConstraintMap::new(), None);
 
         let cat_index = HashSet::from([0, 3, 4, 6, 7, 8, 10, 11]);
 

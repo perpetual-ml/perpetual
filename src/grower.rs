@@ -1,3 +1,7 @@
+//! Grower
+//!
+//! This module manages the process of growing decision trees, supporting different
+//! growth policies like depth-wise and loss-guided.
 use serde::Deserialize;
 use serde::Serialize;
 
@@ -25,7 +29,7 @@ impl Grower for BinaryHeap<SplittableNode> {
     }
 
     fn is_empty(&self) -> bool {
-        self.is_empty()
+        self.len() == 0
     }
 }
 
@@ -39,7 +43,7 @@ impl Grower for VecDeque<SplittableNode> {
     }
 
     fn is_empty(&self) -> bool {
-        self.is_empty()
+        self.len() == 0
     }
 }
 

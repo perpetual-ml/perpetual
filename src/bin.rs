@@ -1,3 +1,7 @@
+//! Bin
+//!
+//! This module defines the `Bin` struct and related utilities for handling binned data.
+//! Each bin stores statistics (gradient and hessian) for a specific feature split point.
 use std::{cell::UnsafeCell, cmp::Ordering};
 
 use crate::data::FloatData;

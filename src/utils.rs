@@ -1,3 +1,6 @@
+//! Utils
+//!
+//! Shared utility functions for mathematical operations, validation, and data manipulation.
 use crate::constants::HESSIAN_EPS;
 use crate::constraints::Constraint;
 use crate::data::FloatData;
@@ -402,6 +405,9 @@ pub fn pivot_on_split(
     let h = &mut hess[start..stop];
 
     let length = index.len();
+    if length == 0 {
+        return 0;
+    }
     let mut last_idx = length - 1;
     let mut rv = None;
 
@@ -449,6 +455,9 @@ pub fn pivot_on_split_const_hess(
     let g = &mut grad[start..stop];
 
     let length = index.len();
+    if length == 0 {
+        return 0;
+    }
     let mut last_idx = length - 1;
     let mut rv = None;
 
@@ -509,9 +518,13 @@ pub fn pivot_on_split_exclude_missing(
     let index = &mut idx[start..stop];
     let gr = &mut grad[start..stop];
     let hs = &mut hess[start..stop];
+    let length = index.len();
+    if length == 0 {
+        return (0, 0);
+    }
     // I think we can do this in O(n) time...
     let mut low = 0;
-    let mut high = index.len() - 1;
+    let mut high = length - 1;
     // The index of the first value, that is not
     // missing.
     let mut missing = 0;
@@ -527,6 +540,8 @@ pub fn pivot_on_split_exclude_missing(
                 gr.swap(missing, low);
                 hs.swap(missing, low);
                 missing += 1;
+                low += 1;
+                continue;
             }
             match exclude_missing_compare(&split_value, l, left_cats) {
                 Ordering::Less | Ordering::Equal => break,
@@ -565,6 +580,18 @@ pub fn pivot_on_split_exclude_missing(
             hs.swap(high, low);
         }
     }
+    if low == high && low < length {
+        let l = feature[index[low]];
+        if l == 0 {
+            index.swap(missing, low);
+            gr.swap(missing, low);
+            hs.swap(missing, low);
+            missing += 1;
+            low += 1;
+        } else if exclude_missing_compare(&split_value, l, left_cats) == Ordering::Greater {
+            low += 1;
+        }
+    }
     (missing, low)
 }
 
@@ -580,9 +607,13 @@ pub fn pivot_on_split_exclude_missing_const_hess(
 ) -> (usize, usize) {
     let index = &mut idx[start..stop];
     let gr = &mut grad[start..stop];
+    let length = index.len();
+    if length == 0 {
+        return (0, 0);
+    }
     // I think we can do this in O(n) time...
     let mut low = 0;
-    let mut high = index.len() - 1;
+    let mut high = length - 1;
     // The index of the first value, that is not
     // missing.
     let mut missing = 0;
@@ -597,6 +628,8 @@ pub fn pivot_on_split_exclude_missing_const_hess(
                 index.swap(missing, low);
                 gr.swap(missing, low);
                 missing += 1;
+                low += 1;
+                continue;
             }
             match exclude_missing_compare(&split_value, l, left_cats) {
                 Ordering::Less | Ordering::Equal => break,
@@ -631,6 +664,17 @@ pub fn pivot_on_split_exclude_missing_const_hess(
         if low < high {
             index.swap(high, low);
             gr.swap(high, low);
+        }
+    }
+    if low == high && low < length {
+        let l = feature[index[low]];
+        if l == 0 {
+            index.swap(missing, low);
+            gr.swap(missing, low);
+            missing += 1;
+            low += 1;
+        } else if exclude_missing_compare(&split_value, l, left_cats) == Ordering::Greater {
+            low += 1;
         }
     }
     (missing, low)

@@ -1,3 +1,6 @@
+//! Constants
+//!
+//! Global constants used across the `perpetual` crate, such as default limits and thresholds.
 /// The number of rounds to look back for auto stopping.
 pub const STOPPING_ROUNDS: usize = 3;
 /// Factor to use when allocating memory for free nodes.

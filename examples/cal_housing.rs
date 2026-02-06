@@ -1,24 +1,11 @@
 //! An example using the `california housing` dataset
 
-// cargo run --release --example cal_housing 1.0 1
+// cargo run --release --example cal_housing 0.5
 
 // cargo build --release --example cal_housing
 // hyperfine --runs 3 ./target/release/examples/cal_housing
 // hyperfine --runs 3 .\target\release\examples\cal_housing
-// hyperfine --runs 11 'cargo run --release --example cal_housing 0.1 0.3 2'
-// hyperfine --runs 11 'cargo run --release --example cal_housing 2.0'
-
-// cargo flamegraph --example cal_housing
-
-//! An example using the `california housing` dataset
-
-// cargo run --release --example cal_housing 1.0 1
-
-// cargo build --release --example cal_housing
-// hyperfine --runs 3 ./target/release/examples/cal_housing
-// hyperfine --runs 3 .\target\release\examples\cal_housing
-// hyperfine --runs 11 'cargo run --release --example cal_housing 0.1 0.3 2'
-// hyperfine --runs 11 'cargo run --release --example cal_housing 2.0'
+// hyperfine --runs 11 'cargo run --release --example cal_housing 0.5'
 
 // cargo flamegraph --example cal_housing
 
@@ -95,8 +82,7 @@ fn read_data(path: &str) -> Result<(Vec<f64>, Vec<f64>), Box<dyn Error>> {
 
 fn main() -> Result<(), Box<dyn Error>> {
     let args: Vec<String> = env::args().collect();
-    let budget = &args[1].parse::<f32>().unwrap_or(1.0);
-    let num_threads = &args[2].parse::<usize>().unwrap_or(1);
+    let budget = &args[1].parse::<f32>().unwrap_or(0.5);
 
     let (data_train, y_train) = read_data("resources/cal_housing_train.csv")?;
     let (data_test, y_test) = read_data("resources/cal_housing_test.csv")?;
@@ -111,7 +97,6 @@ fn main() -> Result<(), Box<dyn Error>> {
     // adjust.
     let mut model = PerpetualBooster::default()
         .set_objective(Objective::SquaredLoss)
-        .set_num_threads(Some(*num_threads))
         .set_budget(*budget);
 
     let now = SystemTime::now();

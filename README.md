@@ -9,10 +9,11 @@
 
 <a href="https://pypi.org/project/perpetual" target="_blank"><img src="https://img.shields.io/pypi/pyversions/perpetual.svg?logo=python&logoColor=white" alt="Python Versions"></a>
 <a href="https://pypi.org/project/perpetual" target="_blank"><img src="https://img.shields.io/pypi/v/perpetual.svg?logo=pypi&logoColor=white" alt="PyPI Version"></a>
+<a href="https://anaconda.org/conda-forge/perpetual" target="_blank"><img src="https://img.shields.io/conda/v/conda-forge/perpetual?label=conda-forge&logo=anaconda&logoColor=white" alt="Conda Version"></a>
 <a href="https://crates.io/crates/perpetual" target="_blank"><img src="https://img.shields.io/crates/v/perpetual?logo=rust&logoColor=white" alt="Crates.io Version"></a>
 <a href="https://perpetual-ml.r-universe.dev/perpetual" target="_blank"><img src="https://img.shields.io/badge/dynamic/json?url=https://perpetual-ml.r-universe.dev/api/packages/perpetual&query=$.Version&label=r-universe&logo=R&logoColor=white&color=brightgreen" alt="R-Universe status"></a>
 <a href="https://discord.gg/AyUK7rr6wy" target="_blank"><img src="https://img.shields.io/badge/join-discord-blue?logo=discord" alt="Static Badge"></a>
-![PyPI - Downloads](https://img.shields.io/pypi/dm/perpetual)
+<a href="https://pypi.org/project/perpetual" target="_blank"><img src="https://img.shields.io/pypi/dm/perpetual?logo=pypi" alt="PyPI - Downloads"></a>
 
 </div>
 

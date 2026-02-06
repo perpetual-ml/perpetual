@@ -26,3 +26,29 @@ Sklearn Interface
 .. autoclass:: perpetual.sklearn.PerpetualRanker
    :members:
    :show-inheritance:
+
+Causal ML
+---------
+
+.. autoclass:: perpetual.iv.BraidedBooster
+   :members:
+   :show-inheritance:
+
+.. autoclass:: perpetual.meta_learners.SLearner
+   :members:
+   :show-inheritance:
+
+.. autoclass:: perpetual.meta_learners.TLearner
+   :members:
+   :show-inheritance:
+
+.. autoclass:: perpetual.meta_learners.XLearner
+   :members:
+   :show-inheritance:
+
+Regulatory Risk
+---------------
+
+.. autoclass:: perpetual.risk.PerpetualRiskEngine
+   :members:
+   :show-inheritance:

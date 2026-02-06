@@ -12,6 +12,7 @@ get_resources_dir <- function() {
     "tests/testthat/resources",
     "../resources",
     "../../resources",
+    "../../../resources",
     "./testthat/resources"
   )
   
@@ -22,27 +23,12 @@ get_resources_dir <- function() {
     }
   }
   
-  # Failback or check if we are in package root (manually run)
-  
-  # Debug info for CI
-  # msg <- paste0(
-  #   "Could not find resources directory.\n",
-  #   "Working directory: ", getwd(), "\n",
-  #   "Candidate paths checked: ", paste(candidates, collapse = ", "), "\n",
-  #   "Files in current dir:\n", paste(list.files(), collapse = "\n"), "\n",
-  #   "Files in parent dir:\n", paste(list.files(".."), collapse = "\n")
-  # )
-  
-  # stop(msg)
   return(NULL)
 }
 
 skip_if_no_resources <- function() {
   if (is.null(get_resources_dir())) {
-    if (Sys.getenv("PERPETUAL_REQ_RESOURCES") == "true") {
-      stop("Strict tests enabled (CI): Resources not found but required!")
-    }
-    testthat::skip("Test resources not found (skipped on R-universe/CRAN without data)")
+    stop("Test resources not found! This is required for all tests to run.")
   }
 }
 

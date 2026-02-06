@@ -1,3 +1,6 @@
+//! Errors
+//!
+//! Custom error types used throughout the `perpetual` crate.
 use thiserror::Error;
 
 /// Errors that can occur in the Perpetual Booster.

@@ -149,3 +149,37 @@ class MultiOutputBoosterType(Protocol):
 
     def get_metadata(self, key: str) -> str:
         """pass"""
+
+
+class IVBoosterType(Protocol):
+    def fit(
+        self,
+        flat_x: np.ndarray,
+        x_rows: int,
+        x_cols: int,
+        flat_z: np.ndarray,
+        z_rows: int,
+        z_cols: int,
+        y: np.ndarray,
+        w: np.ndarray,
+    ):
+        """pass"""
+
+    def predict(
+        self,
+        flat_x: np.ndarray,
+        x_rows: int,
+        x_cols: int,
+        w_counterfactual: np.ndarray,
+    ) -> np.ndarray:
+        """pass"""
+
+    @classmethod
+    def from_json(cls, json_str: str) -> Self:
+        """pass"""
+
+    def json_dump(self) -> str:
+        """pass"""
+
+    def get_params(self) -> Dict[str, Any]:
+        """pass"""

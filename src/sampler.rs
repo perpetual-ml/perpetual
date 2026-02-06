@@ -1,3 +1,7 @@
+//! Sampler
+//!
+//! Strategies for sampling data before fitting new trees, allowing for stochastic
+//! gradient boosting and better regularization.
 use rand::rngs::StdRng;
 use rand::Rng;
 use serde::{Deserialize, Serialize};

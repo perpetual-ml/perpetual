@@ -34,6 +34,7 @@ impl PerpetualBooster {
         max_bin,
         num_threads,
         monotone_constraints,
+        interaction_constraints,
         force_children_to_bound_parent,
         missing,
         allow_missing_splits,
@@ -58,6 +59,7 @@ impl PerpetualBooster {
         max_bin: u16,
         num_threads: Option<usize>,
         monotone_constraints: HashMap<usize, i8>,
+        interaction_constraints: Option<Vec<Vec<usize>>>,
         force_children_to_bound_parent: bool,
         missing: f64,
         allow_missing_splits: bool,
@@ -93,6 +95,7 @@ impl PerpetualBooster {
             .set_max_bin(max_bin)
             .set_num_threads(num_threads)
             .set_monotone_constraints(Some(monotone_constraints_))
+            .set_interaction_constraints(interaction_constraints)
             .set_force_children_to_bound_parent(force_children_to_bound_parent)
             .set_missing(missing)
             .set_allow_missing_splits(allow_missing_splits)
@@ -138,6 +141,11 @@ impl PerpetualBooster {
     fn set_monotone_constraints(&mut self, value: HashMap<usize, i8>) -> PyResult<()> {
         let map = int_map_to_constraint_map(value)?;
         self.booster.cfg.monotone_constraints = Some(map);
+        Ok(())
+    }
+    #[setter]
+    fn set_interaction_constraints(&mut self, value: Option<Vec<Vec<usize>>>) -> PyResult<()> {
+        self.booster.cfg.interaction_constraints = value;
         Ok(())
     }
     #[setter]
@@ -821,6 +829,15 @@ impl PerpetualBooster {
                 self.booster.cfg.allow_missing_splits.into_py_any(py).unwrap(),
             ),
             ("monotone_constraints", monotone_constraints_.into_py_any(py).unwrap()),
+            (
+                "interaction_constraints",
+                self.booster
+                    .cfg
+                    .interaction_constraints
+                    .clone()
+                    .into_py_any(py)
+                    .unwrap(),
+            ),
             ("missing", self.booster.cfg.missing.into_py_any(py).unwrap()),
             (
                 "create_missing_branch",

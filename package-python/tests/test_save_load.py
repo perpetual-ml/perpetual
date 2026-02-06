@@ -51,7 +51,7 @@ class TestSaveLoadFunctions:
         f64_model_path = tmp_path / "modelf64_sl.json"
         X, y = X_y()
         model = PerpetualBooster(
-            objective="SquaredLoss", iteration_limit=10, memory_limit=1.0
+            objective="SquaredLoss", budget=0.1, iteration_limit=10, memory_limit=1.0
         )
         save_func(model, f64_model_path)
         model.json_dump()
@@ -100,7 +100,7 @@ class TestSaveLoadFunctions:
         X, y = X_y()
         X = X
         model = PerpetualBooster(
-            objective="SquaredLoss", iteration_limit=10, memory_limit=1.0
+            objective="SquaredLoss", budget=0.1, iteration_limit=10, memory_limit=1.0
         )
         model.fit(X, y)
         preds = model.predict(X)
@@ -112,7 +112,7 @@ class TestSaveLoadFunctions:
         f64_model_path = tmp_path / "modelf64_ll.json"
         X, y = X_y()
         model = PerpetualBooster(
-            objective="LogLoss", iteration_limit=10, memory_limit=1.0
+            objective="LogLoss", budget=0.1, iteration_limit=10, memory_limit=1.0
         )
         model.fit(X, y)
         preds = model.predict(X)
@@ -140,6 +140,7 @@ class TestSaveLoadFunctions:
 
         model = PerpetualBooster(
             objective="SquaredLoss",
+            budget=0.1,
             monotone_constraints=mono_,
             iteration_limit=10,
             memory_limit=1.0,
@@ -170,12 +171,11 @@ class TestSaveLoadFunctions:
             ]
         )
 
-        # LogLoss
         f64_model_path = tmp_path / "modelf64_ll.json"
         X, y = X_y()
-        X = X
         model = PerpetualBooster(
             objective="LogLoss",
+            budget=0.1,
             monotone_constraints=mono_,
             iteration_limit=10,
             memory_limit=1.0,

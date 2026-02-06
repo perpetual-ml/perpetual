@@ -1,3 +1,7 @@
+//! Data
+//!
+//! Definition of core data structures used throughout the crate, including efficient
+//! matrix representations and support for zero-copy data from Arrow/Polars.
 use serde::{Deserialize, Serialize};
 use std::fmt::{self, Debug, Display};
 use std::iter::Sum;

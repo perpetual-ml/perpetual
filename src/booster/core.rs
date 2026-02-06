@@ -87,9 +87,11 @@ impl PerpetualBooster {
     ///   * If `None`, defaults to the number of available logical cores.
     /// * `monotone_constraints` - Optional constraints to enforce monotonic relationships between features and target.
     ///   * Map from feature index to constraint value: `1` (increasing), `-1` (decreasing), `0` (no constraint).
+    /// * `interaction_constraints` - Optional constraints to enforce allowed interactions between features.
+    ///   * List of allowed feature sets. e.g. `[[0, 1], [2, 3]]`.
     /// * `force_children_to_bound_parent` - If `true`, restricts child node predictions to be within the parent's range.
     ///   * Helps prevent wild predictions, acting as a regularization form.
-    /// * `missing` - The floating-point value representing missing data (e.g., `f64::NAN`).
+    /// * `missing` - The floating-point value representing missing data (e.g. `f64::NAN`).
     /// * `allow_missing_splits` - If `true`, allows the algorithm to learn how to split missing values specifically.
     /// * `create_missing_branch` - If `true`, enables ternary splits (Left, Right, Missing).
     ///   * Adds a dedicated branch for missing values, which can be more powerful than default direction handling.
@@ -123,6 +125,7 @@ impl PerpetualBooster {
         max_bin: u16,
         num_threads: Option<usize>,
         monotone_constraints: Option<ConstraintMap>,
+        interaction_constraints: Option<Vec<Vec<usize>>>,
         force_children_to_bound_parent: bool,
         missing: f64,
         allow_missing_splits: bool,
@@ -145,6 +148,7 @@ impl PerpetualBooster {
             max_bin,
             num_threads,
             monotone_constraints,
+            interaction_constraints,
             force_children_to_bound_parent,
             missing,
             allow_missing_splits,
@@ -231,7 +235,12 @@ impl PerpetualBooster {
             );
             self.fit_trees(data, y, &splitter, sample_weight, group)?;
         } else {
-            let splitter = MissingImputerSplitter::new(self.eta, self.cfg.allow_missing_splits, constraints_map);
+            let splitter = MissingImputerSplitter::new(
+                self.eta,
+                self.cfg.allow_missing_splits,
+                constraints_map,
+                self.cfg.interaction_constraints.clone(),
+            );
             self.fit_trees(data, y, &splitter, sample_weight, group)?;
         };
 
@@ -276,14 +285,19 @@ impl PerpetualBooster {
             );
             self.fit_trees_columnar(data, y, &splitter, sample_weight, group)?;
         } else {
-            let splitter = MissingImputerSplitter::new(self.eta, self.cfg.allow_missing_splits, constraints_map);
+            let splitter = MissingImputerSplitter::new(
+                self.eta,
+                self.cfg.allow_missing_splits,
+                constraints_map,
+                self.cfg.interaction_constraints.clone(),
+            );
             self.fit_trees_columnar(data, y, &splitter, sample_weight, group)?;
         };
 
         Ok(())
     }
 
-    fn fit_trees<T: Splitter>(
+    pub fn fit_trees<T: Splitter>(
         &mut self,
         data: &Matrix<f64>,
         y: &[f64],
@@ -395,7 +409,6 @@ impl PerpetualBooster {
                 .map(|_| NodeHistogramOwned::empty(self.cfg.max_bin, col_amount, is_const_hess, false))
                 .collect();
         }
-
         let mut hist_tree: Vec<NodeHistogram> = hist_tree_owned.iter_mut().map(NodeHistogram::from_owned).collect();
 
         let mut split_info_vec: Vec<SplitInfo> = (0..col_amount).map(|_| SplitInfo::default()).collect();
@@ -436,7 +449,7 @@ impl PerpetualBooster {
             if col_amount != col_index.len() {
                 hist_tree.iter().for_each(|h| {
                     update_cuts(h, col_index_fit, &binned_data.cuts, true);
-                })
+                });
             }
 
             let mut tree = Tree::new();
@@ -452,14 +465,13 @@ impl PerpetualBooster {
                 tld,
                 &loss,
                 y,
-                //objective_fn,
                 &yhat,
                 sample_weight,
                 group,
                 is_const_hess,
                 &mut hist_tree,
                 self.cfg.categorical_features.as_ref(),
-                &mut split_info_slice,
+                &mut split_info_slice, // Pass by value (already a SplitInfoSlice)
                 n_nodes_alloc,
                 self.cfg.save_node_stats,
             );
@@ -532,7 +544,7 @@ impl PerpetualBooster {
         Ok(())
     }
 
-    fn fit_trees_columnar<T: Splitter>(
+    pub fn fit_trees_columnar<T: Splitter>(
         &mut self,
         data: &ColumnarMatrix<f64>,
         y: &[f64],
@@ -1084,7 +1096,6 @@ mod perpetual_booster_test {
         let file = fs::read_to_string("resources/performance.csv").expect("Something went wrong reading the file");
         let y: Vec<f64> = file.lines().map(|x| x.parse::<f64>().unwrap()).collect();
 
-        //let data = Matrix::new(data.get_col(1), 891, 1);
         let mut booster = PerpetualBooster::default()
             .set_max_bin(300)
             .set_base_score(0.5)

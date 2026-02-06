@@ -1,6 +1,6 @@
 [package]
 name = "py-perpetual"
-version = "1.1.2"
+version = "1.2.0"
 edition = "2021"
 authors = ["Mutlu Simsek <msimsek@perpetual-ml.com>", "Serkan Korkmaz <serkor1@duck.com>", "Pieter Pel <pelpieter@gmail.com>"]
 homepage = "https://perpetual-ml.com"
@@ -12,16 +12,16 @@ repository = "https://github.com/perpetual-ml/perpetual"
 keywords = ["machine-learning", "perpetual", "ai", "ml"]
 categories = ["algorithms", "mathematics", "science"]
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [lib]
 name = "perpetual"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-perpetual_rs = {package="perpetual", version = "1.1.2", path = "../" }
+perpetual_rs = {package="perpetual", version = "1.2.0", path = "../" }
 pyo3 = { version = "0.27.2", features = ["extension-module"] }
 numpy = "0.27.1"
 ndarray = "0.17.2"
 serde_plain = { version = "1.0.2" }
 serde = { version = "1.0.228" }
+serde_json = "1.0.149"
 pyo3-log = "0.13.2"

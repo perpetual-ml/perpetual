@@ -1,3 +1,7 @@
+//! Histogram
+//!
+//! Efficient histogram calculations for finding optimal splits.
+//! Histograms store aggregated gradient and hessian statistics for each bin.
 use crate::bin::Bin;
 use crate::data::{FloatData, JaggedMatrix};
 use crate::Matrix;

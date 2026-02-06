@@ -67,9 +67,9 @@ def test_sklearn_compat_classification(X_y):
     proba_booster = model_booster.predict_proba(X_test)
     log_odds_booster = model_booster.predict_log_proba(X_test)
 
-    np.allclose(preds_sklearn, preds_booster)
-    np.allclose(proba_sklearn, proba_booster)
-    np.allclose(log_odds_sklearn, log_odds_booster)
+    assert np.allclose(preds_sklearn, preds_booster)
+    assert np.allclose(proba_sklearn, proba_booster)
+    assert np.allclose(log_odds_sklearn, log_odds_booster)
 
 
 def test_sklearn_compat_regression(X_y):
@@ -86,7 +86,7 @@ def test_sklearn_compat_regression(X_y):
 
     preds_booster = model_booster.predict(X_test)
 
-    np.allclose(preds_sklearn, preds_booster)
+    assert np.allclose(preds_sklearn, preds_booster)
 
 
 def test_sklearn_compat_ranking(X_y_g):
@@ -102,4 +102,4 @@ def test_sklearn_compat_ranking(X_y_g):
 
     preds_booster = model_booster.predict(X)
 
-    np.allclose(preds_sklearn, preds_booster)
+    assert np.allclose(preds_sklearn, preds_booster)

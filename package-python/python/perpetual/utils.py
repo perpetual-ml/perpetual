@@ -210,14 +210,50 @@ def convert_input_frame_columnar(
                 arr = arr.dictionary_encode()
 
             # Extract categories (dictionary)
-            # Arrow dictionary is usually StringArray
-            cats = arr.dictionary.to_pylist()
+            cats_orig = arr.dictionary.to_pylist()
 
             # Extract codes (indices)
-            # Cast to float64 for Perpetual
-            indices = arr.indices.to_numpy(zero_copy_only=False)
-            out_values = indices.astype(np.float64)
-            out_values += 1.0  # Shift: 0 in Perpetual is "nan"
+            indices_raw = arr.indices.to_numpy(zero_copy_only=False)
+
+            # Important: Polars Categorical columns might share a large global dictionary.
+            # We must only include categories that are actually present in this column's data
+            # to remain consistent with the Pandas/Numpy path (which uses np.unique).
+            if arr.null_count < len(indices_raw):
+                # Identify which dictionary indices are actually used
+                valid_mask = np.ones(len(indices_raw), dtype=bool)
+                if arr.null_count > 0 and arr.buffers()[0]:
+                    valid_bits = np.frombuffer(arr.buffers()[0], dtype=np.uint8)
+                    valid_mask = np.unpackbits(valid_bits, bitorder="little")[
+                        : len(indices_raw)
+                    ].astype(bool)
+
+                used_indices = np.unique(indices_raw[valid_mask])
+                cats_present = []
+                for i in used_indices:
+                    idx = int(i)
+                    if 0 <= idx < len(cats_orig):
+                        c = cats_orig[idx]
+                        if c is not None and str(c) != "nan":
+                            cats_present.append(str(c))
+                cats = sorted(cats_present)
+            else:
+                cats = []
+
+            # Create lookup table for remapping original indices to sorted indices
+            # Note: We shift values by +1.0 because 0 in Perpetual is "nan"
+            lookup = np.full(len(cats_orig), np.nan, dtype=np.float64)
+            cat_to_idx = {cat: i for i, cat in enumerate(cats)}
+            for i, cat in enumerate(cats_orig):
+                if cat in cat_to_idx:
+                    lookup[i] = float(cat_to_idx[cat]) + 1.0
+
+            # Match indices to lookup table safely
+            if np.issubdtype(indices_raw.dtype, np.floating):
+                mask = ~np.isnan(indices_raw)
+                out_values = np.full(len(indices_raw), np.nan, dtype=np.float64)
+                out_values[mask] = lookup[indices_raw[mask].astype(np.int64)]
+            else:
+                out_values = lookup[indices_raw]
 
             # Handle Nulls (masked values in Arrow)
             # Set them to NaN
@@ -232,15 +268,6 @@ def convert_input_frame_columnar(
                     # mask is 1 where valid, 0 where null.
                     # We want to set nulls (0) to NaN.
                     out_values[~valid_mask] = np.nan
-
-            # Handle "nan" string in categories
-            if "nan" in cats:
-                nan_idx = cats.index("nan")
-                # Indices pointing to this "nan" string should become NaN
-                # Current logic: cats["nan"] is at `nan_idx`.
-                # `out_values` has `nan_idx + 1`.
-                out_values[out_values == (nan_idx + 1.0)] = np.nan
-                cats.remove("nan")
 
             cats.insert(0, "nan")
 

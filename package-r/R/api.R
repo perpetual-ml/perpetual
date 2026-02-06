@@ -290,10 +290,10 @@ perpetual_to_json <- function(model) {
   .Call("PerpetualBooster_json_dump", model$.ptr, PACKAGE = "perpetual")
 }
 
-# Compatibility for old R6 style usage (optional, but good for backward compat)
+#' @export
 PerpetualBooster <- list(
     new = function(...) {
-        stop("Please use perpetual() instead of PerpetualBooster$new()")
+        perpetual(...)
     },
     load_booster = function(path) {
         perpetual_load(path)

@@ -78,6 +78,7 @@ fn default_reset() -> Option<bool> {
 fn default_categorical_features() -> Option<HashSet<usize>> {
     None
 }
+
 fn default_timeout() -> Option<f32> {
     None
 }
@@ -108,6 +109,9 @@ where
 {
     Deserialize::deserialize(d).map(|x: Option<_>| x.unwrap_or(f64::NAN))
 }
+fn default_interaction_constraints() -> Option<Vec<Vec<usize>>> {
+    None
+}
 
 // Common Booster configuration
 // across
@@ -125,6 +129,9 @@ pub struct BoosterConfig {
     pub num_threads: Option<usize>,
     /// Monotonicity constraints.
     pub monotone_constraints: Option<ConstraintMap>,
+    /// Interaction constraints.
+    #[serde(default = "default_interaction_constraints")]
+    pub interaction_constraints: Option<Vec<Vec<usize>>>,
     /// Whether to restrict child node weights within parent range.
     #[serde(default = "default_force_children_to_bound_parent")]
     pub force_children_to_bound_parent: bool,
@@ -181,6 +188,7 @@ impl Default for BoosterConfig {
             max_bin: 256,
             num_threads: None,
             monotone_constraints: None,
+            interaction_constraints: None,
             force_children_to_bound_parent: false,
             missing: f64::NAN,
             allow_missing_splits: true,
