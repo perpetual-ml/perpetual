@@ -1,0 +1,486 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Customer Retention: Uplift Modeling for Churn Prevention &mdash; Perpetual 1.2.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="../../_static/nbsphinx-code-cells.css?v=2aa19091" />
+
+  
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=6efca38a"></script>
+      <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+      <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+      <script>window.MathJax = {"tex": {"inlineMath": [["$", "$"], ["\\(", "\\)"]], "processEscapes": true}, "options": {"ignoreHtmlClass": "tex2jax_ignore|mathjax_ignore|document", "processHtmlClass": "tex2jax_process|mathjax_process|math|output_area"}}</script>
+      <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@4/tex-mml-chtml.js"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+    <link rel="next" title="Vertical Solutions" href="../../verticals/index.html" />
+    <link rel="prev" title="Fairness-Aware Credit Scoring" href="fairness_aware_modeling.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            Perpetual
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../../installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../api.html">API Reference</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../index.html">Tutorials</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../categorical_data.html">Handling Categorical Data</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../toy_datasets.html">Quick Start with Toy Datasets</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../benchmark.html">Performance Benchmarking</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../custom_objective.html">Custom Objective Tutorial</a></li>
+<li class="toctree-l2"><a class="reference internal" href="uplift_marketing.html">Uplift Modeling and Causal Inference</a></li>
+<li class="toctree-l2"><a class="reference internal" href="iv_causal_effect.html">Instrumental Variables (Boosted IV)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="risk_compliance.html">Risk, Compliance, and Interpretability</a></li>
+<li class="toctree-l2"><a class="reference internal" href="heterogeneous_treatment_effects.html">Heterogeneous Treatment Effects with Meta-Learners</a></li>
+<li class="toctree-l2"><a class="reference internal" href="fairness_aware_modeling.html">Fairness-Aware Credit Scoring</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">Customer Retention: Uplift Modeling for Churn Prevention</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#1.-Prepare-a-Churn-Retention-Dataset">1. Prepare a Churn Retention Dataset</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#2.-Estimate-CATE-with-Multiple-Learners">2. Estimate CATE with Multiple Learners</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#3.-Targeting-Policy-—-Who-Should-Receive-the-Offer?">3. Targeting Policy — Who Should Receive the Offer?</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#4.-Evaluation:-Uplift-Curves-and-Metrics">4. Evaluation: Uplift Curves and Metrics</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#5.-Deep-Dive:-Who-Are-the-Persuadables?">5. Deep Dive: Who Are the Persuadables?</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#Key-Takeaways">Key Takeaways</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../verticals/index.html">Vertical Solutions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../architecture.html">Architecture</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../parameters_tuning.html">Parameters Tuning</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../faq.html">Frequently Asked Questions</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">Perpetual</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">Tutorials</a></li>
+      <li class="breadcrumb-item active">Customer Retention: Uplift Modeling for Churn Prevention</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../_sources/tutorials/causal/customer_retention_uplift.ipynb.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="Customer-Retention:-Uplift-Modeling-for-Churn-Prevention">
+<h1>Customer Retention: Uplift Modeling for Churn Prevention<a class="headerlink" href="#Customer-Retention:-Uplift-Modeling-for-Churn-Prevention" title="Link to this heading"></a></h1>
+<p>Customer churn is a critical problem in subscription businesses (telecom, SaaS, banking). A common intervention is a <strong>retention offer</strong> (discount, loyalty reward, personal call). However, not every customer benefits equally from such an offer:</p>
+<ul class="simple">
+<li><p><strong>Persuadables</strong> — would churn without the offer but stay if treated. <em>Target these.</em></p></li>
+<li><p><strong>Sure Things</strong> — will stay regardless. <em>Waste of budget.</em></p></li>
+<li><p><strong>Lost Causes</strong> — will churn regardless. <em>Waste of budget.</em></p></li>
+<li><p><strong>Sleeping Dogs</strong> — will stay without contact but churn if contacted. <em>Avoid these!</em></p></li>
+</ul>
+<p>Uplift modeling identifies the <strong>persuadables</strong> by estimating the Conditional Average Treatment Effect (CATE) of the retention intervention on each customer.</p>
+<p>This tutorial demonstrates a full <strong>churn uplift</strong> pipeline:</p>
+<ol class="arabic simple">
+<li><p>Simulate a retention campaign dataset.</p></li>
+<li><p>Estimate CATE with S-Learner, T-Learner, X-Learner, DR-Learner, and R-Learner.</p></li>
+<li><p>Build a targeting policy and measure incremental revenue.</p></li>
+<li><p>Evaluate with uplift curves, AUUC, and Qini.</p></li>
+</ol>
+<blockquote>
+<div><p><strong>Note:</strong> We use the <strong>Bank Marketing</strong> dataset from UCI/OpenML as a realistic customer base and simulate a retention RCT on top of it.</p>
+</div></blockquote>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+</pre></div>
+</div>
+<div class="input_area highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">matplotlib.pyplot</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">plt</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pd</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">perpetual.causal_metrics</span><span class="w"> </span><span class="kn">import</span> <span class="n">auuc</span><span class="p">,</span> <span class="n">cumulative_gain_curve</span><span class="p">,</span> <span class="n">qini_coefficient</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">perpetual.meta_learners</span><span class="w"> </span><span class="kn">import</span> <span class="n">DRLearner</span><span class="p">,</span> <span class="n">SLearner</span><span class="p">,</span> <span class="n">TLearner</span><span class="p">,</span> <span class="n">XLearner</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">perpetual.uplift</span><span class="w"> </span><span class="kn">import</span> <span class="n">UpliftBooster</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">sklearn.datasets</span><span class="w"> </span><span class="kn">import</span> <span class="n">fetch_openml</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">sklearn.model_selection</span><span class="w"> </span><span class="kn">import</span> <span class="n">train_test_split</span>
+</pre></div>
+</div>
+</div>
+<section id="1.-Prepare-a-Churn-Retention-Dataset">
+<h2>1. Prepare a Churn Retention Dataset<a class="headerlink" href="#1.-Prepare-a-Churn-Retention-Dataset" title="Link to this heading"></a></h2>
+<p>We use the <strong>Bank Marketing</strong> dataset (OpenML ID 1461) which records whether clients subscribed to a term deposit after a marketing campaign. We re-frame this as a churn-prevention scenario:</p>
+<ul class="simple">
+<li><p><strong>Outcome :math:`Y`</strong>: whether the customer was <em>retained</em> (subscribed).</p></li>
+<li><p><strong>Treatment :math:`W`</strong>: whether the customer received a targeted retention call (simulated RCT).</p></li>
+</ul>
+<p>Since the original dataset is observational, we construct a clean RCT by randomly assigning treatment and simulating heterogeneous response.</p>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+</pre></div>
+</div>
+<div class="input_area highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">data</span> <span class="o">=</span> <span class="n">fetch_openml</span><span class="p">(</span><span class="n">data_id</span><span class="o">=</span><span class="mi">1461</span><span class="p">,</span> <span class="n">as_frame</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">parser</span><span class="o">=</span><span class="s2">&quot;auto&quot;</span><span class="p">)</span>
+<span class="n">df</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">frame</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Raw samples: </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">df</span><span class="p">)</span><span class="si">:</span><span class="s2">,</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="n">df</span><span class="o">.</span><span class="n">head</span><span class="p">()</span>
+</pre></div>
+</div>
+</div>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+</pre></div>
+</div>
+<div class="input_area highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Select features (drop the original outcome and campaign-related cols)</span>
+<span class="n">feature_cols</span> <span class="o">=</span> <span class="p">[</span>
+    <span class="s2">&quot;age&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;job&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;marital&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;education&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;default&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;balance&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;housing&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;loan&quot;</span><span class="p">,</span>
+<span class="p">]</span>
+<span class="n">X</span> <span class="o">=</span> <span class="n">df</span><span class="p">[</span><span class="n">feature_cols</span><span class="p">]</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+
+<span class="c1"># Mark categoricals</span>
+<span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">X</span><span class="o">.</span><span class="n">select_dtypes</span><span class="p">(</span><span class="n">include</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;object&quot;</span><span class="p">,</span> <span class="s2">&quot;category&quot;</span><span class="p">])</span><span class="o">.</span><span class="n">columns</span><span class="p">:</span>
+    <span class="n">X</span><span class="p">[</span><span class="n">c</span><span class="p">]</span> <span class="o">=</span> <span class="n">X</span><span class="p">[</span><span class="n">c</span><span class="p">]</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="s2">&quot;category&quot;</span><span class="p">)</span>
+
+<span class="n">n</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">X</span><span class="p">)</span>
+<span class="n">rng</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">default_rng</span><span class="p">(</span><span class="mi">42</span><span class="p">)</span>
+
+<span class="c1"># --- Simulate an RCT ---</span>
+<span class="c1"># Random treatment assignment (50/50)</span>
+<span class="n">w</span> <span class="o">=</span> <span class="n">rng</span><span class="o">.</span><span class="n">binomial</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mf">0.5</span><span class="p">,</span> <span class="n">size</span><span class="o">=</span><span class="n">n</span><span class="p">)</span>
+
+<span class="c1"># Baseline churn probability (higher for young, low-balance customers)</span>
+<span class="n">age_norm</span> <span class="o">=</span> <span class="p">(</span><span class="n">df</span><span class="p">[</span><span class="s2">&quot;age&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">float</span><span class="p">)</span><span class="o">.</span><span class="n">values</span> <span class="o">-</span> <span class="mi">30</span><span class="p">)</span> <span class="o">/</span> <span class="mi">30</span>
+<span class="n">balance_norm</span> <span class="o">=</span> <span class="p">(</span><span class="n">df</span><span class="p">[</span><span class="s2">&quot;balance&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">float</span><span class="p">)</span><span class="o">.</span><span class="n">values</span> <span class="o">-</span> <span class="mi">1000</span><span class="p">)</span> <span class="o">/</span> <span class="mi">5000</span>
+<span class="n">base_logit</span> <span class="o">=</span> <span class="o">-</span><span class="mf">0.5</span> <span class="o">-</span> <span class="mf">0.3</span> <span class="o">*</span> <span class="n">age_norm</span> <span class="o">+</span> <span class="mf">0.2</span> <span class="o">*</span> <span class="n">balance_norm</span>
+
+<span class="c1"># Heterogeneous treatment effect:</span>
+<span class="c1">#   - Young customers (age &lt; 35) respond well to retention offers</span>
+<span class="c1">#   - Customers with housing loans also respond positively</span>
+<span class="c1">#   - High-balance customers don&#39;t need the offer (&quot;sure things&quot;)</span>
+<span class="n">has_housing</span> <span class="o">=</span> <span class="p">(</span><span class="n">df</span><span class="p">[</span><span class="s2">&quot;housing&quot;</span><span class="p">]</span> <span class="o">==</span> <span class="s2">&quot;yes&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">float</span><span class="p">)</span><span class="o">.</span><span class="n">values</span>
+<span class="n">is_young</span> <span class="o">=</span> <span class="p">(</span><span class="n">df</span><span class="p">[</span><span class="s2">&quot;age&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">float</span><span class="p">)</span><span class="o">.</span><span class="n">values</span> <span class="o">&lt;</span> <span class="mi">35</span><span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">float</span><span class="p">)</span>
+<span class="n">tau</span> <span class="o">=</span> <span class="mf">0.15</span> <span class="o">*</span> <span class="n">is_young</span> <span class="o">+</span> <span class="mf">0.10</span> <span class="o">*</span> <span class="n">has_housing</span> <span class="o">-</span> <span class="mf">0.08</span> <span class="o">*</span> <span class="p">(</span><span class="n">balance_norm</span> <span class="o">&gt;</span> <span class="mf">0.5</span><span class="p">)</span>
+
+<span class="c1"># Generate outcome</span>
+<span class="n">prob_retain</span> <span class="o">=</span> <span class="mi">1</span> <span class="o">/</span> <span class="p">(</span><span class="mi">1</span> <span class="o">+</span> <span class="n">np</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="o">-</span><span class="p">(</span><span class="n">base_logit</span> <span class="o">+</span> <span class="n">tau</span> <span class="o">*</span> <span class="n">w</span><span class="p">)))</span>
+<span class="n">y</span> <span class="o">=</span> <span class="n">rng</span><span class="o">.</span><span class="n">binomial</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">prob_retain</span><span class="p">)</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Treatment rate: </span><span class="si">{</span><span class="n">w</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span><span class="si">:</span><span class="s2">.2%</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Retention rate (treated):  </span><span class="si">{</span><span class="n">y</span><span class="p">[</span><span class="n">w</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span><span class="si">:</span><span class="s2">.2%</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Retention rate (control):  </span><span class="si">{</span><span class="n">y</span><span class="p">[</span><span class="n">w</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span><span class="si">:</span><span class="s2">.2%</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;True ATE: </span><span class="si">{</span><span class="n">tau</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+</pre></div>
+</div>
+<div class="input_area highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">X_train</span><span class="p">,</span> <span class="n">X_test</span><span class="p">,</span> <span class="n">w_train</span><span class="p">,</span> <span class="n">w_test</span><span class="p">,</span> <span class="n">y_train</span><span class="p">,</span> <span class="n">y_test</span><span class="p">,</span> <span class="n">tau_test</span> <span class="o">=</span> <span class="n">train_test_split</span><span class="p">(</span>
+    <span class="n">X</span><span class="p">,</span> <span class="n">w</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">tau</span><span class="p">,</span> <span class="n">test_size</span><span class="o">=</span><span class="mf">0.3</span><span class="p">,</span> <span class="n">random_state</span><span class="o">=</span><span class="mi">42</span>
+<span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Train: </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">X_train</span><span class="p">)</span><span class="si">:</span><span class="s2">,</span><span class="si">}</span><span class="s2">  |  Test: </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">X_test</span><span class="p">)</span><span class="si">:</span><span class="s2">,</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</section>
+<section id="2.-Estimate-CATE-with-Multiple-Learners">
+<h2>2. Estimate CATE with Multiple Learners<a class="headerlink" href="#2.-Estimate-CATE-with-Multiple-Learners" title="Link to this heading"></a></h2>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+</pre></div>
+</div>
+<div class="input_area highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">learners</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s2">&quot;S-Learner&quot;</span><span class="p">:</span> <span class="n">SLearner</span><span class="p">(</span><span class="n">budget</span><span class="o">=</span><span class="mf">0.3</span><span class="p">),</span>
+    <span class="s2">&quot;T-Learner&quot;</span><span class="p">:</span> <span class="n">TLearner</span><span class="p">(</span><span class="n">budget</span><span class="o">=</span><span class="mf">0.3</span><span class="p">),</span>
+    <span class="s2">&quot;X-Learner&quot;</span><span class="p">:</span> <span class="n">XLearner</span><span class="p">(</span><span class="n">budget</span><span class="o">=</span><span class="mf">0.3</span><span class="p">),</span>
+    <span class="s2">&quot;DR-Learner&quot;</span><span class="p">:</span> <span class="n">DRLearner</span><span class="p">(</span><span class="n">budget</span><span class="o">=</span><span class="mf">0.3</span><span class="p">,</span> <span class="n">clip</span><span class="o">=</span><span class="mf">0.01</span><span class="p">),</span>
+<span class="p">}</span>
+
+<span class="n">cate_preds</span> <span class="o">=</span> <span class="p">{}</span>
+<span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">learner</span> <span class="ow">in</span> <span class="n">learners</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+    <span class="n">learner</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">X_train</span><span class="p">,</span> <span class="n">w_train</span><span class="p">,</span> <span class="n">y_train</span><span class="p">)</span>
+    <span class="n">cate_preds</span><span class="p">[</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="n">learner</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="n">X_test</span><span class="p">)</span>
+
+<span class="c1"># R-Learner</span>
+<span class="n">rl</span> <span class="o">=</span> <span class="n">UpliftBooster</span><span class="p">(</span><span class="n">outcome_budget</span><span class="o">=</span><span class="mf">0.1</span><span class="p">,</span> <span class="n">propensity_budget</span><span class="o">=</span><span class="mf">0.01</span><span class="p">,</span> <span class="n">effect_budget</span><span class="o">=</span><span class="mf">0.1</span><span class="p">)</span>
+<span class="n">rl</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">X_train</span><span class="p">,</span> <span class="n">w_train</span><span class="p">,</span> <span class="n">y_train</span><span class="p">)</span>
+<span class="n">cate_preds</span><span class="p">[</span><span class="s2">&quot;R-Learner&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">rl</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="n">X_test</span><span class="p">)</span>
+
+<span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">tau_hat</span> <span class="ow">in</span> <span class="n">cate_preds</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+    <span class="n">corr</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">corrcoef</span><span class="p">(</span><span class="n">tau_test</span><span class="p">,</span> <span class="n">tau_hat</span><span class="p">)[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">]</span>
+    <span class="n">rmse</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">((</span><span class="n">tau_test</span> <span class="o">-</span> <span class="n">tau_hat</span><span class="p">)</span> <span class="o">**</span> <span class="mi">2</span><span class="p">))</span>
+    <span class="nb">print</span><span class="p">(</span>
+        <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">name</span><span class="si">:</span><span class="s2">12s</span><span class="si">}</span><span class="s2">  avg CATE = </span><span class="si">{</span><span class="n">tau_hat</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span><span class="si">:</span><span class="s2">+.4f</span><span class="si">}</span><span class="s2">  &quot;</span>
+        <span class="sa">f</span><span class="s2">&quot;corr(true) = </span><span class="si">{</span><span class="n">corr</span><span class="si">:</span><span class="s2">.3f</span><span class="si">}</span><span class="s2">  RMSE = </span><span class="si">{</span><span class="n">rmse</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2">&quot;</span>
+    <span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</section>
+<section id="3.-Targeting-Policy-—-Who-Should-Receive-the-Offer?">
+<h2>3. Targeting Policy — Who Should Receive the Offer?<a class="headerlink" href="#3.-Targeting-Policy-—-Who-Should-Receive-the-Offer?" title="Link to this heading"></a></h2>
+<p>A <strong>targeting policy</strong> assigns treatment to customers whose predicted uplift exceeds a threshold. We use a simple rule: treat if <span class="math notranslate nohighlight">\(\hat{\tau}(x) &gt; 0\)</span>.</p>
+<p>We compare three scenarios:</p>
+<ol class="arabic simple">
+<li><p><strong>Treat nobody</strong> (control baseline)</p></li>
+<li><p><strong>Treat everybody</strong> (blanket policy)</p></li>
+<li><p><strong>Treat top-k by predicted CATE</strong> (uplift-based targeting)</p></li>
+</ol>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+</pre></div>
+</div>
+<div class="input_area highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Use DR-Learner for targeting</span>
+<span class="n">tau_hat</span> <span class="o">=</span> <span class="n">cate_preds</span><span class="p">[</span><span class="s2">&quot;DR-Learner&quot;</span><span class="p">]</span>
+
+<span class="c1"># Offer cost: $10 per contacted customer</span>
+<span class="c1"># Revenue from retained customer: $100</span>
+<span class="n">OFFER_COST</span> <span class="o">=</span> <span class="mi">10</span>
+<span class="n">RETAIN_VALUE</span> <span class="o">=</span> <span class="mi">100</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">evaluate_policy</span><span class="p">(</span><span class="n">treat_mask</span><span class="p">,</span> <span class="n">y_obs</span><span class="p">,</span> <span class="n">w_obs</span><span class="p">,</span> <span class="n">tau_true</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Estimate incremental outcomes under a targeting policy.&quot;&quot;&quot;</span>
+    <span class="n">n_treated</span> <span class="o">=</span> <span class="n">treat_mask</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span>
+    <span class="c1"># Among those targeted AND actually treated in the RCT</span>
+    <span class="n">expected_uplift</span> <span class="o">=</span> <span class="n">tau_true</span><span class="p">[</span><span class="n">treat_mask</span><span class="p">]</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span> <span class="k">if</span> <span class="n">n_treated</span> <span class="o">&gt;</span> <span class="mi">0</span> <span class="k">else</span> <span class="mi">0</span>
+    <span class="n">incremental_retentions</span> <span class="o">=</span> <span class="n">expected_uplift</span> <span class="o">*</span> <span class="n">n_treated</span>
+    <span class="n">revenue</span> <span class="o">=</span> <span class="n">incremental_retentions</span> <span class="o">*</span> <span class="n">RETAIN_VALUE</span> <span class="o">-</span> <span class="n">n_treated</span> <span class="o">*</span> <span class="n">OFFER_COST</span>
+    <span class="k">return</span> <span class="p">{</span>
+        <span class="s2">&quot;n_targeted&quot;</span><span class="p">:</span> <span class="n">n_treated</span><span class="p">,</span>
+        <span class="s2">&quot;pct_targeted&quot;</span><span class="p">:</span> <span class="n">n_treated</span> <span class="o">/</span> <span class="nb">len</span><span class="p">(</span><span class="n">y_obs</span><span class="p">),</span>
+        <span class="s2">&quot;avg_true_cate&quot;</span><span class="p">:</span> <span class="n">expected_uplift</span><span class="p">,</span>
+        <span class="s2">&quot;est_incremental_revenue&quot;</span><span class="p">:</span> <span class="n">revenue</span><span class="p">,</span>
+    <span class="p">}</span>
+
+
+<span class="n">policies</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s2">&quot;Treat nobody&quot;</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">X_test</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">bool</span><span class="p">),</span>
+    <span class="s2">&quot;Treat all&quot;</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">X_test</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">bool</span><span class="p">),</span>
+    <span class="s2">&quot;Top 30%&quot;</span><span class="p">:</span> <span class="n">tau_hat</span> <span class="o">&gt;=</span> <span class="n">np</span><span class="o">.</span><span class="n">percentile</span><span class="p">(</span><span class="n">tau_hat</span><span class="p">,</span> <span class="mi">70</span><span class="p">),</span>
+    <span class="s2">&quot;Top 50%&quot;</span><span class="p">:</span> <span class="n">tau_hat</span> <span class="o">&gt;=</span> <span class="n">np</span><span class="o">.</span><span class="n">percentile</span><span class="p">(</span><span class="n">tau_hat</span><span class="p">,</span> <span class="mi">50</span><span class="p">),</span>
+    <span class="s2">&quot;CATE &gt; 0&quot;</span><span class="p">:</span> <span class="n">tau_hat</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">,</span>
+<span class="p">}</span>
+
+<span class="n">rows</span> <span class="o">=</span> <span class="p">[]</span>
+<span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">mask</span> <span class="ow">in</span> <span class="n">policies</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+    <span class="n">res</span> <span class="o">=</span> <span class="n">evaluate_policy</span><span class="p">(</span><span class="n">mask</span><span class="p">,</span> <span class="n">y_test</span><span class="p">,</span> <span class="n">w_test</span><span class="p">,</span> <span class="n">tau_test</span><span class="p">)</span>
+    <span class="n">rows</span><span class="o">.</span><span class="n">append</span><span class="p">({</span><span class="s2">&quot;Policy&quot;</span><span class="p">:</span> <span class="n">name</span><span class="p">,</span> <span class="o">**</span><span class="n">res</span><span class="p">})</span>
+
+<span class="n">policy_df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">rows</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">policy_df</span><span class="o">.</span><span class="n">to_string</span><span class="p">(</span><span class="n">index</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">float_format</span><span class="o">=</span><span class="s2">&quot;</span><span class="si">%.3f</span><span class="s2">&quot;</span><span class="p">))</span>
+</pre></div>
+</div>
+</div>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+</pre></div>
+</div>
+<div class="input_area highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">fig</span><span class="p">,</span> <span class="n">ax</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">subplots</span><span class="p">(</span><span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">8</span><span class="p">,</span> <span class="mi">4</span><span class="p">))</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">barh</span><span class="p">(</span><span class="n">policy_df</span><span class="p">[</span><span class="s2">&quot;Policy&quot;</span><span class="p">],</span> <span class="n">policy_df</span><span class="p">[</span><span class="s2">&quot;est_incremental_revenue&quot;</span><span class="p">])</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">set_xlabel</span><span class="p">(</span><span class="s2">&quot;Estimated Incremental Revenue ($)&quot;</span><span class="p">)</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span><span class="s2">&quot;Revenue by Targeting Policy&quot;</span><span class="p">)</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">axvline</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">&quot;grey&quot;</span><span class="p">,</span> <span class="n">linewidth</span><span class="o">=</span><span class="mf">0.5</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">tight_layout</span><span class="p">()</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+</pre></div>
+</div>
+</div>
+</section>
+<section id="4.-Evaluation:-Uplift-Curves-and-Metrics">
+<h2>4. Evaluation: Uplift Curves and Metrics<a class="headerlink" href="#4.-Evaluation:-Uplift-Curves-and-Metrics" title="Link to this heading"></a></h2>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+</pre></div>
+</div>
+<div class="input_area highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">fig</span><span class="p">,</span> <span class="n">axes</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">subplots</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">14</span><span class="p">,</span> <span class="mi">5</span><span class="p">))</span>
+
+<span class="c1"># Cumulative gain</span>
+<span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">scores</span> <span class="ow">in</span> <span class="n">cate_preds</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+    <span class="n">fracs</span><span class="p">,</span> <span class="n">gains</span> <span class="o">=</span> <span class="n">cumulative_gain_curve</span><span class="p">(</span><span class="n">y_test</span><span class="p">,</span> <span class="n">w_test</span><span class="p">,</span> <span class="n">scores</span><span class="p">)</span>
+    <span class="n">axes</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">fracs</span><span class="p">,</span> <span class="n">gains</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="n">name</span><span class="p">)</span>
+<span class="n">axes</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">plot</span><span class="p">([</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">],</span> <span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">],</span> <span class="s2">&quot;k--&quot;</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s2">&quot;Random&quot;</span><span class="p">)</span>
+<span class="n">axes</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span><span class="s2">&quot;Cumulative Gain Curves&quot;</span><span class="p">)</span>
+<span class="n">axes</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">set_xlabel</span><span class="p">(</span><span class="s2">&quot;Fraction Targeted&quot;</span><span class="p">)</span>
+<span class="n">axes</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">set_ylabel</span><span class="p">(</span><span class="s2">&quot;Cumulative Gain&quot;</span><span class="p">)</span>
+<span class="n">axes</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">legend</span><span class="p">(</span><span class="n">fontsize</span><span class="o">=</span><span class="mi">8</span><span class="p">)</span>
+
+<span class="c1"># True CATE vs. predicted (DR-Learner)</span>
+<span class="n">axes</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">scatter</span><span class="p">(</span><span class="n">tau_test</span><span class="p">,</span> <span class="n">cate_preds</span><span class="p">[</span><span class="s2">&quot;DR-Learner&quot;</span><span class="p">],</span> <span class="n">alpha</span><span class="o">=</span><span class="mf">0.1</span><span class="p">,</span> <span class="n">s</span><span class="o">=</span><span class="mi">4</span><span class="p">)</span>
+<span class="n">lims</span> <span class="o">=</span> <span class="p">[</span>
+    <span class="nb">min</span><span class="p">(</span><span class="n">tau_test</span><span class="o">.</span><span class="n">min</span><span class="p">(),</span> <span class="n">cate_preds</span><span class="p">[</span><span class="s2">&quot;DR-Learner&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">min</span><span class="p">()),</span>
+    <span class="nb">max</span><span class="p">(</span><span class="n">tau_test</span><span class="o">.</span><span class="n">max</span><span class="p">(),</span> <span class="n">cate_preds</span><span class="p">[</span><span class="s2">&quot;DR-Learner&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">max</span><span class="p">()),</span>
+<span class="p">]</span>
+<span class="n">axes</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">lims</span><span class="p">,</span> <span class="n">lims</span><span class="p">,</span> <span class="s2">&quot;r--&quot;</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s2">&quot;Perfect&quot;</span><span class="p">)</span>
+<span class="n">axes</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">set_xlabel</span><span class="p">(</span><span class="s2">&quot;True CATE&quot;</span><span class="p">)</span>
+<span class="n">axes</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">set_ylabel</span><span class="p">(</span><span class="s2">&quot;Predicted CATE (DR-Learner)&quot;</span><span class="p">)</span>
+<span class="n">axes</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span><span class="s2">&quot;True vs. Predicted CATE&quot;</span><span class="p">)</span>
+<span class="n">axes</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">legend</span><span class="p">()</span>
+
+<span class="n">plt</span><span class="o">.</span><span class="n">tight_layout</span><span class="p">()</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+</pre></div>
+</div>
+</div>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+</pre></div>
+</div>
+<div class="input_area highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Summary metrics</span>
+<span class="nb">print</span><span class="p">(</span>
+    <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="s1">&#39;Learner&#39;</span><span class="si">:</span><span class="s2">12s</span><span class="si">}</span><span class="s2">  </span><span class="si">{</span><span class="s1">&#39;AUUC (norm)&#39;</span><span class="si">:</span><span class="s2">&gt;12</span><span class="si">}</span><span class="s2">  </span><span class="si">{</span><span class="s1">&#39;Qini&#39;</span><span class="si">:</span><span class="s2">&gt;8</span><span class="si">}</span><span class="s2">  </span><span class="si">{</span><span class="s1">&#39;Corr(true)&#39;</span><span class="si">:</span><span class="s2">&gt;12</span><span class="si">}</span><span class="s2">  </span><span class="si">{</span><span class="s1">&#39;RMSE&#39;</span><span class="si">:</span><span class="s2">&gt;8</span><span class="si">}</span><span class="s2">&quot;</span>
+<span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;-&quot;</span> <span class="o">*</span> <span class="mi">60</span><span class="p">)</span>
+<span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">tau_hat</span> <span class="ow">in</span> <span class="n">cate_preds</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+    <span class="n">a</span> <span class="o">=</span> <span class="n">auuc</span><span class="p">(</span><span class="n">y_test</span><span class="p">,</span> <span class="n">w_test</span><span class="p">,</span> <span class="n">tau_hat</span><span class="p">,</span> <span class="n">normalize</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">q</span> <span class="o">=</span> <span class="n">qini_coefficient</span><span class="p">(</span><span class="n">y_test</span><span class="p">,</span> <span class="n">w_test</span><span class="p">,</span> <span class="n">tau_hat</span><span class="p">)</span>
+    <span class="n">corr</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">corrcoef</span><span class="p">(</span><span class="n">tau_test</span><span class="p">,</span> <span class="n">tau_hat</span><span class="p">)[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">]</span>
+    <span class="n">rmse</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">((</span><span class="n">tau_test</span> <span class="o">-</span> <span class="n">tau_hat</span><span class="p">)</span> <span class="o">**</span> <span class="mi">2</span><span class="p">))</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">name</span><span class="si">:</span><span class="s2">12s</span><span class="si">}</span><span class="s2">  </span><span class="si">{</span><span class="n">a</span><span class="si">:</span><span class="s2">&gt;+12.4f</span><span class="si">}</span><span class="s2">  </span><span class="si">{</span><span class="n">q</span><span class="si">:</span><span class="s2">&gt;+8.4f</span><span class="si">}</span><span class="s2">  </span><span class="si">{</span><span class="n">corr</span><span class="si">:</span><span class="s2">&gt;12.4f</span><span class="si">}</span><span class="s2">  </span><span class="si">{</span><span class="n">rmse</span><span class="si">:</span><span class="s2">&gt;8.4f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</section>
+<section id="5.-Deep-Dive:-Who-Are-the-Persuadables?">
+<h2>5. Deep Dive: Who Are the Persuadables?<a class="headerlink" href="#5.-Deep-Dive:-Who-Are-the-Persuadables?" title="Link to this heading"></a></h2>
+<p>We segment the test set by predicted CATE decile and inspect the demographic profile of the top segment.</p>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+</pre></div>
+</div>
+<div class="input_area highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">tau_hat_dr</span> <span class="o">=</span> <span class="n">cate_preds</span><span class="p">[</span><span class="s2">&quot;DR-Learner&quot;</span><span class="p">]</span>
+<span class="n">decile</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">qcut</span><span class="p">(</span><span class="n">tau_hat_dr</span><span class="p">,</span> <span class="mi">10</span><span class="p">,</span> <span class="n">labels</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">duplicates</span><span class="o">=</span><span class="s2">&quot;drop&quot;</span><span class="p">)</span>
+
+<span class="n">test_df</span> <span class="o">=</span> <span class="n">X_test</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+<span class="n">test_df</span><span class="p">[</span><span class="s2">&quot;cate_hat&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">tau_hat_dr</span>
+<span class="n">test_df</span><span class="p">[</span><span class="s2">&quot;true_cate&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">tau_test</span>
+<span class="n">test_df</span><span class="p">[</span><span class="s2">&quot;decile&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">decile</span>
+
+<span class="n">agg</span> <span class="o">=</span> <span class="n">test_df</span><span class="o">.</span><span class="n">groupby</span><span class="p">(</span><span class="s2">&quot;decile&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">agg</span><span class="p">(</span>
+    <span class="n">avg_cate_hat</span><span class="o">=</span><span class="p">(</span><span class="s2">&quot;cate_hat&quot;</span><span class="p">,</span> <span class="s2">&quot;mean&quot;</span><span class="p">),</span>
+    <span class="n">avg_true_cate</span><span class="o">=</span><span class="p">(</span><span class="s2">&quot;true_cate&quot;</span><span class="p">,</span> <span class="s2">&quot;mean&quot;</span><span class="p">),</span>
+    <span class="n">avg_age</span><span class="o">=</span><span class="p">(</span><span class="s2">&quot;age&quot;</span><span class="p">,</span> <span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="n">x</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">float</span><span class="p">)</span><span class="o">.</span><span class="n">mean</span><span class="p">()),</span>
+    <span class="n">avg_balance</span><span class="o">=</span><span class="p">(</span><span class="s2">&quot;balance&quot;</span><span class="p">,</span> <span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="n">x</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">float</span><span class="p">)</span><span class="o">.</span><span class="n">mean</span><span class="p">()),</span>
+    <span class="n">n</span><span class="o">=</span><span class="p">(</span><span class="s2">&quot;cate_hat&quot;</span><span class="p">,</span> <span class="s2">&quot;count&quot;</span><span class="p">),</span>
+<span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">agg</span><span class="o">.</span><span class="n">to_string</span><span class="p">(</span><span class="n">float_format</span><span class="o">=</span><span class="s2">&quot;</span><span class="si">%.4f</span><span class="s2">&quot;</span><span class="p">))</span>
+</pre></div>
+</div>
+</div>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+</pre></div>
+</div>
+<div class="input_area highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Profile the top decile</span>
+<span class="n">top_decile</span> <span class="o">=</span> <span class="n">test_df</span><span class="p">[</span><span class="n">test_df</span><span class="p">[</span><span class="s2">&quot;decile&quot;</span><span class="p">]</span> <span class="o">==</span> <span class="n">test_df</span><span class="p">[</span><span class="s2">&quot;decile&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">max</span><span class="p">()]</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Top Decile Profile (n=</span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">top_decile</span><span class="p">)</span><span class="si">}</span><span class="s2">)&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  Avg predicted CATE: </span><span class="si">{</span><span class="n">top_decile</span><span class="p">[</span><span class="s1">&#39;cate_hat&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  Avg true CATE:      </span><span class="si">{</span><span class="n">top_decile</span><span class="p">[</span><span class="s1">&#39;true_cate&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  Avg age:            </span><span class="si">{</span><span class="n">top_decile</span><span class="p">[</span><span class="s1">&#39;age&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">float</span><span class="p">)</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span><span class="si">:</span><span class="s2">.1f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="k">if</span> <span class="s2">&quot;job&quot;</span> <span class="ow">in</span> <span class="n">top_decile</span><span class="o">.</span><span class="n">columns</span><span class="p">:</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  Top jobs: </span><span class="si">{</span><span class="n">top_decile</span><span class="p">[</span><span class="s1">&#39;job&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">value_counts</span><span class="p">()</span><span class="o">.</span><span class="n">head</span><span class="p">(</span><span class="mi">3</span><span class="p">)</span><span class="o">.</span><span class="n">to_dict</span><span class="p">()</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="k">if</span> <span class="s2">&quot;housing&quot;</span> <span class="ow">in</span> <span class="n">top_decile</span><span class="o">.</span><span class="n">columns</span><span class="p">:</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  Housing loan: </span><span class="si">{</span><span class="p">(</span><span class="n">top_decile</span><span class="p">[</span><span class="s1">&#39;housing&#39;</span><span class="p">]</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="s1">&#39;yes&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span><span class="si">:</span><span class="s2">.1%</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</section>
+<section id="Key-Takeaways">
+<h2>Key Takeaways<a class="headerlink" href="#Key-Takeaways" title="Link to this heading"></a></h2>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Insight</p></th>
+<th class="head"><p>Details</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><strong>Not everyone benefits from treatment</strong></p></td>
+<td><p>Blanket campaigns waste budget on sure-things and sleeping dogs.</p></td>
+</tr>
+<tr class="row-odd"><td><p><strong>Uplift-based targeting improves ROI</strong></p></td>
+<td><p>Targeting the top persuadables yields higher incremental revenue than treating everyone.</p></td>
+</tr>
+<tr class="row-even"><td><p><strong>Multiple learners, one winner</strong></p></td>
+<td><p>Comparing S/T/X/DR/R-Learners on AUUC and Qini helps select the best model for your data.</p></td>
+</tr>
+<tr class="row-odd"><td><p><strong>Subgroup profiling</strong></p></td>
+<td><p>Decile analysis reveals the demographic characteristics of persuadable customers.</p></td>
+</tr>
+<tr class="row-even"><td><p><strong>Business integration</strong></p></td>
+<td><p>CATE estimates + cost/revenue parameters → actionable targeting thresholds.</p></td>
+</tr>
+</tbody>
+</table>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="fairness_aware_modeling.html" class="btn btn-neutral float-left" title="Fairness-Aware Credit Scoring" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="../../verticals/index.html" class="btn btn-neutral float-right" title="Vertical Solutions" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2026, Mutlu Simsek, Serkan Korkmaz, Pieter Pel.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

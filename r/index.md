@@ -7,13 +7,16 @@ Logo](https://github.com/perpetual-ml/perpetual/raw/main/resources/perp_logo.png
 Versions](https://img.shields.io/pypi/pyversions/perpetual.svg?logo=python&logoColor=white)](https://pypi.org/project/perpetual)
 [![PyPI
 Version](https://img.shields.io/pypi/v/perpetual.svg?logo=pypi&logoColor=white)](https://pypi.org/project/perpetual)
+[![Conda
+Version](https://img.shields.io/conda/v/conda-forge/perpetual?label=conda-forge&logo=anaconda&logoColor=white)](https://anaconda.org/conda-forge/perpetual)
 [![Crates.io
 Version](https://img.shields.io/crates/v/perpetual?logo=rust&logoColor=white)](https://crates.io/crates/perpetual)
 [![R-Universe
 status](https://img.shields.io/badge/dynamic/json?url=https://perpetual-ml.r-universe.dev/api/packages/perpetual&query=%24.Version&label=r-universe&logo=R&logoColor=white&color=brightgreen)](https://perpetual-ml.r-universe.dev/perpetual)
 [![Static
 Badge](https://img.shields.io/badge/join-discord-blue?logo=discord)](https://discord.gg/AyUK7rr6wy)
-![PyPI - Downloads](https://img.shields.io/pypi/dm/perpetual)
+[![PyPI -
+Downloads](https://img.shields.io/pypi/dm/perpetual?logo=pypi)](https://pypi.org/project/perpetual)
 
 PerpetualBooster is a gradient boosting machine (GBM) that doesn’t need
 hyperparameter optimization unlike other GBMs. Similar to AutoML
@@ -73,8 +76,8 @@ dataset (regression):
 | 0.85             | 100                   | 0.196         | 0.196        | 60x                | 87x               |
 | 1.15             | 200                   | 0.190         | 0.190        | 230x               | 259x              |
 
-The following table summarizes the results for the [Cover
-Types](https://scikit-learn.org/stable/modules/generated/sklearn.datasets.fetch_covtype.html)
+The following table summarizes the results for the [Pumpkin
+Seeds](https://www.openml.org/search?type=data&status=active&id=46951)
 dataset (classification):
 
 | Perpetual budget | LightGBM n_estimators | Perpetual ROC AUC | LightGBM ROC AUC | Speed-up wall time | Speed-up cpu time |

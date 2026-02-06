@@ -6,7 +6,7 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Custom Objective Tutorial &mdash; Perpetual 1.1.2 documentation</title>
+  <title>Custom Objective Tutorial &mdash; Perpetual 1.2.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../_static/nbsphinx-code-cells.css?v=2aa19091" />
@@ -14,7 +14,7 @@
   
       <script src="../_static/jquery.js?v=5d32c60e"></script>
       <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../_static/documentation_options.js?v=6f037312"></script>
+      <script src="../_static/documentation_options.js?v=6efca38a"></script>
       <script src="../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
@@ -23,7 +23,7 @@
     <script src="../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
-    <link rel="next" title="Architecture" href="../architecture.html" />
+    <link rel="next" title="Uplift Modeling and Causal Inference" href="causal/uplift_marketing.html" />
     <link rel="prev" title="Performance Benchmarking" href="benchmark.html" /> 
 </head>
 
@@ -62,8 +62,15 @@
 <li class="toctree-l3"><a class="reference internal" href="#4.-Comparison-with-Standard-Objective">4. Comparison with Standard Objective</a></li>
 </ul>
 </li>
+<li class="toctree-l2"><a class="reference internal" href="causal/uplift_marketing.html">Uplift Modeling and Causal Inference</a></li>
+<li class="toctree-l2"><a class="reference internal" href="causal/iv_causal_effect.html">Instrumental Variables (Boosted IV)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="causal/risk_compliance.html">Risk, Compliance, and Interpretability</a></li>
+<li class="toctree-l2"><a class="reference internal" href="causal/heterogeneous_treatment_effects.html">Heterogeneous Treatment Effects with Meta-Learners</a></li>
+<li class="toctree-l2"><a class="reference internal" href="causal/fairness_aware_modeling.html">Fairness-Aware Credit Scoring</a></li>
+<li class="toctree-l2"><a class="reference internal" href="causal/customer_retention_uplift.html">Customer Retention: Uplift Modeling for Churn Prevention</a></li>
 </ul>
 </li>
+<li class="toctree-l1"><a class="reference internal" href="../verticals/index.html">Vertical Solutions</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../architecture.html">Architecture</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../parameters_tuning.html">Parameters Tuning</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../faq.html">Frequently Asked Questions</a></li>
@@ -127,20 +134,23 @@
 <h2>2. Defining a Custom Objective<a class="headerlink" href="#2.-Defining-a-Custom-Objective" title="Link to this heading"></a></h2>
 <p>A custom objective in Perpetual is a tuple of three functions:</p>
 <ol class="arabic simple">
-<li><p><strong>loss(y, pred, weight, group)</strong>: Computes the loss for each sample.</p></li>
-<li><p><strong>gradient(y, pred, weight, group)</strong>: Computes the gradient and hessian for each sample. It should return a tuple <code class="docutils literal notranslate"><span class="pre">(gradient,</span> <span class="pre">hessian)</span></code>. If <code class="docutils literal notranslate"><span class="pre">hessian</span></code> is constant (e.g., 1.0 for SquaredLoss), return <code class="docutils literal notranslate"><span class="pre">None</span></code> to improve performance.</p></li>
-<li><p><strong>initial_value(y, weight, group)</strong>: Computes the initial prediction for the model (usually the mean or median of the target).</p></li>
+<li><p><strong>loss(y, pred, weight, group)</strong>: Per-sample loss.</p></li>
+<li><p><strong>gradient(y, pred, weight, group)</strong>: Per-sample gradient and hessian. Return <code class="docutils literal notranslate"><span class="pre">(gradient,</span> <span class="pre">hessian)</span></code>. If the hessian is constant (e.g. always 1.0 for squared loss), return <code class="docutils literal notranslate"><span class="pre">None</span></code> instead to enable an optimized code path.</p></li>
+<li><p><strong>initial_value(y, weight, group)</strong>: Initial prediction before any trees are added (typically the mean or median of <code class="docutils literal notranslate"><span class="pre">y</span></code>).</p></li>
 </ol>
+<blockquote>
+<div><p><strong>Tip</strong>: In the Rust API, only <code class="docutils literal notranslate"><span class="pre">loss</span></code> and <code class="docutils literal notranslate"><span class="pre">gradient</span></code> are required — <code class="docutils literal notranslate"><span class="pre">initial_value</span></code> defaults to the weighted mean and <code class="docutils literal notranslate"><span class="pre">default_metric</span></code> defaults to RMSE. In the Python API all three functions are required in the tuple.</p>
+</div></blockquote>
 <p>Let’s implement a simple Squared Error objective as an example.</p>
 <div class="nbinput nblast docutils container">
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
-<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="k">def</span><span class="w"> </span><span class="nf">custom_loss</span><span class="p">(</span><span class="n">y</span><span class="p">,</span> <span class="n">pred</span><span class="p">,</span> <span class="n">weight</span><span class="p">,</span> <span class="n">group</span><span class="p">):</span>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="k">def</span><span class="w"> </span><span class="nf">custom_loss</span><span class="p">(</span><span class="n">y</span><span class="p">,</span> <span class="n">pred</span><span class="p">,</span> <span class="n">_weight</span><span class="p">,</span> <span class="n">_group</span><span class="p">):</span>
     <span class="k">return</span> <span class="p">(</span><span class="n">y</span> <span class="o">-</span> <span class="n">pred</span><span class="p">)</span> <span class="o">**</span> <span class="mi">2</span>
 
 
-<span class="k">def</span><span class="w"> </span><span class="nf">custom_gradient</span><span class="p">(</span><span class="n">y</span><span class="p">,</span> <span class="n">pred</span><span class="p">,</span> <span class="n">weight</span><span class="p">,</span> <span class="n">group</span><span class="p">):</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">custom_gradient</span><span class="p">(</span><span class="n">y</span><span class="p">,</span> <span class="n">pred</span><span class="p">,</span> <span class="n">_weight</span><span class="p">,</span> <span class="n">_group</span><span class="p">):</span>
     <span class="c1"># Gradient of (y - pred)^2 with respect to pred is 2 * (pred - y)</span>
     <span class="c1"># Note: Perpetual handles the scaling, so (pred - y) is sufficient.</span>
     <span class="n">grad</span> <span class="o">=</span> <span class="n">pred</span> <span class="o">-</span> <span class="n">y</span>
@@ -148,7 +158,7 @@
     <span class="k">return</span> <span class="n">grad</span><span class="p">,</span> <span class="n">hess</span>
 
 
-<span class="k">def</span><span class="w"> </span><span class="nf">custom_init</span><span class="p">(</span><span class="n">y</span><span class="p">,</span> <span class="n">weight</span><span class="p">,</span> <span class="n">group</span><span class="p">):</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">custom_init</span><span class="p">(</span><span class="n">y</span><span class="p">,</span> <span class="n">_weight</span><span class="p">,</span> <span class="n">_group</span><span class="p">):</span>
     <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">y</span><span class="p">)</span>
 </pre></div>
 </div>
@@ -204,7 +214,7 @@
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
         <a href="benchmark.html" class="btn btn-neutral float-left" title="Performance Benchmarking" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
-        <a href="../architecture.html" class="btn btn-neutral float-right" title="Architecture" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="causal/uplift_marketing.html" class="btn btn-neutral float-right" title="Uplift Modeling and Causal Inference" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 
   <hr/>

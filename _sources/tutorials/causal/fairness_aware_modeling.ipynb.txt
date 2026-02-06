@@ -1,0 +1,383 @@
+{
+ "cells": [
+  {
+   "cell_type": "markdown",
+   "id": "0",
+   "metadata": {},
+   "source": [
+    "# Fairness-Aware Credit Scoring\n",
+    "\n",
+    "Machine learning models used for lending, hiring, and insurance must comply with anti-discrimination regulations. Simply removing protected attributes (\"fairness through unawareness\") is insufficient because other features can serve as proxies.\n",
+    "\n",
+    "This tutorial demonstrates how to build a **fair** credit-risk model using Perpetual's built-in constraints:\n",
+    "\n",
+    "1. **Baseline model** — fit without any fairness considerations.\n",
+    "2. **Monotonicity constraints** — enforce logically consistent feature effects.\n",
+    "3. **Interaction constraints** — prevent the model from learning proxy interactions involving protected attributes.\n",
+    "4. **Adverse-action reason codes** — generate compliant explanations with `PerpetualRiskEngine`.\n",
+    "5. **Fairness auditing** — measure Demographic Parity and Equalized Odds across groups.\n",
+    "\n",
+    "> **Dataset:** The [Adult Census Income](https://archive.ics.uci.edu/ml/datasets/adult) dataset from the UCI repository, available on OpenML. The task is to predict whether an individual earns more than $50K/year. We treat this as a credit-scoring analogue (high income ≈ low risk)."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "1",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "import matplotlib.pyplot as plt\n",
+    "import numpy as np\n",
+    "import pandas as pd\n",
+    "from perpetual import PerpetualBooster, PerpetualRiskEngine\n",
+    "from sklearn.datasets import fetch_openml\n",
+    "from sklearn.metrics import accuracy_score, roc_auc_score\n",
+    "from sklearn.model_selection import train_test_split"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "2",
+   "metadata": {},
+   "source": [
+    "## 1. Load and Explore the Data"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "3",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "data = fetch_openml(data_id=1590, as_frame=True, parser=\"auto\")\n",
+    "df = data.frame\n",
+    "\n",
+    "# Binary target: >50K = 1, <=50K = 0\n",
+    "df[\"target\"] = (df[\"class\"] == \">50K\").astype(int)\n",
+    "\n",
+    "# Protected attribute\n",
+    "protected_col = \"sex\"\n",
+    "\n",
+    "print(f\"Samples: {len(df):,}\")\n",
+    "print(f\"\\nTarget distribution:\\n{df['target'].value_counts(normalize=True)}\")\n",
+    "print(f\"\\nProtected attribute distribution:\\n{df[protected_col].value_counts()}\")\n",
+    "df.head()"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "4",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Features\n",
+    "feature_cols = [\n",
+    "    \"age\",\n",
+    "    \"workclass\",\n",
+    "    \"education\",\n",
+    "    \"education-num\",\n",
+    "    \"marital-status\",\n",
+    "    \"occupation\",\n",
+    "    \"relationship\",\n",
+    "    \"race\",\n",
+    "    \"sex\",\n",
+    "    \"capital-gain\",\n",
+    "    \"capital-loss\",\n",
+    "    \"hours-per-week\",\n",
+    "    \"native-country\",\n",
+    "]\n",
+    "X = df[feature_cols].copy()\n",
+    "\n",
+    "# Mark categoricals\n",
+    "cat_cols = X.select_dtypes(include=[\"object\", \"category\"]).columns.tolist()\n",
+    "for c in cat_cols:\n",
+    "    X[c] = X[c].astype(\"category\")\n",
+    "\n",
+    "y = df[\"target\"].values\n",
+    "S = df[protected_col].values  # protected group labels\n",
+    "\n",
+    "X_train, X_test, y_train, y_test, S_train, S_test = train_test_split(\n",
+    "    X, y, S, test_size=0.2, random_state=42, stratify=y\n",
+    ")\n",
+    "print(f\"Train: {len(X_train):,}  |  Test: {len(X_test):,}\")"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "5",
+   "metadata": {},
+   "source": [
+    "## 2. Baseline Model (Unconstrained)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "6",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "baseline = PerpetualBooster(objective=\"LogLoss\", budget=0.5)\n",
+    "baseline.fit(X_train, y_train)\n",
+    "\n",
+    "probs_bl = baseline.predict_proba(X_test)\n",
+    "preds_bl = (probs_bl > 0.5).astype(int)\n",
+    "\n",
+    "print(f\"Baseline AUC:      {roc_auc_score(y_test, probs_bl):.4f}\")\n",
+    "print(f\"Baseline Accuracy: {accuracy_score(y_test, preds_bl):.4f}\")"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "7",
+   "metadata": {},
+   "source": [
+    "### 2.1 Fairness Audit — Baseline\n",
+    "\n",
+    "We compute two standard fairness metrics:\n",
+    "\n",
+    "- **Demographic Parity (DP):** The difference in positive prediction rates between groups. DP = 0 means equal rates.\n",
+    "- **Equalized Odds (EO):** The maximum difference in True Positive Rate or False Positive Rate between groups."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "8",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "def fairness_report(y_true, y_pred, groups, group_name=\"Group\"):\n",
+    "    \"\"\"Print Demographic Parity and Equalized Odds metrics.\"\"\"\n",
+    "    unique_groups = np.unique(groups)\n",
+    "    print(f\"{'Group':<15} {'Pos Rate':>10} {'TPR':>10} {'FPR':>10} {'n':>8}\")\n",
+    "    print(\"-\" * 55)\n",
+    "    rates = {}\n",
+    "    for g in unique_groups:\n",
+    "        mask = groups == g\n",
+    "        pos_rate = y_pred[mask].mean()\n",
+    "        tp = ((y_pred[mask] == 1) & (y_true[mask] == 1)).sum()\n",
+    "        fn = ((y_pred[mask] == 0) & (y_true[mask] == 1)).sum()\n",
+    "        fp = ((y_pred[mask] == 1) & (y_true[mask] == 0)).sum()\n",
+    "        tn = ((y_pred[mask] == 0) & (y_true[mask] == 0)).sum()\n",
+    "        tpr = tp / (tp + fn) if (tp + fn) > 0 else 0\n",
+    "        fpr = fp / (fp + tn) if (fp + tn) > 0 else 0\n",
+    "        rates[g] = {\"pos_rate\": pos_rate, \"tpr\": tpr, \"fpr\": fpr}\n",
+    "        print(\n",
+    "            f\"{str(g):<15} {pos_rate:>10.4f} {tpr:>10.4f} {fpr:>10.4f} {mask.sum():>8}\"\n",
+    "        )\n",
+    "\n",
+    "    pos_rates = [r[\"pos_rate\"] for r in rates.values()]\n",
+    "    tprs = [r[\"tpr\"] for r in rates.values()]\n",
+    "    fprs = [r[\"fpr\"] for r in rates.values()]\n",
+    "\n",
+    "    dp_gap = max(pos_rates) - min(pos_rates)\n",
+    "    eo_gap = max(max(tprs) - min(tprs), max(fprs) - min(fprs))\n",
+    "\n",
+    "    print(f\"\\nDemographic Parity Gap: {dp_gap:.4f}\")\n",
+    "    print(f\"Equalized Odds Gap:    {eo_gap:.4f}\")\n",
+    "    return dp_gap, eo_gap\n",
+    "\n",
+    "\n",
+    "print(\"=== Baseline Fairness ===\")\n",
+    "dp_bl, eo_bl = fairness_report(y_test, preds_bl, S_test)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "9",
+   "metadata": {},
+   "source": [
+    "## 3. Constrained Model\n",
+    "\n",
+    "We apply two types of constraints to improve fairness while retaining accuracy:\n",
+    "\n",
+    "### 3.1 Monotonicity Constraints\n",
+    "\n",
+    "We enforce that logically relevant features have the expected direction of effect:\n",
+    "- `education-num` ↑ → income ↑ (positive)\n",
+    "- `hours-per-week` ↑ → income ↑ (positive)\n",
+    "- `age` ↑ → income ↑ (positive, on average)\n",
+    "\n",
+    "### 3.2 Interaction Constraints\n",
+    "\n",
+    "We prevent the model from creating splits that interact the protected attribute (`sex`, index 8) with other features. This limits proxy discrimination."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "10",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "monotone = {\n",
+    "    \"education-num\": 1,  # More education → higher income\n",
+    "    \"hours-per-week\": 1,  # More hours → higher income\n",
+    "    \"age\": 1,  # Older → higher income (on average)\n",
+    "    \"capital-gain\": 1,  # More gains → higher income\n",
+    "}\n",
+    "\n",
+    "# 'sex' is at feature index 8. We isolate it so the model\n",
+    "# cannot form interactions between sex and other features.\n",
+    "sex_idx = feature_cols.index(\"sex\")\n",
+    "other_idx = [i for i in range(len(feature_cols)) if i != sex_idx]\n",
+    "interaction_constraints = [other_idx, [sex_idx]]\n",
+    "\n",
+    "constrained = PerpetualBooster(\n",
+    "    objective=\"LogLoss\",\n",
+    "    budget=0.5,\n",
+    "    monotone_constraints=monotone,\n",
+    "    interaction_constraints=interaction_constraints,\n",
+    ")\n",
+    "constrained.fit(X_train, y_train)\n",
+    "\n",
+    "probs_cs = constrained.predict_proba(X_test)\n",
+    "preds_cs = (probs_cs > 0.5).astype(int)\n",
+    "\n",
+    "print(f\"Constrained AUC:      {roc_auc_score(y_test, probs_cs):.4f}\")\n",
+    "print(f\"Constrained Accuracy: {accuracy_score(y_test, preds_cs):.4f}\")"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "11",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "print(\"=== Constrained Fairness ===\")\n",
+    "dp_cs, eo_cs = fairness_report(y_test, preds_cs, S_test)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "12",
+   "metadata": {},
+   "source": [
+    "### 3.3 Comparison: Baseline vs. Constrained"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "13",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "comparison = pd.DataFrame(\n",
+    "    {\n",
+    "        \"Model\": [\"Baseline\", \"Constrained\"],\n",
+    "        \"AUC\": [\n",
+    "            roc_auc_score(y_test, probs_bl),\n",
+    "            roc_auc_score(y_test, probs_cs),\n",
+    "        ],\n",
+    "        \"Accuracy\": [\n",
+    "            accuracy_score(y_test, preds_bl),\n",
+    "            accuracy_score(y_test, preds_cs),\n",
+    "        ],\n",
+    "        \"DP Gap\": [dp_bl, dp_cs],\n",
+    "        \"EO Gap\": [eo_bl, eo_cs],\n",
+    "    }\n",
+    ")\n",
+    "print(comparison.to_string(index=False))"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "14",
+   "metadata": {},
+   "source": [
+    "## 4. Adverse-Action Reason Codes\n",
+    "\n",
+    "Regulations like ECOA (US) and GDPR (EU) require lenders to provide specific reasons when an application is denied. Perpetual's `PerpetualRiskEngine` generates per-applicant explanations directly from tree structure — no post-hoc approximation needed."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "15",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "engine = PerpetualRiskEngine(constrained)\n",
+    "\n",
+    "# Find a \"denied\" applicant (high risk / low income prediction)\n",
+    "denied_idx = np.where(probs_cs < 0.3)[0][:3]  # first 3 denied\n",
+    "\n",
+    "for idx in denied_idx:\n",
+    "    applicant = X_test.iloc[[idx]]\n",
+    "    print(f\"\\n--- Applicant {idx} (P(>50K) = {probs_cs[idx]:.3f}) ---\")\n",
+    "    reasons = engine.generate_reason_codes(applicant, threshold=0.5)\n",
+    "    for reason_list in reasons:\n",
+    "        for i, r in enumerate(reason_list, 1):\n",
+    "            print(f\"  Reason {i}: {r}\")"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "16",
+   "metadata": {},
+   "source": [
+    "## 5. Visualizing the Accuracy–Fairness Trade-off\n",
+    "\n",
+    "By sweeping the classification threshold, we can trace out the frontier of accuracy vs. demographic parity gap."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "17",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "thresholds = np.linspace(0.2, 0.8, 20)\n",
+    "curves = {\"Baseline\": probs_bl, \"Constrained\": probs_cs}\n",
+    "\n",
+    "fig, ax = plt.subplots(figsize=(8, 5))\n",
+    "for label, probs in curves.items():\n",
+    "    accs, dps = [], []\n",
+    "    for t in thresholds:\n",
+    "        preds = (probs > t).astype(int)\n",
+    "        accs.append(accuracy_score(y_test, preds))\n",
+    "        groups_u = np.unique(S_test)\n",
+    "        pos_rates = [preds[S_test == g].mean() for g in groups_u]\n",
+    "        dps.append(max(pos_rates) - min(pos_rates))\n",
+    "    ax.plot(dps, accs, \"o-\", label=label, markersize=4)\n",
+    "\n",
+    "ax.set_xlabel(\"Demographic Parity Gap (lower is fairer)\")\n",
+    "ax.set_ylabel(\"Accuracy\")\n",
+    "ax.set_title(\"Accuracy vs. Fairness Trade-off\")\n",
+    "ax.legend()\n",
+    "plt.tight_layout()\n",
+    "plt.show()"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "18",
+   "metadata": {},
+   "source": [
+    "## Key Takeaways\n",
+    "\n",
+    "| Technique | Purpose |\n",
+    "|---|---|\n",
+    "| **Monotonicity constraints** | Ensure feature effects are logically consistent (e.g., more education → better outcome). |\n",
+    "| **Interaction constraints** | Prevent the model from using proxy interactions with protected attributes. |\n",
+    "| **PerpetualRiskEngine** | Generate compliant adverse-action reason codes directly from tree structure. |\n",
+    "| **Fairness auditing** | Measure Demographic Parity and Equalized Odds to quantify disparate impact. |\n",
+    "| **Threshold tuning** | Trade off accuracy against fairness by adjusting the classification threshold. |"
+   ]
+  }
+ ],
+ "metadata": {
+  "language_info": {
+   "name": "python"
+  }
+ },
+ "nbformat": 4,
+ "nbformat_minor": 5
+}

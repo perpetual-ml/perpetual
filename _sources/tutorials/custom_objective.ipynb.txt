@@ -50,9 +50,11 @@
     "\n",
     "A custom objective in Perpetual is a tuple of three functions:\n",
     "\n",
-    "1.  **loss(y, pred, weight, group)**: Computes the loss for each sample.\n",
-    "2.  **gradient(y, pred, weight, group)**: Computes the gradient and hessian for each sample. It should return a tuple `(gradient, hessian)`. If `hessian` is constant (e.g., 1.0 for SquaredLoss), return `None` to improve performance.\n",
-    "3.  **initial_value(y, weight, group)**: Computes the initial prediction for the model (usually the mean or median of the target).\n",
+    "1. **loss(y, pred, weight, group)**: Per-sample loss.\n",
+    "2. **gradient(y, pred, weight, group)**: Per-sample gradient and hessian. Return `(gradient, hessian)`. If the hessian is constant (e.g. always 1.0 for squared loss), return `None` instead to enable an optimized code path.\n",
+    "3. **initial_value(y, weight, group)**: Initial prediction before any trees are added (typically the mean or median of `y`).\n",
+    "\n",
+    "> **Tip**: In the Rust API, only `loss` and `gradient` are required — `initial_value` defaults to the weighted mean and `default_metric` defaults to RMSE. In the Python API all three functions are required in the tuple.\n",
     "\n",
     "Let's implement a simple Squared Error objective as an example."
    ]
@@ -63,11 +65,11 @@
    "metadata": {},
    "outputs": [],
    "source": [
-    "def custom_loss(y, pred, weight, group):\n",
+    "def custom_loss(y, pred, _weight, _group):\n",
     "    return (y - pred) ** 2\n",
     "\n",
     "\n",
-    "def custom_gradient(y, pred, weight, group):\n",
+    "def custom_gradient(y, pred, _weight, _group):\n",
     "    # Gradient of (y - pred)^2 with respect to pred is 2 * (pred - y)\n",
     "    # Note: Perpetual handles the scaling, so (pred - y) is sufficient.\n",
     "    grad = pred - y\n",
@@ -75,7 +77,7 @@
     "    return grad, hess\n",
     "\n",
     "\n",
-    "def custom_init(y, weight, group):\n",
+    "def custom_init(y, _weight, _group):\n",
     "    return np.mean(y)"
    ]
   },
@@ -137,7 +139,7 @@
  ],
  "metadata": {
   "kernelspec": {
-   "display_name": "Python 3",
+   "display_name": "forust-main-perp-oss (3.13.7)",
    "language": "python",
    "name": "python3"
   },
@@ -151,7 +153,7 @@
    "name": "python",
    "nbconvert_exporter": "python",
    "pygments_lexer": "ipython3",
-   "version": "3.10.0"
+   "version": "3.13.7"
   }
  },
  "nbformat": 4,

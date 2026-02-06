@@ -1,0 +1,226 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>perpetual.risk &mdash; Perpetual 1.2.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
+
+  
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=6efca38a"></script>
+      <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+      <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            Perpetual
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../api.html">API Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../tutorials/index.html">Tutorials</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../verticals/index.html">Vertical Solutions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../architecture.html">Architecture</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../parameters_tuning.html">Parameters Tuning</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../faq.html">Frequently Asked Questions</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">Perpetual</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">perpetual.risk</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for perpetual.risk</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;Adverse-action reason-code generation for credit risk models.</span>
+
+<span class="sd">Provides `PerpetualRiskEngine`, a wrapper around a fitted `PerpetualBooster`</span>
+<span class="sd">that explains rejection decisions by identifying the features most responsible</span>
+<span class="sd">for pushing a score below the approval threshold.</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">List</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">perpetual.booster</span><span class="w"> </span><span class="kn">import</span> <span class="n">PerpetualBooster</span>
+
+
+<div class="viewcode-block" id="PerpetualRiskEngine">
+<a class="viewcode-back" href="../../api.html#perpetual.risk.PerpetualRiskEngine">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">PerpetualRiskEngine</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Risk Engine for generating Adverse Action (Reason) Codes.</span>
+
+<span class="sd">    This engine wraps a fitted PerpetualBooster model and provides functionality</span>
+<span class="sd">    to explain rejections (Adverse Actions) by attributing the negative decision</span>
+<span class="sd">    to specific features.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="PerpetualRiskEngine.__init__">
+<a class="viewcode-back" href="../../api.html#perpetual.risk.PerpetualRiskEngine.__init__">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">model</span><span class="p">:</span> <span class="n">PerpetualBooster</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Wrap a fitted booster for reason-code generation.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        model : PerpetualBooster</span>
+<span class="sd">            A fitted `PerpetualBooster` instance.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">booster</span> <span class="o">=</span> <span class="n">model</span></div>
+
+
+<div class="viewcode-block" id="PerpetualRiskEngine.generate_reason_codes">
+<a class="viewcode-back" href="../../api.html#perpetual.risk.PerpetualRiskEngine.generate_reason_codes">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">generate_reason_codes</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">X</span><span class="p">,</span> <span class="n">threshold</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">n_codes</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">3</span><span class="p">,</span> <span class="n">method</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;Weight&quot;</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Generate reason codes for samples that fall below the approval threshold.</span>
+
+<span class="sd">        Logic:</span>
+<span class="sd">        1. Predict score for X.</span>
+<span class="sd">        2. If score &lt; threshold (Rejection), calculate feature contributions.</span>
+<span class="sd">        3. Identify top N features dragging the score DOWN.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        X : array-like</span>
+<span class="sd">            Applicant data.</span>
+<span class="sd">        threshold : float</span>
+<span class="sd">            Approval threshold. Scores below this are considered rejections.</span>
+<span class="sd">        n_codes : int</span>
+<span class="sd">            Number of reason codes to return per applicant.</span>
+<span class="sd">        method : str</span>
+<span class="sd">            Contribution method. &quot;Weight&quot; is standard SHAP-like contribution.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        reasons : list of list of str</span>
+<span class="sd">            For each sample, a list of reason-code strings (e.g.</span>
+<span class="sd">            ``&quot;feature_name: -0.1234&quot;``).  Approved samples get an empty list.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># Get predictions</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">booster</span><span class="p">,</span> <span class="s2">&quot;classes_&quot;</span><span class="p">,</span> <span class="p">[]))</span> <span class="o">==</span> <span class="mi">2</span><span class="p">:</span>
+            <span class="c1"># For binary classification, use probability of positive class</span>
+            <span class="n">preds</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">booster</span><span class="o">.</span><span class="n">predict_proba</span><span class="p">(</span><span class="n">X</span><span class="p">)[:,</span> <span class="mi">1</span><span class="p">]</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">preds</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">booster</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="n">X</span><span class="p">)</span>
+
+        <span class="c1"># Get contributions (SHAP values)</span>
+        <span class="c1"># shape: (n_samples, n_features + 1) -&gt; last column is bias</span>
+        <span class="n">contributions</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">booster</span><span class="o">.</span><span class="n">predict_contributions</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">method</span><span class="o">=</span><span class="n">method</span><span class="p">)</span>
+
+        <span class="c1"># Remove bias column for feature attribution logic</span>
+        <span class="n">feature_contribs</span> <span class="o">=</span> <span class="n">contributions</span><span class="p">[:,</span> <span class="p">:</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+
+        <span class="n">reasons</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">feature_names</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">booster</span><span class="p">,</span> <span class="s2">&quot;feature_names_in_&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+
+        <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">score</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">preds</span><span class="p">):</span>
+            <span class="n">sample_reasons</span> <span class="o">=</span> <span class="p">[]</span>
+            <span class="k">if</span> <span class="n">score</span> <span class="o">&lt;</span> <span class="n">threshold</span><span class="p">:</span>
+                <span class="c1"># Identify negative contributors</span>
+                <span class="c1"># We want the features with the lowest (most negative) impact</span>
+                <span class="c1"># OR the features that differ most from the &quot;ideal&quot; applicant?</span>
+                <span class="c1"># Standard approach: Features pushing score DOWN the most.</span>
+
+                <span class="n">row_contribs</span> <span class="o">=</span> <span class="n">feature_contribs</span><span class="p">[</span><span class="n">i</span><span class="p">]</span>
+
+                <span class="c1"># Sort indices by contribution value (ascending)</span>
+                <span class="c1"># Lowest values (most negative) first</span>
+                <span class="n">sorted_indices</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">argsort</span><span class="p">(</span><span class="n">row_contribs</span><span class="p">)</span>
+
+                <span class="c1"># Take bottom N</span>
+                <span class="n">top_negative_indices</span> <span class="o">=</span> <span class="n">sorted_indices</span><span class="p">[:</span><span class="n">n_codes</span><span class="p">]</span>
+
+                <span class="k">for</span> <span class="n">idx</span> <span class="ow">in</span> <span class="n">top_negative_indices</span><span class="p">:</span>
+                    <span class="c1"># Only include if contribution is actually negative?</span>
+                    <span class="c1"># Risk models usually imply 0 is neutral.</span>
+                    <span class="c1"># If all contribs are positive but score is low, it&#39;s tricky.</span>
+                    <span class="c1"># Standard implementation takes lowest algebraic values.</span>
+
+                    <span class="n">val</span> <span class="o">=</span> <span class="n">row_contribs</span><span class="p">[</span><span class="n">idx</span><span class="p">]</span>
+                    <span class="n">name</span> <span class="o">=</span> <span class="n">feature_names</span><span class="p">[</span><span class="n">idx</span><span class="p">]</span> <span class="k">if</span> <span class="n">feature_names</span> <span class="k">else</span> <span class="nb">str</span><span class="p">(</span><span class="n">idx</span><span class="p">)</span>
+                    <span class="n">sample_reasons</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">val</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+            <span class="n">reasons</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">sample_reasons</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">reasons</span></div>
+</div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2026, Mutlu Simsek, Serkan Korkmaz, Pieter Pel.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

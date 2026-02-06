@@ -1,0 +1,211 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Uplift Modeling &mdash; Perpetual 1.2.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=9edc463e" />
+
+  
+      <script src="../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../_static/documentation_options.js?v=6efca38a"></script>
+      <script src="../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
+      <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Instrumental Variables (BoostIV)" href="iv.html" />
+    <link rel="prev" title="Vertical Solutions" href="index.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            Perpetual
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../api.html">API Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tutorials/index.html">Tutorials</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Vertical Solutions</a><ul class="current">
+<li class="toctree-l2 current"><a class="current reference internal" href="#">Uplift Modeling</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#upliftbooster-r-learner">UpliftBooster (R-Learner)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#dr-learner-doubly-robust">DR-Learner (Doubly Robust)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#meta-learners">Meta-Learners</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#evaluation-metrics">Evaluation Metrics</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#tutorials">Tutorials</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="iv.html">Instrumental Variables (BoostIV)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="risk.html">Regulatory Risk &amp; Interpretability</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../architecture.html">Architecture</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../parameters_tuning.html">Parameters Tuning</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../faq.html">Frequently Asked Questions</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">Perpetual</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="index.html">Vertical Solutions</a></li>
+      <li class="breadcrumb-item active">Uplift Modeling</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/verticals/uplift.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="uplift-modeling">
+<h1>Uplift Modeling<a class="headerlink" href="#uplift-modeling" title="Link to this heading"></a></h1>
+<p>Uplift modeling, also known as conditional average treatment effect (CATE) estimation, aims to predict the incremental impact of an action (the “treatment”) on an individual’s behavior.</p>
+<p>Unlike standard predictive modeling which predicts the outcome $E[Y|X]$, uplift modeling predicts the difference:
+$$tau(x) = E[Y | X=x, W=1] - E[Y | X=x, W=0]$$
+where $W$ is the treatment indicator.</p>
+<p>Perpetual provides several ways to perform uplift modeling.</p>
+<section id="upliftbooster-r-learner">
+<h2>UpliftBooster (R-Learner)<a class="headerlink" href="#upliftbooster-r-learner" title="Link to this heading"></a></h2>
+<p>The <code class="xref py py-class docutils literal notranslate"><span class="pre">uplift.UpliftBooster</span></code> implements the <strong>R-Learner</strong> (Residual-on-Residual) meta-algorithm. This is a very powerful approach that can handle continuous outcomes and automatically accounts for selection bias if the propensity scores are modeled correctly.</p>
+<p>The objective minimized is:
+$$hat{tau} = text{argmin}_{tau} sum_{i=1}^n left( (Y_i - hat{mu}(X_i)) - tau(X_i)(W_i - hat{p}(X_i)) right)^2$$</p>
+<p>Where:
+* $hat{mu}(X)$ is the estimated outcome (marginal).
+* $hat{p}(X)$ is the estimated propensity score.</p>
+<p>Example:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">perpetual.uplift</span><span class="w"> </span><span class="kn">import</span> <span class="n">UpliftBooster</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+
+<span class="c1"># X: features, w: treatment [0, 1], y: outcome</span>
+<span class="n">model</span> <span class="o">=</span> <span class="n">UpliftBooster</span><span class="p">(</span><span class="n">outcome_budget</span><span class="o">=</span><span class="mf">0.5</span><span class="p">,</span> <span class="n">propensity_budget</span><span class="o">=</span><span class="mf">0.5</span><span class="p">,</span> <span class="n">effect_budget</span><span class="o">=</span><span class="mf">0.5</span><span class="p">)</span>
+<span class="n">model</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">w</span><span class="p">,</span> <span class="n">y</span><span class="p">)</span>
+
+<span class="c1"># Predict treatment effect (uplift)</span>
+<span class="n">uplift_preds</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="n">X_test</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="dr-learner-doubly-robust">
+<h2>DR-Learner (Doubly Robust)<a class="headerlink" href="#dr-learner-doubly-robust" title="Link to this heading"></a></h2>
+<p>The <code class="xref py py-class docutils literal notranslate"><span class="pre">meta_learners.DRLearner</span></code> combines outcome modeling with inverse
+propensity weighting to produce a <em>doubly robust</em> estimate of the CATE.  The
+estimator is consistent when <em>either</em> the outcome models or the propensity
+model is correctly specified.</p>
+<p>The AIPW pseudo-outcome is:</p>
+<p>$$Gamma_i = hat{mu}_1(X_i) - hat{mu}_0(X_i) + frac{W_i(Y_i - hat{mu}_1(X_i))}{hat{p}(X_i)} - frac{(1-W_i)(Y_i - hat{mu}_0(X_i))}{1-hat{p}(X_i)}$$</p>
+<p>Example:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">perpetual.meta_learners</span><span class="w"> </span><span class="kn">import</span> <span class="n">DRLearner</span>
+
+<span class="n">model</span> <span class="o">=</span> <span class="n">DRLearner</span><span class="p">(</span><span class="n">budget</span><span class="o">=</span><span class="mf">0.5</span><span class="p">,</span> <span class="n">clip</span><span class="o">=</span><span class="mf">0.01</span><span class="p">)</span>
+<span class="n">model</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">w</span><span class="p">,</span> <span class="n">y</span><span class="p">)</span>
+<span class="n">cate</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="n">X_test</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="meta-learners">
+<h2>Meta-Learners<a class="headerlink" href="#meta-learners" title="Link to this heading"></a></h2>
+<p>For cases where you want more control or simpler algorithms, Perpetual offers standard Meta-Learners:</p>
+<ul class="simple">
+<li><p><strong>S-Learner</strong>: Uses a single model including the treatment as a feature.</p></li>
+<li><p><strong>T-Learner</strong>: Uses two separate models, one for treatment and one for control.</p></li>
+<li><p><strong>X-Learner</strong>: A multi-stage learner that is particularly effective when treatment groups are imbalanced.</p></li>
+</ul>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">perpetual.meta_learners</span><span class="w"> </span><span class="kn">import</span> <span class="n">XLearner</span>
+
+<span class="n">model</span> <span class="o">=</span> <span class="n">XLearner</span><span class="p">(</span><span class="n">budget</span><span class="o">=</span><span class="mf">0.5</span><span class="p">)</span>
+<span class="n">model</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">w</span><span class="p">,</span> <span class="n">y</span><span class="p">)</span>
+<span class="n">cate</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="n">X_test</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="evaluation-metrics">
+<h2>Evaluation Metrics<a class="headerlink" href="#evaluation-metrics" title="Link to this heading"></a></h2>
+<p>Evaluating uplift models is challenging because individual-level treatment
+effects are never directly observed.  Perpetual provides standard metrics that
+exploit randomized treatment assignment:</p>
+<ul class="simple">
+<li><p><code class="xref py py-func docutils literal notranslate"><span class="pre">causal_metrics.cumulative_gain_curve()</span></code> — the uplift gain curve.</p></li>
+<li><p><code class="xref py py-func docutils literal notranslate"><span class="pre">causal_metrics.auuc()</span></code> — Area Under the Uplift Curve.</p></li>
+<li><p><code class="xref py py-func docutils literal notranslate"><span class="pre">causal_metrics.qini_curve()</span></code> — the Qini curve.</p></li>
+<li><p><code class="xref py py-func docutils literal notranslate"><span class="pre">causal_metrics.qini_coefficient()</span></code> — the Qini coefficient.</p></li>
+</ul>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">perpetual.causal_metrics</span><span class="w"> </span><span class="kn">import</span> <span class="n">auuc</span><span class="p">,</span> <span class="n">qini_coefficient</span>
+
+<span class="n">score</span> <span class="o">=</span> <span class="n">auuc</span><span class="p">(</span><span class="n">y_test</span><span class="p">,</span> <span class="n">w_test</span><span class="p">,</span> <span class="n">uplift_preds</span><span class="p">,</span> <span class="n">normalize</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="n">qini</span>  <span class="o">=</span> <span class="n">qini_coefficient</span><span class="p">(</span><span class="n">y_test</span><span class="p">,</span> <span class="n">w_test</span><span class="p">,</span> <span class="n">uplift_preds</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="tutorials">
+<h2>Tutorials<a class="headerlink" href="#tutorials" title="Link to this heading"></a></h2>
+<p>For a detailed walkthrough using the Hillstrom marketing dataset, see the <a class="reference internal" href="../tutorials/causal/uplift_marketing.html"><span class="doc">Uplift Modeling and Causal Inference</span></a>.</p>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="index.html" class="btn btn-neutral float-left" title="Vertical Solutions" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="iv.html" class="btn btn-neutral float-right" title="Instrumental Variables (BoostIV)" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2026, Mutlu Simsek, Serkan Korkmaz, Pieter Pel.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

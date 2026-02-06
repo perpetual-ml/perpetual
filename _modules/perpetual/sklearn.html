@@ -5,14 +5,14 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>perpetual.sklearn &mdash; Perpetual 1.1.2 documentation</title>
+  <title>perpetual.sklearn &mdash; Perpetual 1.2.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
 
   
       <script src="../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../_static/documentation_options.js?v=6f037312"></script>
+      <script src="../../_static/documentation_options.js?v=6efca38a"></script>
       <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
@@ -46,6 +46,7 @@
 <li class="toctree-l1"><a class="reference internal" href="../../quickstart.html">Quickstart</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../api.html">API Reference</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../tutorials/index.html">Tutorials</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../verticals/index.html">Vertical Solutions</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../architecture.html">Architecture</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../parameters_tuning.html">Parameters Tuning</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../faq.html">Frequently Asked Questions</a></li>
@@ -76,7 +77,14 @@
            <div itemprop="articleBody">
              
   <h1>Source code for perpetual.sklearn</h1><div class="highlight"><pre>
-<span></span><span class="kn">import</span><span class="w"> </span><span class="nn">warnings</span>
+<span></span><span class="sd">&quot;&quot;&quot;Scikit-learn compatible wrappers for the PerpetualBooster.</span>
+
+<span class="sd">Provides `PerpetualClassifier`, `PerpetualRegressor`, and `PerpetualRanker`</span>
+<span class="sd">classes that follow the scikit-learn estimator API, enabling use with</span>
+<span class="sd">pipelines, grid search, and other scikit-learn utilities.</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">warnings</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">types</span><span class="w"> </span><span class="kn">import</span> <span class="n">FunctionType</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Dict</span><span class="p">,</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">,</span> <span class="n">Union</span>
 
@@ -178,6 +186,8 @@
 <span class="sd">            Maximum number of bins for feature discretization.</span>
 <span class="sd">        max_cat : int, default=1000</span>
 <span class="sd">            Maximum unique categories before a feature is treated as numerical.</span>
+<span class="sd">        interaction_constraints : list of list of int, optional</span>
+<span class="sd">            Interaction constraints.</span>
 <span class="sd">        **kwargs</span>
 <span class="sd">            Arbitrary keyword arguments to be passed to the base class.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
@@ -207,7 +217,22 @@
 <div class="viewcode-block" id="PerpetualClassifier.score">
 <a class="viewcode-back" href="../../api.html#perpetual.sklearn.PerpetualClassifier.score">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">score</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">X</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">sample_weight</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns the mean accuracy on the given test data and labels.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return the mean accuracy on the given test data and labels.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        X : array-like of shape (n_samples, n_features)</span>
+<span class="sd">            Test samples.</span>
+<span class="sd">        y : array-like of shape (n_samples,)</span>
+<span class="sd">            True labels.</span>
+<span class="sd">        sample_weight : array-like of shape (n_samples,), optional</span>
+<span class="sd">            Sample weights.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        float</span>
+<span class="sd">            Mean accuracy of ``self.predict(X)`` w.r.t. *y*.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="n">preds</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="n">X</span><span class="p">)</span>
         <span class="k">return</span> <span class="n">accuracy_score</span><span class="p">(</span><span class="n">y</span><span class="p">,</span> <span class="n">preds</span><span class="p">,</span> <span class="n">sample_weight</span><span class="o">=</span><span class="n">sample_weight</span><span class="p">)</span></div>
 
@@ -215,7 +240,24 @@
 <div class="viewcode-block" id="PerpetualClassifier.fit">
 <a class="viewcode-back" href="../../api.html#perpetual.sklearn.PerpetualClassifier.fit">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">fit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">X</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">sample_weight</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="o">**</span><span class="n">fit_params</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Self</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;A wrapper for the base fit method.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Fit the classifier on training data.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        X : array-like of shape (n_samples, n_features)</span>
+<span class="sd">            Training input samples.</span>
+<span class="sd">        y : array-like of shape (n_samples,)</span>
+<span class="sd">            Target class labels.</span>
+<span class="sd">        sample_weight : array-like of shape (n_samples,), optional</span>
+<span class="sd">            Individual weights for each sample.</span>
+<span class="sd">        **fit_params</span>
+<span class="sd">            Additional keyword arguments forwarded to the base ``fit``.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        self</span>
+<span class="sd">            Fitted estimator.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="c1"># Check if objective is appropriate for classification if it&#39;s a string</span>
         <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">objective</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">objective</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">[</span><span class="s2">&quot;LogLoss&quot;</span><span class="p">]:</span>
             <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span>
@@ -319,6 +361,8 @@
 <span class="sd">            Maximum number of bins for feature discretization.</span>
 <span class="sd">        max_cat : int, default=1000</span>
 <span class="sd">            Maximum unique categories before a feature is treated as numerical.</span>
+<span class="sd">        interaction_constraints : list of list of int, optional</span>
+<span class="sd">            Interaction constraints.</span>
 <span class="sd">        **kwargs</span>
 <span class="sd">            Arbitrary keyword arguments to be passed to the base class.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
@@ -347,7 +391,24 @@
 <div class="viewcode-block" id="PerpetualRegressor.fit">
 <a class="viewcode-back" href="../../api.html#perpetual.sklearn.PerpetualRegressor.fit">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">fit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">X</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">sample_weight</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="o">**</span><span class="n">fit_params</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Self</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;A wrapper for the base fit method.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Fit the regressor on training data.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        X : array-like of shape (n_samples, n_features)</span>
+<span class="sd">            Training input samples.</span>
+<span class="sd">        y : array-like of shape (n_samples,)</span>
+<span class="sd">            Target values.</span>
+<span class="sd">        sample_weight : array-like of shape (n_samples,), optional</span>
+<span class="sd">            Individual weights for each sample.</span>
+<span class="sd">        **fit_params</span>
+<span class="sd">            Additional keyword arguments forwarded to the base ``fit``.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        self</span>
+<span class="sd">            Fitted estimator.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="c1"># For regression, we typically enforce len(self.classes_) == 0 after fit</span>
         <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">objective</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">objective</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">[</span>
             <span class="s2">&quot;SquaredLoss&quot;</span><span class="p">,</span>
@@ -365,7 +426,22 @@
 <div class="viewcode-block" id="PerpetualRegressor.score">
 <a class="viewcode-back" href="../../api.html#perpetual.sklearn.PerpetualRegressor.score">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">score</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">X</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">sample_weight</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns the coefficient of determination ($R^2$) of the prediction.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return the coefficient of determination ($R^2$) of the prediction.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        X : array-like of shape (n_samples, n_features)</span>
+<span class="sd">            Test samples.</span>
+<span class="sd">        y : array-like of shape (n_samples,)</span>
+<span class="sd">            True target values.</span>
+<span class="sd">        sample_weight : array-like of shape (n_samples,), optional</span>
+<span class="sd">            Sample weights.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        float</span>
+<span class="sd">            $R^2$ score of ``self.predict(X)`` w.r.t. *y*.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="n">preds</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="n">X</span><span class="p">)</span>
         <span class="k">return</span> <span class="n">r2_score</span><span class="p">(</span><span class="n">y</span><span class="p">,</span> <span class="n">preds</span><span class="p">,</span> <span class="n">sample_weight</span><span class="o">=</span><span class="n">sample_weight</span><span class="p">)</span></div>
 </div>
@@ -463,6 +539,8 @@
 <span class="sd">            Maximum number of bins for feature discretization.</span>
 <span class="sd">        max_cat : int, default=1000</span>
 <span class="sd">            Maximum unique categories before a feature is treated as numerical.</span>
+<span class="sd">        interaction_constraints : list of list of int, optional</span>
+<span class="sd">            Interaction constraints.</span>
 <span class="sd">        **kwargs</span>
 <span class="sd">            Arbitrary keyword arguments to be passed to the base class.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
@@ -486,14 +564,31 @@
 <div class="viewcode-block" id="PerpetualRanker.fit">
 <a class="viewcode-back" href="../../api.html#perpetual.sklearn.PerpetualRanker.fit">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">fit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">X</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">group</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">sample_weight</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="o">**</span><span class="n">fit_params</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Self</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">        Fit the ranker. Requires the &#39;group&#39; parameter.</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Fit the ranker on training data.</span>
 
-<span class="sd">        Args:</span>
-<span class="sd">            X: Training data.</span>
-<span class="sd">            y: Target relevance scores.</span>
-<span class="sd">            group: Group lengths to use for a ranking objective. (Required for ListNetLoss).</span>
-<span class="sd">            sample_weight: Instance weights.</span>
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        X : array-like of shape (n_samples, n_features)</span>
+<span class="sd">            Training input samples.</span>
+<span class="sd">        y : array-like of shape (n_samples,)</span>
+<span class="sd">            Target relevance scores.</span>
+<span class="sd">        group : array-like of int, optional</span>
+<span class="sd">            Group lengths used by the ranking objective.  **Required** when</span>
+<span class="sd">            ``objective=&quot;ListNetLoss&quot;``.</span>
+<span class="sd">        sample_weight : array-like of shape (n_samples,), optional</span>
+<span class="sd">            Individual weights for each sample.</span>
+<span class="sd">        **fit_params</span>
+<span class="sd">            Additional keyword arguments forwarded to the base ``fit``.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        self</span>
+<span class="sd">            Fitted estimator.</span>
+
+<span class="sd">        Raises</span>
+<span class="sd">        ------</span>
+<span class="sd">        ValueError</span>
+<span class="sd">            If *group* is ``None`` and the objective is ``&quot;ListNetLoss&quot;``.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="p">(</span>
             <span class="n">group</span> <span class="ow">is</span> <span class="kc">None</span>

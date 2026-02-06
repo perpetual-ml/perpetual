@@ -5,14 +5,14 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Index &mdash; Perpetual 1.1.2 documentation</title>
+  <title>Index &mdash; Perpetual 1.2.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=9edc463e" />
 
   
       <script src="_static/jquery.js?v=5d32c60e"></script>
       <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="_static/documentation_options.js?v=6f037312"></script>
+      <script src="_static/documentation_options.js?v=6efca38a"></script>
       <script src="_static/doctools.js?v=fd6eb6e6"></script>
       <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
@@ -46,6 +46,7 @@
 <li class="toctree-l1"><a class="reference internal" href="quickstart.html">Quickstart</a></li>
 <li class="toctree-l1"><a class="reference internal" href="api.html">API Reference</a></li>
 <li class="toctree-l1"><a class="reference internal" href="tutorials/index.html">Tutorials</a></li>
+<li class="toctree-l1"><a class="reference internal" href="verticals/index.html">Vertical Solutions</a></li>
 <li class="toctree-l1"><a class="reference internal" href="architecture.html">Architecture</a></li>
 <li class="toctree-l1"><a class="reference internal" href="parameters_tuning.html">Parameters Tuning</a></li>
 <li class="toctree-l1"><a class="reference internal" href="faq.html">Frequently Asked Questions</a></li>
@@ -91,14 +92,25 @@
  | <a href="#P"><strong>P</strong></a>
  | <a href="#S"><strong>S</strong></a>
  | <a href="#T"><strong>T</strong></a>
+ | <a href="#X"><strong>X</strong></a>
  
 </div>
 <h2 id="_">_</h2>
 <table style="width: 100%" class="indextable genindextable"><tr>
   <td style="width: 33%; vertical-align: top;"><ul>
-      <li><a href="api.html#perpetual.PerpetualBooster.__init__">__init__() (perpetual.PerpetualBooster method)</a>
+      <li><a href="api.html#perpetual.iv.BraidedBooster.__init__">__init__() (perpetual.iv.BraidedBooster method)</a>
 
       <ul>
+        <li><a href="api.html#perpetual.meta_learners.SLearner.__init__">(perpetual.meta_learners.SLearner method)</a>
+</li>
+        <li><a href="api.html#perpetual.meta_learners.TLearner.__init__">(perpetual.meta_learners.TLearner method)</a>
+</li>
+        <li><a href="api.html#perpetual.meta_learners.XLearner.__init__">(perpetual.meta_learners.XLearner method)</a>
+</li>
+        <li><a href="api.html#perpetual.PerpetualBooster.__init__">(perpetual.PerpetualBooster method)</a>
+</li>
+        <li><a href="api.html#perpetual.risk.PerpetualRiskEngine.__init__">(perpetual.risk.PerpetualRiskEngine method)</a>
+</li>
         <li><a href="api.html#perpetual.sklearn.PerpetualClassifier.__init__">(perpetual.sklearn.PerpetualClassifier method)</a>
 </li>
         <li><a href="api.html#perpetual.sklearn.PerpetualRanker.__init__">(perpetual.sklearn.PerpetualRanker method)</a>
@@ -113,6 +125,10 @@
 <table style="width: 100%" class="indextable genindextable"><tr>
   <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="api.html#perpetual.PerpetualBooster.base_score">base_score (perpetual.PerpetualBooster property)</a>
+</li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="api.html#perpetual.iv.BraidedBooster">BraidedBooster (class in perpetual.iv)</a>
 </li>
   </ul></td>
 </tr></table>
@@ -142,11 +158,17 @@
       </ul></li>
       <li><a href="api.html#perpetual.PerpetualBooster.feature_names_in_">feature_names_in_ (perpetual.PerpetualBooster attribute)</a>
 </li>
-  </ul></td>
-  <td style="width: 33%; vertical-align: top;"><ul>
-      <li><a href="api.html#perpetual.PerpetualBooster.fit">fit() (perpetual.PerpetualBooster method)</a>
+      <li><a href="api.html#perpetual.iv.BraidedBooster.fit">fit() (perpetual.iv.BraidedBooster method)</a>
 
       <ul>
+        <li><a href="api.html#perpetual.meta_learners.SLearner.fit">(perpetual.meta_learners.SLearner method)</a>
+</li>
+        <li><a href="api.html#perpetual.meta_learners.TLearner.fit">(perpetual.meta_learners.TLearner method)</a>
+</li>
+        <li><a href="api.html#perpetual.meta_learners.XLearner.fit">(perpetual.meta_learners.XLearner method)</a>
+</li>
+        <li><a href="api.html#perpetual.PerpetualBooster.fit">(perpetual.PerpetualBooster method)</a>
+</li>
         <li><a href="api.html#perpetual.sklearn.PerpetualClassifier.fit">(perpetual.sklearn.PerpetualClassifier method)</a>
 </li>
         <li><a href="api.html#perpetual.sklearn.PerpetualRanker.fit">(perpetual.sklearn.PerpetualRanker method)</a>
@@ -155,11 +177,17 @@
 </li>
       </ul></li>
   </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="api.html#perpetual.iv.BraidedBooster.from_json">from_json() (perpetual.iv.BraidedBooster class method)</a>
+</li>
+  </ul></td>
 </tr></table>
 
 <h2 id="G">G</h2>
 <table style="width: 100%" class="indextable genindextable"><tr>
   <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="api.html#perpetual.risk.PerpetualRiskEngine.generate_reason_codes">generate_reason_codes() (perpetual.risk.PerpetualRiskEngine method)</a>
+</li>
       <li><a href="api.html#perpetual.PerpetualBooster.get_metadata">get_metadata() (perpetual.PerpetualBooster method)</a>
 </li>
   </ul></td>
@@ -228,8 +256,20 @@
 </li>
       <li><a href="api.html#perpetual.sklearn.PerpetualRegressor">PerpetualRegressor (class in perpetual.sklearn)</a>
 </li>
-      <li><a href="api.html#perpetual.PerpetualBooster.predict">predict() (perpetual.PerpetualBooster method)</a>
+      <li><a href="api.html#perpetual.risk.PerpetualRiskEngine">PerpetualRiskEngine (class in perpetual.risk)</a>
 </li>
+      <li><a href="api.html#perpetual.iv.BraidedBooster.predict">predict() (perpetual.iv.BraidedBooster method)</a>
+
+      <ul>
+        <li><a href="api.html#perpetual.meta_learners.SLearner.predict">(perpetual.meta_learners.SLearner method)</a>
+</li>
+        <li><a href="api.html#perpetual.meta_learners.TLearner.predict">(perpetual.meta_learners.TLearner method)</a>
+</li>
+        <li><a href="api.html#perpetual.meta_learners.XLearner.predict">(perpetual.meta_learners.XLearner method)</a>
+</li>
+        <li><a href="api.html#perpetual.PerpetualBooster.predict">(perpetual.PerpetualBooster method)</a>
+</li>
+      </ul></li>
   </ul></td>
   <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="api.html#perpetual.PerpetualBooster.predict_contributions">predict_contributions() (perpetual.PerpetualBooster method)</a>
@@ -266,6 +306,8 @@
       </ul></li>
       <li><a href="api.html#perpetual.PerpetualBooster.set_params">set_params() (perpetual.PerpetualBooster method)</a>
 </li>
+      <li><a href="api.html#perpetual.meta_learners.SLearner">SLearner (class in perpetual.meta_learners)</a>
+</li>
   </ul></td>
 </tr></table>
 
@@ -274,9 +316,21 @@
   <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="api.html#perpetual.PerpetualBooster.text_dump">text_dump() (perpetual.PerpetualBooster method)</a>
 </li>
+      <li><a href="api.html#perpetual.meta_learners.TLearner">TLearner (class in perpetual.meta_learners)</a>
+</li>
   </ul></td>
   <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="api.html#perpetual.iv.BraidedBooster.to_json">to_json() (perpetual.iv.BraidedBooster method)</a>
+</li>
       <li><a href="api.html#perpetual.PerpetualBooster.trees_to_dataframe">trees_to_dataframe() (perpetual.PerpetualBooster method)</a>
+</li>
+  </ul></td>
+</tr></table>
+
+<h2 id="X">X</h2>
+<table style="width: 100%" class="indextable genindextable"><tr>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="api.html#perpetual.meta_learners.XLearner">XLearner (class in perpetual.meta_learners)</a>
 </li>
   </ul></td>
 </tr></table>
