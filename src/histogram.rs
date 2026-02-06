@@ -193,6 +193,149 @@ impl NodeHistogramOwned {
     }
 }
 
+/// Arena-based bulk histogram storage.
+///
+/// Stores all histogram bins for all nodes in a single contiguous allocation,
+/// eliminating the overhead of thousands of individual Vec allocations.
+/// For n_nodes=10000 with 8 features, this replaces ~80000 heap allocations
+/// with a single one, dramatically reducing allocation overhead.
+pub struct HistogramArena {
+    /// Single contiguous allocation of all bins.
+    bins: Vec<Bin>,
+    /// Number of bins per feature (same order as col_index).
+    col_bin_counts: Vec<usize>,
+    /// Number of nodes.
+    n_nodes: usize,
+}
+
+impl HistogramArena {
+    /// Create arena from cuts (variable bins per feature).
+    /// Uses alloc_zeroed for demand-paged zero memory, then parallel init of
+    /// only num/cut_value fields to parallelize page faults across cores.
+    pub fn from_cuts(cuts: &JaggedMatrix<f64>, col_index: &[usize], _is_const_hess: bool, n_nodes: usize) -> Self {
+        let col_cuts: Vec<&[f64]> = col_index.iter().map(|&col| cuts.get_col(col)).collect();
+        let col_bin_counts: Vec<usize> = col_cuts.iter().map(|c| c.len()).collect();
+        let bins_per_node: usize = col_bin_counts.iter().sum();
+        let total_bins = bins_per_node * n_nodes;
+
+        // Allocate zeroed memory (OS provides demand-paged zero pages for large allocs).
+        // g_folded, h_folded, counts are all correctly zero. Only num/cut_value need setting.
+        let mut bins: Vec<Bin> = Self::alloc_zeroed_bins(total_bins);
+
+        // Build template arrays for num and cut_value (per-node layout).
+        let mut template_num: Vec<u16> = Vec::with_capacity(bins_per_node);
+        let mut template_cv: Vec<f64> = Vec::with_capacity(bins_per_node);
+        for col_cuts_slice in &col_cuts {
+            let cuts_mod = &col_cuts_slice[..(col_cuts_slice.len() - 1)];
+            template_num.push(0);
+            template_cv.push(f64::NAN);
+            for (it, c) in cuts_mod.iter().enumerate() {
+                template_num.push(it as u16 + 1);
+                template_cv.push(*c);
+            }
+        }
+
+        // Parallel init of num/cut_value across all nodes.
+        // This triggers page faults in parallel across rayon threads,
+        // parallelizing the OS overhead of backing virtual memory with physical pages.
+        bins.par_chunks_mut(bins_per_node).for_each(|node_bins| {
+            for (bin, (&num, &cv)) in node_bins.iter_mut().zip(template_num.iter().zip(template_cv.iter())) {
+                bin.num = num;
+                bin.cut_value = cv;
+            }
+        });
+
+        HistogramArena {
+            bins,
+            col_bin_counts,
+            n_nodes,
+        }
+    }
+
+    /// Create arena with fixed max_bin for all features.
+    pub fn from_fixed(max_bin: u16, col_amount: usize, _is_const_hess: bool, n_nodes: usize) -> Self {
+        let bins_per_feature = max_bin as usize + 2;
+        let col_bin_counts: Vec<usize> = vec![bins_per_feature; col_amount];
+        let bins_per_node = bins_per_feature * col_amount;
+        let total_bins = bins_per_node * n_nodes;
+
+        // Allocate zeroed memory
+        let mut bins: Vec<Bin> = Self::alloc_zeroed_bins(total_bins);
+
+        // Build template for fixed bins (all features have same layout)
+        let mut template_num: Vec<u16> = Vec::with_capacity(bins_per_node);
+        let mut template_cv: Vec<f64> = Vec::with_capacity(bins_per_node);
+        for _col in 0..col_amount {
+            template_num.push(0);
+            template_cv.push(f64::NAN);
+            for i in 0..(max_bin + 1) {
+                template_num.push(i + 1);
+                template_cv.push(f64::NAN);
+            }
+        }
+
+        // Parallel init of num/cut_value
+        bins.par_chunks_mut(bins_per_node).for_each(|node_bins| {
+            for (bin, (&num, &cv)) in node_bins.iter_mut().zip(template_num.iter().zip(template_cv.iter())) {
+                bin.num = num;
+                bin.cut_value = cv;
+            }
+        });
+
+        HistogramArena {
+            bins,
+            col_bin_counts,
+            n_nodes,
+        }
+    }
+
+    /// Allocate a Vec<Bin> of `count` bins, all zeroed.
+    /// Uses alloc_zeroed so the OS can provide demand-paged zero memory
+    /// for large allocations without physical zeroing overhead.
+    fn alloc_zeroed_bins(count: usize) -> Vec<Bin> {
+        if count == 0 {
+            return Vec::new();
+        }
+        unsafe {
+            let layout = std::alloc::Layout::array::<Bin>(count).unwrap();
+            let ptr = std::alloc::alloc_zeroed(layout) as *mut Bin;
+            if ptr.is_null() {
+                std::alloc::handle_alloc_error(layout);
+            }
+            Vec::from_raw_parts(ptr, count, count)
+        }
+    }
+
+    /// Create NodeHistogram references into this arena.
+    ///
+    /// Returns a Vec of NodeHistogram that borrow from this arena.
+    /// The arena must outlive the returned histograms.
+    pub fn as_node_histograms(&mut self) -> Vec<NodeHistogram<'_>> {
+        let mut result: Vec<NodeHistogram<'_>> = Vec::with_capacity(self.n_nodes);
+        let n_cols = self.col_bin_counts.len();
+
+        // Cast the entire bins slice to UnsafeCell<Bin> slice (same layout, repr(transparent))
+        let all_cells: &[UnsafeCell<Bin>] = unsafe {
+            let ptr = self.bins.as_ptr() as *const UnsafeCell<Bin>;
+            std::slice::from_raw_parts(ptr, self.bins.len())
+        };
+
+        let mut offset = 0;
+        for _node in 0..self.n_nodes {
+            let mut features: Vec<FeatureHistogram<'_>> = Vec::with_capacity(n_cols);
+            for &n_bins in &self.col_bin_counts {
+                features.push(FeatureHistogram {
+                    data: &all_cells[offset..offset + n_bins],
+                });
+                offset += n_bins;
+            }
+            result.push(NodeHistogram { data: features });
+        }
+
+        result
+    }
+}
+
 /// Node Histogram.
 #[derive(Debug)]
 pub struct NodeHistogram<'a> {

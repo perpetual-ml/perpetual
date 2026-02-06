@@ -348,6 +348,26 @@ where
     p
 }
 
+/// Compute the weighted median of `y`.
+///
+/// When `sample_weight` is `None` every element has unit weight.
+pub fn weighted_median(y: &[f64], sample_weight: Option<&[f64]>) -> f64 {
+    let mut idxs: Vec<usize> = (0..y.len()).collect();
+    idxs.sort_by(|&i, &j| y[i].total_cmp(&y[j]));
+
+    let total_w = sample_weight.map(|w| w.iter().sum::<f64>()).unwrap_or(y.len() as f64);
+    let target = total_w * 0.5;
+
+    let mut cum = 0.0_f64;
+    for &i in &idxs {
+        cum += sample_weight.map_or(1.0, |w| w[i]);
+        if cum >= target {
+            return y[i];
+        }
+    }
+    y[idxs[y.len() / 2]]
+}
+
 // Return the index of the first value in a slice that
 // is less another number. This will return the first index for
 // missing values.

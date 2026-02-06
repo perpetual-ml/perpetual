@@ -9,7 +9,7 @@ use crate::data::FloatData;
 use serde::{Deserialize, Serialize};
 
 /// Struct to hold the information of a given bin.
-#[derive(Debug, Deserialize, Serialize, Clone)]
+#[derive(Debug, Deserialize, Serialize, Clone, Copy)]
 pub struct Bin {
     /// The bin number or index.
     pub num: u16,

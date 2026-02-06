@@ -1,3 +1,7 @@
+//! Python bindings for the Perpetual gradient boosting library.
+//!
+//! This crate exposes [`PerpetualBooster`], [`MultiOutputBooster`], [`UpliftBooster`],
+//! and [`IVBooster`] to Python via [PyO3](https://pyo3.rs).
 mod booster;
 mod custom_objective;
 mod iv;

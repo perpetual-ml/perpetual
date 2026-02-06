@@ -1,3 +1,6 @@
+//! Tree Prediction Methods
+//!
+//! Prediction and feature-contribution logic executed on individual trees.
 use super::tree::Tree;
 use crate::data::ColumnarMatrix;
 use crate::{utils::odds, Matrix};
@@ -5,6 +8,10 @@ use rayon::prelude::*;
 use std::collections::{HashMap, HashSet};
 
 impl Tree {
+    /// Compute probability-change contributions for a single row.
+    ///
+    /// Tracks how the predicted probability changes as the sample traverses
+    /// from the root to a leaf. Only valid for `LogLoss` objective.
     pub fn predict_contributions_row_probability_change(
         &self,
         row: &[f64],
@@ -33,7 +40,10 @@ impl Tree {
         lo
     }
 
-    // Branch average difference predictions
+    /// Compute midpoint-difference contributions for a single row.
+    ///
+    /// At each internal node the contribution is the difference between
+    /// the child's weight and the midpoint of the sibling weights.
     pub fn predict_contributions_row_midpoint_difference(&self, row: &[f64], contribs: &mut [f64], missing: &f64) {
         // Bias term is left as 0.
 
@@ -72,7 +82,10 @@ impl Tree {
         }
     }
 
-    // Branch difference predictions.
+    /// Compute branch-difference contributions for a single row.
+    ///
+    /// The contribution is the weight of the traversed child minus the
+    /// weight of the sibling child.
     pub fn predict_contributions_row_branch_difference(&self, row: &[f64], contribs: &mut [f64], missing: &f64) {
         // Bias term is left as 0.
 
@@ -108,8 +121,10 @@ impl Tree {
         }
     }
 
-    // How does the travelled childs weight change relative to the
-    // mode branch.
+    /// Compute mode-difference contributions for a single row.
+    ///
+    /// The contribution is the weight of the traversed child minus the
+    /// weight of whichever sibling has the greater coverage (the "mode").
     pub fn predict_contributions_row_mode_difference(&self, row: &[f64], contribs: &mut [f64], missing: &f64) {
         // Bias term is left as 0.
         let mut node_idx = 0;
@@ -142,6 +157,7 @@ impl Tree {
         }
     }
 
+    /// Compute Saabas-style weight contributions for a single row.
     pub fn predict_contributions_row_weight(&self, row: &[f64], contribs: &mut [f64], missing: &f64) {
         // Add the bias term first...
         contribs[contribs.len() - 1] += self.nodes.get(&0).unwrap().weight_value as f64;
@@ -161,6 +177,7 @@ impl Tree {
         }
     }
 
+    /// Compute Saabas-style weight contributions for the entire dataset.
     pub fn predict_contributions_weight(&self, data: &Matrix<f64>, contribs: &mut [f64], missing: &f64) {
         // There needs to always be at least 2 trees
         data.index
@@ -169,6 +186,7 @@ impl Tree {
             .for_each(|(row, contribs)| self.predict_contributions_row_weight(&data.get_row(*row), contribs, missing))
     }
 
+    /// Compute average (internal-node) contributions for a single row.
     pub fn predict_contributions_row_average(
         &self,
         row: &[f64],
@@ -194,6 +212,7 @@ impl Tree {
         }
     }
 
+    /// Compute average (internal-node) contributions for the entire dataset.
     pub fn predict_contributions_average(
         &self,
         data: &Matrix<f64>,
@@ -222,6 +241,7 @@ impl Tree {
         }
     }
 
+    /// Predict from a pre-sliced row (no matrix lookup).
     pub fn predict_row_from_row_slice(&self, row: &[f64], missing: &f64) -> f64 {
         let mut node_idx = 0;
         loop {
@@ -245,6 +265,7 @@ impl Tree {
             .collect()
     }
 
+    /// Generate predictions for a full dataset.
     pub fn predict(&self, data: &Matrix<f64>, parallel: bool, missing: &f64) -> Vec<f64> {
         if parallel {
             self.predict_parallel(data, missing)
@@ -283,6 +304,7 @@ impl Tree {
             .collect()
     }
 
+    /// Return the set of node indices visited by each sample.
     pub fn predict_nodes(&self, data: &Matrix<f64>, parallel: bool, missing: &f64) -> Vec<HashSet<usize>> {
         if parallel {
             self.predict_nodes_parallel(data, missing)
@@ -324,6 +346,7 @@ impl Tree {
             .collect()
     }
 
+    /// Generate predictions from a columnar (zero-copy) dataset.
     pub fn predict_columnar(&self, data: &ColumnarMatrix<f64>, parallel: bool, missing: &f64) -> Vec<f64> {
         if parallel {
             self.predict_parallel_columnar(data, missing)
@@ -366,6 +389,7 @@ impl Tree {
             .collect()
     }
 
+    /// Return the set of node indices visited by each sample (columnar variant).
     pub fn predict_nodes_columnar(
         &self,
         data: &ColumnarMatrix<f64>,

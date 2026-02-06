@@ -1,6 +1,6 @@
-//! Predictions
+//! Prediction Methods
 //!
-//!
+//! Prediction, probability, contribution, and feature importance methods for the booster.
 
 use crate::booster::config::ContributionsMethod;
 use crate::data::ColumnarMatrix;
@@ -57,10 +57,12 @@ impl PerpetualBooster {
         init_preds
     }
 
-    /// Generate probabilities on data using the gradient booster.
+    /// Generate class probabilities (sigmoid of log-odds) for the given data.
     ///
-    /// * `data` -  Either a Polars or Pandas DataFrame, or a 2 dimensional Numpy array.
-    /// * `parallel` -  Predict in parallel.
+    /// Only meaningful for binary classification with `LogLoss` objective.
+    ///
+    /// * `data` - The feature matrix.
+    /// * `parallel` - Predict in parallel.
     pub fn predict_proba(&self, data: &Matrix<f64>, parallel: bool) -> Vec<f64> {
         let preds = self.predict(data, parallel);
         if parallel {
@@ -70,10 +72,10 @@ impl PerpetualBooster {
         }
     }
 
-    /// Generate probabilities on columnar data using the gradient booster (zero-copy from Polars).
+    /// Generate class probabilities for columnar data (zero-copy).
     ///
-    /// * `data` -  ColumnarMatrix where each column is a separate slice.
-    /// * `parallel` -  Predict in parallel.
+    /// * `data` - The columnar feature matrix.
+    /// * `parallel` - Predict in parallel.
     pub fn predict_proba_columnar(&self, data: &ColumnarMatrix<f64>, parallel: bool) -> Vec<f64> {
         let preds = self.predict_columnar(data, parallel);
         if parallel {

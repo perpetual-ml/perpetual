@@ -1,3 +1,9 @@
+"""Uplift modelling via the R-Learner approach.
+
+Estimates the Conditional Average Treatment Effect (CATE) using a three-stage
+gradient boosting pipeline: outcome model, propensity model, and effect model.
+"""
+
 from typing import Any, Dict, Iterable, Optional, Union
 
 import numpy as np
@@ -8,6 +14,14 @@ from perpetual.utils import convert_input_array, convert_input_frame
 
 
 class UpliftBooster:
+    """R-Learner uplift model for estimating heterogeneous treatment effects.
+
+    Learns the Conditional Average Treatment Effect (CATE)
+    ``tau(x) = E[Y | X, W=1] - E[Y | X, W=0]`` using three sequentially
+    fitted gradient boosting models: an outcome model, a propensity model,
+    and an effect model.
+    """
+
     def __init__(
         self,
         outcome_budget: float = 0.5,
@@ -40,50 +54,55 @@ class UpliftBooster:
 
         Parameters
         ----------
-        outcome_budget : float
-            Budget for the outcome model mu(x).
-        propensity_budget : float
-            Budget for the propensity model p(x).
-        effect_budget : float
-            Budget for the effect model tau(x).
+        outcome_budget : float, default=0.5
+            Fitting budget for the outcome model ``mu(x)``. Higher values allow
+            more boosting rounds.
+        propensity_budget : float, default=0.5
+            Fitting budget for the propensity model ``p(x)``. Higher values allow
+            more boosting rounds.
+        effect_budget : float, default=0.5
+            Fitting budget for the effect model ``tau(x)``. Higher values allow
+            more boosting rounds.
         num_threads : int, optional
-            Number of threads.
+            Number of threads to use during training and prediction.
         monotone_constraints : dict, optional
-            Monotone constraints.
+            Constraints mapping feature indices/names to -1, 1, or 0.
         force_children_to_bound_parent : bool, default=False
-            Force children to be bounded by parent.
+            Whether to restrict children nodes to be within the parent's range.
         missing : float, default=np.nan
-            Missing value.
+            Value to consider as missing data.
         allow_missing_splits : bool, default=True
-            Allow missing splits.
+            Whether to allow splits that separate missing from non-missing values.
         create_missing_branch : bool, default=False
-            Create missing branch.
+            Whether to create a separate branch for missing values (ternary trees).
         terminate_missing_features : iterable, optional
-            Terminate missing features.
+            Features for which missing branches are always terminated when
+            ``create_missing_branch`` is True.
         missing_node_treatment : str, default="None"
-            Missing node treatment.
+            How to handle weights for missing nodes. Options: ``"None"``,
+            ``"AssignToParent"``, ``"AverageLeafWeight"``, ``"AverageNodeWeight"``.
         log_iterations : int, default=0
-            Log iterations.
+            Logging frequency (every N iterations). 0 disables logging.
         quantile : float, optional
-            Quantile for QuantileLoss.
+            Target quantile when using ``"QuantileLoss"``.
         reset : bool, optional
-            Reset model on fit.
+            Whether to reset the model or continue training on subsequent fits.
         categorical_features : iterable or str, default="auto"
-            Categorical features.
+            Feature indices or names to treat as categorical.
         timeout : float, optional
-            Timeout in seconds.
+            Time limit for fitting in seconds.
         iteration_limit : int, optional
-            Iteration limit.
+            Maximum number of boosting iterations.
         memory_limit : float, optional
-            Memory limit in GB.
+            Memory limit for training in GB.
         stopping_rounds : int, optional
-            Stopping rounds.
+            Number of rounds without improvement before stopping.
         max_bin : int, default=256
-            Maximum number of bins.
+            Maximum number of bins for feature discretization.
         max_cat : int, default=1000
-            Maximum unique categories.
+            Maximum unique categories before a feature is treated as numerical.
         interaction_constraints : list of list of int, optional
-            Interaction constraints.
+            Groups of feature indices allowed to interact.
         """
         self.outcome_budget = outcome_budget
         self.propensity_budget = propensity_budget

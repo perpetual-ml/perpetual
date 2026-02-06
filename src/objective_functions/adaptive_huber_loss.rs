@@ -1,33 +1,29 @@
-//! Adaptive Huber Loss function
-//!
-//!
+//! Adaptive Huber Loss function — automatically adjusts `delta` from the
+//! residual distribution.
 
-use crate::{metrics::evaluation::Metric, objective_functions::objective::ObjectiveFunction};
+use crate::{objective_functions::objective::ObjectiveFunction, utils::weighted_median};
 use serde::{Deserialize, Serialize};
 
-/// Adaptive Huber Loss
+/// Adaptive Huber Loss — delta is derived from the `quantile` of the
+/// absolute-error distribution at each evaluation.
 #[derive(Default, Debug, Deserialize, Serialize, Clone)]
 pub struct AdaptiveHuberLoss {
     pub quantile: Option<f64>,
 }
 
+/// Compute the adaptive delta: the `alpha`-quantile of |y - yhat|.
+#[inline]
+fn adaptive_delta(y: &[f64], yhat: &[f64], alpha: f64) -> f64 {
+    let n = y.len();
+    let mut abs_res: Vec<f64> = y.iter().zip(yhat).map(|(&yi, &yh)| (yi - yh).abs()).collect();
+    abs_res.sort_by(|a, b| a.total_cmp(b));
+    abs_res[((n as f64) * alpha).floor() as usize % n]
+}
+
 impl ObjectiveFunction for AdaptiveHuberLoss {
     #[inline]
     fn loss(&self, y: &[f64], yhat: &[f64], sample_weight: Option<&[f64]>, _group: Option<&[u64]>) -> Vec<f32> {
-        // default alpha: 0.5
-        // if not passed explicitly
-        let alpha = self.quantile.unwrap_or(0.5);
-        let n = y.len();
-
-        let mut abs_res = y
-            .iter()
-            .zip(yhat.iter())
-            .map(|(&yi, &yh)| (yi - yh).abs())
-            .collect::<Vec<_>>();
-        abs_res.sort_by(|a, b| a.partial_cmp(b).unwrap());
-
-        let idx = ((n as f64) * alpha).floor() as usize;
-        let delta = abs_res[idx.min(n - 1)];
+        let delta = adaptive_delta(y, yhat, self.quantile.unwrap_or(0.5));
 
         match sample_weight {
             Some(weights) => y
@@ -70,21 +66,8 @@ impl ObjectiveFunction for AdaptiveHuberLoss {
         sample_weight: Option<&[f64]>,
         _group: Option<&[u64]>,
     ) -> (Vec<f32>, Option<Vec<f32>>) {
-        // default alpha: 0.5
-        // if not passed explicitly
-        let alpha = self.quantile.unwrap_or(0.5);
+        let delta = adaptive_delta(y, yhat, self.quantile.unwrap_or(0.5)) as f32;
         let n = y.len();
-
-        let mut abs_res = y
-            .iter()
-            .zip(yhat.iter())
-            .map(|(&yi, &yh)| (yi - yh).abs())
-            .collect::<Vec<_>>();
-        abs_res.sort_by(|a, b| a.partial_cmp(b).unwrap());
-        let idx = ((n as f64) * alpha).floor() as usize;
-        let delta = abs_res[idx.min(n - 1)] as f32;
-
-        // --- Vectorized Loop ---
         let mut g = Vec::with_capacity(n);
         let mut h = Vec::with_capacity(n);
 
@@ -92,15 +75,12 @@ impl ObjectiveFunction for AdaptiveHuberLoss {
             Some(weights) => {
                 for i in 0..n {
                     let diff = (yhat[i] - y[i]) as f32;
-                    let abs_diff = diff.abs();
                     let w = weights[i] as f32;
-
-                    if abs_diff <= delta {
+                    if diff.abs() <= delta {
                         g.push(diff * w);
                         h.push(w);
                     } else {
-                        let sign = diff.signum();
-                        g.push(delta * sign * w);
+                        g.push(delta * diff.signum() * w);
                         h.push(0.0);
                     }
                 }
@@ -109,14 +89,11 @@ impl ObjectiveFunction for AdaptiveHuberLoss {
             None => {
                 for i in 0..n {
                     let diff = (yhat[i] - y[i]) as f32;
-                    let abs_diff = diff.abs();
-
-                    if abs_diff <= delta {
+                    if diff.abs() <= delta {
                         g.push(diff);
                         h.push(1.0);
                     } else {
-                        let sign = diff.signum();
-                        g.push(delta * sign);
+                        g.push(delta * diff.signum());
                         h.push(0.0);
                     }
                 }
@@ -126,27 +103,61 @@ impl ObjectiveFunction for AdaptiveHuberLoss {
     }
 
     fn initial_value(&self, y: &[f64], sample_weight: Option<&[f64]>, _group: Option<&[u64]>) -> f64 {
-        let mut idxs = (0..y.len()).collect::<Vec<_>>();
-        idxs.sort_by(|&i, &j| y[i].partial_cmp(&y[j]).unwrap());
-
-        let total_w = sample_weight.map(|w| w.iter().sum::<f64>()).unwrap_or(y.len() as f64);
-        let target = total_w * 0.5;
-
-        // find weighted median via scan()
-        let median = idxs
-            .iter()
-            .scan(0.0, |cum, &i| {
-                *cum += sample_weight.map_or(1.0, |w| w[i]);
-                Some((i, *cum))
-            })
-            .find(|&(_i, cum)| cum >= target)
-            .map(|(i, _)| y[i])
-            .unwrap_or(y[idxs[y.len() / 2]]);
-
-        median
+        weighted_median(y, sample_weight)
     }
 
-    fn default_metric(&self) -> Metric {
-        Metric::RootMeanSquaredError
+    // `default_metric`: inherits the trait default (`RootMeanSquaredError`).
+
+    fn gradient_and_loss(
+        &self,
+        y: &[f64],
+        yhat: &[f64],
+        sample_weight: Option<&[f64]>,
+        _group: Option<&[u64]>,
+    ) -> (Vec<f32>, Option<Vec<f32>>, Vec<f32>) {
+        // Compute delta once to avoid sorting the residuals twice.
+        let delta = adaptive_delta(y, yhat, self.quantile.unwrap_or(0.5));
+        let delta32 = delta as f32;
+        let n = y.len();
+        let mut g = Vec::with_capacity(n);
+        let mut h = Vec::with_capacity(n);
+        let mut l = Vec::with_capacity(n);
+
+        match sample_weight {
+            Some(weights) => {
+                for i in 0..n {
+                    let r = yhat[i] - y[i];
+                    let ar = r.abs();
+                    let diff = r as f32;
+                    let w = weights[i] as f32;
+                    if ar <= delta {
+                        g.push(diff * w);
+                        h.push(w);
+                        l.push((0.5 * r * r * weights[i]) as f32);
+                    } else {
+                        g.push(delta32 * diff.signum() * w);
+                        h.push(0.0);
+                        l.push((delta * (ar - 0.5 * delta) * weights[i]) as f32);
+                    }
+                }
+            }
+            None => {
+                for i in 0..n {
+                    let r = yhat[i] - y[i];
+                    let ar = r.abs();
+                    let diff = r as f32;
+                    if ar <= delta {
+                        g.push(diff);
+                        h.push(1.0);
+                        l.push((0.5 * r * r) as f32);
+                    } else {
+                        g.push(delta32 * diff.signum());
+                        h.push(0.0);
+                        l.push((delta * (ar - 0.5 * delta)) as f32);
+                    }
+                }
+            }
+        }
+        (g, Some(h), l)
     }
 }

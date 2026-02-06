@@ -1,4 +1,11 @@
-from typing import List, Tuple, Union
+"""Adverse-action reason-code generation for credit risk models.
+
+Provides `PerpetualRiskEngine`, a wrapper around a fitted `PerpetualBooster`
+that explains rejection decisions by identifying the features most responsible
+for pushing a score below the approval threshold.
+"""
+
+from typing import List
 
 import numpy as np
 
@@ -15,11 +22,18 @@ class PerpetualRiskEngine:
     """
 
     def __init__(self, model: PerpetualBooster):
+        """Wrap a fitted booster for reason-code generation.
+
+        Parameters
+        ----------
+        model : PerpetualBooster
+            A fitted `PerpetualBooster` instance.
+        """
         self.booster = model
 
     def generate_reason_codes(
         self, X, threshold: float, n_codes: int = 3, method: str = "Weight"
-    ) -> Union[List[List[Tuple[str, float]]], List[List[int]]]:
+    ) -> List[List[str]]:
         """
         Generate reason codes for samples that fall below the approval threshold.
 
@@ -41,10 +55,9 @@ class PerpetualRiskEngine:
 
         Returns
         -------
-        reasons : List[List[Tuple[str, float]]]
-            List of reasons for each applicant.
-            If approved, list is empty.
-            If rejected, contains tuples of (Feature Name/Index, Contribution Value).
+        reasons : list of list of str
+            For each sample, a list of reason-code strings (e.g.
+            ``"feature_name: -0.1234"``).  Approved samples get an empty list.
         """
         # Get predictions
         if len(getattr(self.booster, "classes_", [])) == 2:

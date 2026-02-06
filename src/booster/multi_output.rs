@@ -1,6 +1,7 @@
-//! MultiOutputBooster
+//! Multi-Output Booster
 //!
-//!
+//! A wrapper around multiple [`PerpetualBooster`] instances for multi-target
+//! regression or classification tasks.
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 
@@ -11,12 +12,19 @@ use crate::errors::PerpetualError;
 use crate::objective_functions::objective::Objective;
 use crate::{ColumnarMatrix, Matrix, PerpetualBooster};
 
-/// Perpetual Booster object
+/// Multi-Output Gradient Boosting Machine.
+///
+/// Wraps `n_boosters` independent [`PerpetualBooster`] instances — one per target column —
+/// and exposes a unified `fit` / `predict` API.
 #[derive(Clone, Serialize, Deserialize)]
 pub struct MultiOutputBooster {
+    /// Number of independent boosters (one per output).
     pub n_boosters: usize,
+    /// Shared configuration applied to every sub-booster.
     pub cfg: BoosterConfig,
+    /// The individual [`PerpetualBooster`] instances.
     pub boosters: Vec<PerpetualBooster>,
+    /// Arbitrary metadata key-value pairs.
     metadata: HashMap<String, String>,
 }
 
@@ -41,8 +49,9 @@ impl Default for MultiOutputBooster {
 }
 
 impl MultiOutputBooster {
-    /// Multi Output Booster object
+    /// Create a new `MultiOutputBooster`.
     ///
+    /// * `n_boosters` - Number of independent boosters (one per target column).
     /// * `objective` - The name of objective function used to optimize. Valid options are:
     ///   "LogLoss" to use logistic loss as the objective function,
     ///   "SquaredLoss" to use Squared Error as the objective function,
@@ -60,10 +69,10 @@ impl MultiOutputBooster {
     ///   between the training features and the target variable.
     /// * `force_children_to_bound_parent` - force_children_to_bound_parent.
     /// * `missing` - Value to consider missing.
-    /// * `allow_missing_splits` - Should the algorithm allow splits that completed seperate out missing
-    ///   and non-missing values, in the case where `create_missing_branch` is false. When `create_missing_branch`
-    ///   is true, setting this to true will result in the missin branch being further split.
-    /// * `create_missing_branch` - Should missing be split out it's own separate branch?
+    /// * `allow_missing_splits` - Whether the algorithm allows splits that completely separate
+    ///   missing and non-missing values. When `create_missing_branch` is true, setting this to
+    ///   true will result in the missing branch being further split.
+    /// * `create_missing_branch` - Should missing be split out into its own separate branch?
     /// * `missing_node_treatment` - specify how missing nodes should be handled during training.
     /// * `log_iterations` - Setting to a value (N) other than zero will result in information being logged about ever N iterations.
     /// * `seed` - Integer value used to seed any randomness used in the algorithm.

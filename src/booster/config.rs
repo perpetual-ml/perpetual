@@ -1,9 +1,7 @@
-//! Booster configurations
+//! Booster Configuration
 //!
-//! Booster specific configurations.
-//!
-//!
-//!
+//! Defines the configuration structures and enums used by the Perpetual Booster,
+//! including contribution methods, importance methods, and missing-value strategies.
 use crate::constraints::ConstraintMap;
 use crate::errors::PerpetualError;
 use crate::objective_functions::objective::Objective;
@@ -11,9 +9,6 @@ use serde::{de::DeserializeOwned, Deserialize, Deserializer, Serialize};
 use std::collections::HashSet;
 use std::fs;
 use std::path::Path;
-
-// Common configuration
-// across implementations
 
 /// Methods for calculating feature contributions.
 #[derive(Serialize, Deserialize, Clone, Copy)]
@@ -62,10 +57,6 @@ pub enum MissingNodeTreatment {
     AverageNodeWeight,
 }
 
-// Common functions
-// fn default_cal_models() -> HashMap<String, [(PerpetualBooster, f64); 2]> {
-//     HashMap::new()
-// }
 fn default_budget() -> f32 {
     0.5
 }

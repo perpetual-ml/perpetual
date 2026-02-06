@@ -36,15 +36,33 @@ Example:
    # Predict treatment effect (uplift)
    uplift_preds = model.predict(X_test)
 
+DR-Learner (Doubly Robust)
+--------------------------
+
+The :class:`meta_learners.DRLearner` combines outcome modeling with inverse
+propensity weighting to produce a *doubly robust* estimate of the CATE.  The
+estimator is consistent when *either* the outcome models or the propensity
+model is correctly specified.
+
+The AIPW pseudo-outcome is:
+
+$$\Gamma_i = \hat{\mu}_1(X_i) - \hat{\mu}_0(X_i) + \frac{W_i(Y_i - \hat{\mu}_1(X_i))}{\hat{p}(X_i)} - \frac{(1-W_i)(Y_i - \hat{\mu}_0(X_i))}{1-\hat{p}(X_i)}$$
+
+Example:
+
+.. code-block:: python
+
+   from perpetual.meta_learners import DRLearner
+
+   model = DRLearner(budget=0.5, clip=0.01)
+   model.fit(X, w, y)
+   cate = model.predict(X_test)
+
 Meta-Learners
 -------------
 
 For cases where you want more control or simpler algorithms, Perpetual offers standard Meta-Learners:
 
-Tutorials
----------
-
-For a detailed walkthrough using the Hillstrom marketing dataset, see the :doc:`../tutorials/verticals/uplift_marketing`.
 * **S-Learner**: Uses a single model including the treatment as a feature.
 * **T-Learner**: Uses two separate models, one for treatment and one for control.
 * **X-Learner**: A multi-stage learner that is particularly effective when treatment groups are imbalanced.
@@ -56,3 +74,27 @@ For a detailed walkthrough using the Hillstrom marketing dataset, see the :doc:`
    model = XLearner(budget=0.5)
    model.fit(X, w, y)
    cate = model.predict(X_test)
+
+Evaluation Metrics
+------------------
+
+Evaluating uplift models is challenging because individual-level treatment
+effects are never directly observed.  Perpetual provides standard metrics that
+exploit randomized treatment assignment:
+
+* :func:`causal_metrics.cumulative_gain_curve` — the uplift gain curve.
+* :func:`causal_metrics.auuc` — Area Under the Uplift Curve.
+* :func:`causal_metrics.qini_curve` — the Qini curve.
+* :func:`causal_metrics.qini_coefficient` — the Qini coefficient.
+
+.. code-block:: python
+
+   from perpetual.causal_metrics import auuc, qini_coefficient
+
+   score = auuc(y_test, w_test, uplift_preds, normalize=True)
+   qini  = qini_coefficient(y_test, w_test, uplift_preds)
+
+Tutorials
+---------
+
+For a detailed walkthrough using the Hillstrom marketing dataset, see the :doc:`../tutorials/causal/uplift_marketing`.

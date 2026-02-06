@@ -1,3 +1,7 @@
+//! Core Booster Implementation
+//!
+//! Contains the [`PerpetualBooster`] struct — the main entry point for
+//! training gradient-boosted tree ensembles with the Perpetual algorithm.
 use crate::bin::Bin;
 use crate::binning::{bin_columnar_matrix, bin_matrix};
 use crate::booster::config::*;
@@ -9,7 +13,7 @@ use crate::constraints::ConstraintMap;
 use crate::data::{ColumnarMatrix, Matrix};
 use crate::decision_tree::tree::{Tree, TreeStopper};
 use crate::errors::PerpetualError;
-use crate::histogram::{update_cuts, NodeHistogram, NodeHistogramOwned};
+use crate::histogram::{update_cuts, HistogramArena, NodeHistogram};
 use crate::objective_functions::objective::{Objective, ObjectiveFunction};
 use crate::splitter::{MissingBranchSplitter, MissingImputerSplitter, SplitInfo, SplitInfoSlice, Splitter};
 use core::{f32, f64};
@@ -22,7 +26,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::mem;
 use std::time::Instant;
-use sysinfo::System;
+use sysinfo::{MemoryRefreshKind, RefreshKind, System};
 
 type ImportanceFn = fn(&Tree, &mut HashMap<usize, (f32, usize)>);
 
@@ -382,7 +386,7 @@ impl PerpetualBooster {
         } else {
             mem_bin * self.cfg.max_bin as usize * col_amount
         };
-        let sys = System::new_all();
+        let sys = System::new_with_specifics(RefreshKind::nothing().with_memory(MemoryRefreshKind::everything()));
         let mem_available = match self.cfg.memory_limit {
             Some(mem_limit) => mem_limit * 1e9_f32,
             None => match sys.cgroup_limits() {
@@ -398,18 +402,12 @@ impl PerpetualBooster {
         } else {
             n_nodes_alloc = (FREE_MEM_ALLOC_FACTOR * (mem_available / (mem_hist as f32))) as usize;
         }
-
-        let mut hist_tree_owned: Vec<NodeHistogramOwned>;
-        if col_amount == col_index.len() {
-            hist_tree_owned = (0..n_nodes_alloc)
-                .map(|_| NodeHistogramOwned::empty_from_cuts(&binned_data.cuts, &col_index, is_const_hess, false))
-                .collect();
+        let mut hist_arena = if col_amount == col_index.len() {
+            HistogramArena::from_cuts(&binned_data.cuts, &col_index, is_const_hess, n_nodes_alloc)
         } else {
-            hist_tree_owned = (0..n_nodes_alloc)
-                .map(|_| NodeHistogramOwned::empty(self.cfg.max_bin, col_amount, is_const_hess, false))
-                .collect();
-        }
-        let mut hist_tree: Vec<NodeHistogram> = hist_tree_owned.iter_mut().map(NodeHistogram::from_owned).collect();
+            HistogramArena::from_fixed(self.cfg.max_bin, col_amount, is_const_hess, n_nodes_alloc)
+        };
+        let mut hist_tree: Vec<NodeHistogram> = hist_arena.as_node_histograms();
 
         let mut split_info_vec: Vec<SplitInfo> = (0..col_amount).map(|_| SplitInfo::default()).collect();
         let mut split_info_slice = SplitInfoSlice::new(&mut split_info_vec);
@@ -475,7 +473,6 @@ impl PerpetualBooster {
                 n_nodes_alloc,
                 self.cfg.save_node_stats,
             );
-
             self.update_predictions_inplace(&mut yhat, &tree, data);
 
             if tree.nodes.len() < 5 {
@@ -500,8 +497,7 @@ impl PerpetualBooster {
                 n_low_loss_rounds = 0;
             }
 
-            (grad, hess) = objective_fn.gradient(y, &yhat, sample_weight, group);
-            loss = objective_fn.loss(y, &yhat, sample_weight, group);
+            (grad, hess, loss) = objective_fn.gradient_and_loss(y, &yhat, sample_weight, group);
 
             if verbose {
                 info!(
@@ -621,7 +617,7 @@ impl PerpetualBooster {
         } else {
             mem_bin * self.cfg.max_bin as usize * col_amount
         };
-        let sys = System::new_all();
+        let sys = System::new_with_specifics(RefreshKind::nothing().with_memory(MemoryRefreshKind::everything()));
         let mem_available = match self.cfg.memory_limit {
             Some(mem_limit) => mem_limit * 1e9_f32,
             None => match sys.cgroup_limits() {
@@ -638,18 +634,12 @@ impl PerpetualBooster {
             n_nodes_alloc = (FREE_MEM_ALLOC_FACTOR * (mem_available / (mem_hist as f32))) as usize;
         }
 
-        let mut hist_tree_owned: Vec<NodeHistogramOwned>;
-        if col_amount == col_index.len() {
-            hist_tree_owned = (0..n_nodes_alloc)
-                .map(|_| NodeHistogramOwned::empty_from_cuts(&binned_data.cuts, &col_index, is_const_hess, false))
-                .collect();
+        let mut hist_arena = if col_amount == col_index.len() {
+            HistogramArena::from_cuts(&binned_data.cuts, &col_index, is_const_hess, n_nodes_alloc)
         } else {
-            hist_tree_owned = (0..n_nodes_alloc)
-                .map(|_| NodeHistogramOwned::empty(self.cfg.max_bin, col_amount, is_const_hess, false))
-                .collect();
-        }
-
-        let mut hist_tree: Vec<NodeHistogram> = hist_tree_owned.iter_mut().map(NodeHistogram::from_owned).collect();
+            HistogramArena::from_fixed(self.cfg.max_bin, col_amount, is_const_hess, n_nodes_alloc)
+        };
+        let mut hist_tree: Vec<NodeHistogram> = hist_arena.as_node_histograms();
         let mut split_info_vec: Vec<SplitInfo> = (0..col_amount).map(|_| SplitInfo::default()).collect();
         let mut split_info_slice = SplitInfoSlice::new(&mut split_info_vec);
 
@@ -738,8 +728,7 @@ impl PerpetualBooster {
                 n_low_loss_rounds = 0;
             }
 
-            (grad, hess) = objective_fn.gradient(y, &yhat, sample_weight, group);
-            loss = objective_fn.loss(y, &yhat, sample_weight, group);
+            (grad, hess, loss) = objective_fn.gradient_and_loss(y, &yhat, sample_weight, group);
 
             if verbose {
                 info!(
@@ -968,7 +957,6 @@ impl BoosterIO for PerpetualBooster {
 mod perpetual_booster_test {
 
     use crate::booster::config::*;
-    use crate::metrics::evaluation::Metric;
     use crate::metrics::ranking::{ndcg_at_k_metric, GainScheme};
     use crate::objective_functions::objective::{Objective, ObjectiveFunction};
     use crate::utils::between;
@@ -1352,7 +1340,8 @@ mod perpetual_booster_test {
     #[test]
     fn test_custom_objective_function() -> Result<(), Box<dyn Error>> {
         // cargo test booster::booster::perpetual_booster_test::test_custom_objective_function
-        // define objective function
+
+        // Minimal custom squared-loss — only loss + gradient required.
         #[derive(Clone, Serialize, Deserialize)]
         struct CustomSquaredLoss;
 
@@ -1361,11 +1350,11 @@ mod perpetual_booster_test {
                 y.iter()
                     .zip(yhat)
                     .enumerate()
-                    .map(|(idx, (y_i, yhat_i))| {
-                        let diff = y_i - yhat_i;
-                        let l = diff * diff;
+                    .map(|(i, (yi, yhi))| {
+                        let d = yi - yhi;
+                        let l = d * d;
                         match sample_weight {
-                            Some(w) => (l * w[idx]) as f32,
+                            Some(w) => (l * w[i]) as f32,
                             None => l as f32,
                         }
                     })
@@ -1383,31 +1372,18 @@ mod perpetual_booster_test {
                     .iter()
                     .zip(yhat)
                     .enumerate()
-                    .map(|(idx, (y_i, yhat_i))| {
-                        let g = yhat_i - y_i;
+                    .map(|(i, (yi, yhi))| {
+                        let g = yhi - yi;
                         match sample_weight {
-                            Some(w) => (g * w[idx]) as f32,
+                            Some(w) => (g * w[i]) as f32,
                             None => g as f32,
                         }
                     })
                     .collect();
-                // let hess = vec![1.0_f32; y.len()];
-                (grad, None)
+                (grad, None) // constant hessian → None
             }
 
-            fn initial_value(&self, y: &[f64], sample_weight: Option<&[f64]>, _group: Option<&[u64]>) -> f64 {
-                match sample_weight {
-                    Some(w) => {
-                        let sw: f64 = w.iter().sum();
-                        y.iter().enumerate().map(|(i, y_i)| y_i * w[i]).sum::<f64>() / sw
-                    }
-                    None => y.iter().sum::<f64>() / y.len() as f64,
-                }
-            }
-
-            fn default_metric(&self) -> Metric {
-                Metric::RootMeanSquaredError
-            }
+            // initial_value and default_metric use trait defaults.
         }
 
         let (data, y) = read_data("resources/cal_housing_test.csv")?;

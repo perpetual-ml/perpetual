@@ -1,6 +1,7 @@
-//! ListNet Loss function
+//! ListNet Loss for Learning-to-Rank.
 //!
-//!
+//! Implements the ListNet loss function which uses softmax-based
+//! cross-entropy between ground-truth and predicted relevance distributions.
 use crate::metrics::ranking::GainScheme;
 use crate::{metrics::evaluation::Metric, objective_functions::objective::ObjectiveFunction};
 use serde::{Deserialize, Serialize};
@@ -204,5 +205,63 @@ impl ObjectiveFunction for ListNetLoss {
             k: None,
             gain: GainScheme::Burges,
         }
+    }
+
+    fn gradient_and_loss(
+        &self,
+        y: &[f64],
+        yhat: &[f64],
+        sample_weight: Option<&[f64]>,
+        group: Option<&[u64]>,
+    ) -> (Vec<f32>, Option<Vec<f32>>, Vec<f32>) {
+        if y.len() < 2 {
+            return (vec![0.0f32; y.len()], None, vec![LOSS_FOR_SINGLE_GROUP; y.len()]);
+        }
+
+        let mut gradients = vec![0.0f32; y.len()];
+        let mut hessians = vec![0.0f32; y.len()];
+        let mut losses = vec![0.0f32; y.len()];
+
+        if let Some(group_sizes) = group {
+            let mut start = 0;
+            for &group_size in group_sizes {
+                let end = start + group_size as usize;
+                let group_len = group_size as usize;
+
+                let y_group = &y[start..end];
+                let yhat_group = &yhat[start..end];
+                let weight_group = sample_weight.map(|w| &w[start..end]);
+
+                // Single pair of softmax computations per group.
+                let mut softmax_y = vec![0.0f32; group_len];
+                let mut softmax_yhat = vec![0.0f32; group_len];
+                compute_softmax_inplace(y_group, &mut softmax_y);
+                compute_softmax_inplace(yhat_group, &mut softmax_yhat);
+
+                compute_group_gradients(&softmax_y, &softmax_yhat, weight_group, &mut gradients[start..end]);
+                compute_group_hessian(&softmax_yhat, weight_group, &mut hessians[start..end]);
+
+                let group_loss = compute_listnet_loss(&softmax_y, &softmax_yhat, weight_group);
+                let per_sample_loss = group_loss / (group_size as f32);
+                losses[start..end].fill(per_sample_loss);
+
+                start = end;
+            }
+        } else {
+            // Single pair of softmax computations for the whole dataset.
+            let mut softmax_y = vec![0.0f32; y.len()];
+            let mut softmax_yhat = vec![0.0f32; y.len()];
+            compute_softmax_inplace(y, &mut softmax_y);
+            compute_softmax_inplace(yhat, &mut softmax_yhat);
+
+            compute_group_gradients(&softmax_y, &softmax_yhat, sample_weight, &mut gradients);
+            compute_group_hessian(&softmax_yhat, sample_weight, &mut hessians);
+
+            let total_loss = compute_listnet_loss(&softmax_y, &softmax_yhat, sample_weight);
+            let per_sample_loss = total_loss / (y.len() as f32);
+            losses.fill(per_sample_loss);
+        }
+
+        (gradients, Some(hessians), losses)
     }
 }

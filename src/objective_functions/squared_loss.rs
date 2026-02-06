@@ -1,10 +1,9 @@
-//! Squared Loss function
-//!
-//!
-use crate::{metrics::evaluation::Metric, objective_functions::objective::ObjectiveFunction, utils::fast_sum};
+//! Squared Loss function for regression.
+use crate::{metrics::evaluation::Metric, objective_functions::objective::ObjectiveFunction};
 use serde::{Deserialize, Serialize};
 
 #[derive(Default, Debug, Deserialize, Serialize, Clone)]
+/// Squared Error loss — minimizes `(y - ŷ)²`.
 pub struct SquaredLoss {}
 
 impl ObjectiveFunction for SquaredLoss {
@@ -41,10 +40,10 @@ impl ObjectiveFunction for SquaredLoss {
     ) -> (Vec<f32>, Option<Vec<f32>>) {
         let len = y.len();
         let mut g = Vec::with_capacity(len);
-        let mut h = Vec::with_capacity(len);
 
         match sample_weight {
             Some(w) => {
+                let mut h = Vec::with_capacity(len);
                 for i in 0..len {
                     let diff = (yhat[i] - y[i]) as f32;
                     let w_val = w[i] as f32;
@@ -55,31 +54,50 @@ impl ObjectiveFunction for SquaredLoss {
             }
             None => {
                 for i in 0..len {
-                    let diff = (yhat[i] - y[i]) as f32;
-                    g.push(diff);
+                    g.push((yhat[i] - y[i]) as f32);
                 }
                 (g, None)
             }
         }
     }
 
-    #[inline]
-    fn initial_value(&self, y: &[f64], sample_weight: Option<&[f64]>, _group: Option<&[u64]>) -> f64 {
-        match sample_weight {
-            Some(sample_weight) => {
-                let mut ytot: f64 = 0.;
-                let mut ntot: f64 = 0.;
-                for i in 0..y.len() {
-                    ytot += sample_weight[i] * y[i];
-                    ntot += sample_weight[i];
-                }
-                ytot / ntot
-            }
-            None => fast_sum(y) / y.len() as f64,
-        }
-    }
+    // `initial_value`: inherits the default weighted-mean implementation from the trait.
 
     fn default_metric(&self) -> Metric {
         Metric::RootMeanSquaredLogError
+    }
+
+    fn gradient_and_loss(
+        &self,
+        y: &[f64],
+        yhat: &[f64],
+        sample_weight: Option<&[f64]>,
+        _group: Option<&[u64]>,
+    ) -> (Vec<f32>, Option<Vec<f32>>, Vec<f32>) {
+        let len = y.len();
+        let mut g = Vec::with_capacity(len);
+        let mut l = Vec::with_capacity(len);
+
+        match sample_weight {
+            Some(w) => {
+                let mut h = Vec::with_capacity(len);
+                for i in 0..len {
+                    let diff = yhat[i] - y[i];
+                    let w_val = w[i] as f32;
+                    g.push(diff as f32 * w_val);
+                    h.push(w_val);
+                    l.push((diff * diff * w[i]) as f32);
+                }
+                (g, Some(h), l)
+            }
+            None => {
+                for i in 0..len {
+                    let diff = yhat[i] - y[i];
+                    g.push(diff as f32);
+                    l.push((diff * diff) as f32);
+                }
+                (g, None, l)
+            }
+        }
     }
 }

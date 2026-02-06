@@ -1,9 +1,9 @@
-//! Huber Loss function
+//! Huber Loss function for robust regression.
 
-use crate::{metrics::evaluation::Metric, objective_functions::objective::ObjectiveFunction};
+use crate::{objective_functions::objective::ObjectiveFunction, utils::weighted_median};
 use serde::{Deserialize, Serialize};
 
-/// Huber Loss
+/// Huber Loss — quadratic near zero, linear beyond `delta`.
 #[derive(Default, Debug, Deserialize, Serialize, Clone)]
 pub struct HuberLoss {
     pub delta: Option<f64>,
@@ -63,15 +63,12 @@ impl ObjectiveFunction for HuberLoss {
             Some(weights) => {
                 for i in 0..len {
                     let diff = (yhat[i] - y[i]) as f32;
-                    let abs_diff = diff.abs();
                     let w = weights[i] as f32;
-
-                    if abs_diff <= delta {
+                    if diff.abs() <= delta {
                         g.push(diff * w);
                         h.push(w);
                     } else {
-                        let sign = diff.signum();
-                        g.push(delta * sign * w);
+                        g.push(delta * diff.signum() * w);
                         h.push(0.0);
                     }
                 }
@@ -80,14 +77,11 @@ impl ObjectiveFunction for HuberLoss {
             None => {
                 for i in 0..len {
                     let diff = (yhat[i] - y[i]) as f32;
-                    let abs_diff = diff.abs();
-
-                    if abs_diff <= delta {
+                    if diff.abs() <= delta {
                         g.push(diff);
                         h.push(1.0);
                     } else {
-                        let sign = diff.signum();
-                        g.push(delta * sign);
+                        g.push(delta * diff.signum());
                         h.push(0.0);
                     }
                 }
@@ -98,26 +92,60 @@ impl ObjectiveFunction for HuberLoss {
 
     #[inline]
     fn initial_value(&self, y: &[f64], sample_weight: Option<&[f64]>, _group: Option<&[u64]>) -> f64 {
-        let mut idxs = (0..y.len()).collect::<Vec<_>>();
-        idxs.sort_by(|&i, &j| y[i].partial_cmp(&y[j]).unwrap());
-
-        let total_w = sample_weight.map(|w| w.iter().sum::<f64>()).unwrap_or(y.len() as f64);
-        let target = total_w * 0.5;
-
-        let median = idxs
-            .iter()
-            .scan(0.0, |cum, &i| {
-                *cum += sample_weight.map_or(1.0, |w| w[i]);
-                Some((i, *cum))
-            })
-            .find(|&(_i, cum)| cum >= target)
-            .map(|(i, _)| y[i])
-            .unwrap_or(y[idxs[y.len() / 2]]);
-
-        median
+        weighted_median(y, sample_weight)
     }
 
-    fn default_metric(&self) -> Metric {
-        Metric::RootMeanSquaredError
+    // `default_metric`: inherits the trait default (`RootMeanSquaredError`).
+
+    fn gradient_and_loss(
+        &self,
+        y: &[f64],
+        yhat: &[f64],
+        sample_weight: Option<&[f64]>,
+        _group: Option<&[u64]>,
+    ) -> (Vec<f32>, Option<Vec<f32>>, Vec<f32>) {
+        let delta = self.delta.unwrap_or(1.0);
+        let delta32 = delta as f32;
+        let len = y.len();
+        let mut g = Vec::with_capacity(len);
+        let mut h = Vec::with_capacity(len);
+        let mut l = Vec::with_capacity(len);
+
+        match sample_weight {
+            Some(weights) => {
+                for i in 0..len {
+                    let r = yhat[i] - y[i];
+                    let ar = r.abs();
+                    let diff = r as f32;
+                    let w = weights[i] as f32;
+                    if ar <= delta {
+                        g.push(diff * w);
+                        h.push(w);
+                        l.push((0.5 * r * r * weights[i]) as f32);
+                    } else {
+                        g.push(delta32 * diff.signum() * w);
+                        h.push(0.0);
+                        l.push((delta * (ar - 0.5 * delta) * weights[i]) as f32);
+                    }
+                }
+            }
+            None => {
+                for i in 0..len {
+                    let r = yhat[i] - y[i];
+                    let ar = r.abs();
+                    let diff = r as f32;
+                    if ar <= delta {
+                        g.push(diff);
+                        h.push(1.0);
+                        l.push((0.5 * r * r) as f32);
+                    } else {
+                        g.push(delta32 * diff.signum());
+                        h.push(0.0);
+                        l.push((delta * (ar - 0.5 * delta)) as f32);
+                    }
+                }
+            }
+        }
+        (g, Some(h), l)
     }
 }

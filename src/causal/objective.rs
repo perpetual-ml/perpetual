@@ -1,15 +1,44 @@
+//! R-Learner Objective
+//!
+//! Custom objective function for the effect model in the R-Learner
+//! meta-algorithm. Minimizes the R-Loss for CATE estimation.
 use crate::metrics::evaluation::Metric;
 use crate::objective_functions::objective::ObjectiveFunction;
 use serde::{Deserialize, Serialize};
 
+/// Minimum propensity clip to avoid division-by-zero or extreme weights.
+const PROPENSITY_CLIP_MIN: f64 = 1e-6;
+/// Maximum propensity clip.
+const PROPENSITY_CLIP_MAX: f64 = 1.0 - 1e-6;
+/// Minimum hessian floor to stabilize the R-Learner when propensity
+/// residuals are very small (overlap violations).
+const HESSIAN_FLOOR: f64 = 1e-6;
+
+/// R-Learner objective for estimating the Conditional Average Treatment Effect (CATE).
+///
+/// Minimizes the R-Loss:
+/// $L = \sum \bigl((Y - \hat{\mu}(X)) - \tau(X)(W - \hat{p}(X))\bigr)^2$
+///
+/// where $\tau(X)$ is the treatment effect being learned.
+///
+/// Propensity scores are automatically clipped to
+/// `[PROPENSITY_CLIP_MIN, PROPENSITY_CLIP_MAX]` and the hessian is floored
+/// at `HESSIAN_FLOOR` to prevent numerical blow-up in regions of poor overlap.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RLearnerObjective {
+    /// Observed treatment assignments.
     pub treatment: Vec<f64>,
-    pub outcome_predicted: Vec<f64>,   // \hat{\mu}(x)
-    pub treatment_predicted: Vec<f64>, // \hat{p}(x)
+    /// Predicted outcome $\hat{\mu}(x)$ from the nuisance outcome model.
+    pub outcome_predicted: Vec<f64>,
+    /// Predicted treatment probability $\hat{p}(x)$ from the nuisance propensity model.
+    pub treatment_predicted: Vec<f64>,
 }
 
 impl RLearnerObjective {
+    /// Create a new `RLearnerObjective`.
+    ///
+    /// # Panics
+    /// Panics if the three input vectors have different lengths.
     pub fn new(treatment: Vec<f64>, outcome_predicted: Vec<f64>, treatment_predicted: Vec<f64>) -> Self {
         assert_eq!(treatment.len(), outcome_predicted.len());
         assert_eq!(treatment.len(), treatment_predicted.len());
@@ -23,10 +52,7 @@ impl RLearnerObjective {
 
 impl ObjectiveFunction for RLearnerObjective {
     fn loss(&self, y: &[f64], yhat: &[f64], _sample_weight: Option<&[f64]>, _group: Option<&[u64]>) -> Vec<f32> {
-        // L = \sum ( (y - \mu) - \tau(x) * (w - p) )^2
-        // y here is the actual outcome.
-        // yhat is \tau(x).
-
+        // L_i = ( (y_i - mu_i) - tau_i * (w_i - p_i) )^2
         y.iter()
             .zip(yhat.iter())
             .zip(self.treatment.iter())
@@ -34,7 +60,8 @@ impl ObjectiveFunction for RLearnerObjective {
             .zip(self.treatment_predicted.iter())
             .map(|((((y_i, tau_i), w_i), mu_i), p_i)| {
                 let y_res = y_i - mu_i;
-                let w_res = w_i - p_i;
+                let p_clipped = p_i.clamp(PROPENSITY_CLIP_MIN, PROPENSITY_CLIP_MAX);
+                let w_res = w_i - p_clipped;
                 let diff = y_res - tau_i * w_res;
                 (diff * diff) as f32
             })
@@ -58,27 +85,16 @@ impl ObjectiveFunction for RLearnerObjective {
 
         for i in 0..n {
             let y_res = y[i] - self.outcome_predicted[i];
-            let w_res = self.treatment[i] - self.treatment_predicted[i];
+            let p_clipped = self.treatment_predicted[i].clamp(PROPENSITY_CLIP_MIN, PROPENSITY_CLIP_MAX);
+            let w_res = self.treatment[i] - p_clipped;
             let tau = yhat[i];
 
-            // Gradient: -2 * w_res * (y_res - tau * w_res)
-            // But usually we drop the factor of 2 for optimization or include 0.5 in loss
-            // SquaredLoss in core uses: g = yhat - y, h = 1 (for 0.5 * (y-yhat)^2)
-            // Let's match that scale.
-            // Metric to minimize: 0.5 * (y_target - y_pred)^2
-            // Our residual target is y_res / w_res (if w_res != 0)
-            // weighted by w_res^2.
-
-            // Let's compute exact derivative of 0.5 * ((y-mu) - tau*(w-p))^2
-            // d/dtau = -(w-p) * (y_res - tau*w_res)
-            //        = -w_res*y_res + tau*w_res^2
-
+            // Derivative of 0.5 * ((y-mu) - tau*(w-p))^2 w.r.t. tau:
+            //   g = -(w-p) * ((y-mu) - tau*(w-p))
+            //     = -w_res * y_res + tau * w_res^2
+            //   h = (w-p)^2
             let g = -w_res * y_res + tau * w_res * w_res;
-            let h = w_res * w_res;
-
-            // Stabilize Hessian?
-            // If w_res is very small (propensity near 0 or 1), h is small.
-            // This effectively ignores those samples, which is correct for R-learner.
+            let h = (w_res * w_res).max(HESSIAN_FLOOR);
 
             grad.push(g as f32);
             hess.push(h as f32);

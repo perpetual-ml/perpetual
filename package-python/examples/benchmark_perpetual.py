@@ -39,7 +39,7 @@ def prepare_data(data_id, seed):
 
 if __name__ == "__main__":
     print(f"perpetual: {version('perpetual')}")
-    budget = 1.15
+    budget = 0.76
     data_id = ""  # 46951 -> Pumpkin Seeds, Else -> California Housing
     cpu_times = []
     wall_times = []

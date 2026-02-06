@@ -1,3 +1,7 @@
+//! Tree
+//!
+//! The core [`Tree`] struct that holds a trained decision tree and the logic
+//! for growing, fitting, and evaluating it.
 use crate::data::Matrix;
 use crate::grower::Grower;
 use crate::histogram::{update_histogram, NodeHistogram};
@@ -13,18 +17,30 @@ use std::cmp::max;
 use std::collections::{BinaryHeap, HashMap, HashSet};
 use std::fmt::{self, Display};
 
+/// Reason a tree stopped growing.
 #[derive(Deserialize, Serialize, Clone, PartialEq, Debug)]
 pub enum TreeStopper {
+    /// The generalization check signaled to stop.
     Generalization,
+    /// The step-size (learning rate) became too small.
     StepSize,
+    /// The maximum number of nodes was reached.
     MaxNodes,
 }
 
+/// A single decision tree in the ensemble.
+///
+/// Stores nodes in a `HashMap<usize, Node>` keyed by node index
+/// (root = 0), along with tree-level metadata.
 #[derive(Deserialize, Serialize, Clone)]
 pub struct Tree {
+    /// Map of node index to [`Node`].
     pub nodes: HashMap<usize, Node>,
+    /// Reason this tree stopped growing.
     pub stopper: TreeStopper,
+    /// Maximum depth of the tree.
     pub depth: usize,
+    /// Number of leaf nodes.
     pub n_leaves: usize,
 }
 

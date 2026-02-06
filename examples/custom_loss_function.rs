@@ -1,13 +1,13 @@
-//! Example: Training a Perpetual Boosting Machine with custom objective functions
-//! ------------------------------------------------------------------------------
+//! Example: Training a Perpetual Boosting Machine with a custom objective
+//! -----------------------------------------------------------------------
 //! This example shows how to supply your own loss to the gradient-boosting
-//! machine at runtime. We define a minimal **squared-error** objective that
-//! implements the `ObjectiveFunction` trait, inject it through
-//! `BoosterConfig::with_custom_objective`, fit on the California-housing test
-//! set, and print a few diagnostics.
+//! machine at runtime.  We define a minimal **squared-error** objective that
+//! implements the `ObjectiveFunction` trait (only `loss` and `gradient` are
+//! required — `initial_value` and `default_metric` have sensible defaults),
+//! inject it through `Objective::Custom(...)`, fit on the California-housing
+//! test set, and print a few diagnostics.
 //!
 //! ```bash
-//! # From the crate root of *perpetual*
 //! cargo run --example custom_loss_function
 //! ```
 use std::error::Error;
@@ -15,40 +15,31 @@ use std::fs::File;
 use std::io::BufReader;
 use std::sync::Arc;
 
-use perpetual::metrics::evaluation::Metric;
 use perpetual::objective_functions::Objective;
 use perpetual::{Matrix, PerpetualBooster};
 
-//-----------------//
-// Define function //
-//-----------------//
+//--------------------------------------------------
+// Define custom objective — only loss + gradient
+//--------------------------------------------------
 #[derive(Clone)]
 struct CustomSquaredLoss;
+
 impl perpetual::objective_functions::ObjectiveFunction for CustomSquaredLoss {
-    #[inline]
     fn loss(&self, y: &[f64], yhat: &[f64], sample_weight: Option<&[f64]>, _group: Option<&[u64]>) -> Vec<f32> {
-        match sample_weight {
-            Some(sample_weight) => y
-                .iter()
-                .zip(yhat)
-                .zip(sample_weight)
-                .map(|((y_, yhat_), w_)| {
-                    let s = *y_ - *yhat_;
-                    (s * s * *w_) as f32
-                })
-                .collect(),
-            None => y
-                .iter()
-                .zip(yhat)
-                .map(|(y_, yhat_)| {
-                    let s = *y_ - *yhat_;
-                    (s * s) as f32
-                })
-                .collect(),
-        }
+        y.iter()
+            .zip(yhat)
+            .enumerate()
+            .map(|(i, (y_, yhat_))| {
+                let s = y_ - yhat_;
+                let l = s * s;
+                match sample_weight {
+                    Some(w) => (l * w[i]) as f32,
+                    None => l as f32,
+                }
+            })
+            .collect()
     }
 
-    #[inline]
     fn gradient(
         &self,
         y: &[f64],
@@ -57,34 +48,24 @@ impl perpetual::objective_functions::ObjectiveFunction for CustomSquaredLoss {
         _group: Option<&[u64]>,
     ) -> (Vec<f32>, Option<Vec<f32>>) {
         match sample_weight {
-            Some(sample_weight) => {
+            Some(w) => {
                 let (g, h) = y
                     .iter()
                     .zip(yhat)
-                    .zip(sample_weight)
-                    .map(|((y_, yhat_), w_)| (((yhat_ - *y_) * *w_) as f32, *w_ as f32))
+                    .zip(w)
+                    .map(|((y_, yhat_), w_)| (((yhat_ - y_) * w_) as f32, *w_ as f32))
                     .unzip();
                 (g, Some(h))
             }
             None => (
-                y.iter().zip(yhat).map(|(y_, yhat_)| (yhat_ - *y_) as f32).collect(),
-                None,
+                y.iter().zip(yhat).map(|(y_, yhat_)| (yhat_ - y_) as f32).collect(),
+                None, // constant hessian = 1 → return None for optimized path
             ),
         }
     }
 
-    fn initial_value(&self, y: &[f64], sample_weight: Option<&[f64]>, _group: Option<&[u64]>) -> f64 {
-        if let Some(w) = sample_weight {
-            let sum_w: f64 = w.iter().sum();
-            y.iter().zip(w).map(|(yi, wi)| yi * wi).sum::<f64>() / sum_w
-        } else {
-            y.iter().sum::<f64>() / y.len() as f64
-        }
-    }
-
-    fn default_metric(&self) -> Metric {
-        Metric::RootMeanSquaredLogError
-    }
+    // initial_value → defaults to weighted mean (correct for squared loss).
+    // default_metric → defaults to RootMeanSquaredError.
 }
 
 fn main() -> Result<(), Box<dyn Error>> {

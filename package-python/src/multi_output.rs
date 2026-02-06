@@ -1,3 +1,4 @@
+//! PyO3 wrapper around the Multi-Output Booster.
 use crate::custom_objective::CustomObjective;
 use crate::utils::int_map_to_constraint_map;
 use crate::utils::to_value_error;
@@ -17,6 +18,7 @@ use pyo3::IntoPyObjectExt;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
+/// Python-facing Multi-Output Booster.
 #[pyclass(subclass)]
 pub struct MultiOutputBooster {
     booster: CrateMultiOutputBooster,

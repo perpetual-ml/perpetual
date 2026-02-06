@@ -1,3 +1,9 @@
+"""Boosted Instrumental Variable (BoostIV) estimator.
+
+Implements a two-stage least-squares approach using gradient boosting to
+estimate causal effects in the presence of endogeneity.
+"""
+
 from typing import Any, Dict, Iterable, Optional, Union
 
 import numpy as np
@@ -8,6 +14,13 @@ from perpetual.utils import convert_input_array, convert_input_frame
 
 
 class BraidedBooster:
+    """Two-stage instrumental-variable estimator powered by gradient boosting.
+
+    Stage 1 regresses the treatment on the instruments, and Stage 2 regresses
+    the outcome on the predicted treatment and covariates.  Both stages are
+    fitted using Perpetual's self-generalizing boosting.
+    """
+
     def __init__(
         self,
         treatment_objective: str = "SquaredLoss",
@@ -41,52 +54,54 @@ class BraidedBooster:
 
         Parameters
         ----------
-        treatment_objective : str
-            Objective for Stage 1 (Treatment Model). e.g., "SquaredLoss" or "LogLoss".
-        outcome_objective : str
-            Objective for Stage 2 (Outcome Model). e.g., "SquaredLoss".
-        stage1_budget : float
-            Budget for Stage 1.
-        stage2_budget : float
-            Budget for Stage 2.
+        treatment_objective : str, default="SquaredLoss"
+            Objective for Stage 1 (Treatment Model). e.g., ``"SquaredLoss"`` or ``"LogLoss"``.
+        outcome_objective : str, default="SquaredLoss"
+            Objective for Stage 2 (Outcome Model). e.g., ``"SquaredLoss"``.
+        stage1_budget : float, default=0.5
+            Fitting budget for Stage 1. Higher values allow more boosting rounds.
+        stage2_budget : float, default=0.5
+            Fitting budget for Stage 2. Higher values allow more boosting rounds.
         num_threads : int, optional
-            Number of threads.
+            Number of threads to use during training and prediction.
         monotone_constraints : dict, optional
-            Monotone constraints.
+            Constraints mapping feature indices/names to -1, 1, or 0.
         force_children_to_bound_parent : bool, default=False
-            Force children to be bounded by parent.
+            Whether to restrict children nodes to be within the parent's range.
         missing : float, default=np.nan
-            Missing value.
+            Value to consider as missing data.
         allow_missing_splits : bool, default=True
-            Allow missing splits.
+            Whether to allow splits that separate missing from non-missing values.
         create_missing_branch : bool, default=False
-            Create missing branch.
+            Whether to create a separate branch for missing values (ternary trees).
         terminate_missing_features : iterable, optional
-            Terminate missing features.
+            Features for which missing branches are always terminated when
+            ``create_missing_branch`` is True.
         missing_node_treatment : str, default="None"
-            Missing node treatment.
+            How to handle weights for missing nodes. Options: ``"None"``,
+            ``"AssignToParent"``, ``"AverageLeafWeight"``, ``"AverageNodeWeight"``.
         log_iterations : int, default=0
-            Log iterations.
+            Logging frequency (every N iterations). 0 disables logging.
         quantile : float, optional
-            Quantile for QuantileLoss.
+            Target quantile when using ``"QuantileLoss"``.
         reset : bool, optional
-            Reset model on fit.
+            Whether to reset the model or continue training on subsequent fits.
         categorical_features : iterable or str, default="auto"
-            Categorical features.
+            Feature indices or names to treat as categorical.
         timeout : float, optional
-            Timeout in seconds.
+            Time limit for fitting in seconds.
         iteration_limit : int, optional
-            Iteration limit.
+            Maximum number of boosting iterations.
         memory_limit : float, optional
-            Memory limit in GB.
+            Memory limit for training in GB.
         stopping_rounds : int, optional
-            Stopping rounds.
+            Number of rounds without improvement before stopping.
         max_bin : int, default=256
-            Maximum number of bins.
+            Maximum number of bins for feature discretization.
         max_cat : int, default=1000
-            Maximum unique categories.
+            Maximum unique categories before a feature is treated as numerical.
         interaction_constraints : list of list of int, optional
-            Interaction constraints.
+            Groups of feature indices allowed to interact.
         """
         self.treatment_objective = treatment_objective
         self.outcome_objective = outcome_objective

@@ -1,3 +1,7 @@
+//! Uplift Booster (R-Learner)
+//!
+//! Estimates the Conditional Average Treatment Effect (CATE) using the
+//! R-Learner meta-algorithm backed by gradient boosting.
 use crate::booster::config::MissingNodeTreatment;
 use crate::booster::core::PerpetualBooster;
 use crate::causal::objective::RLearnerObjective;
@@ -19,8 +23,11 @@ use std::collections::HashSet;
 ///    $$ L = ((Y - \mu(x)) - \tau(x)(W - p(x)))^2 $$
 #[derive(Serialize, Deserialize)]
 pub struct UpliftBooster {
+    /// Nuisance outcome model $\mu(x) = E[Y|X]$.
     pub outcome_model: PerpetualBooster,
+    /// Nuisance propensity model $p(x) = P(W=1|X)$.
     pub propensity_model: PerpetualBooster,
+    /// Effect model that learns $\tau(x)$ by minimizing R-Loss.
     pub effect_model: PerpetualBooster,
 }
 

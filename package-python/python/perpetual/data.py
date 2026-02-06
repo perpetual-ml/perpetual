@@ -1,10 +1,54 @@
+"""Data structures for tree inspection."""
+
 from dataclasses import dataclass
 from typing import Any, Iterable, Optional, Union
 
 
 @dataclass
 class Node:
-    """Dataclass representation of a node, this represents all of the fields present in a tree node."""
+    """Dataclass representing a single node in a decision tree.
+
+    Attributes
+    ----------
+    num : int
+        Node index.
+    weight_value : float
+        Leaf weight (prediction contribution).
+    hessian_sum : float
+        Sum of hessians (sample coverage).
+    depth : int
+        Depth of the node in the tree.
+    split_value : float
+        Threshold used for splitting.
+    split_feature : str or int
+        Feature used for the split.
+    split_gain : float
+        Gain achieved by this split.
+    missing_node : int
+        Index of the child that receives missing values.
+    left_child : int
+        Index of the left child.
+    right_child : int
+        Index of the right child.
+    is_leaf : bool
+        Whether this node is a leaf.
+    node_type : str
+        One of ``"split"``, ``"leaf"``, or ``"missing"``.
+    parent_node : int
+        Index of the parent node.
+    generalization : float or None
+        Generalization score (if ``save_node_stats`` is enabled).
+    left_cats : iterable or None
+        Categorical values routed to the left child.
+    right_cats : iterable or None
+        Categorical values routed to the right child.
+    count : int
+        Number of samples reaching this node.
+    weights : iterable of float or None
+        Cross-validation fold weights.
+    stats : any or None
+        Additional node statistics.
+    """
 
     num: int
     weight_value: float

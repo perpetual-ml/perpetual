@@ -1,3 +1,7 @@
+//! Instrumental Variable (BoostIV) Estimator
+//!
+//! Implements a two-stage least-squares (2SLS) approach using gradient boosting
+//! to estimate causal effects in the presence of endogeneity.
 use crate::booster::config::MissingNodeTreatment;
 use crate::booster::core::PerpetualBooster;
 use crate::constraints::ConstraintMap;
@@ -23,9 +27,13 @@ use std::collections::HashSet;
 ///
 #[derive(Serialize, Deserialize)]
 pub struct IVBooster {
+    /// Stage 1 model that predicts the treatment from instruments + covariates.
     pub treatment_model: PerpetualBooster,
+    /// Stage 2 model that predicts the outcome from predicted treatment + covariates.
     pub outcome_model: PerpetualBooster,
+    /// Budget allocated to the stage 1 (treatment) model.
     pub stage1_budget: f32,
+    /// Budget allocated to the stage 2 (outcome) model.
     pub stage2_budget: f32,
 }
 

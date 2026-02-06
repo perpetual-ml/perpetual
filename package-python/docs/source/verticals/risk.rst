@@ -40,4 +40,4 @@ To ensure fairness and common-sense behavior (e.g., increasing income should not
 Tutorials
 ---------
 
-For a detailed walkthrough using the German Credit dataset, see the :doc:`../tutorials/verticals/risk_compliance`.
+For a detailed walkthrough using the German Credit dataset, see the :doc:`../tutorials/causal/risk_compliance`.

@@ -8,22 +8,29 @@ use std::sync::Arc;
 /// Trait defining a custom objective function.
 ///
 /// Implement this trait to define your own loss function and gradient calculation.
+///
+/// Only [`loss`](ObjectiveFunction::loss) and [`gradient`](ObjectiveFunction::gradient)
+/// are required — the remaining methods have sensible defaults:
+///
+/// * `initial_value` — weighted mean of `y` (suitable for most regression objectives).
+/// * `default_metric` — `Metric::RootMeanSquaredError`.
+/// * `gradient_and_loss` — calls `gradient()` then `loss()` (override for fused implementations).
 pub trait ObjectiveFunction: Send + Sync {
-    /// Calculate the loss for each sample.
+    /// Per-sample loss.
     ///
     /// # Arguments
-    /// * `y` - True target values.
-    /// * `yhat` - Predicted values (log-odds or raw scores).
-    /// * `sample_weight` - Optional weights for each sample.
-    /// * `group` - Optional group IDs (for ranking).
+    /// * `y` – true target values.
+    /// * `yhat` – predicted values (log-odds or raw scores).
+    /// * `sample_weight` – optional per-sample weights.
+    /// * `group` – optional group sizes (for ranking).
     fn loss(&self, y: &[f64], yhat: &[f64], sample_weight: Option<&[f64]>, group: Option<&[u64]>) -> Vec<f32>;
 
-    /// Calculate the gradient and hessian for each sample.
+    /// Per-sample gradient and (optional) hessian.
     ///
-    /// # Returns
-    /// A tuple `(gradient, hessian)`.
-    /// * `gradient`: First derivative of loss w.r.t prediction.
-    /// * `hessian`: Second derivative. If `None`, constant hessian is assumed (optimized path).
+    /// Returns `(gradient, hessian)`.
+    /// * `gradient` – first derivative of loss w.r.t. prediction.
+    /// * `hessian` – second derivative. Return `None` when the hessian is constant
+    ///   (e.g. 1.0 for squared loss) to enable an optimized code path.
     fn gradient(
         &self,
         y: &[f64],
@@ -32,13 +39,42 @@ pub trait ObjectiveFunction: Send + Sync {
         group: Option<&[u64]>,
     ) -> (Vec<f32>, Option<Vec<f32>>);
 
-    /// Calculate the initial prediction value (base_score).
+    /// Initial prediction (base score) before any trees are added.
     ///
-    /// Usually the mean of targets (for regression) or log-odds of mean (for classification).
-    fn initial_value(&self, y: &[f64], sample_weight: Option<&[f64]>, group: Option<&[u64]>) -> f64;
+    /// Default: weighted mean of `y`.
+    fn initial_value(&self, y: &[f64], sample_weight: Option<&[f64]>, _group: Option<&[u64]>) -> f64 {
+        match sample_weight {
+            Some(w) => {
+                let sw: f64 = w.iter().sum();
+                y.iter().zip(w).map(|(yi, wi)| yi * wi).sum::<f64>() / sw
+            }
+            None => y.iter().sum::<f64>() / y.len() as f64,
+        }
+    }
 
-    /// Return the default evaluation metric for this objective.
-    fn default_metric(&self) -> Metric;
+    /// Default evaluation metric for this objective.
+    ///
+    /// Default: `Metric::RootMeanSquaredError`.
+    fn default_metric(&self) -> Metric {
+        Metric::RootMeanSquaredError
+    }
+
+    /// Gradient, hessian **and** loss in a single pass over the data.
+    ///
+    /// The default implementation calls [`gradient`](ObjectiveFunction::gradient)
+    /// and [`loss`](ObjectiveFunction::loss) separately. Override when the two
+    /// share intermediate computations (e.g. the sigmoid in log-loss).
+    fn gradient_and_loss(
+        &self,
+        y: &[f64],
+        yhat: &[f64],
+        sample_weight: Option<&[f64]>,
+        group: Option<&[u64]>,
+    ) -> (Vec<f32>, Option<Vec<f32>>, Vec<f32>) {
+        let (g, h) = self.gradient(y, yhat, sample_weight, group);
+        let l = self.loss(y, yhat, sample_weight, group);
+        (g, h, l)
+    }
 }
 
 /// The Objective function to minimize during training.
@@ -113,21 +149,30 @@ impl Objective {
     }
 }
 
+/// Dispatch a method call through the `Objective` enum to the concrete loss.
+macro_rules! dispatch {
+    ($self:expr, $method:ident ( $($arg:expr),* )) => {
+        match $self {
+            Objective::LogLoss => LogLoss::default().$method($($arg),*),
+            Objective::SquaredLoss => SquaredLoss::default().$method($($arg),*),
+            Objective::QuantileLoss { quantile } => {
+                QuantileLoss { quantile: *quantile }.$method($($arg),*)
+            }
+            Objective::HuberLoss { delta } => {
+                HuberLoss { delta: *delta }.$method($($arg),*)
+            }
+            Objective::AdaptiveHuberLoss { quantile } => {
+                AdaptiveHuberLoss { quantile: *quantile }.$method($($arg),*)
+            }
+            Objective::ListNetLoss => ListNetLoss::default().$method($($arg),*),
+            Objective::Custom(arc) => arc.$method($($arg),*),
+        }
+    };
+}
+
 impl ObjectiveFunction for Objective {
     fn loss(&self, y: &[f64], yhat: &[f64], sample_weight: Option<&[f64]>, group: Option<&[u64]>) -> Vec<f32> {
-        match self {
-            Objective::LogLoss => LogLoss::default().loss(y, yhat, sample_weight, group),
-            Objective::SquaredLoss => SquaredLoss::default().loss(y, yhat, sample_weight, group),
-            Objective::QuantileLoss { quantile } => {
-                QuantileLoss { quantile: *quantile }.loss(y, yhat, sample_weight, group)
-            }
-            Objective::HuberLoss { delta } => HuberLoss { delta: *delta }.loss(y, yhat, sample_weight, group),
-            Objective::AdaptiveHuberLoss { quantile } => {
-                AdaptiveHuberLoss { quantile: *quantile }.loss(y, yhat, sample_weight, group)
-            }
-            Objective::ListNetLoss => ListNetLoss::default().loss(y, yhat, sample_weight, group),
-            Objective::Custom(arc) => arc.loss(y, yhat, sample_weight, group),
-        }
+        dispatch!(self, loss(y, yhat, sample_weight, group))
     }
 
     fn gradient(
@@ -137,47 +182,25 @@ impl ObjectiveFunction for Objective {
         sample_weight: Option<&[f64]>,
         group: Option<&[u64]>,
     ) -> (Vec<f32>, Option<Vec<f32>>) {
-        match self {
-            Objective::LogLoss => LogLoss::default().gradient(y, yhat, sample_weight, group),
-            Objective::SquaredLoss => SquaredLoss::default().gradient(y, yhat, sample_weight, group),
-            Objective::QuantileLoss { quantile } => {
-                QuantileLoss { quantile: *quantile }.gradient(y, yhat, sample_weight, group)
-            }
-            Objective::HuberLoss { delta } => HuberLoss { delta: *delta }.gradient(y, yhat, sample_weight, group),
-            Objective::AdaptiveHuberLoss { quantile } => {
-                AdaptiveHuberLoss { quantile: *quantile }.gradient(y, yhat, sample_weight, group)
-            }
-            Objective::ListNetLoss => ListNetLoss::default().gradient(y, yhat, sample_weight, group),
-            Objective::Custom(arc) => arc.gradient(y, yhat, sample_weight, group),
-        }
+        dispatch!(self, gradient(y, yhat, sample_weight, group))
     }
 
     fn initial_value(&self, y: &[f64], sample_weight: Option<&[f64]>, group: Option<&[u64]>) -> f64 {
-        match self {
-            Objective::LogLoss => LogLoss::default().initial_value(y, sample_weight, group),
-            Objective::SquaredLoss => SquaredLoss::default().initial_value(y, sample_weight, group),
-            Objective::QuantileLoss { quantile } => {
-                QuantileLoss { quantile: *quantile }.initial_value(y, sample_weight, group)
-            }
-            Objective::HuberLoss { delta } => HuberLoss { delta: *delta }.initial_value(y, sample_weight, group),
-            Objective::AdaptiveHuberLoss { quantile } => {
-                AdaptiveHuberLoss { quantile: *quantile }.initial_value(y, sample_weight, group)
-            }
-            Objective::ListNetLoss => ListNetLoss::default().initial_value(y, sample_weight, group),
-            Objective::Custom(arc) => arc.initial_value(y, sample_weight, group),
-        }
+        dispatch!(self, initial_value(y, sample_weight, group))
     }
 
     fn default_metric(&self) -> Metric {
-        match self {
-            Objective::LogLoss => LogLoss::default().default_metric(),
-            Objective::SquaredLoss => SquaredLoss::default().default_metric(),
-            Objective::QuantileLoss { quantile } => QuantileLoss { quantile: *quantile }.default_metric(),
-            Objective::HuberLoss { delta } => HuberLoss { delta: *delta }.default_metric(),
-            Objective::AdaptiveHuberLoss { quantile } => AdaptiveHuberLoss { quantile: *quantile }.default_metric(),
-            Objective::ListNetLoss => ListNetLoss::default().default_metric(),
-            Objective::Custom(arc) => arc.default_metric(),
-        }
+        dispatch!(self, default_metric())
+    }
+
+    fn gradient_and_loss(
+        &self,
+        y: &[f64],
+        yhat: &[f64],
+        sample_weight: Option<&[f64]>,
+        group: Option<&[u64]>,
+    ) -> (Vec<f32>, Option<Vec<f32>>, Vec<f32>) {
+        dispatch!(self, gradient_and_loss(y, yhat, sample_weight, group))
     }
 }
 

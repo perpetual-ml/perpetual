@@ -1,3 +1,5 @@
+"""Core PerpetualBooster and MultiOutputBooster Python classes."""
+
 import inspect
 import json
 import warnings
@@ -28,11 +30,21 @@ from perpetual.utils import (
 
 
 class PerpetualBooster:
-    # Define the metadata parameters
-    # that are present on all instances of this class
-    # this is useful for parameters that should be
-    # attempted to be loaded in and set
-    # as attributes on the booster after it is loaded.
+    """Self-generalizing gradient boosted decision tree model.
+
+    PerpetualBooster automatically determines the best number of boosting
+    rounds using a built-in generalization strategy, eliminating the need
+    for manual early-stopping or cross-validation.  It supports regression,
+    binary and multi-class classification, and quantile objectives, as well
+    as custom loss functions.
+
+    See Also
+    --------
+    perpetual.PerpetualBooster.__init__ : Constructor with full parameter list.
+    """
+
+    #: Metadata attributes that are persisted alongside the model and
+    #: restored when a saved booster is loaded.
     metadata_attributes: Dict[str, BaseSerializer] = {
         "feature_names_in_": ObjectSerializer(),
         "n_features_": ObjectSerializer(),
@@ -1532,7 +1544,6 @@ class PerpetualBooster:
         node_map = {int(k): i for i, k in enumerate(sorted_keys)}
 
         num_nodes = len(sorted_keys)
-        # print(f"DEBUG: Converting tree group={group_id}. num_nodes={num_nodes}")
 
         left_children = [-1] * num_nodes
         right_children = [-1] * num_nodes
@@ -1554,8 +1565,6 @@ class PerpetualBooster:
             node = nodes_dict[k]
             nid = int(node["num"])
             idx = node_map[nid]
-
-            # print(f"  DEBUG: Node {i} nid={nid} idx={idx}")
 
             sum_hessian[idx] = node["hessian_sum"]
             base_weights[idx] = node["weight_value"]

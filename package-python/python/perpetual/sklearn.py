@@ -1,3 +1,10 @@
+"""Scikit-learn compatible wrappers for the PerpetualBooster.
+
+Provides `PerpetualClassifier`, `PerpetualRegressor`, and `PerpetualRanker`
+classes that follow the scikit-learn estimator API, enabling use with
+pipelines, grid search, and other scikit-learn utilities.
+"""
+
 import warnings
 from types import FunctionType
 from typing import Any, Dict, Optional, Tuple, Union
@@ -124,12 +131,44 @@ class PerpetualClassifier(PerpetualBooster, ClassifierMixin):
     # and properly adapted in PerpetualBooster.
 
     def score(self, X, y, sample_weight=None):
-        """Returns the mean accuracy on the given test data and labels."""
+        """Return the mean accuracy on the given test data and labels.
+
+        Parameters
+        ----------
+        X : array-like of shape (n_samples, n_features)
+            Test samples.
+        y : array-like of shape (n_samples,)
+            True labels.
+        sample_weight : array-like of shape (n_samples,), optional
+            Sample weights.
+
+        Returns
+        -------
+        float
+            Mean accuracy of ``self.predict(X)`` w.r.t. *y*.
+        """
         preds = self.predict(X)
         return accuracy_score(y, preds, sample_weight=sample_weight)
 
     def fit(self, X, y, sample_weight=None, **fit_params) -> Self:
-        """A wrapper for the base fit method."""
+        """Fit the classifier on training data.
+
+        Parameters
+        ----------
+        X : array-like of shape (n_samples, n_features)
+            Training input samples.
+        y : array-like of shape (n_samples,)
+            Target class labels.
+        sample_weight : array-like of shape (n_samples,), optional
+            Individual weights for each sample.
+        **fit_params
+            Additional keyword arguments forwarded to the base ``fit``.
+
+        Returns
+        -------
+        self
+            Fitted estimator.
+        """
         # Check if objective is appropriate for classification if it's a string
         if isinstance(self.objective, str) and self.objective not in ["LogLoss"]:
             warnings.warn(
@@ -254,7 +293,24 @@ class PerpetualRegressor(PerpetualBooster, RegressorMixin):
         )
 
     def fit(self, X, y, sample_weight=None, **fit_params) -> Self:
-        """A wrapper for the base fit method."""
+        """Fit the regressor on training data.
+
+        Parameters
+        ----------
+        X : array-like of shape (n_samples, n_features)
+            Training input samples.
+        y : array-like of shape (n_samples,)
+            Target values.
+        sample_weight : array-like of shape (n_samples,), optional
+            Individual weights for each sample.
+        **fit_params
+            Additional keyword arguments forwarded to the base ``fit``.
+
+        Returns
+        -------
+        self
+            Fitted estimator.
+        """
         # For regression, we typically enforce len(self.classes_) == 0 after fit
         if isinstance(self.objective, str) and self.objective not in [
             "SquaredLoss",
@@ -269,7 +325,22 @@ class PerpetualRegressor(PerpetualBooster, RegressorMixin):
         return super().fit(X, y, sample_weight=sample_weight, **fit_params)
 
     def score(self, X, y, sample_weight=None):
-        """Returns the coefficient of determination ($R^2$) of the prediction."""
+        """Return the coefficient of determination ($R^2$) of the prediction.
+
+        Parameters
+        ----------
+        X : array-like of shape (n_samples, n_features)
+            Test samples.
+        y : array-like of shape (n_samples,)
+            True target values.
+        sample_weight : array-like of shape (n_samples,), optional
+            Sample weights.
+
+        Returns
+        -------
+        float
+            $R^2$ score of ``self.predict(X)`` w.r.t. *y*.
+        """
         preds = self.predict(X)
         return r2_score(y, preds, sample_weight=sample_weight)
 
@@ -383,14 +454,31 @@ class PerpetualRanker(
         )
 
     def fit(self, X, y, group=None, sample_weight=None, **fit_params) -> Self:
-        """
-        Fit the ranker. Requires the 'group' parameter.
+        """Fit the ranker on training data.
 
-        Args:
-            X: Training data.
-            y: Target relevance scores.
-            group: Group lengths to use for a ranking objective. (Required for ListNetLoss).
-            sample_weight: Instance weights.
+        Parameters
+        ----------
+        X : array-like of shape (n_samples, n_features)
+            Training input samples.
+        y : array-like of shape (n_samples,)
+            Target relevance scores.
+        group : array-like of int, optional
+            Group lengths used by the ranking objective.  **Required** when
+            ``objective="ListNetLoss"``.
+        sample_weight : array-like of shape (n_samples,), optional
+            Individual weights for each sample.
+        **fit_params
+            Additional keyword arguments forwarded to the base ``fit``.
+
+        Returns
+        -------
+        self
+            Fitted estimator.
+
+        Raises
+        ------
+        ValueError
+            If *group* is ``None`` and the objective is ``"ListNetLoss"``.
         """
         if (
             group is None

@@ -1,3 +1,4 @@
+//! PyO3 wrapper around the Instrumental Variable (BoostIV) estimator.
 use crate::utils::{int_map_to_constraint_map, to_value_error};
 use numpy::{IntoPyArray, PyArray1, PyReadonlyArray1};
 use perpetual_rs::causal::iv::IVBooster as CrateIVBooster;
@@ -9,6 +10,7 @@ use pyo3::types::PyType;
 use pyo3::IntoPyObjectExt;
 use std::collections::{HashMap, HashSet};
 
+/// Python-facing Instrumental Variable (BoostIV) estimator.
 #[pyclass]
 pub struct IVBooster {
     booster: CrateIVBooster,

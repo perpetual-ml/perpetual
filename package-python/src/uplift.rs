@@ -1,3 +1,4 @@
+//! PyO3 wrapper around the Uplift (R-Learner) booster.
 use crate::utils::{int_map_to_constraint_map, to_value_error};
 use numpy::{IntoPyArray, PyArray1, PyReadonlyArray1};
 use perpetual_rs::causal::uplift::UpliftBooster as CrateUpliftBooster;
@@ -6,6 +7,7 @@ use pyo3::prelude::*;
 use pyo3::types::PyType;
 use std::collections::{HashMap, HashSet};
 
+/// Python-facing Uplift (R-Learner) booster.
 #[pyclass]
 pub struct UpliftBooster {
     booster: CrateUpliftBooster,

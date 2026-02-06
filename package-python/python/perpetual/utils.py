@@ -1,3 +1,5 @@
+"""Internal utilities for data conversion and input validation."""
+
 import logging
 from typing import Dict, Iterable, List, Optional, Tuple
 
@@ -7,6 +9,7 @@ logger = logging.getLogger(__name__)
 
 
 def type_df(df):
+    """Return a string tag for the DataFrame library (``'pandas_df'``, ``'polars_df'``, ``'numpy'``, or ``''``)."""
     library_name = type(df).__module__.split(".")[0]
     if type(df).__name__ == "DataFrame":
         if library_name == "pandas":
@@ -20,6 +23,7 @@ def type_df(df):
 
 
 def type_series(y):
+    """Return a string tag for the Series library (``'pandas_series'``, ``'polars_series'``, ``'numpy'``, or ``''``)."""
     library_name = type(y).__module__.split(".")[0]
     if type(y).__name__ == "Series":
         if library_name == "pandas":
@@ -33,6 +37,13 @@ def type_series(y):
 
 
 def convert_input_array(x, objective, is_target=False, is_int=False) -> np.ndarray:
+    """Convert an array-like input to a flat ``float64`` (or ``uint64``) NumPy array.
+
+    Returns
+    -------
+    tuple of (np.ndarray, list)
+        The converted array and the detected class labels (empty list if not classification).
+    """
     classes_ = []
 
     if type(x).__module__.split(".")[0] == "numpy":

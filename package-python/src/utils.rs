@@ -1,3 +1,4 @@
+//! Utility helpers for the Python bindings.
 use numpy::IntoPyArray;
 use numpy::PyArray1;
 use numpy::PyReadonlyArray1;
@@ -8,6 +9,7 @@ use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use std::collections::HashMap;
 
+/// Convert a Python `Dict[int, int]` of constraint codes to a Rust [`ConstraintMap`].
 pub fn int_map_to_constraint_map(int_map: HashMap<usize, i8>) -> PyResult<ConstraintMap> {
     let mut constraints: ConstraintMap = HashMap::new();
     for (f, c) in int_map.iter() {
@@ -25,12 +27,14 @@ pub fn int_map_to_constraint_map(int_map: HashMap<usize, i8>) -> PyResult<Constr
     Ok(constraints)
 }
 
+/// Convert a `Result<T, E>` into a `PyResult<T>` using `PyValueError`.
 pub fn to_value_error<T, E: std::fmt::Display>(value: Result<T, E>) -> Result<T, PyErr> {
     match value {
         Ok(v) => Ok(v),
         Err(e) => Err(PyValueError::new_err(e.to_string())),
     }
 }
+/// Print a matrix to stdout (debugging helper).
 #[pyfunction]
 pub fn print_matrix(x: PyReadonlyArray1<f32>, rows: usize, cols: usize) -> PyResult<()> {
     let m = Matrix::new(x.as_slice()?, rows, cols);
@@ -38,6 +42,7 @@ pub fn print_matrix(x: PyReadonlyArray1<f32>, rows: usize, cols: usize) -> PyRes
     Ok(())
 }
 
+/// Compute percentiles of a weighted sample.
 #[pyfunction]
 pub fn percentiles<'py>(
     py: Python<'py>,

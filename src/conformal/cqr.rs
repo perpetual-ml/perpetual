@@ -1,8 +1,13 @@
+//! Conformalized Quantile Regression (CQR)
+//!
+//! Calibrates upper and lower quantile models on held-out data to produce
+//! prediction intervals with marginal coverage of at least `1 - alpha`.
 use crate::objective_functions::objective::Objective;
 use crate::{errors::PerpetualError, utils::percentiles, ColumnarMatrix, Matrix, PerpetualBooster};
 use std::collections::HashMap;
 
-pub type CalData<'a> = (Matrix<'a, f64>, &'a [f64], &'a [f64]); // (x_flat_data, rows, cols), y, alpha
+/// Calibration data: `(features, targets, alpha_values)`.
+pub type CalData<'a> = (Matrix<'a, f64>, &'a [f64], &'a [f64]);
 
 impl PerpetualBooster {
     /// Calibrate models to get prediction intervals

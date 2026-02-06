@@ -1,3 +1,4 @@
+//! PyO3 wrapper around [`CratePerpetualBooster`].
 use crate::custom_objective::CustomObjective;
 use crate::utils::int_map_to_constraint_map;
 use crate::utils::to_value_error;
@@ -19,6 +20,7 @@ use pyo3::{Bound, Python};
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
+/// Python-facing Perpetual Booster.
 #[pyclass(subclass)]
 pub struct PerpetualBooster {
     booster: CratePerpetualBooster,

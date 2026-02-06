@@ -1,3 +1,6 @@
+//! Evaluation
+//!
+//! Enum of supported evaluation metrics and helper functions for dispatch.
 use crate::errors::PerpetualError;
 use crate::metrics::classification;
 pub use crate::metrics::ranking::GainScheme;
@@ -6,6 +9,9 @@ use crate::utils::items_to_strings;
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 
+/// Type alias for a metric calculation function.
+///
+/// Takes: `(y, yhat, sample_weight, group, quantile)` and returns a scalar.
 pub type MetricFn = fn(&[f64], &[f64], &[f64], &[u64], Option<f32>) -> f64;
 
 /// Compare to metric values, determining if b is better.
@@ -33,13 +39,20 @@ pub fn is_comparison_better(value: f64, comparison: f64, maximize: bool) -> bool
     }
 }
 
+/// Supported evaluation metrics.
 #[derive(Debug, Deserialize, Serialize, Clone, Copy)]
 pub enum Metric {
+    /// Area Under the ROC Curve (classification).
     AUC,
+    /// Log Loss (binary cross-entropy).
     LogLoss,
+    /// Root Mean Squared Logarithmic Error.
     RootMeanSquaredLogError,
+    /// Root Mean Squared Error.
     RootMeanSquaredError,
+    /// Quantile loss (pinball loss).
     QuantileLoss,
+    /// Normalized Discounted Cumulative Gain (ranking).
     NDCG { k: Option<u64>, gain: GainScheme },
 }
 
@@ -52,6 +65,7 @@ fn get_parse_error(s: &str) -> PerpetualError {
             "LogLoss",
             "RootMeanSquaredLogError",
             "RootMeanSquaredError",
+            "QuantileLoss",
             "NDCG",
             "NDCG@k",
         ]),

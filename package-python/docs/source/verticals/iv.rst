@@ -36,4 +36,4 @@ Example:
 Tutorials
 ---------
 
-For a detailed walkthrough using the Card (1995) education dataset, see the :doc:`../tutorials/verticals/iv_causal_effect`.
+For a detailed walkthrough using the Card (1995) education dataset, see the :doc:`../tutorials/causal/iv_causal_effect`.

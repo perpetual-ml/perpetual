@@ -1,11 +1,12 @@
+//! Setter Methods
+//!
+//! Builder-style setters for configuring [`PerpetualBooster`] parameters.
 use crate::booster::config::MissingNodeTreatment;
 use crate::objective_functions::objective::Objective;
 use crate::{constraints::ConstraintMap, PerpetualBooster};
 use std::collections::HashSet;
 
 impl PerpetualBooster {
-    // Set methods for paramters
-
     /// Set the objective on the booster.
     /// * `objective` - The objective type of the booster.
     pub fn set_objective(mut self, objective: Objective) -> Self {
