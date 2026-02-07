@@ -690,7 +690,7 @@ def test_polars():
         "deck",
         "embark_town",
     ]
-    X_pl = X_pl.with_columns(pl.col(cols).cast(pl.Categorical))
+    X_pl = X_pl.with_columns(pl.col(cols).cast(pl.String).cast(pl.Categorical))
     X_pd[cols] = X_pd[cols].astype("category")
 
     model_pl_mt = PerpetualBooster(objective="LogLoss", budget=0.1)

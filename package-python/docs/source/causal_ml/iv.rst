@@ -2,17 +2,17 @@
 Instrumental Variables (BoostIV)
 ================================
 
-Instrumental variables (IV) are used in causal inference to estimate causal effects when there is unobserved confounding between the treatment $W$ and the outcome $Y$.
+Instrumental variables (IV) are used in causal inference to estimate causal effects when there is unobserved confounding between the treatment :math:`W` and the outcome :math:`Y`.
 
-Unobserved confounding violates the consistency of standard estimators (like Ordinary Least Squares or standard Gradient Boosting). An **instrument** $Z$ is a variable that is correlated with the treatment but has no direct effect on the outcome except through the treatment.
+Unobserved confounding violates the consistency of standard estimators (like Ordinary Least Squares or standard Gradient Boosting). An **instrument** :math:`Z` is a variable that is correlated with the treatment but has no direct effect on the outcome except through the treatment.
 
 Boosted Instrumental Variables
 ------------------------------
 
 The :class:`iv.BraidedBooster` implements a **2-Stage Least Squares (2SLS)** approach using Gradient Boosting. This allows for capturing complex non-linear relationships in both the first stage (treatment assignment) and the second stage (outcome estimation).
 
-1. **Stage 1**: Model the treatment $W$ as a function of covariates $X$ and instruments $Z$: $\hat{W} = f(X, Z)$.
-2. **Stage 2**: Model the outcome $Y$ as a function of covariates $X$ and the predicted treatment from the first stage $\hat{W}$: $\hat{Y} = g(X, \hat{W})$.
+1. **Stage 1**: Model the treatment :math:`W` as a function of covariates :math:`X` and instruments :math:`Z`: :math:`\hat{W} = f(X, Z)`.
+2. **Stage 2**: Model the outcome :math:`Y` as a function of covariates :math:`X` and the predicted treatment from the first stage :math:`\hat{W}`: :math:`\hat{Y} = g(X, \hat{W})`.
 
 Example:
 

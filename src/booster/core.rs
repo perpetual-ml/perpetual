@@ -387,21 +387,17 @@ impl PerpetualBooster {
             mem_bin * self.cfg.max_bin as usize * col_amount
         };
         let sys = System::new_with_specifics(RefreshKind::nothing().with_memory(MemoryRefreshKind::everything()));
-        let mem_available = match self.cfg.memory_limit {
-            Some(mem_limit) => mem_limit * 1e9_f32,
-            None => match sys.cgroup_limits() {
-                Some(limits) => limits.free_memory as f32,
-                None => sys.available_memory() as f32,
-            },
+        let n_nodes_alloc = match self.cfg.memory_limit {
+            Some(mem_limit) => (FREE_MEM_ALLOC_FACTOR * (mem_limit * 1e9_f32 / mem_hist as f32)) as usize,
+            None => {
+                let mem_available = match sys.cgroup_limits() {
+                    Some(limits) => limits.free_memory as f32,
+                    None => sys.available_memory() as f32,
+                };
+                let n = (FREE_MEM_ALLOC_FACTOR * (mem_available / mem_hist as f32)) as usize;
+                n.clamp(N_NODES_ALLOC_MIN, N_NODES_ALLOC_MAX)
+            }
         };
-
-        let mut n_nodes_alloc: usize;
-        if self.cfg.memory_limit.is_none() {
-            n_nodes_alloc = (FREE_MEM_ALLOC_FACTOR * (mem_available / (mem_hist as f32))) as usize;
-            n_nodes_alloc = n_nodes_alloc.clamp(N_NODES_ALLOC_MIN, N_NODES_ALLOC_MAX);
-        } else {
-            n_nodes_alloc = (FREE_MEM_ALLOC_FACTOR * (mem_available / (mem_hist as f32))) as usize;
-        }
         let mut hist_arena = if col_amount == col_index.len() {
             HistogramArena::from_cuts(&binned_data.cuts, &col_index, is_const_hess, n_nodes_alloc)
         } else {
@@ -567,12 +563,8 @@ impl PerpetualBooster {
             }
             yhat = vec![self.base_score; y.len()];
         } else {
-            // For reset=false, we need to predict - create temp flat data
-            let flat_data: Vec<f64> = (0..data.cols)
-                .flat_map(|col| data.get_col(col).iter().copied())
-                .collect();
-            let temp_matrix = Matrix::new(&flat_data, data.rows, data.cols);
-            yhat = self.predict(&temp_matrix, true);
+            // For reset=false, predict using the columnar path (zero-copy).
+            yhat = self.predict_columnar(data, true);
         }
 
         let (mut grad, mut hess) = objective_fn.gradient(y, &yhat, sample_weight, group);
@@ -618,21 +610,17 @@ impl PerpetualBooster {
             mem_bin * self.cfg.max_bin as usize * col_amount
         };
         let sys = System::new_with_specifics(RefreshKind::nothing().with_memory(MemoryRefreshKind::everything()));
-        let mem_available = match self.cfg.memory_limit {
-            Some(mem_limit) => mem_limit * 1e9_f32,
-            None => match sys.cgroup_limits() {
-                Some(limits) => limits.free_memory as f32,
-                None => sys.available_memory() as f32,
-            },
+        let n_nodes_alloc = match self.cfg.memory_limit {
+            Some(mem_limit) => (FREE_MEM_ALLOC_FACTOR * (mem_limit * 1e9_f32 / mem_hist as f32)) as usize,
+            None => {
+                let mem_available = match sys.cgroup_limits() {
+                    Some(limits) => limits.free_memory as f32,
+                    None => sys.available_memory() as f32,
+                };
+                let n = (FREE_MEM_ALLOC_FACTOR * (mem_available / mem_hist as f32)) as usize;
+                n.clamp(N_NODES_ALLOC_MIN, N_NODES_ALLOC_MAX)
+            }
         };
-
-        let mut n_nodes_alloc: usize;
-        if self.cfg.memory_limit.is_none() {
-            n_nodes_alloc = (FREE_MEM_ALLOC_FACTOR * (mem_available / (mem_hist as f32))) as usize;
-            n_nodes_alloc = n_nodes_alloc.clamp(N_NODES_ALLOC_MIN, N_NODES_ALLOC_MAX);
-        } else {
-            n_nodes_alloc = (FREE_MEM_ALLOC_FACTOR * (mem_available / (mem_hist as f32))) as usize;
-        }
 
         let mut hist_arena = if col_amount == col_index.len() {
             HistogramArena::from_cuts(&binned_data.cuts, &col_index, is_const_hess, n_nodes_alloc)

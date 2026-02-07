@@ -78,12 +78,15 @@ fn bin_columnar_matrix_from_cuts<T: FloatData<T>>(
     cuts: &JaggedMatrix<T>,
     missing: &T,
 ) -> Vec<u16> {
-    // Build column-major output by iterating through each column
+    // Build column-major output by iterating through each column.
+    // We iterate exactly `data.rows` elements per column to avoid
+    // reading Arrow buffer padding bytes that extend beyond the
+    // logical row count.
     let mut result = Vec::with_capacity(data.rows * data.cols);
     for col in 0..data.cols {
         let col_data = data.get_col(col);
         let col_cuts = cuts.get_col(col);
-        for (row, v) in col_data.iter().enumerate() {
+        for (row, v) in col_data.iter().enumerate().take(data.rows) {
             if data.is_valid(row, col) {
                 result.push(map_bin(col_cuts, v, missing).unwrap());
             } else {

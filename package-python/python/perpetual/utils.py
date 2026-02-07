@@ -207,78 +207,26 @@ def convert_input_frame_columnar(
     # Convert each column to numpy array
     columns = []
     masks = []
+    import polars as pl
     import pyarrow as pa
 
     for i, col_name in enumerate(features_):
         if i in categorical_set:
-            # For categorical columns, we need to encode them
-            # Use Arrow to get codes and categories without forcing numpy object conversion
-            arr = X[col_name].to_arrow()
-            if isinstance(arr, pa.ChunkedArray):
-                arr = arr.combine_chunks()
+            # For categorical columns, cast to String first to bypass
+            # Polars' global string cache which can make the Arrow
+            # DictionaryArray dictionary unreliable (it may contain
+            # categories from ALL categorical columns, not just this one).
+            str_series = X[col_name].cast(pl.String)
+            str_np = str_series.to_numpy(allow_copy=True)
+            null_mask = str_series.is_null().to_numpy()
 
-            if not isinstance(arr, pa.DictionaryArray):
-                arr = arr.dictionary_encode()
-
-            # Extract categories (dictionary)
-            cats_orig = arr.dictionary.to_pylist()
-
-            # Extract codes (indices)
-            indices_raw = arr.indices.to_numpy(zero_copy_only=False)
-
-            # Important: Polars Categorical columns might share a large global dictionary.
-            # We must only include categories that are actually present in this column's data
-            # to remain consistent with the Pandas/Numpy path (which uses np.unique).
-            if arr.null_count < len(indices_raw):
-                # Identify which dictionary indices are actually used
-                valid_mask = np.ones(len(indices_raw), dtype=bool)
-                if arr.null_count > 0 and arr.buffers()[0]:
-                    valid_bits = np.frombuffer(arr.buffers()[0], dtype=np.uint8)
-                    valid_mask = np.unpackbits(valid_bits, bitorder="little")[
-                        : len(indices_raw)
-                    ].astype(bool)
-
-                used_indices = np.unique(indices_raw[valid_mask])
-                cats_present = []
-                for i in used_indices:
-                    idx = int(i)
-                    if 0 <= idx < len(cats_orig):
-                        c = cats_orig[idx]
-                        if c is not None and str(c) != "nan":
-                            cats_present.append(str(c))
-                cats = sorted(cats_present)
+            # Get sorted unique non-null categories (consistent with Pandas np.unique path)
+            valid_strs = str_np[~null_mask]
+            if len(valid_strs) > 0:
+                cats = sorted(set(valid_strs))
+                cats = [c for c in cats if c != "nan"]
             else:
                 cats = []
-
-            # Create lookup table for remapping original indices to sorted indices
-            # Note: We shift values by +1.0 because 0 in Perpetual is "nan"
-            lookup = np.full(len(cats_orig), np.nan, dtype=np.float64)
-            cat_to_idx = {cat: i for i, cat in enumerate(cats)}
-            for i, cat in enumerate(cats_orig):
-                if cat in cat_to_idx:
-                    lookup[i] = float(cat_to_idx[cat]) + 1.0
-
-            # Match indices to lookup table safely
-            if np.issubdtype(indices_raw.dtype, np.floating):
-                mask = ~np.isnan(indices_raw)
-                out_values = np.full(len(indices_raw), np.nan, dtype=np.float64)
-                out_values[mask] = lookup[indices_raw[mask].astype(np.int64)]
-            else:
-                out_values = lookup[indices_raw]
-
-            # Handle Nulls (masked values in Arrow)
-            # Set them to NaN
-            if arr.null_count > 0:
-                # Simpler: convert validity bitmap to byte array using numpy unpacking
-                row_count = len(out_values)
-                if arr.buffers()[0]:
-                    valid_bits = np.frombuffer(arr.buffers()[0], dtype=np.uint8)
-                    valid_mask = np.unpackbits(valid_bits, bitorder="little")[
-                        :row_count
-                    ].astype(bool)
-                    # mask is 1 where valid, 0 where null.
-                    # We want to set nulls (0) to NaN.
-                    out_values[~valid_mask] = np.nan
 
             cats.insert(0, "nan")
 
@@ -289,6 +237,16 @@ def convert_input_frame_columnar(
                 )
 
             cat_mapping[col_name] = cats
+
+            # Encode: use searchsorted on sorted cats (without "nan" at 0) for vectorized mapping
+            cats_no_nan = cats[1:]  # remove "nan" prefix
+            cats_arr = np.array(cats_no_nan)
+            out_values = np.full(rows, np.nan, dtype=np.float64)
+            valid_indices = ~null_mask
+            if valid_indices.any():
+                encoded = np.searchsorted(cats_arr, valid_strs) + 1.0
+                out_values[valid_indices] = encoded
+
             columns.append(out_values)
             masks.append(None)  # Categorical encoding handles NaNs
         else:
@@ -311,8 +269,8 @@ def convert_input_frame_columnar(
             else:
                 masks.append(np.frombuffer(buffers[0], dtype=np.uint8))
 
-            # values
-            col_array = np.frombuffer(buffers[1], dtype=np.float64)
+            # values — truncate to `rows` to exclude Arrow buffer padding
+            col_array = np.frombuffer(buffers[1], dtype=np.float64)[:rows]
             columns.append(col_array)
 
     if categorical_features_:
@@ -374,92 +332,30 @@ def transform_input_frame_columnar(
 
     columns = []
     masks = []
+    import polars as pl
     import pyarrow as pa
 
     for i, col_name in enumerate(features_):
         if cat_mapping and col_name in cat_mapping:
-            # For categorical columns, we need to encode them using the existing cat_mapping
+            # For categorical columns, encode using the existing cat_mapping.
+            # Cast to String first to bypass Polars' global string cache
+            # which can make Arrow DictionaryArray dictionaries unreliable.
             categories = cat_mapping[col_name]
+            cats = categories.copy()
+            cats.remove("nan")
 
-            # Use Arrow for zero-copy extraction
-            arr = X[col_name].to_arrow()
-            if isinstance(arr, pa.ChunkedArray):
-                arr = arr.combine_chunks()
-            if not isinstance(arr, pa.DictionaryArray):
-                arr = arr.dictionary_encode()
+            str_series = X[col_name].cast(pl.String)
+            str_np = str_series.to_numpy(allow_copy=True)
+            null_mask = str_series.is_null().to_numpy()
 
-            # Input categories
-            new_cats = arr.dictionary.to_pylist()
-
-            # Extract codes (indices)
-            # We need integers for indexing `lookup`.
-            # If indices has nulls, to_numpy() might return floats.
-            # We fill nulls with 0 to ensure we get integers, then mask result later.
-            filled_indices_arr = arr.indices.fill_null(0)
-            new_indices = filled_indices_arr.to_numpy()
-
-            # Build mapping from new_cats indices to old_cats indices
-            # old_cats = categories. "nan" is at index 0.
-            # We want to map new_cat_idx -> old_cat_idx.
-            # If new_cat is "nan", map to 0?
-            # Perpetual encoding: "nan" -> NaN (in float), Cat1 -> 1.0, Cat2 -> 2.0.
-            # categories list has "nan" at 0.
-            # So "A" is at index 1.
-
-            # We need to map `new_indices` to `out_values`.
-
-            # Create a lookup table (array)
-            # lookup[new_code] = old_float_code
-
-            lookup = np.full(len(new_cats), np.nan, dtype=np.float64)
-
-            # optimization: map strings to indices for old categories
-            old_cat_map = {c: i for i, c in enumerate(categories)}
-            # categories[0] is "nan"
-
-            for i, cat in enumerate(new_cats):
-                if cat in old_cat_map:
-                    idx = old_cat_map[cat]
-                    # If idx is 0 ("nan"), we want result to be np.nan?
-                    # Previous logic: `inversed[inversed == ind_nan] = np.nan`.
-                    # Wait, `inversed` from `searchsorted` was 0-based index into `cats` (without "nan" inside `searchsorted` call?).
-                    # Previous logic:
-                    # `cats.remove("nan")`
-                    # `searchsorted(cats, ...)` -> index into cats (0 to N-1).
-                    # `+ 1.0`. So 1 to N.
-                    # `categories` has "nan" inserted at 0.
-                    # So index 1 corresponds to `categories[1]`.
-                    # Logic holds.
-
-                    if categories[idx] == "nan":
-                        lookup[i] = np.nan
-                    else:
-                        lookup[i] = float(idx)
-                        # Note: categories has "nan" at 0. "A" at 1.
-                        # If `cat` is "A", `idx` is 1. We want 1.0. Correct.
-                else:
-                    # Unknown category -> NaN?
-                    lookup[i] = np.nan
-
-            # Apply lookup
-            # Handle out of bounds indices just in case? Arrow indices should be valid.
-            # `new_indices` are codes into `new_cats`.
-
-            # Check for nulls in `new_indices` (masked)
-            # If null, they map to NaN.
-
-            # `take` style mapping
-            # `lookup` has NaN for unknown/nan cats.
-            x_enc = lookup[new_indices]
-
-            # Handle array-level nulls
-            if arr.null_count > 0:
-                if arr.buffers()[0]:
-                    valid_bits = np.frombuffer(arr.buffers()[0], dtype=np.uint8)
-                    valid_mask = np.unpackbits(valid_bits, bitorder="little")[
-                        : len(x_enc)
-                    ].astype(bool)
-                    x_enc[~valid_mask] = np.nan
+            x_enc = np.full(rows, np.nan, dtype=np.float64)
+            valid_indices = ~null_mask
+            if valid_indices.any():
+                valid_strs = str_np[valid_indices]
+                encoded = np.searchsorted(cats, valid_strs) + 1.0
+                ind_nan = len(categories)
+                encoded[encoded == ind_nan] = np.nan
+                x_enc[valid_indices] = encoded
 
             columns.append(x_enc)
             masks.append(None)
@@ -476,7 +372,7 @@ def transform_input_frame_columnar(
                 masks.append(None)
             else:
                 masks.append(np.frombuffer(buffers[0], dtype=np.uint8))
-            columns.append(np.frombuffer(buffers[1], dtype=np.float64))
+            columns.append(np.frombuffer(buffers[1], dtype=np.float64)[:rows])
 
     return features_, columns, masks, rows, cols
 

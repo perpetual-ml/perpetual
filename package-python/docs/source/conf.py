@@ -8,7 +8,7 @@ copyright = f"{datetime.now().year}, Mutlu Simsek, Serkan Korkmaz, Pieter Pel"
 author = "Mutlu Simsek, Serkan Korkmaz, Pieter Pel"
 
 # The full version, including alpha/beta/rc tags
-release = "1.2.0"
+release = "1.3.0"
 
 # -- General configuration ---------------------------------------------------
 
@@ -18,6 +18,7 @@ extensions = [
     "sphinx.ext.napoleon",
     "sphinx.ext.viewcode",
     "sphinx.ext.intersphinx",
+    "sphinx.ext.mathjax",
     "numpydoc",
     "nbsphinx",
 ]
@@ -44,6 +45,10 @@ html_theme = "sphinx_rtd_theme"
 # relative to this directory. They are copied after the builtin static files,
 # so a file named "default.css" will overwrite the builtin "default.css".
 html_static_path = ["_static"]
+
+html_css_files = [
+    "custom.css",
+]
 
 html_theme_options = {
     "display_version": True,

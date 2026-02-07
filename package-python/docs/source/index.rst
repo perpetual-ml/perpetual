@@ -2,9 +2,14 @@ Perpetual Documentation
 =======================
 
 .. image:: _static/perp_logo.png
-   :align: center
+   :align: left
    :alt: Perpetual Logo
    :width: 100px
+   :class: perp-logo
+
+.. raw:: html
+
+   <div style="clear: both;"></div>
 
 Perpetual is a self-generalizing gradient boosting machine that doesn't need hyperparameter optimization. It is designed to be easy to use while providing state-of-the-art predictive performance.
 
@@ -24,7 +29,7 @@ Key Features
    quickstart
    api
    tutorials/index
-   verticals/index
+   Causal ML <causal_ml/index>
    architecture
    parameters_tuning
    faq

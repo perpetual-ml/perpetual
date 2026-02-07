@@ -37,7 +37,9 @@ pub fn training_benchmark(c: &mut Criterion) {
 
     group.bench_function("train_booster_cal_housing", |b| {
         b.iter(|| {
-            let mut booster = PerpetualBooster::default().set_objective(Objective::SquaredLoss);
+            let mut booster = PerpetualBooster::default()
+                .set_objective(Objective::SquaredLoss)
+                .set_budget(2.0);
             // Using default parameters as baseline
             booster
                 .fit(black_box(&data), black_box(&y), black_box(None), black_box(None))
@@ -52,7 +54,7 @@ pub fn training_benchmark_cover_types(c: &mut Criterion) {
         fs::read_to_string("resources/cover_types_train.csv").expect("Something went wrong reading the file");
 
     // Skip header and limit rows
-    let lines = file_content.lines().skip(1).take(2000);
+    let lines = file_content.lines().skip(1).take(10000);
 
     let mut data_vec: Vec<f64> = Vec::new();
     let mut y: Vec<f64> = Vec::new();
