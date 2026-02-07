@@ -1,0 +1,345 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>perpetual.causal_metrics &mdash; Perpetual 1.3.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="../../_static/custom.css?v=9cdd1368" />
+
+  
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=1f29e9d3"></script>
+      <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+      <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            Perpetual
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../api.html">API Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../tutorials/index.html">Tutorials</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../causal_ml/index.html">Causal ML</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../architecture.html">Architecture</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../parameters_tuning.html">Parameters Tuning</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../faq.html">Frequently Asked Questions</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">Perpetual</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">perpetual.causal_metrics</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for perpetual.causal_metrics</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;Causal ML evaluation metrics.</span>
+
+<span class="sd">Provides standard metrics for evaluating heterogeneous treatment effect</span>
+<span class="sd">(uplift) models when ground-truth individual effects are unavailable</span>
+<span class="sd">but randomized (or quasi-randomized) treatment assignment is available.</span>
+
+<span class="sd">Functions</span>
+<span class="sd">---------</span>
+<span class="sd">- :func:`cumulative_gain_curve` – compute the cumulative gain (uplift) curve.</span>
+<span class="sd">- :func:`auuc` – Area Under the Uplift Curve (AUUC).</span>
+<span class="sd">- :func:`qini_curve` – compute the Qini curve.</span>
+<span class="sd">- :func:`qini_coefficient` – Qini coefficient (area between Qini curve and</span>
+<span class="sd">  random).</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">Tuple</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_sort_by_uplift</span><span class="p">(</span>
+    <span class="n">y</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span>
+    <span class="n">w</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span>
+    <span class="n">uplift_score</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span>
+    <span class="n">sample_weight</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="n">Optional</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">]]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Sort arrays by descending uplift score.&quot;&quot;&quot;</span>
+    <span class="n">order</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">argsort</span><span class="p">(</span><span class="o">-</span><span class="n">uplift_score</span><span class="p">)</span>
+    <span class="n">y_s</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">y</span><span class="p">)[</span><span class="n">order</span><span class="p">]</span>
+    <span class="n">w_s</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">w</span><span class="p">)[</span><span class="n">order</span><span class="p">]</span>
+    <span class="n">u_s</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">uplift_score</span><span class="p">)[</span><span class="n">order</span><span class="p">]</span>
+    <span class="n">sw_s</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">sample_weight</span><span class="p">)[</span><span class="n">order</span><span class="p">]</span> <span class="k">if</span> <span class="n">sample_weight</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="kc">None</span>
+    <span class="k">return</span> <span class="n">y_s</span><span class="p">,</span> <span class="n">w_s</span><span class="p">,</span> <span class="n">u_s</span><span class="p">,</span> <span class="n">sw_s</span>
+
+
+<span class="c1"># ---------------------------------------------------------------------------</span>
+<span class="c1"># Cumulative gain (uplift) curve</span>
+<span class="c1"># ---------------------------------------------------------------------------</span>
+
+
+<div class="viewcode-block" id="cumulative_gain_curve">
+<a class="viewcode-back" href="../../api.html#perpetual.causal_metrics.cumulative_gain_curve">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">cumulative_gain_curve</span><span class="p">(</span>
+    <span class="n">y_true</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span>
+    <span class="n">w_true</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span>
+    <span class="n">uplift_score</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Compute the cumulative gain (uplift) curve.</span>
+
+<span class="sd">    Samples are sorted by ``uplift_score`` in descending order.  At each</span>
+<span class="sd">    fraction of the population the observed uplift (difference in conversion</span>
+<span class="sd">    rates between treated and control) multiplied by the fraction of the</span>
+<span class="sd">    population seen so far is computed.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    y_true : array-like of shape (n_samples,)</span>
+<span class="sd">        Observed binary outcome (0 or 1).</span>
+<span class="sd">    w_true : array-like of shape (n_samples,)</span>
+<span class="sd">        Observed binary treatment (0 or 1).</span>
+<span class="sd">    uplift_score : array-like of shape (n_samples,)</span>
+<span class="sd">        Predicted CATE / uplift score (higher ⇒ more benefit from treatment).</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    fractions : ndarray of shape (n_samples,)</span>
+<span class="sd">        Fraction of population from 0 to 1.</span>
+<span class="sd">    gains : ndarray of shape (n_samples,)</span>
+<span class="sd">        Cumulative gain at each fraction.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">y_s</span><span class="p">,</span> <span class="n">w_s</span><span class="p">,</span> <span class="n">_</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">_sort_by_uplift</span><span class="p">(</span><span class="n">y_true</span><span class="p">,</span> <span class="n">w_true</span><span class="p">,</span> <span class="n">uplift_score</span><span class="p">)</span>
+    <span class="n">n</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">y_s</span><span class="p">)</span>
+
+    <span class="n">n_treat</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">cumsum</span><span class="p">(</span><span class="n">w_s</span><span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">float</span><span class="p">)</span>
+    <span class="n">n_control</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">cumsum</span><span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="n">w_s</span><span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">float</span><span class="p">)</span>
+    <span class="n">y_treat</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">cumsum</span><span class="p">(</span><span class="n">y_s</span> <span class="o">*</span> <span class="n">w_s</span><span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">float</span><span class="p">)</span>
+    <span class="n">y_control</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">cumsum</span><span class="p">(</span><span class="n">y_s</span> <span class="o">*</span> <span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="n">w_s</span><span class="p">))</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">float</span><span class="p">)</span>
+
+    <span class="c1"># Avoid division by zero.</span>
+    <span class="n">rate_treat</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">divide</span><span class="p">(</span>
+        <span class="n">y_treat</span><span class="p">,</span> <span class="n">n_treat</span><span class="p">,</span> <span class="n">out</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">zeros_like</span><span class="p">(</span><span class="n">y_treat</span><span class="p">),</span> <span class="n">where</span><span class="o">=</span><span class="n">n_treat</span> <span class="o">&gt;</span> <span class="mi">0</span>
+    <span class="p">)</span>
+    <span class="n">rate_control</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">divide</span><span class="p">(</span>
+        <span class="n">y_control</span><span class="p">,</span> <span class="n">n_control</span><span class="p">,</span> <span class="n">out</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">zeros_like</span><span class="p">(</span><span class="n">y_control</span><span class="p">),</span> <span class="n">where</span><span class="o">=</span><span class="n">n_control</span> <span class="o">&gt;</span> <span class="mi">0</span>
+    <span class="p">)</span>
+
+    <span class="n">uplift_at_k</span> <span class="o">=</span> <span class="n">rate_treat</span> <span class="o">-</span> <span class="n">rate_control</span>
+    <span class="n">fractions</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">n</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span> <span class="o">/</span> <span class="n">n</span>
+    <span class="n">gains</span> <span class="o">=</span> <span class="n">uplift_at_k</span> <span class="o">*</span> <span class="n">fractions</span>
+
+    <span class="k">return</span> <span class="n">fractions</span><span class="p">,</span> <span class="n">gains</span></div>
+
+
+
+<span class="c1"># ---------------------------------------------------------------------------</span>
+<span class="c1"># AUUC</span>
+<span class="c1"># ---------------------------------------------------------------------------</span>
+
+
+<div class="viewcode-block" id="auuc">
+<a class="viewcode-back" href="../../api.html#perpetual.causal_metrics.auuc">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">auuc</span><span class="p">(</span>
+    <span class="n">y_true</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span>
+    <span class="n">w_true</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span>
+    <span class="n">uplift_score</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span>
+    <span class="n">normalize</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Area Under the Uplift Curve (AUUC).</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    y_true : array-like of shape (n_samples,)</span>
+<span class="sd">        Observed binary outcome.</span>
+<span class="sd">    w_true : array-like of shape (n_samples,)</span>
+<span class="sd">        Observed binary treatment indicator.</span>
+<span class="sd">    uplift_score : array-like of shape (n_samples,)</span>
+<span class="sd">        Predicted CATE / uplift score.</span>
+<span class="sd">    normalize : bool, default=True</span>
+<span class="sd">        If ``True``, subtract the area of a random model (diagonal) so that</span>
+<span class="sd">        a random model scores 0.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    float</span>
+<span class="sd">        AUUC value.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">fracs</span><span class="p">,</span> <span class="n">gains</span> <span class="o">=</span> <span class="n">cumulative_gain_curve</span><span class="p">(</span><span class="n">y_true</span><span class="p">,</span> <span class="n">w_true</span><span class="p">,</span> <span class="n">uplift_score</span><span class="p">)</span>
+    <span class="n">area</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">trapezoid</span><span class="p">(</span><span class="n">gains</span><span class="p">,</span> <span class="n">fracs</span><span class="p">))</span>
+
+    <span class="k">if</span> <span class="n">normalize</span><span class="p">:</span>
+        <span class="c1"># Random model area = 0.5 * overall_uplift</span>
+        <span class="n">y_arr</span><span class="p">,</span> <span class="n">w_arr</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">y_true</span><span class="p">),</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">w_true</span><span class="p">)</span>
+        <span class="n">m1</span> <span class="o">=</span> <span class="n">w_arr</span> <span class="o">==</span> <span class="mi">1</span>
+        <span class="n">m0</span> <span class="o">=</span> <span class="n">w_arr</span> <span class="o">==</span> <span class="mi">0</span>
+        <span class="n">overall_uplift</span> <span class="o">=</span> <span class="mf">0.0</span>
+        <span class="k">if</span> <span class="n">m1</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span> <span class="o">&gt;</span> <span class="mi">0</span> <span class="ow">and</span> <span class="n">m0</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="n">overall_uplift</span> <span class="o">=</span> <span class="n">y_arr</span><span class="p">[</span><span class="n">m1</span><span class="p">]</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span> <span class="o">-</span> <span class="n">y_arr</span><span class="p">[</span><span class="n">m0</span><span class="p">]</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span>
+        <span class="n">random_area</span> <span class="o">=</span> <span class="mf">0.5</span> <span class="o">*</span> <span class="n">overall_uplift</span>
+        <span class="n">area</span> <span class="o">-=</span> <span class="n">random_area</span>
+
+    <span class="k">return</span> <span class="nb">float</span><span class="p">(</span><span class="n">area</span><span class="p">)</span></div>
+
+
+
+<span class="c1"># ---------------------------------------------------------------------------</span>
+<span class="c1"># Qini curve &amp; coefficient</span>
+<span class="c1"># ---------------------------------------------------------------------------</span>
+
+
+<div class="viewcode-block" id="qini_curve">
+<a class="viewcode-back" href="../../api.html#perpetual.causal_metrics.qini_curve">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">qini_curve</span><span class="p">(</span>
+    <span class="n">y_true</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span>
+    <span class="n">w_true</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span>
+    <span class="n">uplift_score</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Compute the Qini curve.</span>
+
+<span class="sd">    The Qini curve counts the *incremental* number of positive outcomes</span>
+<span class="sd">    attributable to treatment as a function of the population fraction</span>
+<span class="sd">    targeted.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    y_true : array-like of shape (n_samples,)</span>
+<span class="sd">        Observed binary outcome.</span>
+<span class="sd">    w_true : array-like of shape (n_samples,)</span>
+<span class="sd">        Observed binary treatment indicator.</span>
+<span class="sd">    uplift_score : array-like of shape (n_samples,)</span>
+<span class="sd">        Predicted CATE / uplift score.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    fractions : ndarray of shape (n_samples + 1,)</span>
+<span class="sd">        Population fraction (starts at 0).</span>
+<span class="sd">    qini : ndarray of shape (n_samples + 1,)</span>
+<span class="sd">        Qini value at each fraction (starts at 0).</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">y_s</span><span class="p">,</span> <span class="n">w_s</span><span class="p">,</span> <span class="n">_</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">_sort_by_uplift</span><span class="p">(</span><span class="n">y_true</span><span class="p">,</span> <span class="n">w_true</span><span class="p">,</span> <span class="n">uplift_score</span><span class="p">)</span>
+    <span class="n">n</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">y_s</span><span class="p">)</span>
+
+    <span class="n">n_treat</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">cumsum</span><span class="p">(</span><span class="n">w_s</span><span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">float</span><span class="p">)</span>
+    <span class="n">n_control</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">cumsum</span><span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="n">w_s</span><span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">float</span><span class="p">)</span>
+    <span class="n">y_treat</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">cumsum</span><span class="p">(</span><span class="n">y_s</span> <span class="o">*</span> <span class="n">w_s</span><span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">float</span><span class="p">)</span>
+    <span class="n">y_control</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">cumsum</span><span class="p">(</span><span class="n">y_s</span> <span class="o">*</span> <span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="n">w_s</span><span class="p">))</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">float</span><span class="p">)</span>
+
+    <span class="c1"># Qini: Y_treat - Y_control * (N_treat / N_control)  (adjusted for group sizes)</span>
+    <span class="n">adj_control</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">divide</span><span class="p">(</span>
+        <span class="n">y_control</span> <span class="o">*</span> <span class="n">n_treat</span><span class="p">,</span>
+        <span class="n">n_control</span><span class="p">,</span>
+        <span class="n">out</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">zeros_like</span><span class="p">(</span><span class="n">y_control</span><span class="p">),</span>
+        <span class="n">where</span><span class="o">=</span><span class="n">n_control</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">qini</span> <span class="o">=</span> <span class="n">y_treat</span> <span class="o">-</span> <span class="n">adj_control</span>
+
+    <span class="c1"># Prepend origin</span>
+    <span class="n">fractions</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">concatenate</span><span class="p">([[</span><span class="mf">0.0</span><span class="p">],</span> <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">n</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span> <span class="o">/</span> <span class="n">n</span><span class="p">])</span>
+    <span class="n">qini</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">concatenate</span><span class="p">([[</span><span class="mf">0.0</span><span class="p">],</span> <span class="n">qini</span><span class="p">])</span>
+
+    <span class="k">return</span> <span class="n">fractions</span><span class="p">,</span> <span class="n">qini</span></div>
+
+
+
+<div class="viewcode-block" id="qini_coefficient">
+<a class="viewcode-back" href="../../api.html#perpetual.causal_metrics.qini_coefficient">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">qini_coefficient</span><span class="p">(</span>
+    <span class="n">y_true</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span>
+    <span class="n">w_true</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span>
+    <span class="n">uplift_score</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Qini coefficient: area between the Qini curve and the random diagonal.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    y_true : array-like of shape (n_samples,)</span>
+<span class="sd">        Observed binary outcome.</span>
+<span class="sd">    w_true : array-like of shape (n_samples,)</span>
+<span class="sd">        Observed binary treatment indicator.</span>
+<span class="sd">    uplift_score : array-like of shape (n_samples,)</span>
+<span class="sd">        Predicted CATE / uplift score.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    float</span>
+<span class="sd">        Qini coefficient value.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">fracs</span><span class="p">,</span> <span class="n">q</span> <span class="o">=</span> <span class="n">qini_curve</span><span class="p">(</span><span class="n">y_true</span><span class="p">,</span> <span class="n">w_true</span><span class="p">,</span> <span class="n">uplift_score</span><span class="p">)</span>
+    <span class="n">model_area</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">trapezoid</span><span class="p">(</span><span class="n">q</span><span class="p">,</span> <span class="n">fracs</span><span class="p">))</span>
+
+    <span class="c1"># Random line: straight from (0, 0) to (1, qini_total)</span>
+    <span class="n">qini_total</span> <span class="o">=</span> <span class="n">q</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+    <span class="n">random_area</span> <span class="o">=</span> <span class="mf">0.5</span> <span class="o">*</span> <span class="n">qini_total</span>
+
+    <span class="k">return</span> <span class="nb">float</span><span class="p">(</span><span class="n">model_area</span> <span class="o">-</span> <span class="n">random_area</span><span class="p">)</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2026, Mutlu Simsek, Serkan Korkmaz, Pieter Pel.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

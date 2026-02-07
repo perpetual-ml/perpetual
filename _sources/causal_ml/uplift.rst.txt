@@ -4,9 +4,13 @@ Uplift Modeling
 
 Uplift modeling, also known as conditional average treatment effect (CATE) estimation, aims to predict the incremental impact of an action (the "treatment") on an individual's behavior.
 
-Unlike standard predictive modeling which predicts the outcome $E[Y|X]$, uplift modeling predicts the difference:
-$$\tau(x) = E[Y | X=x, W=1] - E[Y | X=x, W=0]$$
-where $W$ is the treatment indicator.
+Unlike standard predictive modeling which predicts the outcome :math:`E[Y|X]`, uplift modeling predicts the difference:
+
+.. math::
+
+   \tau(x) = E[Y \mid X=x, W=1] - E[Y \mid X=x, W=0]
+
+where :math:`W` is the treatment indicator.
 
 Perpetual provides several ways to perform uplift modeling.
 
@@ -16,11 +20,15 @@ UpliftBooster (R-Learner)
 The :class:`uplift.UpliftBooster` implements the **R-Learner** (Residual-on-Residual) meta-algorithm. This is a very powerful approach that can handle continuous outcomes and automatically accounts for selection bias if the propensity scores are modeled correctly.
 
 The objective minimized is:
-$$\hat{\tau} = \text{argmin}_{\tau} \sum_{i=1}^n \left( (Y_i - \hat{\mu}(X_i)) - \tau(X_i)(W_i - \hat{p}(X_i)) \right)^2$$
+
+.. math::
+
+   \hat{\tau} = \text{argmin}_{\tau} \sum_{i=1}^n \left( (Y_i - \hat{\mu}(X_i)) - \tau(X_i)(W_i - \hat{p}(X_i)) \right)^2
 
 Where:
-* $\hat{\mu}(X)$ is the estimated outcome (marginal).
-* $\hat{p}(X)$ is the estimated propensity score.
+
+* :math:`\hat{\mu}(X)` is the estimated outcome (marginal).
+* :math:`\hat{p}(X)` is the estimated propensity score.
 
 Example:
 
@@ -46,7 +54,9 @@ model is correctly specified.
 
 The AIPW pseudo-outcome is:
 
-$$\Gamma_i = \hat{\mu}_1(X_i) - \hat{\mu}_0(X_i) + \frac{W_i(Y_i - \hat{\mu}_1(X_i))}{\hat{p}(X_i)} - \frac{(1-W_i)(Y_i - \hat{\mu}_0(X_i))}{1-\hat{p}(X_i)}$$
+.. math::
+
+   \Gamma_i = \hat{\mu}_1(X_i) - \hat{\mu}_0(X_i) + \frac{W_i(Y_i - \hat{\mu}_1(X_i))}{\hat{p}(X_i)} - \frac{(1-W_i)(Y_i - \hat{\mu}_0(X_i))}{1-\hat{p}(X_i)}
 
 Example:
 

@@ -6,22 +6,25 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Uplift Modeling &mdash; Perpetual 1.2.0 documentation</title>
+  <title>Uplift Modeling &mdash; Perpetual 1.3.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="../_static/custom.css?v=9cdd1368" />
 
   
       <script src="../_static/jquery.js?v=5d32c60e"></script>
       <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../_static/documentation_options.js?v=6efca38a"></script>
+      <script src="../_static/documentation_options.js?v=1f29e9d3"></script>
       <script src="../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+      <script>window.MathJax = {"tex": {"inlineMath": [["$", "$"], ["\\(", "\\)"]], "processEscapes": true}, "options": {"ignoreHtmlClass": "tex2jax_ignore|mathjax_ignore|document", "processHtmlClass": "tex2jax_process|mathjax_process|math|output_area"}}</script>
+      <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@4/tex-mml-chtml.js"></script>
     <script src="../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
     <link rel="next" title="Instrumental Variables (BoostIV)" href="iv.html" />
-    <link rel="prev" title="Vertical Solutions" href="index.html" /> 
+    <link rel="prev" title="Causal ML" href="index.html" /> 
 </head>
 
 <body class="wy-body-for-nav"> 
@@ -49,7 +52,7 @@
 <li class="toctree-l1"><a class="reference internal" href="../quickstart.html">Quickstart</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../api.html">API Reference</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../tutorials/index.html">Tutorials</a></li>
-<li class="toctree-l1 current"><a class="reference internal" href="index.html">Vertical Solutions</a><ul class="current">
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Causal ML</a><ul class="current">
 <li class="toctree-l2 current"><a class="current reference internal" href="#">Uplift Modeling</a><ul>
 <li class="toctree-l3"><a class="reference internal" href="#upliftbooster-r-learner">UpliftBooster (R-Learner)</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#dr-learner-doubly-robust">DR-Learner (Doubly Robust)</a></li>
@@ -81,10 +84,10 @@
           <div role="navigation" aria-label="Page navigation">
   <ul class="wy-breadcrumbs">
       <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
-          <li class="breadcrumb-item"><a href="index.html">Vertical Solutions</a></li>
+          <li class="breadcrumb-item"><a href="index.html">Causal ML</a></li>
       <li class="breadcrumb-item active">Uplift Modeling</li>
       <li class="wy-breadcrumbs-aside">
-            <a href="../_sources/verticals/uplift.rst.txt" rel="nofollow"> View page source</a>
+            <a href="../_sources/causal_ml/uplift.rst.txt" rel="nofollow"> View page source</a>
       </li>
   </ul>
   <hr/>
@@ -95,18 +98,22 @@
   <section id="uplift-modeling">
 <h1>Uplift Modeling<a class="headerlink" href="#uplift-modeling" title="Link to this heading"></a></h1>
 <p>Uplift modeling, also known as conditional average treatment effect (CATE) estimation, aims to predict the incremental impact of an action (the “treatment”) on an individual’s behavior.</p>
-<p>Unlike standard predictive modeling which predicts the outcome $E[Y|X]$, uplift modeling predicts the difference:
-$$tau(x) = E[Y | X=x, W=1] - E[Y | X=x, W=0]$$
-where $W$ is the treatment indicator.</p>
+<p>Unlike standard predictive modeling which predicts the outcome <span class="math notranslate nohighlight">\(E[Y|X]\)</span>, uplift modeling predicts the difference:</p>
+<div class="math notranslate nohighlight">
+\[\tau(x) = E[Y \mid X=x, W=1] - E[Y \mid X=x, W=0]\]</div>
+<p>where <span class="math notranslate nohighlight">\(W\)</span> is the treatment indicator.</p>
 <p>Perpetual provides several ways to perform uplift modeling.</p>
 <section id="upliftbooster-r-learner">
 <h2>UpliftBooster (R-Learner)<a class="headerlink" href="#upliftbooster-r-learner" title="Link to this heading"></a></h2>
 <p>The <code class="xref py py-class docutils literal notranslate"><span class="pre">uplift.UpliftBooster</span></code> implements the <strong>R-Learner</strong> (Residual-on-Residual) meta-algorithm. This is a very powerful approach that can handle continuous outcomes and automatically accounts for selection bias if the propensity scores are modeled correctly.</p>
-<p>The objective minimized is:
-$$hat{tau} = text{argmin}_{tau} sum_{i=1}^n left( (Y_i - hat{mu}(X_i)) - tau(X_i)(W_i - hat{p}(X_i)) right)^2$$</p>
-<p>Where:
-* $hat{mu}(X)$ is the estimated outcome (marginal).
-* $hat{p}(X)$ is the estimated propensity score.</p>
+<p>The objective minimized is:</p>
+<div class="math notranslate nohighlight">
+\[\hat{\tau} = \text{argmin}_{\tau} \sum_{i=1}^n \left( (Y_i - \hat{\mu}(X_i)) - \tau(X_i)(W_i - \hat{p}(X_i)) \right)^2\]</div>
+<p>Where:</p>
+<ul class="simple">
+<li><p><span class="math notranslate nohighlight">\(\hat{\mu}(X)\)</span> is the estimated outcome (marginal).</p></li>
+<li><p><span class="math notranslate nohighlight">\(\hat{p}(X)\)</span> is the estimated propensity score.</p></li>
+</ul>
 <p>Example:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">perpetual.uplift</span><span class="w"> </span><span class="kn">import</span> <span class="n">UpliftBooster</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
@@ -127,7 +134,8 @@ propensity weighting to produce a <em>doubly robust</em> estimate of the CATE.  
 estimator is consistent when <em>either</em> the outcome models or the propensity
 model is correctly specified.</p>
 <p>The AIPW pseudo-outcome is:</p>
-<p>$$Gamma_i = hat{mu}_1(X_i) - hat{mu}_0(X_i) + frac{W_i(Y_i - hat{mu}_1(X_i))}{hat{p}(X_i)} - frac{(1-W_i)(Y_i - hat{mu}_0(X_i))}{1-hat{p}(X_i)}$$</p>
+<div class="math notranslate nohighlight">
+\[\Gamma_i = \hat{\mu}_1(X_i) - \hat{\mu}_0(X_i) + \frac{W_i(Y_i - \hat{\mu}_1(X_i))}{\hat{p}(X_i)} - \frac{(1-W_i)(Y_i - \hat{\mu}_0(X_i))}{1-\hat{p}(X_i)}\]</div>
 <p>Example:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">perpetual.meta_learners</span><span class="w"> </span><span class="kn">import</span> <span class="n">DRLearner</span>
 
@@ -181,7 +189,7 @@ exploit randomized treatment assignment:</p>
            </div>
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
-        <a href="index.html" class="btn btn-neutral float-left" title="Vertical Solutions" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="index.html" class="btn btn-neutral float-left" title="Causal ML" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
         <a href="iv.html" class="btn btn-neutral float-right" title="Instrumental Variables (BoostIV)" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 

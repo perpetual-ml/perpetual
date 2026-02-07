@@ -1,0 +1,417 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>perpetual.fairness &mdash; Perpetual 1.3.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="../../_static/custom.css?v=9cdd1368" />
+
+  
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=1f29e9d3"></script>
+      <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+      <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            Perpetual
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../api.html">API Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../tutorials/index.html">Tutorials</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../causal_ml/index.html">Causal ML</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../architecture.html">Architecture</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../parameters_tuning.html">Parameters Tuning</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../faq.html">Frequently Asked Questions</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">Perpetual</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">perpetual.fairness</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for perpetual.fairness</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;Fairness-aware gradient boosting classifier.</span>
+
+<span class="sd">Provides ``FairClassifier``, a wrapper around ``PerpetualBooster`` that adds</span>
+<span class="sd">an in-processing fairness regularization penalty to the log-loss gradient.</span>
+<span class="sd">Two fairness criteria are supported:</span>
+
+<span class="sd">* **Demographic Parity** — penalizes correlation between predictions and a</span>
+<span class="sd">  sensitive attribute :math:`S`.</span>
+<span class="sd">* **Equalized Odds** — penalizes correlation between predictions and</span>
+<span class="sd">  :math:`S` *conditionally* within each class of the true label :math:`Y`.</span>
+
+<span class="sd">The objective is:</span>
+
+<span class="sd">.. math::</span>
+
+<span class="sd">    L = \\text{LogLoss} + \\lambda \\cdot \\text{Penalty}(\\hat{Y}, S)</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Optional</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing_extensions</span><span class="w"> </span><span class="kn">import</span> <span class="n">Self</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">perpetual.booster</span><span class="w"> </span><span class="kn">import</span> <span class="n">PerpetualBooster</span>
+
+<span class="c1"># ---------------------------------------------------------------------------</span>
+<span class="c1"># Custom objective helpers  (mirror Rust FairnessObjective)</span>
+<span class="c1"># ---------------------------------------------------------------------------</span>
+
+<span class="n">_VALID_FAIRNESS_TYPES</span> <span class="o">=</span> <span class="p">(</span><span class="s2">&quot;demographic_parity&quot;</span><span class="p">,</span> <span class="s2">&quot;equalized_odds&quot;</span><span class="p">)</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_fair_loss</span><span class="p">(</span><span class="n">sensitive_attr</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Return a loss callable (standard log-loss; penalty is gradient-only).&quot;&quot;&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">loss</span><span class="p">(</span><span class="n">y</span><span class="p">,</span> <span class="n">yhat</span><span class="p">,</span> <span class="n">sample_weight</span><span class="p">,</span> <span class="n">group</span><span class="p">):</span>
+        <span class="n">y</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">y</span><span class="p">)</span>
+        <span class="n">yhat</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">yhat</span><span class="p">)</span>
+        <span class="n">p</span> <span class="o">=</span> <span class="mf">1.0</span> <span class="o">/</span> <span class="p">(</span><span class="mf">1.0</span> <span class="o">+</span> <span class="n">np</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="o">-</span><span class="n">yhat</span><span class="p">))</span>
+        <span class="n">score</span> <span class="o">=</span> <span class="o">-</span><span class="p">(</span>
+            <span class="n">y</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">maximum</span><span class="p">(</span><span class="n">p</span><span class="p">,</span> <span class="mf">1e-15</span><span class="p">))</span>
+            <span class="o">+</span> <span class="p">(</span><span class="mf">1.0</span> <span class="o">-</span> <span class="n">y</span><span class="p">)</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">maximum</span><span class="p">(</span><span class="mf">1.0</span> <span class="o">-</span> <span class="n">p</span><span class="p">,</span> <span class="mf">1e-15</span><span class="p">))</span>
+        <span class="p">)</span>
+        <span class="k">return</span> <span class="n">score</span><span class="o">.</span><span class="n">tolist</span><span class="p">()</span>
+
+    <span class="k">return</span> <span class="n">loss</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_fair_gradient_dp</span><span class="p">(</span><span class="n">sensitive_attr</span><span class="p">,</span> <span class="n">lam</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Gradient for Demographic Parity fairness.&quot;&quot;&quot;</span>
+    <span class="n">s</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">sensitive_attr</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">gradient</span><span class="p">(</span><span class="n">y</span><span class="p">,</span> <span class="n">yhat</span><span class="p">,</span> <span class="n">sample_weight</span><span class="p">,</span> <span class="n">group</span><span class="p">):</span>
+        <span class="n">y</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">y</span><span class="p">)</span>
+        <span class="n">yhat</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">yhat</span><span class="p">)</span>
+        <span class="n">p</span> <span class="o">=</span> <span class="mf">1.0</span> <span class="o">/</span> <span class="p">(</span><span class="mf">1.0</span> <span class="o">+</span> <span class="n">np</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="o">-</span><span class="n">yhat</span><span class="p">))</span>
+        <span class="n">dp</span> <span class="o">=</span> <span class="n">p</span> <span class="o">*</span> <span class="p">(</span><span class="mf">1.0</span> <span class="o">-</span> <span class="n">p</span><span class="p">)</span>
+
+        <span class="c1"># Group means</span>
+        <span class="n">mask1</span> <span class="o">=</span> <span class="n">s</span> <span class="o">==</span> <span class="mi">1</span>
+        <span class="n">mask0</span> <span class="o">=</span> <span class="o">~</span><span class="n">mask1</span>
+        <span class="n">n1</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">mask1</span><span class="o">.</span><span class="n">sum</span><span class="p">())</span> <span class="ow">or</span> <span class="mf">1.0</span>
+        <span class="n">n0</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">mask0</span><span class="o">.</span><span class="n">sum</span><span class="p">())</span> <span class="ow">or</span> <span class="mf">1.0</span>
+        <span class="n">mean1</span> <span class="o">=</span> <span class="n">p</span><span class="p">[</span><span class="n">mask1</span><span class="p">]</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span> <span class="o">/</span> <span class="n">n1</span>
+        <span class="n">mean0</span> <span class="o">=</span> <span class="n">p</span><span class="p">[</span><span class="n">mask0</span><span class="p">]</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span> <span class="o">/</span> <span class="n">n0</span>
+        <span class="n">diff</span> <span class="o">=</span> <span class="n">mean1</span> <span class="o">-</span> <span class="n">mean0</span>
+
+        <span class="n">grad</span> <span class="o">=</span> <span class="n">p</span> <span class="o">-</span> <span class="n">y</span>  <span class="c1"># standard log-loss gradient</span>
+
+        <span class="c1"># Fairness penalty gradient</span>
+        <span class="n">fair_grad</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span>
+            <span class="n">mask1</span><span class="p">,</span>
+            <span class="mf">2.0</span> <span class="o">*</span> <span class="n">lam</span> <span class="o">*</span> <span class="n">diff</span> <span class="o">*</span> <span class="p">(</span><span class="mf">1.0</span> <span class="o">/</span> <span class="n">n1</span><span class="p">)</span> <span class="o">*</span> <span class="n">dp</span><span class="p">,</span>
+            <span class="mf">2.0</span> <span class="o">*</span> <span class="n">lam</span> <span class="o">*</span> <span class="n">diff</span> <span class="o">*</span> <span class="p">(</span><span class="o">-</span><span class="mf">1.0</span> <span class="o">/</span> <span class="n">n0</span><span class="p">)</span> <span class="o">*</span> <span class="n">dp</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="n">grad</span> <span class="o">=</span> <span class="n">grad</span> <span class="o">+</span> <span class="n">fair_grad</span>
+        <span class="n">hess</span> <span class="o">=</span> <span class="n">dp</span>
+
+        <span class="k">return</span> <span class="n">grad</span><span class="o">.</span><span class="n">tolist</span><span class="p">(),</span> <span class="n">hess</span><span class="o">.</span><span class="n">tolist</span><span class="p">()</span>
+
+    <span class="k">return</span> <span class="n">gradient</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_fair_gradient_eo</span><span class="p">(</span><span class="n">sensitive_attr</span><span class="p">,</span> <span class="n">lam</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Gradient for Equalized Odds fairness.&quot;&quot;&quot;</span>
+    <span class="n">s</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">sensitive_attr</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">gradient</span><span class="p">(</span><span class="n">y</span><span class="p">,</span> <span class="n">yhat</span><span class="p">,</span> <span class="n">sample_weight</span><span class="p">,</span> <span class="n">group</span><span class="p">):</span>
+        <span class="n">y</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">y</span><span class="p">)</span>
+        <span class="n">yhat</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">yhat</span><span class="p">)</span>
+        <span class="n">p</span> <span class="o">=</span> <span class="mf">1.0</span> <span class="o">/</span> <span class="p">(</span><span class="mf">1.0</span> <span class="o">+</span> <span class="n">np</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="o">-</span><span class="n">yhat</span><span class="p">))</span>
+        <span class="n">dp</span> <span class="o">=</span> <span class="n">p</span> <span class="o">*</span> <span class="p">(</span><span class="mf">1.0</span> <span class="o">-</span> <span class="n">p</span><span class="p">)</span>
+        <span class="n">label</span> <span class="o">=</span> <span class="p">(</span><span class="n">y</span> <span class="o">&gt;=</span> <span class="mf">0.5</span><span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">int</span><span class="p">)</span>
+
+        <span class="n">grad</span> <span class="o">=</span> <span class="n">p</span> <span class="o">-</span> <span class="n">y</span>  <span class="c1"># standard log-loss gradient</span>
+        <span class="n">hess</span> <span class="o">=</span> <span class="n">dp</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+
+        <span class="k">for</span> <span class="n">lbl</span> <span class="ow">in</span> <span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">):</span>
+            <span class="n">lbl_mask</span> <span class="o">=</span> <span class="n">label</span> <span class="o">==</span> <span class="n">lbl</span>
+            <span class="n">s1_lbl</span> <span class="o">=</span> <span class="p">(</span><span class="n">s</span> <span class="o">==</span> <span class="mi">1</span><span class="p">)</span> <span class="o">&amp;</span> <span class="n">lbl_mask</span>
+            <span class="n">s0_lbl</span> <span class="o">=</span> <span class="p">(</span><span class="n">s</span> <span class="o">==</span> <span class="mi">0</span><span class="p">)</span> <span class="o">&amp;</span> <span class="n">lbl_mask</span>
+            <span class="n">n1</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">s1_lbl</span><span class="o">.</span><span class="n">sum</span><span class="p">())</span> <span class="ow">or</span> <span class="mf">1.0</span>
+            <span class="n">n0</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">s0_lbl</span><span class="o">.</span><span class="n">sum</span><span class="p">())</span> <span class="ow">or</span> <span class="mf">1.0</span>
+            <span class="n">mean1</span> <span class="o">=</span> <span class="n">p</span><span class="p">[</span><span class="n">s1_lbl</span><span class="p">]</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span> <span class="o">/</span> <span class="n">n1</span> <span class="k">if</span> <span class="n">s1_lbl</span><span class="o">.</span><span class="n">any</span><span class="p">()</span> <span class="k">else</span> <span class="mf">0.0</span>
+            <span class="n">mean0</span> <span class="o">=</span> <span class="n">p</span><span class="p">[</span><span class="n">s0_lbl</span><span class="p">]</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span> <span class="o">/</span> <span class="n">n0</span> <span class="k">if</span> <span class="n">s0_lbl</span><span class="o">.</span><span class="n">any</span><span class="p">()</span> <span class="k">else</span> <span class="mf">0.0</span>
+            <span class="n">diff</span> <span class="o">=</span> <span class="n">mean1</span> <span class="o">-</span> <span class="n">mean0</span>
+
+            <span class="n">fair_grad</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span>
+                <span class="n">s1_lbl</span><span class="p">,</span>
+                <span class="mf">2.0</span> <span class="o">*</span> <span class="n">lam</span> <span class="o">*</span> <span class="n">diff</span> <span class="o">*</span> <span class="p">(</span><span class="mf">1.0</span> <span class="o">/</span> <span class="n">n1</span><span class="p">)</span> <span class="o">*</span> <span class="n">dp</span><span class="p">,</span>
+                <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span>
+                    <span class="n">s0_lbl</span><span class="p">,</span>
+                    <span class="mf">2.0</span> <span class="o">*</span> <span class="n">lam</span> <span class="o">*</span> <span class="n">diff</span> <span class="o">*</span> <span class="p">(</span><span class="o">-</span><span class="mf">1.0</span> <span class="o">/</span> <span class="n">n0</span><span class="p">)</span> <span class="o">*</span> <span class="n">dp</span><span class="p">,</span>
+                    <span class="mf">0.0</span><span class="p">,</span>
+                <span class="p">),</span>
+            <span class="p">)</span>
+            <span class="n">grad</span> <span class="o">=</span> <span class="n">grad</span> <span class="o">+</span> <span class="n">fair_grad</span>
+
+        <span class="k">return</span> <span class="n">grad</span><span class="o">.</span><span class="n">tolist</span><span class="p">(),</span> <span class="n">hess</span><span class="o">.</span><span class="n">tolist</span><span class="p">()</span>
+
+    <span class="k">return</span> <span class="n">gradient</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_fair_initial_value</span><span class="p">():</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Return an initial-value callable.&quot;&quot;&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">initial_value</span><span class="p">(</span><span class="n">y</span><span class="p">,</span> <span class="n">sample_weight</span><span class="p">,</span> <span class="n">group</span><span class="p">):</span>
+        <span class="k">return</span> <span class="mf">0.0</span>
+
+    <span class="k">return</span> <span class="n">initial_value</span>
+
+
+<span class="c1"># ---------------------------------------------------------------------------</span>
+<span class="c1"># FairClassifier</span>
+<span class="c1"># ---------------------------------------------------------------------------</span>
+
+
+<div class="viewcode-block" id="FairClassifier">
+<a class="viewcode-back" href="../../api.html#perpetual.fairness.FairClassifier">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">FairClassifier</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Fairness-aware gradient boosting classifier.</span>
+
+<span class="sd">    Wraps a ``PerpetualBooster`` with an in-processing fairness penalty that</span>
+<span class="sd">    regularizes the log-loss gradient to reduce dependence of predictions on</span>
+<span class="sd">    a sensitive attribute.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    sensitive_feature : int</span>
+<span class="sd">        Column index of the sensitive attribute in *X*.  The column must be</span>
+<span class="sd">        binary (0 or 1).</span>
+<span class="sd">    fairness_type : str, default=&quot;demographic_parity&quot;</span>
+<span class="sd">        Fairness criterion.  One of:</span>
+
+<span class="sd">        - ``&quot;demographic_parity&quot;`` — penalize overall disparity.</span>
+<span class="sd">        - ``&quot;equalized_odds&quot;`` — penalize disparity within each label class.</span>
+<span class="sd">    lam : float, default=1.0</span>
+<span class="sd">        Strength of the fairness penalty (:math:`\\lambda`).</span>
+<span class="sd">    budget : float, default=0.5</span>
+<span class="sd">        Fitting budget forwarded to ``PerpetualBooster``.</span>
+<span class="sd">    **kwargs</span>
+<span class="sd">        Additional keyword arguments forwarded to ``PerpetualBooster``.</span>
+
+<span class="sd">    Attributes</span>
+<span class="sd">    ----------</span>
+<span class="sd">    feature_importances_ : ndarray of shape (n_features,)</span>
+<span class="sd">        Feature importances from the fitted model.</span>
+
+<span class="sd">    Examples</span>
+<span class="sd">    --------</span>
+<span class="sd">    &gt;&gt;&gt; from perpetual.fairness import FairClassifier</span>
+<span class="sd">    &gt;&gt;&gt; import numpy as np</span>
+<span class="sd">    &gt;&gt;&gt; X = np.column_stack([np.random.randn(200, 3),</span>
+<span class="sd">    ...                      np.random.binomial(1, 0.5, 200)])</span>
+<span class="sd">    &gt;&gt;&gt; y = (X[:, 0] &gt; 0).astype(float)</span>
+<span class="sd">    &gt;&gt;&gt; clf = FairClassifier(sensitive_feature=3, lam=2.0)</span>
+<span class="sd">    &gt;&gt;&gt; clf.fit(X, y)  # doctest: +SKIP</span>
+<span class="sd">    &gt;&gt;&gt; probs = clf.predict_proba(X)  # doctest: +SKIP</span>
+
+<span class="sd">    Notes</span>
+<span class="sd">    -----</span>
+<span class="sd">    The fairness penalty is applied only through the gradient; the reported</span>
+<span class="sd">    loss is standard log-loss.  This mirrors the Rust ``FairnessObjective``</span>
+<span class="sd">    implementation.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="FairClassifier.__init__">
+<a class="viewcode-back" href="../../api.html#perpetual.fairness.FairClassifier.__init__">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">sensitive_feature</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+        <span class="n">fairness_type</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;demographic_parity&quot;</span><span class="p">,</span>
+        <span class="n">lam</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1.0</span><span class="p">,</span>
+        <span class="n">budget</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.5</span><span class="p">,</span>
+        <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
+    <span class="p">):</span>
+        <span class="k">if</span> <span class="n">fairness_type</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">_VALID_FAIRNESS_TYPES</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;fairness_type must be one of </span><span class="si">{</span><span class="n">_VALID_FAIRNESS_TYPES</span><span class="si">}</span><span class="s2">, &quot;</span>
+                <span class="sa">f</span><span class="s2">&quot;got </span><span class="si">{</span><span class="n">fairness_type</span><span class="si">!r}</span><span class="s2">.&quot;</span>
+            <span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">sensitive_feature</span> <span class="o">=</span> <span class="n">sensitive_feature</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">fairness_type</span> <span class="o">=</span> <span class="n">fairness_type</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">lam</span> <span class="o">=</span> <span class="n">lam</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">budget</span> <span class="o">=</span> <span class="n">budget</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_kwargs</span> <span class="o">=</span> <span class="n">kwargs</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">feature_importances_</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span></div>
+
+
+<div class="viewcode-block" id="FairClassifier.fit">
+<a class="viewcode-back" href="../../api.html#perpetual.fairness.FairClassifier.fit">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">fit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">X</span><span class="p">,</span> <span class="n">y</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Self</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Fit the fair classifier.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        X : array-like of shape (n_samples, n_features)</span>
+<span class="sd">            Feature matrix.  The column at index ``sensitive_feature`` must</span>
+<span class="sd">            contain binary (0/1) values.</span>
+<span class="sd">        y : array-like of shape (n_samples,)</span>
+<span class="sd">            Binary target variable (0 or 1).</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        self</span>
+<span class="sd">            Fitted estimator.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">X_arr</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">float</span><span class="p">)</span>
+        <span class="n">y_arr</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">y</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">float</span><span class="p">)</span>
+        <span class="n">sensitive_attr</span> <span class="o">=</span> <span class="n">X_arr</span><span class="p">[:,</span> <span class="bp">self</span><span class="o">.</span><span class="n">sensitive_feature</span><span class="p">]</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">int</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">fairness_type</span> <span class="o">==</span> <span class="s2">&quot;demographic_parity&quot;</span><span class="p">:</span>
+            <span class="n">grad_fn</span> <span class="o">=</span> <span class="n">_fair_gradient_dp</span><span class="p">(</span><span class="n">sensitive_attr</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">lam</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">grad_fn</span> <span class="o">=</span> <span class="n">_fair_gradient_eo</span><span class="p">(</span><span class="n">sensitive_attr</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">lam</span><span class="p">)</span>
+
+        <span class="n">objective</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="n">_fair_loss</span><span class="p">(</span><span class="n">sensitive_attr</span><span class="p">),</span>
+            <span class="n">grad_fn</span><span class="p">,</span>
+            <span class="n">_fair_initial_value</span><span class="p">(),</span>
+        <span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_model</span> <span class="o">=</span> <span class="n">PerpetualBooster</span><span class="p">(</span>
+            <span class="n">budget</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">budget</span><span class="p">,</span> <span class="n">objective</span><span class="o">=</span><span class="n">objective</span><span class="p">,</span> <span class="o">**</span><span class="bp">self</span><span class="o">.</span><span class="n">_kwargs</span>
+        <span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_model</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">X_arr</span><span class="p">,</span> <span class="n">y_arr</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">feature_importances_</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_model</span><span class="o">.</span><span class="n">feature_importances_</span>
+        <span class="k">return</span> <span class="bp">self</span></div>
+
+
+<div class="viewcode-block" id="FairClassifier.predict">
+<a class="viewcode-back" href="../../api.html#perpetual.fairness.FairClassifier.predict">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">predict</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">X</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Predict class labels.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        X : array-like of shape (n_samples, n_features)</span>
+<span class="sd">            Feature matrix.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        ndarray of shape (n_samples,)</span>
+<span class="sd">            Predicted class labels (0 or 1).</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">scores</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_model</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="n">X</span><span class="p">)</span>
+        <span class="k">return</span> <span class="p">(</span><span class="n">scores</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">int</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="FairClassifier.predict_proba">
+<a class="viewcode-back" href="../../api.html#perpetual.fairness.FairClassifier.predict_proba">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">predict_proba</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">X</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Predict class probabilities.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        X : array-like of shape (n_samples, n_features)</span>
+<span class="sd">            Feature matrix.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        ndarray of shape (n_samples, 2)</span>
+<span class="sd">            Predicted probabilities for class 0 and class 1.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">scores</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_model</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="n">X</span><span class="p">)</span>
+        <span class="n">p1</span> <span class="o">=</span> <span class="mf">1.0</span> <span class="o">/</span> <span class="p">(</span><span class="mf">1.0</span> <span class="o">+</span> <span class="n">np</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="o">-</span><span class="n">scores</span><span class="p">))</span>
+        <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">column_stack</span><span class="p">([</span><span class="mf">1.0</span> <span class="o">-</span> <span class="n">p1</span><span class="p">,</span> <span class="n">p1</span><span class="p">])</span></div>
+
+
+<div class="viewcode-block" id="FairClassifier.decision_function">
+<a class="viewcode-back" href="../../api.html#perpetual.fairness.FairClassifier.decision_function">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">decision_function</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">X</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return raw log-odds scores.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        X : array-like of shape (n_samples, n_features)</span>
+<span class="sd">            Feature matrix.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        ndarray of shape (n_samples,)</span>
+<span class="sd">            Raw boosted scores (log-odds).</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_model</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="n">X</span><span class="p">)</span></div>
+</div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2026, Mutlu Simsek, Serkan Korkmaz, Pieter Pel.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

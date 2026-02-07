@@ -1,0 +1,350 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Double Machine Learning: Estimating the Gender Wage Gap &mdash; Perpetual 1.3.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="../../_static/nbsphinx-code-cells.css?v=2aa19091" />
+      <link rel="stylesheet" type="text/css" href="../../_static/custom.css?v=9cdd1368" />
+
+  
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=1f29e9d3"></script>
+      <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+      <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+      <script>window.MathJax = {"tex": {"inlineMath": [["$", "$"], ["\\(", "\\)"]], "processEscapes": true}, "options": {"ignoreHtmlClass": "tex2jax_ignore|mathjax_ignore|document", "processHtmlClass": "tex2jax_process|mathjax_process|math|output_area"}}</script>
+      <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@4/tex-mml-chtml.js"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+    <link rel="next" title="Policy Learning: Optimal Treatment Assignment" href="policy_learning.html" />
+    <link rel="prev" title="Instrumental Variables (Boosted IV)" href="iv_causal_effect.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            Perpetual
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../../installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../api.html">API Reference</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../index.html">Tutorials</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../categorical_data.html">Handling Categorical Data</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../toy_datasets.html">Quick Start with Toy Datasets</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../sklearn_interface.html">Scikit-Learn Interface: Classification, Regression &amp; Ranking</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../benchmark.html">Performance Benchmarking</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../custom_objective.html">Custom Objective Tutorial</a></li>
+<li class="toctree-l2"><a class="reference internal" href="uplift_marketing.html">Uplift Modeling and Causal Inference</a></li>
+<li class="toctree-l2"><a class="reference internal" href="iv_causal_effect.html">Instrumental Variables (Boosted IV)</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">Double Machine Learning: Estimating the Gender Wage Gap</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#1.-Load-the-CPS-1985-Wages-Dataset">1. Load the CPS 1985 Wages Dataset</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#2.-Prepare-Features">2. Prepare Features</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#3.-Train/Test-Split">3. Train/Test Split</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#4.-Fit-the-DML-Estimator">4. Fit the DML Estimator</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#5.-Estimate-Heterogeneous-Treatment-Effects">5. Estimate Heterogeneous Treatment Effects</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#6.-Feature-Importance">6. Feature Importance</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#7.-Compare-with-Naive-Estimate">7. Compare with Naive Estimate</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#8.-Subgroup-Analysis">8. Subgroup Analysis</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#Summary">Summary</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#References">References</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="policy_learning.html">Policy Learning: Optimal Treatment Assignment</a></li>
+<li class="toctree-l2"><a class="reference internal" href="risk_compliance.html">Risk, Compliance, and Interpretability</a></li>
+<li class="toctree-l2"><a class="reference internal" href="heterogeneous_treatment_effects.html">Heterogeneous Treatment Effects with Meta-Learners</a></li>
+<li class="toctree-l2"><a class="reference internal" href="fairness_aware_modeling.html">Fairness-Aware Credit Scoring</a></li>
+<li class="toctree-l2"><a class="reference internal" href="fair_classification.html">Fairness-Aware Classification with FairClassifier</a></li>
+<li class="toctree-l2"><a class="reference internal" href="customer_retention_uplift.html">Customer Retention: Uplift Modeling for Churn Prevention</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../causal_ml/index.html">Causal ML</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../architecture.html">Architecture</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../parameters_tuning.html">Parameters Tuning</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../faq.html">Frequently Asked Questions</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">Perpetual</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">Tutorials</a></li>
+      <li class="breadcrumb-item active">Double Machine Learning: Estimating the Gender Wage Gap</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../_sources/tutorials/causal/dml_wage_gap.ipynb.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="Double-Machine-Learning:-Estimating-the-Gender-Wage-Gap">
+<h1>Double Machine Learning: Estimating the Gender Wage Gap<a class="headerlink" href="#Double-Machine-Learning:-Estimating-the-Gender-Wage-Gap" title="Link to this heading"></a></h1>
+<p>Double/Debiased Machine Learning (DML) is a modern causal inference method introduced by Chernozhukov et al. (2018) for estimating treatment effects in the presence of high-dimensional confounders.</p>
+<p>The <strong>partial-linear model</strong> is:</p>
+<div class="math notranslate nohighlight">
+\[Y = \theta(X) \cdot W + g(X) + \epsilon\]</div>
+<p>where <span class="math notranslate nohighlight">\(\theta(X)\)</span> is the heterogeneous treatment effect we want to learn.</p>
+<p>In this tutorial we use the <strong>CPS 1985</strong> wages dataset to estimate the causal effect of gender on wages, controlling for education, experience, and other confounders.</p>
+<p>Perpetual’s <code class="docutils literal notranslate"><span class="pre">DMLEstimator</span></code> handles cross-fitting automatically and uses a custom DML objective (mirroring the Rust <code class="docutils literal notranslate"><span class="pre">DMLObjective</span></code>) for the final effect model.</p>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+</pre></div>
+</div>
+<div class="input_area highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pd</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">perpetual.dml</span><span class="w"> </span><span class="kn">import</span> <span class="n">DMLEstimator</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">sklearn.datasets</span><span class="w"> </span><span class="kn">import</span> <span class="n">fetch_openml</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">sklearn.model_selection</span><span class="w"> </span><span class="kn">import</span> <span class="n">train_test_split</span>
+</pre></div>
+</div>
+</div>
+<section id="1.-Load-the-CPS-1985-Wages-Dataset">
+<h2>1. Load the CPS 1985 Wages Dataset<a class="headerlink" href="#1.-Load-the-CPS-1985-Wages-Dataset" title="Link to this heading"></a></h2>
+<p>The Current Population Survey (CPS) 1985 dataset contains information about workers’ wages, education, experience, and demographics.</p>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+</pre></div>
+</div>
+<div class="input_area highlight-python notranslate"><div class="highlight"><pre><span></span><span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Fetching CPS 1985 Wages dataset...&quot;</span><span class="p">)</span>
+<span class="n">data</span> <span class="o">=</span> <span class="n">fetch_openml</span><span class="p">(</span><span class="n">data_id</span><span class="o">=</span><span class="mi">534</span><span class="p">,</span> <span class="n">as_frame</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">parser</span><span class="o">=</span><span class="s2">&quot;auto&quot;</span><span class="p">)</span>
+<span class="n">df</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">frame</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Shape: </span><span class="si">{</span><span class="n">df</span><span class="o">.</span><span class="n">shape</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="n">df</span><span class="o">.</span><span class="n">head</span><span class="p">()</span>
+</pre></div>
+</div>
+</div>
+</section>
+<section id="2.-Prepare-Features">
+<h2>2. Prepare Features<a class="headerlink" href="#2.-Prepare-Features" title="Link to this heading"></a></h2>
+<p>We encode the treatment (gender) as binary and prepare covariates.</p>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+</pre></div>
+</div>
+<div class="input_area highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Encode categorical variables</span>
+<span class="n">df_encoded</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">get_dummies</span><span class="p">(</span>
+    <span class="n">df</span><span class="p">,</span>
+    <span class="n">columns</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;sex&quot;</span><span class="p">,</span> <span class="s2">&quot;marr&quot;</span><span class="p">,</span> <span class="s2">&quot;union&quot;</span><span class="p">,</span> <span class="s2">&quot;race&quot;</span><span class="p">,</span> <span class="s2">&quot;south&quot;</span><span class="p">,</span> <span class="s2">&quot;smsa&quot;</span><span class="p">,</span> <span class="s2">&quot;sector&quot;</span><span class="p">],</span>
+    <span class="n">drop_first</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="n">dtype</span><span class="o">=</span><span class="nb">float</span><span class="p">,</span>
+<span class="p">)</span>
+
+<span class="c1"># Treatment: being female (1 = female, 0 = male)</span>
+<span class="n">w</span> <span class="o">=</span> <span class="p">(</span>
+    <span class="n">df_encoded</span><span class="p">[</span><span class="s2">&quot;sex_female&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">values</span>
+    <span class="k">if</span> <span class="s2">&quot;sex_female&quot;</span> <span class="ow">in</span> <span class="n">df_encoded</span><span class="o">.</span><span class="n">columns</span>
+    <span class="k">else</span> <span class="p">(</span>
+        <span class="mf">1.0</span> <span class="o">-</span> <span class="n">df_encoded</span><span class="p">[</span><span class="s2">&quot;sex_male&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">values</span>
+        <span class="k">if</span> <span class="s2">&quot;sex_male&quot;</span> <span class="ow">in</span> <span class="n">df_encoded</span><span class="o">.</span><span class="n">columns</span>
+        <span class="k">else</span> <span class="n">df</span><span class="p">[</span><span class="s2">&quot;sex&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">map</span><span class="p">({</span><span class="s2">&quot;female&quot;</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span> <span class="s2">&quot;male&quot;</span><span class="p">:</span> <span class="mi">0</span><span class="p">})</span><span class="o">.</span><span class="n">values</span>
+    <span class="p">)</span>
+<span class="p">)</span>
+
+<span class="c1"># Outcome: log wage (log transform for normality)</span>
+<span class="n">y</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">log1p</span><span class="p">(</span><span class="n">df_encoded</span><span class="p">[</span><span class="s2">&quot;wage&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">values</span><span class="p">)</span>
+
+<span class="c1"># Covariates: everything except wage and the treatment column</span>
+<span class="n">drop_cols</span> <span class="o">=</span> <span class="p">[</span><span class="n">c</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">df_encoded</span><span class="o">.</span><span class="n">columns</span> <span class="k">if</span> <span class="n">c</span> <span class="ow">in</span> <span class="p">[</span><span class="s2">&quot;wage&quot;</span><span class="p">,</span> <span class="s2">&quot;sex_female&quot;</span><span class="p">,</span> <span class="s2">&quot;sex_male&quot;</span><span class="p">]]</span>
+<span class="n">X</span> <span class="o">=</span> <span class="n">df_encoded</span><span class="o">.</span><span class="n">drop</span><span class="p">(</span><span class="n">columns</span><span class="o">=</span><span class="n">drop_cols</span><span class="p">)</span><span class="o">.</span><span class="n">values</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">float</span><span class="p">)</span>
+<span class="n">feature_names</span> <span class="o">=</span> <span class="p">[</span><span class="n">c</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">df_encoded</span><span class="o">.</span><span class="n">columns</span> <span class="k">if</span> <span class="n">c</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">drop_cols</span><span class="p">]</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;X shape: </span><span class="si">{</span><span class="n">X</span><span class="o">.</span><span class="n">shape</span><span class="si">}</span><span class="s2">, Treatment mean: </span><span class="si">{</span><span class="n">w</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</section>
+<section id="3.-Train/Test-Split">
+<h2>3. Train/Test Split<a class="headerlink" href="#3.-Train/Test-Split" title="Link to this heading"></a></h2>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+</pre></div>
+</div>
+<div class="input_area highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">X_train</span><span class="p">,</span> <span class="n">X_test</span><span class="p">,</span> <span class="n">w_train</span><span class="p">,</span> <span class="n">w_test</span><span class="p">,</span> <span class="n">y_train</span><span class="p">,</span> <span class="n">y_test</span> <span class="o">=</span> <span class="n">train_test_split</span><span class="p">(</span>
+    <span class="n">X</span><span class="p">,</span> <span class="n">w</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">test_size</span><span class="o">=</span><span class="mf">0.3</span><span class="p">,</span> <span class="n">random_state</span><span class="o">=</span><span class="mi">42</span>
+<span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Train: </span><span class="si">{</span><span class="n">X_train</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="si">}</span><span class="s2">, Test: </span><span class="si">{</span><span class="n">X_test</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</section>
+<section id="4.-Fit-the-DML-Estimator">
+<h2>4. Fit the DML Estimator<a class="headerlink" href="#4.-Fit-the-DML-Estimator" title="Link to this heading"></a></h2>
+<p>The <code class="docutils literal notranslate"><span class="pre">DMLEstimator</span></code> performs cross-fitting internally:</p>
+<ol class="arabic simple">
+<li><p>Fits an <strong>outcome nuisance</strong> model <span class="math notranslate nohighlight">\(g(X) \approx E[Y|X]\)</span> on each fold.</p></li>
+<li><p>Fits a <strong>treatment nuisance</strong> model <span class="math notranslate nohighlight">\(m(X) \approx E[W|X]\)</span> on each fold.</p></li>
+<li><p>Computes orthogonalized residuals <span class="math notranslate nohighlight">\(\tilde{Y}\)</span> and <span class="math notranslate nohighlight">\(\tilde{W}\)</span>.</p></li>
+<li><p>Fits the <strong>effect model</strong> using a DML-specific custom objective.</p></li>
+</ol>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+</pre></div>
+</div>
+<div class="input_area highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">dml</span> <span class="o">=</span> <span class="n">DMLEstimator</span><span class="p">(</span><span class="n">budget</span><span class="o">=</span><span class="mf">0.5</span><span class="p">,</span> <span class="n">n_folds</span><span class="o">=</span><span class="mi">3</span><span class="p">)</span>
+<span class="n">dml</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">X_train</span><span class="p">,</span> <span class="n">w_train</span><span class="p">,</span> <span class="n">y_train</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;DML model fitted.&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</section>
+<section id="5.-Estimate-Heterogeneous-Treatment-Effects">
+<h2>5. Estimate Heterogeneous Treatment Effects<a class="headerlink" href="#5.-Estimate-Heterogeneous-Treatment-Effects" title="Link to this heading"></a></h2>
+<p>The predicted CATE represents how much the wage (in log scale) changes due to being female, for each individual.</p>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+</pre></div>
+</div>
+<div class="input_area highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">cate_test</span> <span class="o">=</span> <span class="n">dml</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="n">X_test</span><span class="p">)</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Average Treatment Effect (ATE): </span><span class="si">{</span><span class="n">cate_test</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  (in wage terms: </span><span class="si">{</span><span class="n">np</span><span class="o">.</span><span class="n">expm1</span><span class="p">(</span><span class="n">cate_test</span><span class="o">.</span><span class="n">mean</span><span class="p">())</span><span class="si">:</span><span class="s2">.2%</span><span class="si">}</span><span class="s2"> change)&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Median CATE: </span><span class="si">{</span><span class="n">np</span><span class="o">.</span><span class="n">median</span><span class="p">(</span><span class="n">cate_test</span><span class="p">)</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Std of CATE: </span><span class="si">{</span><span class="n">cate_test</span><span class="o">.</span><span class="n">std</span><span class="p">()</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Range: [</span><span class="si">{</span><span class="n">cate_test</span><span class="o">.</span><span class="n">min</span><span class="p">()</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2">, </span><span class="si">{</span><span class="n">cate_test</span><span class="o">.</span><span class="n">max</span><span class="p">()</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2">]&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</section>
+<section id="6.-Feature-Importance">
+<h2>6. Feature Importance<a class="headerlink" href="#6.-Feature-Importance" title="Link to this heading"></a></h2>
+<p>Which features drive heterogeneity in the gender wage gap?</p>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+</pre></div>
+</div>
+<div class="input_area highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">importances</span> <span class="o">=</span> <span class="n">dml</span><span class="o">.</span><span class="n">feature_importances_</span>
+<span class="n">top_k</span> <span class="o">=</span> <span class="mi">10</span>
+<span class="n">top_idx</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">argsort</span><span class="p">(</span><span class="n">importances</span><span class="p">)[::</span><span class="o">-</span><span class="mi">1</span><span class="p">][:</span><span class="n">top_k</span><span class="p">]</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">Top </span><span class="si">{</span><span class="n">top_k</span><span class="si">}</span><span class="s2"> features driving CATE heterogeneity:&quot;</span><span class="p">)</span>
+<span class="k">for</span> <span class="n">rank</span><span class="p">,</span> <span class="n">idx</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">top_idx</span><span class="p">,</span> <span class="mi">1</span><span class="p">):</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  </span><span class="si">{</span><span class="n">rank</span><span class="si">}</span><span class="s2">. </span><span class="si">{</span><span class="n">feature_names</span><span class="p">[</span><span class="n">idx</span><span class="p">]</span><span class="si">:</span><span class="s2">25s</span><span class="si">}</span><span class="s2">  importance=</span><span class="si">{</span><span class="n">importances</span><span class="p">[</span><span class="n">idx</span><span class="p">]</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</section>
+<section id="7.-Compare-with-Naive-Estimate">
+<h2>7. Compare with Naive Estimate<a class="headerlink" href="#7.-Compare-with-Naive-Estimate" title="Link to this heading"></a></h2>
+<p>A naive comparison of means ignores confounders. DML accounts for differences in education, experience, sector, etc.</p>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+</pre></div>
+</div>
+<div class="input_area highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">naive_ate</span> <span class="o">=</span> <span class="n">y_test</span><span class="p">[</span><span class="n">w_test</span> <span class="o">==</span> <span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span> <span class="o">-</span> <span class="n">y_test</span><span class="p">[</span><span class="n">w_test</span> <span class="o">==</span> <span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span>
+<span class="n">dml_ate</span> <span class="o">=</span> <span class="n">cate_test</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Naive ATE (difference in means): </span><span class="si">{</span><span class="n">naive_ate</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;DML ATE (cross-fitted):          </span><span class="si">{</span><span class="n">dml_ate</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">The DML estimate accounts for confounders like education and experience.&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</section>
+<section id="8.-Subgroup-Analysis">
+<h2>8. Subgroup Analysis<a class="headerlink" href="#8.-Subgroup-Analysis" title="Link to this heading"></a></h2>
+<p>Examine how the treatment effect varies across subgroups.</p>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+</pre></div>
+</div>
+<div class="input_area highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Split by median CATE</span>
+<span class="n">median_cate</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">median</span><span class="p">(</span><span class="n">cate_test</span><span class="p">)</span>
+<span class="n">high_effect</span> <span class="o">=</span> <span class="n">cate_test</span> <span class="o">&gt;=</span> <span class="n">median_cate</span>
+<span class="n">low_effect</span> <span class="o">=</span> <span class="n">cate_test</span> <span class="o">&lt;</span> <span class="n">median_cate</span>
+
+<span class="nb">print</span><span class="p">(</span>
+    <span class="sa">f</span><span class="s2">&quot;Subgroup with higher wage gap:  mean CATE = </span><span class="si">{</span><span class="n">cate_test</span><span class="p">[</span><span class="n">high_effect</span><span class="p">]</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2">&quot;</span>
+<span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Subgroup with lower wage gap:   mean CATE = </span><span class="si">{</span><span class="n">cate_test</span><span class="p">[</span><span class="n">low_effect</span><span class="p">]</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</section>
+<section id="Summary">
+<h2>Summary<a class="headerlink" href="#Summary" title="Link to this heading"></a></h2>
+<p>In this tutorial we:</p>
+<ol class="arabic simple">
+<li><p>Used <strong>DMLEstimator</strong> with real-world CPS wage data.</p></li>
+<li><p>Estimated the <strong>heterogeneous causal effect</strong> of gender on wages.</p></li>
+<li><p>Leveraged cross-fitting to avoid overfitting nuisance models.</p></li>
+<li><p>Identified which features drive <strong>variation</strong> in the wage gap.</p></li>
+<li><p>Compared the DML estimate with a naive difference-in-means.</p></li>
+</ol>
+<section id="References">
+<h3>References<a class="headerlink" href="#References" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p>Chernozhukov, V. et al. (2018). <em>Double/Debiased Machine Learning for Treatment and Structural Parameters</em>. The Econometrics Journal, 21(1).</p></li>
+</ul>
+</section>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="iv_causal_effect.html" class="btn btn-neutral float-left" title="Instrumental Variables (Boosted IV)" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="policy_learning.html" class="btn btn-neutral float-right" title="Policy Learning: Optimal Treatment Assignment" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2026, Mutlu Simsek, Serkan Korkmaz, Pieter Pel.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

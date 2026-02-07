@@ -5,14 +5,15 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>perpetual.meta_learners &mdash; Perpetual 1.2.0 documentation</title>
+  <title>perpetual.meta_learners &mdash; Perpetual 1.3.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="../../_static/custom.css?v=9cdd1368" />
 
   
       <script src="../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../_static/documentation_options.js?v=6efca38a"></script>
+      <script src="../../_static/documentation_options.js?v=1f29e9d3"></script>
       <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
@@ -46,7 +47,7 @@
 <li class="toctree-l1"><a class="reference internal" href="../../quickstart.html">Quickstart</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../api.html">API Reference</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../tutorials/index.html">Tutorials</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../verticals/index.html">Vertical Solutions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../causal_ml/index.html">Causal ML</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../architecture.html">Architecture</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../parameters_tuning.html">Parameters Tuning</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../faq.html">Frequently Asked Questions</a></li>
@@ -429,6 +430,8 @@
 <span class="c1"># ---------------------------------------------------------------------------</span>
 
 
+<div class="viewcode-block" id="DRLearner">
+<a class="viewcode-back" href="../../api.html#perpetual.meta_learners.DRLearner">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">DRLearner</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Doubly Robust (DR) Learner for heterogeneous treatment effect estimation.</span>
 
@@ -468,6 +471,8 @@
 <span class="sd">        Additional keyword arguments forwarded to `PerpetualBooster`.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
+<div class="viewcode-block" id="DRLearner.__init__">
+<a class="viewcode-back" href="../../api.html#perpetual.meta_learners.DRLearner.__init__">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">budget</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.5</span><span class="p">,</span>
@@ -486,8 +491,11 @@
             <span class="n">budget</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">propensity_budget</span><span class="p">,</span> <span class="n">objective</span><span class="o">=</span><span class="s2">&quot;LogLoss&quot;</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span>
         <span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">effect</span> <span class="o">=</span> <span class="n">PerpetualBooster</span><span class="p">(</span><span class="n">budget</span><span class="o">=</span><span class="n">budget</span><span class="p">,</span> <span class="n">objective</span><span class="o">=</span><span class="s2">&quot;SquaredLoss&quot;</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">feature_importances_</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">feature_importances_</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span></div>
 
+
+<div class="viewcode-block" id="DRLearner.fit">
+<a class="viewcode-back" href="../../api.html#perpetual.meta_learners.DRLearner.fit">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">fit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">X</span><span class="p">,</span> <span class="n">w</span><span class="p">,</span> <span class="n">y</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Self</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Fit the DR-Learner.</span>
 
@@ -534,8 +542,11 @@
         <span class="c1"># Stage 4: Final effect model.</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">effect</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">X_arr</span><span class="p">,</span> <span class="n">gamma</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">feature_importances_</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">effect</span><span class="o">.</span><span class="n">feature_importances_</span>
-        <span class="k">return</span> <span class="bp">self</span>
+        <span class="k">return</span> <span class="bp">self</span></div>
 
+
+<div class="viewcode-block" id="DRLearner.predict">
+<a class="viewcode-back" href="../../api.html#perpetual.meta_learners.DRLearner.predict">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">predict</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">X</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Predict CATE.</span>
 
@@ -549,7 +560,9 @@
 <span class="sd">        ndarray of shape (n_samples,)</span>
 <span class="sd">            Estimated treatment effect for each sample.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
-        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">effect</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="n">X</span><span class="p">)</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">effect</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="n">X</span><span class="p">)</span></div>
+</div>
+
 </pre></div>
 
            </div>

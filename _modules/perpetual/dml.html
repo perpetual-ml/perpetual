@@ -1,0 +1,350 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>perpetual.dml &mdash; Perpetual 1.3.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="../../_static/custom.css?v=9cdd1368" />
+
+  
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=1f29e9d3"></script>
+      <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+      <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            Perpetual
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../api.html">API Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../tutorials/index.html">Tutorials</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../causal_ml/index.html">Causal ML</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../architecture.html">Architecture</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../parameters_tuning.html">Parameters Tuning</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../faq.html">Frequently Asked Questions</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">Perpetual</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">perpetual.dml</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for perpetual.dml</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;Double / Debiased Machine Learning (DML) estimator.</span>
+
+<span class="sd">Implements the Chernozhukov et al. (2018) partial-linear model for</span>
+<span class="sd">heterogeneous treatment effect estimation using cross-fitting and</span>
+<span class="sd">Perpetual&#39;s self-generalizing gradient boosting.</span>
+
+<span class="sd">Partial-linear model</span>
+<span class="sd">--------------------</span>
+
+<span class="sd">.. math::</span>
+
+<span class="sd">    Y = \\theta(X) \\cdot W + g(X) + \\epsilon</span>
+
+<span class="sd">where :math:`\\theta(X)` is the heterogeneous treatment effect.</span>
+
+<span class="sd">The DML approach orthogonalizes both the treatment and outcome:</span>
+
+<span class="sd">.. math::</span>
+
+<span class="sd">    \\tilde{Y} = Y - \\hat{g}(X), \\quad \\tilde{W} = W - \\hat{m}(X)</span>
+
+<span class="sd">and the effect model minimizes the R-Learner / DML objective:</span>
+
+<span class="sd">.. math::</span>
+
+<span class="sd">    L = \\bigl(\\tilde{Y} - \\theta(X) \\cdot \\tilde{W}\\bigr)^2</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Optional</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing_extensions</span><span class="w"> </span><span class="kn">import</span> <span class="n">Self</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">perpetual.booster</span><span class="w"> </span><span class="kn">import</span> <span class="n">PerpetualBooster</span>
+
+<span class="c1"># ---------------------------------------------------------------------------</span>
+<span class="c1"># Custom objective helpers  (mirror Rust DMLObjective)</span>
+<span class="c1"># ---------------------------------------------------------------------------</span>
+
+<span class="n">_HESSIAN_FLOOR</span> <span class="o">=</span> <span class="mf">1e-6</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_dml_loss</span><span class="p">(</span><span class="n">y_residual</span><span class="p">,</span> <span class="n">w_residual</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Return a loss callable for the DML objective.&quot;&quot;&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">loss</span><span class="p">(</span><span class="n">y</span><span class="p">,</span> <span class="n">yhat</span><span class="p">,</span> <span class="n">sample_weight</span><span class="p">,</span> <span class="n">group</span><span class="p">):</span>
+        <span class="n">diff</span> <span class="o">=</span> <span class="n">y_residual</span> <span class="o">-</span> <span class="n">yhat</span> <span class="o">*</span> <span class="n">w_residual</span>
+        <span class="k">return</span> <span class="p">(</span><span class="n">diff</span> <span class="o">*</span> <span class="n">diff</span><span class="p">)</span><span class="o">.</span><span class="n">tolist</span><span class="p">()</span>
+
+    <span class="k">return</span> <span class="n">loss</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_dml_gradient</span><span class="p">(</span><span class="n">y_residual</span><span class="p">,</span> <span class="n">w_residual</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Return a gradient callable for the DML objective.&quot;&quot;&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">gradient</span><span class="p">(</span><span class="n">y</span><span class="p">,</span> <span class="n">yhat</span><span class="p">,</span> <span class="n">sample_weight</span><span class="p">,</span> <span class="n">group</span><span class="p">):</span>
+        <span class="c1"># g = -w_res * y_res + theta * w_res^2</span>
+        <span class="n">grad</span> <span class="o">=</span> <span class="o">-</span><span class="n">w_residual</span> <span class="o">*</span> <span class="n">y_residual</span> <span class="o">+</span> <span class="n">yhat</span> <span class="o">*</span> <span class="n">w_residual</span> <span class="o">*</span> <span class="n">w_residual</span>
+        <span class="n">hess</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">maximum</span><span class="p">(</span><span class="n">w_residual</span> <span class="o">*</span> <span class="n">w_residual</span><span class="p">,</span> <span class="n">_HESSIAN_FLOOR</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">grad</span><span class="o">.</span><span class="n">tolist</span><span class="p">(),</span> <span class="n">hess</span><span class="o">.</span><span class="n">tolist</span><span class="p">()</span>
+
+    <span class="k">return</span> <span class="n">gradient</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_dml_initial_value</span><span class="p">(</span><span class="n">y_residual</span><span class="p">,</span> <span class="n">w_residual</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Return an initial-value callable for the DML objective.&quot;&quot;&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">initial_value</span><span class="p">(</span><span class="n">y</span><span class="p">,</span> <span class="n">sample_weight</span><span class="p">,</span> <span class="n">group</span><span class="p">):</span>
+        <span class="n">num</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">y_residual</span> <span class="o">*</span> <span class="n">w_residual</span><span class="p">))</span>
+        <span class="n">den</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">w_residual</span> <span class="o">*</span> <span class="n">w_residual</span><span class="p">))</span>
+        <span class="k">if</span> <span class="nb">abs</span><span class="p">(</span><span class="n">den</span><span class="p">)</span> <span class="o">&lt;</span> <span class="n">_HESSIAN_FLOOR</span><span class="p">:</span>
+            <span class="k">return</span> <span class="mf">0.0</span>
+        <span class="k">return</span> <span class="n">num</span> <span class="o">/</span> <span class="n">den</span>
+
+    <span class="k">return</span> <span class="n">initial_value</span>
+
+
+<span class="c1"># ---------------------------------------------------------------------------</span>
+<span class="c1"># DMLEstimator</span>
+<span class="c1"># ---------------------------------------------------------------------------</span>
+
+
+<div class="viewcode-block" id="DMLEstimator">
+<a class="viewcode-back" href="../../api.html#perpetual.dml.DMLEstimator">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">DMLEstimator</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Double Machine Learning (DML) estimator for heterogeneous treatment effects.</span>
+
+<span class="sd">    Uses three gradient boosting stages with K-fold cross-fitting to learn</span>
+<span class="sd">    :math:`\\theta(X)` — the Conditional Average Treatment Effect (CATE).</span>
+
+<span class="sd">    Stages</span>
+<span class="sd">    ------</span>
+<span class="sd">    1. **Outcome nuisance** — fit :math:`g(X) \\approx E[Y|X]` via cross-fitting.</span>
+<span class="sd">    2. **Treatment nuisance** — fit :math:`m(X) \\approx E[W|X]` via cross-fitting.</span>
+<span class="sd">    3. **Effect model** — regress :math:`\\tilde{Y}` on :math:`X` using a</span>
+<span class="sd">       custom DML objective weighted by :math:`\\tilde{W}`.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    budget : float, default=0.5</span>
+<span class="sd">        Fitting budget forwarded to each internal ``PerpetualBooster``.</span>
+<span class="sd">    n_folds : int, default=2</span>
+<span class="sd">        Number of cross-fitting folds (must be &gt;= 2).</span>
+<span class="sd">    clip : float, default=0.01</span>
+<span class="sd">        Treatment residuals are clipped to ``[-1/clip, 1/clip]`` range to</span>
+<span class="sd">        avoid extreme weights.</span>
+<span class="sd">    **kwargs</span>
+<span class="sd">        Additional keyword arguments forwarded to ``PerpetualBooster``.</span>
+
+<span class="sd">    Attributes</span>
+<span class="sd">    ----------</span>
+<span class="sd">    feature_importances_ : ndarray of shape (n_features,)</span>
+<span class="sd">        Feature importances from the final effect model.</span>
+
+<span class="sd">    Examples</span>
+<span class="sd">    --------</span>
+<span class="sd">    &gt;&gt;&gt; from perpetual.dml import DMLEstimator</span>
+<span class="sd">    &gt;&gt;&gt; import numpy as np</span>
+<span class="sd">    &gt;&gt;&gt; X = np.random.randn(500, 5)</span>
+<span class="sd">    &gt;&gt;&gt; w = np.random.binomial(1, 0.5, 500).astype(float)</span>
+<span class="sd">    &gt;&gt;&gt; y = X[:, 0] * w + np.random.randn(500) * 0.5</span>
+<span class="sd">    &gt;&gt;&gt; dml = DMLEstimator(budget=0.3, n_folds=2)</span>
+<span class="sd">    &gt;&gt;&gt; dml.fit(X, w, y)  # doctest: +SKIP</span>
+<span class="sd">    &gt;&gt;&gt; cate = dml.predict(X)  # doctest: +SKIP</span>
+
+<span class="sd">    References</span>
+<span class="sd">    ----------</span>
+<span class="sd">    Chernozhukov, V., Chetverikov, D., Demirer, M., Duflo, E., Hansen, C.,</span>
+<span class="sd">    Newey, W., &amp; Robins, J. (2018). *Double/debiased machine learning for</span>
+<span class="sd">    treatment and structural parameters*. The Econometrics Journal, 21(1).</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="DMLEstimator.__init__">
+<a class="viewcode-back" href="../../api.html#perpetual.dml.DMLEstimator.__init__">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">budget</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.5</span><span class="p">,</span>
+        <span class="n">n_folds</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">2</span><span class="p">,</span>
+        <span class="n">clip</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.01</span><span class="p">,</span>
+        <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
+    <span class="p">):</span>
+        <span class="k">if</span> <span class="n">n_folds</span> <span class="o">&lt;</span> <span class="mi">2</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;n_folds must be &gt;= 2.&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">budget</span> <span class="o">=</span> <span class="n">budget</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">n_folds</span> <span class="o">=</span> <span class="n">n_folds</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">clip</span> <span class="o">=</span> <span class="n">clip</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_kwargs</span> <span class="o">=</span> <span class="n">kwargs</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">feature_importances_</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span></div>
+
+
+<div class="viewcode-block" id="DMLEstimator.fit">
+<a class="viewcode-back" href="../../api.html#perpetual.dml.DMLEstimator.fit">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">fit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">X</span><span class="p">,</span> <span class="n">w</span><span class="p">,</span> <span class="n">y</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Self</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Fit the DML estimator with cross-fitting.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        X : array-like of shape (n_samples, n_features)</span>
+<span class="sd">            Covariate matrix.</span>
+<span class="sd">        w : array-like of shape (n_samples,)</span>
+<span class="sd">            Treatment variable (continuous or binary).</span>
+<span class="sd">        y : array-like of shape (n_samples,)</span>
+<span class="sd">            Outcome variable.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        self</span>
+<span class="sd">            Fitted estimator.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">X_arr</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">float</span><span class="p">)</span>
+        <span class="n">w_arr</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">w</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">float</span><span class="p">)</span>
+        <span class="n">y_arr</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">y</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">float</span><span class="p">)</span>
+        <span class="n">n</span> <span class="o">=</span> <span class="n">X_arr</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+
+        <span class="c1"># ---- Cross-fitted residuals ----</span>
+        <span class="n">y_residual</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">n</span><span class="p">)</span>
+        <span class="n">w_residual</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">n</span><span class="p">)</span>
+
+        <span class="n">indices</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="n">n</span><span class="p">)</span>
+        <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">shuffle</span><span class="p">(</span><span class="n">indices</span><span class="p">)</span>
+        <span class="n">folds</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array_split</span><span class="p">(</span><span class="n">indices</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">n_folds</span><span class="p">)</span>
+
+        <span class="k">for</span> <span class="n">fold_idx</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">n_folds</span><span class="p">):</span>
+            <span class="n">test_idx</span> <span class="o">=</span> <span class="n">folds</span><span class="p">[</span><span class="n">fold_idx</span><span class="p">]</span>
+            <span class="n">train_idx</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">concatenate</span><span class="p">(</span>
+                <span class="p">[</span><span class="n">folds</span><span class="p">[</span><span class="n">j</span><span class="p">]</span> <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">n_folds</span><span class="p">)</span> <span class="k">if</span> <span class="n">j</span> <span class="o">!=</span> <span class="n">fold_idx</span><span class="p">]</span>
+            <span class="p">)</span>
+
+            <span class="c1"># Outcome nuisance g(X) = E[Y|X]</span>
+            <span class="n">g_model</span> <span class="o">=</span> <span class="n">PerpetualBooster</span><span class="p">(</span>
+                <span class="n">budget</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">budget</span><span class="p">,</span> <span class="n">objective</span><span class="o">=</span><span class="s2">&quot;SquaredLoss&quot;</span><span class="p">,</span> <span class="o">**</span><span class="bp">self</span><span class="o">.</span><span class="n">_kwargs</span>
+            <span class="p">)</span>
+            <span class="n">g_model</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">X_arr</span><span class="p">[</span><span class="n">train_idx</span><span class="p">],</span> <span class="n">y_arr</span><span class="p">[</span><span class="n">train_idx</span><span class="p">])</span>
+            <span class="n">y_residual</span><span class="p">[</span><span class="n">test_idx</span><span class="p">]</span> <span class="o">=</span> <span class="n">y_arr</span><span class="p">[</span><span class="n">test_idx</span><span class="p">]</span> <span class="o">-</span> <span class="n">g_model</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="n">X_arr</span><span class="p">[</span><span class="n">test_idx</span><span class="p">])</span>
+
+            <span class="c1"># Treatment nuisance m(X) = E[W|X]</span>
+            <span class="n">m_model</span> <span class="o">=</span> <span class="n">PerpetualBooster</span><span class="p">(</span>
+                <span class="n">budget</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">budget</span><span class="p">,</span> <span class="n">objective</span><span class="o">=</span><span class="s2">&quot;SquaredLoss&quot;</span><span class="p">,</span> <span class="o">**</span><span class="bp">self</span><span class="o">.</span><span class="n">_kwargs</span>
+            <span class="p">)</span>
+            <span class="n">m_model</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">X_arr</span><span class="p">[</span><span class="n">train_idx</span><span class="p">],</span> <span class="n">w_arr</span><span class="p">[</span><span class="n">train_idx</span><span class="p">])</span>
+            <span class="n">w_residual</span><span class="p">[</span><span class="n">test_idx</span><span class="p">]</span> <span class="o">=</span> <span class="n">w_arr</span><span class="p">[</span><span class="n">test_idx</span><span class="p">]</span> <span class="o">-</span> <span class="n">m_model</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="n">X_arr</span><span class="p">[</span><span class="n">test_idx</span><span class="p">])</span>
+
+        <span class="c1"># Clip treatment residuals for numerical stability.</span>
+        <span class="n">w_residual</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">clip</span><span class="p">(</span><span class="n">w_residual</span><span class="p">,</span> <span class="o">-</span><span class="mf">1.0</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">clip</span><span class="p">,</span> <span class="mf">1.0</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">clip</span><span class="p">)</span>
+
+        <span class="c1"># ---- Effect model with DML objective ----</span>
+        <span class="n">objective</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="n">_dml_loss</span><span class="p">(</span><span class="n">y_residual</span><span class="p">,</span> <span class="n">w_residual</span><span class="p">),</span>
+            <span class="n">_dml_gradient</span><span class="p">(</span><span class="n">y_residual</span><span class="p">,</span> <span class="n">w_residual</span><span class="p">),</span>
+            <span class="n">_dml_initial_value</span><span class="p">(</span><span class="n">y_residual</span><span class="p">,</span> <span class="n">w_residual</span><span class="p">),</span>
+        <span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_effect_model</span> <span class="o">=</span> <span class="n">PerpetualBooster</span><span class="p">(</span>
+            <span class="n">budget</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">budget</span><span class="p">,</span> <span class="n">objective</span><span class="o">=</span><span class="n">objective</span><span class="p">,</span> <span class="o">**</span><span class="bp">self</span><span class="o">.</span><span class="n">_kwargs</span>
+        <span class="p">)</span>
+        <span class="c1"># The &quot;y&quot; passed to the booster is unused by the custom objective;</span>
+        <span class="c1"># pass y_residual as a placeholder.</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_effect_model</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">X_arr</span><span class="p">,</span> <span class="n">y_residual</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">feature_importances_</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_effect_model</span><span class="o">.</span><span class="n">feature_importances_</span>
+        <span class="k">return</span> <span class="bp">self</span></div>
+
+
+<div class="viewcode-block" id="DMLEstimator.predict">
+<a class="viewcode-back" href="../../api.html#perpetual.dml.DMLEstimator.predict">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">predict</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">X</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Predict CATE (heterogeneous treatment effect).</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        X : array-like of shape (n_samples, n_features)</span>
+<span class="sd">            Covariate matrix.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        ndarray of shape (n_samples,)</span>
+<span class="sd">            Estimated :math:`\\theta(X)` for each sample.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_effect_model</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="n">X</span><span class="p">)</span></div>
+</div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2026, Mutlu Simsek, Serkan Korkmaz, Pieter Pel.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

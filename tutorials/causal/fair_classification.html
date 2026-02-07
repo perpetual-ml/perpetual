@@ -1,0 +1,387 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Fairness-Aware Classification with FairClassifier &mdash; Perpetual 1.3.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="../../_static/nbsphinx-code-cells.css?v=2aa19091" />
+      <link rel="stylesheet" type="text/css" href="../../_static/custom.css?v=9cdd1368" />
+
+  
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=1f29e9d3"></script>
+      <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+      <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+      <script>window.MathJax = {"tex": {"inlineMath": [["$", "$"], ["\\(", "\\)"]], "processEscapes": true}, "options": {"ignoreHtmlClass": "tex2jax_ignore|mathjax_ignore|document", "processHtmlClass": "tex2jax_process|mathjax_process|math|output_area"}}</script>
+      <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@4/tex-mml-chtml.js"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+    <link rel="next" title="Customer Retention: Uplift Modeling for Churn Prevention" href="customer_retention_uplift.html" />
+    <link rel="prev" title="Fairness-Aware Credit Scoring" href="fairness_aware_modeling.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            Perpetual
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../../installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../api.html">API Reference</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../index.html">Tutorials</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../categorical_data.html">Handling Categorical Data</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../toy_datasets.html">Quick Start with Toy Datasets</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../sklearn_interface.html">Scikit-Learn Interface: Classification, Regression &amp; Ranking</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../benchmark.html">Performance Benchmarking</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../custom_objective.html">Custom Objective Tutorial</a></li>
+<li class="toctree-l2"><a class="reference internal" href="uplift_marketing.html">Uplift Modeling and Causal Inference</a></li>
+<li class="toctree-l2"><a class="reference internal" href="iv_causal_effect.html">Instrumental Variables (Boosted IV)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="dml_wage_gap.html">Double Machine Learning: Estimating the Gender Wage Gap</a></li>
+<li class="toctree-l2"><a class="reference internal" href="policy_learning.html">Policy Learning: Optimal Treatment Assignment</a></li>
+<li class="toctree-l2"><a class="reference internal" href="risk_compliance.html">Risk, Compliance, and Interpretability</a></li>
+<li class="toctree-l2"><a class="reference internal" href="heterogeneous_treatment_effects.html">Heterogeneous Treatment Effects with Meta-Learners</a></li>
+<li class="toctree-l2"><a class="reference internal" href="fairness_aware_modeling.html">Fairness-Aware Credit Scoring</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">Fairness-Aware Classification with FairClassifier</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#1.-Load-the-Adult-Census-Dataset">1. Load the Adult Census Dataset</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#2.-Prepare-Features">2. Prepare Features</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#3.-Baseline:-Unconstrained-Model">3. Baseline: Unconstrained Model</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#4.-Fair-Model:-Demographic-Parity">4. Fair Model: Demographic Parity</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#5.-Fair-Model:-Equalized-Odds">5. Fair Model: Equalized Odds</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#6.-Compare-All-Models">6. Compare All Models</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#7.-Tuning-the-Fairness-Penalty">7. Tuning the Fairness Penalty</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#Summary">Summary</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="customer_retention_uplift.html">Customer Retention: Uplift Modeling for Churn Prevention</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../causal_ml/index.html">Causal ML</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../architecture.html">Architecture</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../parameters_tuning.html">Parameters Tuning</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../faq.html">Frequently Asked Questions</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">Perpetual</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">Tutorials</a></li>
+      <li class="breadcrumb-item active">Fairness-Aware Classification with FairClassifier</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../_sources/tutorials/causal/fair_classification.ipynb.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="Fairness-Aware-Classification-with-FairClassifier">
+<h1>Fairness-Aware Classification with FairClassifier<a class="headerlink" href="#Fairness-Aware-Classification-with-FairClassifier" title="Link to this heading"></a></h1>
+<p>Machine learning models deployed in high-stakes domains (lending, hiring, criminal justice) can inadvertently discriminate against protected groups.</p>
+<p>Perpetual’s <code class="docutils literal notranslate"><span class="pre">FairClassifier</span></code> adds an <strong>in-processing</strong> fairness penalty to the log-loss gradient, directly reducing disparity during training rather than as a post-hoc correction.</p>
+<p>Two criteria are supported:</p>
+<ul class="simple">
+<li><p><strong>Demographic Parity</strong>: <span class="math notranslate nohighlight">\(P(\hat{Y}=1|S=0) \approx P(\hat{Y}=1|S=1)\)</span></p></li>
+<li><p><strong>Equalized Odds</strong>: equal true-positive and false-positive rates across groups.</p></li>
+</ul>
+<p>In this tutorial we use the <strong>Adult Census Income</strong> dataset to build a fair income predictor that mitigates gender bias.</p>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+</pre></div>
+</div>
+<div class="input_area highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pd</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">perpetual</span><span class="w"> </span><span class="kn">import</span> <span class="n">PerpetualBooster</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">perpetual.fairness</span><span class="w"> </span><span class="kn">import</span> <span class="n">FairClassifier</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">sklearn.datasets</span><span class="w"> </span><span class="kn">import</span> <span class="n">fetch_openml</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">sklearn.metrics</span><span class="w"> </span><span class="kn">import</span> <span class="n">accuracy_score</span><span class="p">,</span> <span class="n">roc_auc_score</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">sklearn.model_selection</span><span class="w"> </span><span class="kn">import</span> <span class="n">train_test_split</span>
+</pre></div>
+</div>
+</div>
+<section id="1.-Load-the-Adult-Census-Dataset">
+<h2>1. Load the Adult Census Dataset<a class="headerlink" href="#1.-Load-the-Adult-Census-Dataset" title="Link to this heading"></a></h2>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+</pre></div>
+</div>
+<div class="input_area highlight-python notranslate"><div class="highlight"><pre><span></span><span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Fetching Adult Census Income dataset...&quot;</span><span class="p">)</span>
+<span class="n">data</span> <span class="o">=</span> <span class="n">fetch_openml</span><span class="p">(</span><span class="n">data_id</span><span class="o">=</span><span class="mi">1590</span><span class="p">,</span> <span class="n">as_frame</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">parser</span><span class="o">=</span><span class="s2">&quot;auto&quot;</span><span class="p">)</span>
+<span class="n">df</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">frame</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Shape: </span><span class="si">{</span><span class="n">df</span><span class="o">.</span><span class="n">shape</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="n">df</span><span class="o">.</span><span class="n">head</span><span class="p">()</span>
+</pre></div>
+</div>
+</div>
+</section>
+<section id="2.-Prepare-Features">
+<h2>2. Prepare Features<a class="headerlink" href="#2.-Prepare-Features" title="Link to this heading"></a></h2>
+<p>We encode sex as the sensitive attribute and prepare the feature matrix.</p>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+</pre></div>
+</div>
+<div class="input_area highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Target: income &gt;50K</span>
+<span class="n">y</span> <span class="o">=</span> <span class="p">(</span><span class="n">df</span><span class="p">[</span><span class="s2">&quot;class&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">str</span><span class="p">)</span><span class="o">.</span><span class="n">str</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span><span class="o">.</span><span class="n">str</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;&gt;50K&quot;</span><span class="p">))</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">float</span><span class="p">)</span><span class="o">.</span><span class="n">values</span>
+
+<span class="c1"># Encode categoricals</span>
+<span class="n">cat_cols</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">select_dtypes</span><span class="p">(</span><span class="n">include</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;category&quot;</span><span class="p">,</span> <span class="s2">&quot;object&quot;</span><span class="p">])</span><span class="o">.</span><span class="n">columns</span><span class="o">.</span><span class="n">tolist</span><span class="p">()</span>
+<span class="n">cat_cols</span> <span class="o">=</span> <span class="p">[</span><span class="n">c</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">cat_cols</span> <span class="k">if</span> <span class="n">c</span> <span class="o">!=</span> <span class="s2">&quot;class&quot;</span><span class="p">]</span>
+<span class="n">df_encoded</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">get_dummies</span><span class="p">(</span>
+    <span class="n">df</span><span class="o">.</span><span class="n">drop</span><span class="p">(</span><span class="n">columns</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;class&quot;</span><span class="p">]),</span> <span class="n">columns</span><span class="o">=</span><span class="n">cat_cols</span><span class="p">,</span> <span class="n">drop_first</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">float</span>
+<span class="p">)</span>
+
+<span class="c1"># Identify the sensitive feature column index (sex_Male)</span>
+<span class="n">sex_col</span> <span class="o">=</span> <span class="p">[</span>
+    <span class="n">c</span>
+    <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">df_encoded</span><span class="o">.</span><span class="n">columns</span>
+    <span class="k">if</span> <span class="s2">&quot;sex&quot;</span> <span class="ow">in</span> <span class="n">c</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span> <span class="ow">and</span> <span class="p">(</span><span class="s2">&quot;male&quot;</span> <span class="ow">in</span> <span class="n">c</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span> <span class="ow">or</span> <span class="s2">&quot;Male&quot;</span> <span class="ow">in</span> <span class="n">c</span><span class="p">)</span>
+<span class="p">]</span>
+<span class="k">if</span> <span class="ow">not</span> <span class="n">sex_col</span><span class="p">:</span>
+    <span class="c1"># Fall back: create it</span>
+    <span class="n">df_encoded</span><span class="p">[</span><span class="s2">&quot;sex_Male&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">df</span><span class="p">[</span><span class="s2">&quot;sex&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">map</span><span class="p">({</span><span class="s2">&quot;Male&quot;</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span> <span class="s2">&quot;Female&quot;</span><span class="p">:</span> <span class="mi">0</span><span class="p">})</span><span class="o">.</span><span class="n">values</span>
+    <span class="n">sex_col</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;sex_Male&quot;</span><span class="p">]</span>
+
+<span class="n">sensitive_col_name</span> <span class="o">=</span> <span class="n">sex_col</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+<span class="n">feature_names</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">df_encoded</span><span class="o">.</span><span class="n">columns</span><span class="p">)</span>
+<span class="n">sensitive_idx</span> <span class="o">=</span> <span class="n">feature_names</span><span class="o">.</span><span class="n">index</span><span class="p">(</span><span class="n">sensitive_col_name</span><span class="p">)</span>
+<span class="n">X</span> <span class="o">=</span> <span class="n">df_encoded</span><span class="o">.</span><span class="n">values</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">float</span><span class="p">)</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;X shape: </span><span class="si">{</span><span class="n">X</span><span class="o">.</span><span class="n">shape</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Sensitive feature: &#39;</span><span class="si">{</span><span class="n">sensitive_col_name</span><span class="si">}</span><span class="s2">&#39; at index </span><span class="si">{</span><span class="n">sensitive_idx</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Positive class rate: </span><span class="si">{</span><span class="n">y</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span><span class="si">:</span><span class="s2">.2%</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+</pre></div>
+</div>
+<div class="input_area highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">X_train</span><span class="p">,</span> <span class="n">X_test</span><span class="p">,</span> <span class="n">y_train</span><span class="p">,</span> <span class="n">y_test</span> <span class="o">=</span> <span class="n">train_test_split</span><span class="p">(</span>
+    <span class="n">X</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">test_size</span><span class="o">=</span><span class="mf">0.3</span><span class="p">,</span> <span class="n">random_state</span><span class="o">=</span><span class="mi">42</span><span class="p">,</span> <span class="n">stratify</span><span class="o">=</span><span class="n">y</span>
+<span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Train: </span><span class="si">{</span><span class="n">X_train</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="si">}</span><span class="s2">, Test: </span><span class="si">{</span><span class="n">X_test</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</section>
+<section id="3.-Baseline:-Unconstrained-Model">
+<h2>3. Baseline: Unconstrained Model<a class="headerlink" href="#3.-Baseline:-Unconstrained-Model" title="Link to this heading"></a></h2>
+<p>First, train a standard <code class="docutils literal notranslate"><span class="pre">PerpetualBooster</span></code> without fairness constraints to measure the baseline disparity.</p>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+</pre></div>
+</div>
+<div class="input_area highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">baseline</span> <span class="o">=</span> <span class="n">PerpetualBooster</span><span class="p">(</span><span class="n">objective</span><span class="o">=</span><span class="s2">&quot;LogLoss&quot;</span><span class="p">,</span> <span class="n">budget</span><span class="o">=</span><span class="mf">0.5</span><span class="p">)</span>
+<span class="n">baseline</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">X_train</span><span class="p">,</span> <span class="n">y_train</span><span class="p">)</span>
+
+<span class="n">bl_probs</span> <span class="o">=</span> <span class="n">baseline</span><span class="o">.</span><span class="n">predict_proba</span><span class="p">(</span><span class="n">X_test</span><span class="p">)[:,</span> <span class="mi">1</span><span class="p">]</span>
+<span class="n">bl_preds</span> <span class="o">=</span> <span class="p">(</span><span class="n">bl_probs</span> <span class="o">&gt;=</span> <span class="mf">0.5</span><span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">int</span><span class="p">)</span>
+
+<span class="c1"># Fairness metrics</span>
+<span class="n">s_test</span> <span class="o">=</span> <span class="n">X_test</span><span class="p">[:,</span> <span class="n">sensitive_idx</span><span class="p">]</span>
+<span class="n">bl_rate_s1</span> <span class="o">=</span> <span class="n">bl_preds</span><span class="p">[</span><span class="n">s_test</span> <span class="o">==</span> <span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span>
+<span class="n">bl_rate_s0</span> <span class="o">=</span> <span class="n">bl_preds</span><span class="p">[</span><span class="n">s_test</span> <span class="o">==</span> <span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;=== Baseline (unconstrained) ===&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Accuracy:  </span><span class="si">{</span><span class="n">accuracy_score</span><span class="p">(</span><span class="n">y_test</span><span class="p">,</span><span class="w"> </span><span class="n">bl_preds</span><span class="p">)</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;AUC:       </span><span class="si">{</span><span class="n">roc_auc_score</span><span class="p">(</span><span class="n">y_test</span><span class="p">,</span><span class="w"> </span><span class="n">bl_probs</span><span class="p">)</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Positive rate (Male):   </span><span class="si">{</span><span class="n">bl_rate_s1</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Positive rate (Female): </span><span class="si">{</span><span class="n">bl_rate_s0</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Demographic Parity gap: </span><span class="si">{</span><span class="nb">abs</span><span class="p">(</span><span class="n">bl_rate_s1</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="n">bl_rate_s0</span><span class="p">)</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</section>
+<section id="4.-Fair-Model:-Demographic-Parity">
+<h2>4. Fair Model: Demographic Parity<a class="headerlink" href="#4.-Fair-Model:-Demographic-Parity" title="Link to this heading"></a></h2>
+<p>Now train a <code class="docutils literal notranslate"><span class="pre">FairClassifier</span></code> that penalizes the correlation between predictions and the sensitive attribute.</p>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+</pre></div>
+</div>
+<div class="input_area highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">fair_dp</span> <span class="o">=</span> <span class="n">FairClassifier</span><span class="p">(</span>
+    <span class="n">sensitive_feature</span><span class="o">=</span><span class="n">sensitive_idx</span><span class="p">,</span>
+    <span class="n">fairness_type</span><span class="o">=</span><span class="s2">&quot;demographic_parity&quot;</span><span class="p">,</span>
+    <span class="n">lam</span><span class="o">=</span><span class="mf">5.0</span><span class="p">,</span>
+    <span class="n">budget</span><span class="o">=</span><span class="mf">0.5</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="n">fair_dp</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">X_train</span><span class="p">,</span> <span class="n">y_train</span><span class="p">)</span>
+
+<span class="n">dp_probs</span> <span class="o">=</span> <span class="n">fair_dp</span><span class="o">.</span><span class="n">predict_proba</span><span class="p">(</span><span class="n">X_test</span><span class="p">)[:,</span> <span class="mi">1</span><span class="p">]</span>
+<span class="n">dp_preds</span> <span class="o">=</span> <span class="n">fair_dp</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="n">X_test</span><span class="p">)</span>
+
+<span class="n">dp_rate_s1</span> <span class="o">=</span> <span class="n">dp_preds</span><span class="p">[</span><span class="n">s_test</span> <span class="o">==</span> <span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span>
+<span class="n">dp_rate_s0</span> <span class="o">=</span> <span class="n">dp_preds</span><span class="p">[</span><span class="n">s_test</span> <span class="o">==</span> <span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;=== FairClassifier (Demographic Parity, λ=5.0) ===&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Accuracy:  </span><span class="si">{</span><span class="n">accuracy_score</span><span class="p">(</span><span class="n">y_test</span><span class="p">,</span><span class="w"> </span><span class="n">dp_preds</span><span class="p">)</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;AUC:       </span><span class="si">{</span><span class="n">roc_auc_score</span><span class="p">(</span><span class="n">y_test</span><span class="p">,</span><span class="w"> </span><span class="n">dp_probs</span><span class="p">)</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Positive rate (Male):   </span><span class="si">{</span><span class="n">dp_rate_s1</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Positive rate (Female): </span><span class="si">{</span><span class="n">dp_rate_s0</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Demographic Parity gap: </span><span class="si">{</span><span class="nb">abs</span><span class="p">(</span><span class="n">dp_rate_s1</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="n">dp_rate_s0</span><span class="p">)</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</section>
+<section id="5.-Fair-Model:-Equalized-Odds">
+<h2>5. Fair Model: Equalized Odds<a class="headerlink" href="#5.-Fair-Model:-Equalized-Odds" title="Link to this heading"></a></h2>
+<p>Equalized Odds penalizes disparity <em>within each class</em>, targeting equal error rates across groups.</p>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+</pre></div>
+</div>
+<div class="input_area highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">fair_eo</span> <span class="o">=</span> <span class="n">FairClassifier</span><span class="p">(</span>
+    <span class="n">sensitive_feature</span><span class="o">=</span><span class="n">sensitive_idx</span><span class="p">,</span>
+    <span class="n">fairness_type</span><span class="o">=</span><span class="s2">&quot;equalized_odds&quot;</span><span class="p">,</span>
+    <span class="n">lam</span><span class="o">=</span><span class="mf">5.0</span><span class="p">,</span>
+    <span class="n">budget</span><span class="o">=</span><span class="mf">0.5</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="n">fair_eo</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">X_train</span><span class="p">,</span> <span class="n">y_train</span><span class="p">)</span>
+
+<span class="n">eo_probs</span> <span class="o">=</span> <span class="n">fair_eo</span><span class="o">.</span><span class="n">predict_proba</span><span class="p">(</span><span class="n">X_test</span><span class="p">)[:,</span> <span class="mi">1</span><span class="p">]</span>
+<span class="n">eo_preds</span> <span class="o">=</span> <span class="n">fair_eo</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="n">X_test</span><span class="p">)</span>
+
+<span class="c1"># Equalized Odds: check TPR and FPR per group</span>
+<span class="k">for</span> <span class="n">label_name</span><span class="p">,</span> <span class="n">s_val</span> <span class="ow">in</span> <span class="p">[(</span><span class="s2">&quot;Male&quot;</span><span class="p">,</span> <span class="mi">1</span><span class="p">),</span> <span class="p">(</span><span class="s2">&quot;Female&quot;</span><span class="p">,</span> <span class="mi">0</span><span class="p">)]:</span>
+    <span class="n">mask</span> <span class="o">=</span> <span class="n">s_test</span> <span class="o">==</span> <span class="n">s_val</span>
+    <span class="n">tpr</span> <span class="o">=</span> <span class="n">eo_preds</span><span class="p">[(</span><span class="n">mask</span><span class="p">)</span> <span class="o">&amp;</span> <span class="p">(</span><span class="n">y_test</span> <span class="o">==</span> <span class="mi">1</span><span class="p">)]</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span>
+    <span class="n">fpr</span> <span class="o">=</span> <span class="n">eo_preds</span><span class="p">[(</span><span class="n">mask</span><span class="p">)</span> <span class="o">&amp;</span> <span class="p">(</span><span class="n">y_test</span> <span class="o">==</span> <span class="mi">0</span><span class="p">)]</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">label_name</span><span class="si">:</span><span class="s2">8s</span><span class="si">}</span><span class="s2">  TPR=</span><span class="si">{</span><span class="n">tpr</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2">  FPR=</span><span class="si">{</span><span class="n">fpr</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">Accuracy:  </span><span class="si">{</span><span class="n">accuracy_score</span><span class="p">(</span><span class="n">y_test</span><span class="p">,</span><span class="w"> </span><span class="n">eo_preds</span><span class="p">)</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;AUC:       </span><span class="si">{</span><span class="n">roc_auc_score</span><span class="p">(</span><span class="n">y_test</span><span class="p">,</span><span class="w"> </span><span class="n">eo_probs</span><span class="p">)</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</section>
+<section id="6.-Compare-All-Models">
+<h2>6. Compare All Models<a class="headerlink" href="#6.-Compare-All-Models" title="Link to this heading"></a></h2>
+<p>Fairness comes with a trade-off: we reduce disparity at some cost to predictive accuracy.</p>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+</pre></div>
+</div>
+<div class="input_area highlight-python notranslate"><div class="highlight"><pre><span></span><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="s1">&#39;Model&#39;</span><span class="si">:</span><span class="s2">&lt;35</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="s1">&#39;Accuracy&#39;</span><span class="si">:</span><span class="s2">&gt;10</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="s1">&#39;AUC&#39;</span><span class="si">:</span><span class="s2">&gt;10</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="s1">&#39;DP Gap&#39;</span><span class="si">:</span><span class="s2">&gt;10</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;-&quot;</span> <span class="o">*</span> <span class="mi">70</span><span class="p">)</span>
+
+<span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">preds</span><span class="p">,</span> <span class="n">probs</span> <span class="ow">in</span> <span class="p">[</span>
+    <span class="p">(</span><span class="s2">&quot;Baseline (unconstrained)&quot;</span><span class="p">,</span> <span class="n">bl_preds</span><span class="p">,</span> <span class="n">bl_probs</span><span class="p">),</span>
+    <span class="p">(</span><span class="s2">&quot;FairClassifier (Dem. Parity)&quot;</span><span class="p">,</span> <span class="n">dp_preds</span><span class="p">,</span> <span class="n">dp_probs</span><span class="p">),</span>
+    <span class="p">(</span><span class="s2">&quot;FairClassifier (Eq. Odds)&quot;</span><span class="p">,</span> <span class="n">eo_preds</span><span class="p">,</span> <span class="n">eo_probs</span><span class="p">),</span>
+<span class="p">]:</span>
+    <span class="n">acc</span> <span class="o">=</span> <span class="n">accuracy_score</span><span class="p">(</span><span class="n">y_test</span><span class="p">,</span> <span class="n">preds</span><span class="p">)</span>
+    <span class="n">auc</span> <span class="o">=</span> <span class="n">roc_auc_score</span><span class="p">(</span><span class="n">y_test</span><span class="p">,</span> <span class="n">probs</span><span class="p">)</span>
+    <span class="n">gap</span> <span class="o">=</span> <span class="nb">abs</span><span class="p">(</span><span class="n">preds</span><span class="p">[</span><span class="n">s_test</span> <span class="o">==</span> <span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span> <span class="o">-</span> <span class="n">preds</span><span class="p">[</span><span class="n">s_test</span> <span class="o">==</span> <span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">mean</span><span class="p">())</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">name</span><span class="si">:</span><span class="s2">&lt;35</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="n">acc</span><span class="si">:</span><span class="s2">&gt;10.4f</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="n">auc</span><span class="si">:</span><span class="s2">&gt;10.4f</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="n">gap</span><span class="si">:</span><span class="s2">&gt;10.4f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</section>
+<section id="7.-Tuning-the-Fairness-Penalty">
+<h2>7. Tuning the Fairness Penalty<a class="headerlink" href="#7.-Tuning-the-Fairness-Penalty" title="Link to this heading"></a></h2>
+<p>The <code class="docutils literal notranslate"><span class="pre">lam</span></code> parameter controls the strength of the fairness penalty. Higher values produce fairer but potentially less accurate models.</p>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+</pre></div>
+</div>
+<div class="input_area highlight-python notranslate"><div class="highlight"><pre><span></span><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="s1">&#39;λ&#39;</span><span class="si">:</span><span class="s2">&gt;6</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="s1">&#39;Accuracy&#39;</span><span class="si">:</span><span class="s2">&gt;10</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="s1">&#39;AUC&#39;</span><span class="si">:</span><span class="s2">&gt;10</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="s1">&#39;DP Gap&#39;</span><span class="si">:</span><span class="s2">&gt;10</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;-&quot;</span> <span class="o">*</span> <span class="mi">40</span><span class="p">)</span>
+
+<span class="k">for</span> <span class="n">lam</span> <span class="ow">in</span> <span class="p">[</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">,</span> <span class="mf">5.0</span><span class="p">,</span> <span class="mf">10.0</span><span class="p">,</span> <span class="mf">25.0</span><span class="p">]:</span>
+    <span class="n">clf</span> <span class="o">=</span> <span class="n">FairClassifier</span><span class="p">(</span>
+        <span class="n">sensitive_feature</span><span class="o">=</span><span class="n">sensitive_idx</span><span class="p">,</span>
+        <span class="n">fairness_type</span><span class="o">=</span><span class="s2">&quot;demographic_parity&quot;</span><span class="p">,</span>
+        <span class="n">lam</span><span class="o">=</span><span class="n">lam</span><span class="p">,</span>
+        <span class="n">budget</span><span class="o">=</span><span class="mf">0.5</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">clf</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">X_train</span><span class="p">,</span> <span class="n">y_train</span><span class="p">)</span>
+    <span class="n">probs</span> <span class="o">=</span> <span class="n">clf</span><span class="o">.</span><span class="n">predict_proba</span><span class="p">(</span><span class="n">X_test</span><span class="p">)[:,</span> <span class="mi">1</span><span class="p">]</span>
+    <span class="n">preds</span> <span class="o">=</span> <span class="n">clf</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="n">X_test</span><span class="p">)</span>
+    <span class="n">acc</span> <span class="o">=</span> <span class="n">accuracy_score</span><span class="p">(</span><span class="n">y_test</span><span class="p">,</span> <span class="n">preds</span><span class="p">)</span>
+    <span class="n">auc</span> <span class="o">=</span> <span class="n">roc_auc_score</span><span class="p">(</span><span class="n">y_test</span><span class="p">,</span> <span class="n">probs</span><span class="p">)</span>
+    <span class="n">gap</span> <span class="o">=</span> <span class="nb">abs</span><span class="p">(</span><span class="n">preds</span><span class="p">[</span><span class="n">s_test</span> <span class="o">==</span> <span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span> <span class="o">-</span> <span class="n">preds</span><span class="p">[</span><span class="n">s_test</span> <span class="o">==</span> <span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">mean</span><span class="p">())</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">lam</span><span class="si">:</span><span class="s2">&gt;6.1f</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="n">acc</span><span class="si">:</span><span class="s2">&gt;10.4f</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="n">auc</span><span class="si">:</span><span class="s2">&gt;10.4f</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="n">gap</span><span class="si">:</span><span class="s2">&gt;10.4f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</section>
+<section id="Summary">
+<h2>Summary<a class="headerlink" href="#Summary" title="Link to this heading"></a></h2>
+<p>In this tutorial we:</p>
+<ol class="arabic simple">
+<li><p>Trained a <strong>baseline</strong> model and measured gender disparity.</p></li>
+<li><p>Used <code class="docutils literal notranslate"><span class="pre">FairClassifier</span></code> with <strong>Demographic Parity</strong> to reduce the positive-prediction gap between groups.</p></li>
+<li><p>Used <code class="docutils literal notranslate"><span class="pre">FairClassifier</span></code> with <strong>Equalized Odds</strong> to equalize TPR/FPR.</p></li>
+<li><p>Explored the <strong>accuracy–fairness trade-off</strong> by varying <code class="docutils literal notranslate"><span class="pre">lam</span></code>.</p></li>
+</ol>
+<p>The <code class="docutils literal notranslate"><span class="pre">FairClassifier</span></code> provides a simple, integrated approach to building fairer models without requiring separate pre- or post-processing steps.</p>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="fairness_aware_modeling.html" class="btn btn-neutral float-left" title="Fairness-Aware Credit Scoring" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="customer_retention_uplift.html" class="btn btn-neutral float-right" title="Customer Retention: Uplift Modeling for Churn Prevention" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2026, Mutlu Simsek, Serkan Korkmaz, Pieter Pel.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

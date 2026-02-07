@@ -1,0 +1,383 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Policy Learning: Optimal Treatment Assignment &mdash; Perpetual 1.3.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="../../_static/nbsphinx-code-cells.css?v=2aa19091" />
+      <link rel="stylesheet" type="text/css" href="../../_static/custom.css?v=9cdd1368" />
+
+  
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=1f29e9d3"></script>
+      <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+      <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+      <script>window.MathJax = {"tex": {"inlineMath": [["$", "$"], ["\\(", "\\)"]], "processEscapes": true}, "options": {"ignoreHtmlClass": "tex2jax_ignore|mathjax_ignore|document", "processHtmlClass": "tex2jax_process|mathjax_process|math|output_area"}}</script>
+      <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@4/tex-mml-chtml.js"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+    <link rel="next" title="Risk, Compliance, and Interpretability" href="risk_compliance.html" />
+    <link rel="prev" title="Double Machine Learning: Estimating the Gender Wage Gap" href="dml_wage_gap.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            Perpetual
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../../installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../api.html">API Reference</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../index.html">Tutorials</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../categorical_data.html">Handling Categorical Data</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../toy_datasets.html">Quick Start with Toy Datasets</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../sklearn_interface.html">Scikit-Learn Interface: Classification, Regression &amp; Ranking</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../benchmark.html">Performance Benchmarking</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../custom_objective.html">Custom Objective Tutorial</a></li>
+<li class="toctree-l2"><a class="reference internal" href="uplift_marketing.html">Uplift Modeling and Causal Inference</a></li>
+<li class="toctree-l2"><a class="reference internal" href="iv_causal_effect.html">Instrumental Variables (Boosted IV)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="dml_wage_gap.html">Double Machine Learning: Estimating the Gender Wage Gap</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">Policy Learning: Optimal Treatment Assignment</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#1.-Load-the-Bank-Marketing-Dataset">1. Load the Bank Marketing Dataset</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#2.-Simulate-an-RCT">2. Simulate an RCT</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#3.-Learn-an-IPW-Policy">3. Learn an IPW Policy</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#4.-Learn-an-AIPW-(Doubly-Robust)-Policy">4. Learn an AIPW (Doubly Robust) Policy</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#5.-Evaluate-Policies">5. Evaluate Policies</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#6.-Feature-Importance">6. Feature Importance</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#7.-Uplift-Curve-Evaluation">7. Uplift Curve Evaluation</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#Summary">Summary</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#References">References</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="risk_compliance.html">Risk, Compliance, and Interpretability</a></li>
+<li class="toctree-l2"><a class="reference internal" href="heterogeneous_treatment_effects.html">Heterogeneous Treatment Effects with Meta-Learners</a></li>
+<li class="toctree-l2"><a class="reference internal" href="fairness_aware_modeling.html">Fairness-Aware Credit Scoring</a></li>
+<li class="toctree-l2"><a class="reference internal" href="fair_classification.html">Fairness-Aware Classification with FairClassifier</a></li>
+<li class="toctree-l2"><a class="reference internal" href="customer_retention_uplift.html">Customer Retention: Uplift Modeling for Churn Prevention</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../causal_ml/index.html">Causal ML</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../architecture.html">Architecture</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../parameters_tuning.html">Parameters Tuning</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../faq.html">Frequently Asked Questions</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">Perpetual</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">Tutorials</a></li>
+      <li class="breadcrumb-item active">Policy Learning: Optimal Treatment Assignment</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../_sources/tutorials/causal/policy_learning.ipynb.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="Policy-Learning:-Optimal-Treatment-Assignment">
+<h1>Policy Learning: Optimal Treatment Assignment<a class="headerlink" href="#Policy-Learning:-Optimal-Treatment-Assignment" title="Link to this heading"></a></h1>
+<p>Policy learning aims to find the <strong>optimal treatment rule</strong> <span class="math notranslate nohighlight">\(\pi(X) \in \{0, 1\}\)</span> that maximizes expected outcomes in a population.</p>
+<p>Perpetual’s <code class="docutils literal notranslate"><span class="pre">PolicyLearner</span></code> implements the Athey &amp; Wager (2021) framework using <strong>inverse propensity weighting</strong> (IPW) to transform the causal inference problem into a weighted classification task.</p>
+<p>Two modes are available:</p>
+<ul class="simple">
+<li><p><strong>IPW</strong> — standard inverse propensity weighting.</p></li>
+<li><p><strong>AIPW</strong> (doubly robust) — incorporates a baseline outcome model to reduce variance.</p></li>
+</ul>
+<p>In this tutorial we use the <strong>Bank Marketing</strong> dataset to learn an optimal policy for targeting customers with a marketing campaign.</p>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+</pre></div>
+</div>
+<div class="input_area highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pd</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">perpetual.causal_metrics</span><span class="w"> </span><span class="kn">import</span> <span class="n">auuc</span><span class="p">,</span> <span class="n">qini_coefficient</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">perpetual.policy</span><span class="w"> </span><span class="kn">import</span> <span class="n">PolicyLearner</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">sklearn.datasets</span><span class="w"> </span><span class="kn">import</span> <span class="n">fetch_openml</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">sklearn.model_selection</span><span class="w"> </span><span class="kn">import</span> <span class="n">train_test_split</span>
+</pre></div>
+</div>
+</div>
+<section id="1.-Load-the-Bank-Marketing-Dataset">
+<h2>1. Load the Bank Marketing Dataset<a class="headerlink" href="#1.-Load-the-Bank-Marketing-Dataset" title="Link to this heading"></a></h2>
+<p>The Bank Marketing dataset records whether clients subscribed to a term deposit after being contacted in a marketing campaign. We treat the phone contact as the “treatment” and subscription as the “outcome”.</p>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+</pre></div>
+</div>
+<div class="input_area highlight-python notranslate"><div class="highlight"><pre><span></span><span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Fetching Bank Marketing dataset...&quot;</span><span class="p">)</span>
+<span class="n">data</span> <span class="o">=</span> <span class="n">fetch_openml</span><span class="p">(</span><span class="n">data_id</span><span class="o">=</span><span class="mi">1461</span><span class="p">,</span> <span class="n">as_frame</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">parser</span><span class="o">=</span><span class="s2">&quot;auto&quot;</span><span class="p">)</span>
+<span class="n">df</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">frame</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Shape: </span><span class="si">{</span><span class="n">df</span><span class="o">.</span><span class="n">shape</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="n">df</span><span class="o">.</span><span class="n">head</span><span class="p">()</span>
+</pre></div>
+</div>
+</div>
+</section>
+<section id="2.-Simulate-an-RCT">
+<h2>2. Simulate an RCT<a class="headerlink" href="#2.-Simulate-an-RCT" title="Link to this heading"></a></h2>
+<p>Since the original dataset is observational, we simulate a randomized controlled trial (RCT) by randomly assigning treatment. This gives us known propensity scores (0.5) for clean evaluation.</p>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+</pre></div>
+</div>
+<div class="input_area highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">seed</span><span class="p">(</span><span class="mi">42</span><span class="p">)</span>
+
+<span class="c1"># Encode target</span>
+<span class="n">y_col</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">columns</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+<span class="n">y_all</span> <span class="o">=</span> <span class="p">(</span>
+    <span class="p">(</span><span class="n">df</span><span class="p">[</span><span class="n">y_col</span><span class="p">]</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">str</span><span class="p">)</span><span class="o">.</span><span class="n">str</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span><span class="o">.</span><span class="n">isin</span><span class="p">([</span><span class="s2">&quot;1&quot;</span><span class="p">,</span> <span class="s2">&quot;2&quot;</span><span class="p">,</span> <span class="s2">&quot;yes&quot;</span><span class="p">,</span> <span class="s2">&quot;Yes&quot;</span><span class="p">]))</span>
+    <span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">float</span><span class="p">)</span>
+    <span class="o">.</span><span class="n">values</span>
+<span class="p">)</span>
+
+<span class="c1"># Encode features</span>
+<span class="n">feature_cols</span> <span class="o">=</span> <span class="p">[</span><span class="n">c</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">df</span><span class="o">.</span><span class="n">columns</span> <span class="k">if</span> <span class="n">c</span> <span class="o">!=</span> <span class="n">y_col</span><span class="p">]</span>
+<span class="n">df_feat</span> <span class="o">=</span> <span class="n">df</span><span class="p">[</span><span class="n">feature_cols</span><span class="p">]</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+<span class="n">cat_cols</span> <span class="o">=</span> <span class="n">df_feat</span><span class="o">.</span><span class="n">select_dtypes</span><span class="p">(</span><span class="n">include</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;category&quot;</span><span class="p">,</span> <span class="s2">&quot;object&quot;</span><span class="p">])</span><span class="o">.</span><span class="n">columns</span><span class="o">.</span><span class="n">tolist</span><span class="p">()</span>
+<span class="n">df_encoded</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">get_dummies</span><span class="p">(</span><span class="n">df_feat</span><span class="p">,</span> <span class="n">columns</span><span class="o">=</span><span class="n">cat_cols</span><span class="p">,</span> <span class="n">drop_first</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">float</span><span class="p">)</span>
+<span class="n">X_all</span> <span class="o">=</span> <span class="n">df_encoded</span><span class="o">.</span><span class="n">values</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">float</span><span class="p">)</span>
+<span class="n">feature_names</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">df_encoded</span><span class="o">.</span><span class="n">columns</span><span class="p">)</span>
+
+<span class="c1"># Simulate RCT: random treatment with P(W=1)=0.5</span>
+<span class="n">w_all</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">binomial</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mf">0.5</span><span class="p">,</span> <span class="n">size</span><span class="o">=</span><span class="nb">len</span><span class="p">(</span><span class="n">y_all</span><span class="p">))</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">float</span><span class="p">)</span>
+
+<span class="c1"># Simulate heterogeneous treatment effect based on age and balance</span>
+<span class="n">age_idx</span> <span class="o">=</span> <span class="n">feature_names</span><span class="o">.</span><span class="n">index</span><span class="p">(</span><span class="s2">&quot;age&quot;</span><span class="p">)</span> <span class="k">if</span> <span class="s2">&quot;age&quot;</span> <span class="ow">in</span> <span class="n">feature_names</span> <span class="k">else</span> <span class="mi">0</span>
+<span class="n">balance_idx</span> <span class="o">=</span> <span class="n">feature_names</span><span class="o">.</span><span class="n">index</span><span class="p">(</span><span class="s2">&quot;balance&quot;</span><span class="p">)</span> <span class="k">if</span> <span class="s2">&quot;balance&quot;</span> <span class="ow">in</span> <span class="n">feature_names</span> <span class="k">else</span> <span class="mi">1</span>
+
+<span class="c1"># Younger clients with higher balance benefit more from contact</span>
+<span class="n">age_norm</span> <span class="o">=</span> <span class="p">(</span><span class="n">X_all</span><span class="p">[:,</span> <span class="n">age_idx</span><span class="p">]</span> <span class="o">-</span> <span class="n">X_all</span><span class="p">[:,</span> <span class="n">age_idx</span><span class="p">]</span><span class="o">.</span><span class="n">mean</span><span class="p">())</span> <span class="o">/</span> <span class="p">(</span>
+    <span class="n">X_all</span><span class="p">[:,</span> <span class="n">age_idx</span><span class="p">]</span><span class="o">.</span><span class="n">std</span><span class="p">()</span> <span class="o">+</span> <span class="mf">1e-8</span>
+<span class="p">)</span>
+<span class="n">bal_norm</span> <span class="o">=</span> <span class="p">(</span><span class="n">X_all</span><span class="p">[:,</span> <span class="n">balance_idx</span><span class="p">]</span> <span class="o">-</span> <span class="n">X_all</span><span class="p">[:,</span> <span class="n">balance_idx</span><span class="p">]</span><span class="o">.</span><span class="n">mean</span><span class="p">())</span> <span class="o">/</span> <span class="p">(</span>
+    <span class="n">X_all</span><span class="p">[:,</span> <span class="n">balance_idx</span><span class="p">]</span><span class="o">.</span><span class="n">std</span><span class="p">()</span> <span class="o">+</span> <span class="mf">1e-8</span>
+<span class="p">)</span>
+<span class="n">true_cate</span> <span class="o">=</span> <span class="mf">0.1</span> <span class="o">-</span> <span class="mf">0.05</span> <span class="o">*</span> <span class="n">age_norm</span> <span class="o">+</span> <span class="mf">0.05</span> <span class="o">*</span> <span class="n">bal_norm</span>
+
+<span class="c1"># Outcome: base rate + treatment effect</span>
+<span class="n">base_rate</span> <span class="o">=</span> <span class="mf">0.12</span>
+<span class="n">prob_y</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">clip</span><span class="p">(</span><span class="n">base_rate</span> <span class="o">+</span> <span class="n">w_all</span> <span class="o">*</span> <span class="n">true_cate</span><span class="p">,</span> <span class="mf">0.01</span><span class="p">,</span> <span class="mf">0.99</span><span class="p">)</span>
+<span class="n">y_sim</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">binomial</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">prob_y</span><span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">float</span><span class="p">)</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;X shape: </span><span class="si">{</span><span class="n">X_all</span><span class="o">.</span><span class="n">shape</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Treatment rate: </span><span class="si">{</span><span class="n">w_all</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span><span class="si">:</span><span class="s2">.2%</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Outcome rate: </span><span class="si">{</span><span class="n">y_sim</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span><span class="si">:</span><span class="s2">.2%</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;True ATE: </span><span class="si">{</span><span class="n">true_cate</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+</pre></div>
+</div>
+<div class="input_area highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">X_train</span><span class="p">,</span> <span class="n">X_test</span><span class="p">,</span> <span class="n">w_train</span><span class="p">,</span> <span class="n">w_test</span><span class="p">,</span> <span class="n">y_train</span><span class="p">,</span> <span class="n">y_test</span><span class="p">,</span> <span class="n">cate_train</span><span class="p">,</span> <span class="n">cate_test</span> <span class="o">=</span> <span class="p">(</span>
+    <span class="n">train_test_split</span><span class="p">(</span><span class="n">X_all</span><span class="p">,</span> <span class="n">w_all</span><span class="p">,</span> <span class="n">y_sim</span><span class="p">,</span> <span class="n">true_cate</span><span class="p">,</span> <span class="n">test_size</span><span class="o">=</span><span class="mf">0.3</span><span class="p">,</span> <span class="n">random_state</span><span class="o">=</span><span class="mi">42</span><span class="p">)</span>
+<span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Train: </span><span class="si">{</span><span class="n">X_train</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="si">}</span><span class="s2">, Test: </span><span class="si">{</span><span class="n">X_test</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</section>
+<section id="3.-Learn-an-IPW-Policy">
+<h2>3. Learn an IPW Policy<a class="headerlink" href="#3.-Learn-an-IPW-Policy" title="Link to this heading"></a></h2>
+<p>The IPW <code class="docutils literal notranslate"><span class="pre">PolicyLearner</span></code> computes pseudo-outcomes from the propensity scores and outcome, then learns a policy that assigns treatment when the pseudo-outcome is positive.</p>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+</pre></div>
+</div>
+<div class="input_area highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Since we simulated an RCT, we know the propensity is 0.5 for all samples.</span>
+<span class="n">prop_train</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">full</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">w_train</span><span class="p">),</span> <span class="mf">0.5</span><span class="p">)</span>
+
+<span class="n">pl_ipw</span> <span class="o">=</span> <span class="n">PolicyLearner</span><span class="p">(</span><span class="n">budget</span><span class="o">=</span><span class="mf">0.5</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="s2">&quot;ipw&quot;</span><span class="p">)</span>
+<span class="n">pl_ipw</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">X_train</span><span class="p">,</span> <span class="n">w_train</span><span class="p">,</span> <span class="n">y_train</span><span class="p">,</span> <span class="n">propensity</span><span class="o">=</span><span class="n">prop_train</span><span class="p">)</span>
+
+<span class="n">policy_ipw</span> <span class="o">=</span> <span class="n">pl_ipw</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="n">X_test</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;IPW Policy: treat </span><span class="si">{</span><span class="n">policy_ipw</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span><span class="si">:</span><span class="s2">.2%</span><span class="si">}</span><span class="s2"> of the population&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</section>
+<section id="4.-Learn-an-AIPW-(Doubly-Robust)-Policy">
+<h2>4. Learn an AIPW (Doubly Robust) Policy<a class="headerlink" href="#4.-Learn-an-AIPW-(Doubly-Robust)-Policy" title="Link to this heading"></a></h2>
+<p>AIPW reduces variance by incorporating a baseline outcome model.</p>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+</pre></div>
+</div>
+<div class="input_area highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">pl_aipw</span> <span class="o">=</span> <span class="n">PolicyLearner</span><span class="p">(</span><span class="n">budget</span><span class="o">=</span><span class="mf">0.5</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="s2">&quot;aipw&quot;</span><span class="p">)</span>
+<span class="n">pl_aipw</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">X_train</span><span class="p">,</span> <span class="n">w_train</span><span class="p">,</span> <span class="n">y_train</span><span class="p">,</span> <span class="n">propensity</span><span class="o">=</span><span class="n">prop_train</span><span class="p">)</span>
+
+<span class="n">policy_aipw</span> <span class="o">=</span> <span class="n">pl_aipw</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="n">X_test</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;AIPW Policy: treat </span><span class="si">{</span><span class="n">policy_aipw</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span><span class="si">:</span><span class="s2">.2%</span><span class="si">}</span><span class="s2"> of the population&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</section>
+<section id="5.-Evaluate-Policies">
+<h2>5. Evaluate Policies<a class="headerlink" href="#5.-Evaluate-Policies" title="Link to this heading"></a></h2>
+<p>We compare the learned policies against random treatment and treat-everyone baselines using the true CATE.</p>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+</pre></div>
+</div>
+<div class="input_area highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">def</span><span class="w"> </span><span class="nf">policy_value</span><span class="p">(</span><span class="n">policy</span><span class="p">,</span> <span class="n">true_cate</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Expected improvement from a targeting policy vs. no treatment.&quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="p">(</span><span class="n">policy</span> <span class="o">*</span> <span class="n">true_cate</span><span class="p">)</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span>
+
+
+<span class="c1"># Baselines</span>
+<span class="n">treat_all</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">cate_test</span><span class="p">))</span>
+<span class="n">treat_none</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">cate_test</span><span class="p">))</span>
+<span class="n">random_policy</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">binomial</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mf">0.5</span><span class="p">,</span> <span class="n">size</span><span class="o">=</span><span class="nb">len</span><span class="p">(</span><span class="n">cate_test</span><span class="p">))</span>
+
+<span class="c1"># Oracle: treat only when CATE &gt; 0</span>
+<span class="n">oracle</span> <span class="o">=</span> <span class="p">(</span><span class="n">cate_test</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">int</span><span class="p">)</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="s1">&#39;Policy&#39;</span><span class="si">:</span><span class="s2">&lt;25</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="s1">&#39;Value&#39;</span><span class="si">:</span><span class="s2">&gt;10</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="s1">&#39;Treat %&#39;</span><span class="si">:</span><span class="s2">&gt;10</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;-&quot;</span> <span class="o">*</span> <span class="mi">48</span><span class="p">)</span>
+<span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">pol</span> <span class="ow">in</span> <span class="p">[</span>
+    <span class="p">(</span><span class="s2">&quot;Treat Everyone&quot;</span><span class="p">,</span> <span class="n">treat_all</span><span class="p">),</span>
+    <span class="p">(</span><span class="s2">&quot;Treat Nobody&quot;</span><span class="p">,</span> <span class="n">treat_none</span><span class="p">),</span>
+    <span class="p">(</span><span class="s2">&quot;Random (50%)&quot;</span><span class="p">,</span> <span class="n">random_policy</span><span class="p">),</span>
+    <span class="p">(</span><span class="s2">&quot;IPW PolicyLearner&quot;</span><span class="p">,</span> <span class="n">policy_ipw</span><span class="p">),</span>
+    <span class="p">(</span><span class="s2">&quot;AIPW PolicyLearner&quot;</span><span class="p">,</span> <span class="n">policy_aipw</span><span class="p">),</span>
+    <span class="p">(</span><span class="s2">&quot;Oracle (true CATE&gt;0)&quot;</span><span class="p">,</span> <span class="n">oracle</span><span class="p">),</span>
+<span class="p">]:</span>
+    <span class="n">val</span> <span class="o">=</span> <span class="n">policy_value</span><span class="p">(</span><span class="n">pol</span><span class="p">,</span> <span class="n">cate_test</span><span class="p">)</span>
+    <span class="n">pct</span> <span class="o">=</span> <span class="n">pol</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">name</span><span class="si">:</span><span class="s2">&lt;25</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="n">val</span><span class="si">:</span><span class="s2">&gt;10.4f</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="n">pct</span><span class="si">:</span><span class="s2">&gt;10.2%</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</section>
+<section id="6.-Feature-Importance">
+<h2>6. Feature Importance<a class="headerlink" href="#6.-Feature-Importance" title="Link to this heading"></a></h2>
+<p>Which features matter most for the treatment-assignment decision?</p>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+</pre></div>
+</div>
+<div class="input_area highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">importances</span> <span class="o">=</span> <span class="n">pl_aipw</span><span class="o">.</span><span class="n">feature_importances_</span>
+<span class="n">top_k</span> <span class="o">=</span> <span class="mi">10</span>
+<span class="n">top_idx</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">argsort</span><span class="p">(</span><span class="n">importances</span><span class="p">)[::</span><span class="o">-</span><span class="mi">1</span><span class="p">][:</span><span class="n">top_k</span><span class="p">]</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Top </span><span class="si">{</span><span class="n">top_k</span><span class="si">}</span><span class="s2"> features for policy assignment:&quot;</span><span class="p">)</span>
+<span class="k">for</span> <span class="n">rank</span><span class="p">,</span> <span class="n">idx</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">top_idx</span><span class="p">,</span> <span class="mi">1</span><span class="p">):</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  </span><span class="si">{</span><span class="n">rank</span><span class="si">}</span><span class="s2">. </span><span class="si">{</span><span class="n">feature_names</span><span class="p">[</span><span class="n">idx</span><span class="p">]</span><span class="si">:</span><span class="s2">25s</span><span class="si">}</span><span class="s2">  importance=</span><span class="si">{</span><span class="n">importances</span><span class="p">[</span><span class="n">idx</span><span class="p">]</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</section>
+<section id="7.-Uplift-Curve-Evaluation">
+<h2>7. Uplift Curve Evaluation<a class="headerlink" href="#7.-Uplift-Curve-Evaluation" title="Link to this heading"></a></h2>
+<p>We can also use <code class="docutils literal notranslate"><span class="pre">causal_metrics</span></code> to evaluate the policy score as an uplift model, checking whether higher-scored individuals benefit more.</p>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+</pre></div>
+</div>
+<div class="input_area highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Use the continuous policy score as the uplift score</span>
+<span class="n">uplift_score</span> <span class="o">=</span> <span class="n">pl_aipw</span><span class="o">.</span><span class="n">predict_proba</span><span class="p">(</span><span class="n">X_test</span><span class="p">)</span>
+
+<span class="n">aipw_auuc</span> <span class="o">=</span> <span class="n">auuc</span><span class="p">(</span><span class="n">y_test</span><span class="p">,</span> <span class="n">w_test</span><span class="p">,</span> <span class="n">uplift_score</span><span class="p">)</span>
+<span class="n">aipw_qini</span> <span class="o">=</span> <span class="n">qini_coefficient</span><span class="p">(</span><span class="n">y_test</span><span class="p">,</span> <span class="n">w_test</span><span class="p">,</span> <span class="n">uplift_score</span><span class="p">)</span>
+
+<span class="c1"># Compare with random</span>
+<span class="n">random_score</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">randn</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">y_test</span><span class="p">))</span>
+<span class="n">rand_auuc</span> <span class="o">=</span> <span class="n">auuc</span><span class="p">(</span><span class="n">y_test</span><span class="p">,</span> <span class="n">w_test</span><span class="p">,</span> <span class="n">random_score</span><span class="p">)</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;AIPW PolicyLearner — AUUC: </span><span class="si">{</span><span class="n">aipw_auuc</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2">, Qini: </span><span class="si">{</span><span class="n">aipw_qini</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Random baseline    — AUUC: </span><span class="si">{</span><span class="n">rand_auuc</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</section>
+<section id="Summary">
+<h2>Summary<a class="headerlink" href="#Summary" title="Link to this heading"></a></h2>
+<p>In this tutorial we:</p>
+<ol class="arabic simple">
+<li><p>Simulated an RCT with <strong>heterogeneous treatment effects</strong> on real-world Bank Marketing features.</p></li>
+<li><p>Trained <strong>IPW</strong> and <strong>AIPW</strong> policy learners to find optimal treatment rules.</p></li>
+<li><p>Compared learned policies against baselines and the oracle.</p></li>
+<li><p>Identified the most important features for treatment assignment.</p></li>
+<li><p>Evaluated the policy as an uplift model using AUUC and Qini.</p></li>
+</ol>
+<section id="References">
+<h3>References<a class="headerlink" href="#References" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p>Athey, S. &amp; Wager, S. (2021). <em>Policy Learning with Observational Data</em>. Econometrica, 89(1), 133-161.</p></li>
+</ul>
+</section>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="dml_wage_gap.html" class="btn btn-neutral float-left" title="Double Machine Learning: Estimating the Gender Wage Gap" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="risk_compliance.html" class="btn btn-neutral float-right" title="Risk, Compliance, and Interpretability" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2026, Mutlu Simsek, Serkan Korkmaz, Pieter Pel.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
