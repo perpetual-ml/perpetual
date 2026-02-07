@@ -1,0 +1,40 @@
+TARGET = x86_64-pc-windows-gnu
+
+PKG_LIBS = -L. -lperpetual_r -lws2_32 -luserenv -lbcrypt -ladvapi32 -lntdll
+PKG_CFLAGS = -I./rust/target/$(TARGET)/release
+
+all: rust-target
+
+rust-target:
+	@echo "Building Rust library for Windows..."
+	@echo "Attempting to add $(TARGET) target..."
+	-rustup target add $(TARGET)
+	@if rustup target list --installed 2>/dev/null | grep -q "$(TARGET)" && \
+		cd rust && cargo build --release --lib --manifest-path Cargo.toml --target $(TARGET) --verbose > cargo_build.log 2>&1; then \
+		echo "Target $(TARGET) build successful."; \
+	else \
+		echo "Target $(TARGET) build failed. Detailed log:"; \
+		cat rust/cargo_build.log || true; \
+		echo "Falling back to default host target..."; \
+		cd rust && cargo build --release --lib --manifest-path Cargo.toml --verbose >> cargo_build.log 2>&1; \
+	fi
+	@if [ ! -f rust/target/$(TARGET)/release/libperpetual_r.a ] && [ ! -f rust/target/release/libperpetual_r.a ] && [ ! -f rust/target/release/perpetual_r.lib ]; then \
+		echo "ERROR: Detailed build log follow:"; \
+		cat rust/cargo_build.log || true; \
+	fi
+	@if [ -f rust/target/$(TARGET)/release/libperpetual_r.a ]; then \
+		echo "Found target artifact: rust/target/$(TARGET)/release/libperpetual_r.a"; \
+		cp rust/target/$(TARGET)/release/libperpetual_r.a .; \
+	elif [ -f rust/target/release/libperpetual_r.a ]; then \
+		echo "Found host artifact: rust/target/release/libperpetual_r.a"; \
+		cp rust/target/release/libperpetual_r.a .; \
+	elif [ -f rust/target/release/perpetual_r.lib ]; then \
+		echo "Found host artifact (MSVC): rust/target/release/perpetual_r.lib"; \
+		cp rust/target/release/perpetual_r.lib ./libperpetual_r.a; \
+	else \
+		echo "ERROR: libperpetual_r.a (or .lib) not found in expected locations!"; \
+		exit 1; \
+	fi
+
+clean:
+	rm -f libperpetual_r.a
