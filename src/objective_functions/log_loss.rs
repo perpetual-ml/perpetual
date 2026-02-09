@@ -139,4 +139,55 @@ impl ObjectiveFunction for LogLoss {
         }
         (g, Some(h), l)
     }
+
+    fn gradient_and_loss_into(
+        &self,
+        y: &[f64],
+        yhat: &[f64],
+        sample_weight: Option<&[f64]>,
+        _group: Option<&[u64]>,
+        grad: &mut [f32],
+        hess: &mut Option<Vec<f32>>,
+        loss: &mut [f32],
+    ) {
+        let len = y.len();
+        let h = hess.get_or_insert_with(|| vec![0.0; len]);
+        match sample_weight {
+            Some(w) => {
+                for i in 0..len {
+                    let y_val = y[i] as f32;
+                    let yhat_val = yhat[i] as f32;
+                    let w_val = w[i] as f32;
+                    let p = 1.0_f32 / (1.0 + (-yhat_val).exp());
+                    grad[i] = (p - y_val) * w_val;
+                    h[i] = p * (1.0 - p) * w_val;
+                    let p64 = 1.0_f64 / (1.0 + (-yhat[i]).exp());
+                    loss[i] = (-(y[i] * p64.ln() + (1.0 - y[i]) * (1.0 - p64).ln()) * w[i]) as f32;
+                }
+            }
+            None => {
+                for i in 0..len {
+                    let y_val = y[i] as f32;
+                    let yhat_val = yhat[i] as f32;
+                    let p = 1.0_f32 / (1.0 + (-yhat_val).exp());
+                    grad[i] = p - y_val;
+                    h[i] = p * (1.0 - p);
+                    let p64 = 1.0_f64 / (1.0 + (-yhat[i]).exp());
+                    loss[i] = (-(y[i] * p64.ln() + (1.0 - y[i]) * (1.0 - p64).ln())) as f32;
+                }
+            }
+        }
+    }
+}
+
+/// Compute log loss for a single sample without heap allocation.
+#[inline]
+#[allow(dead_code)]
+pub fn log_loss_single(y: f64, yhat: f64, sample_weight: Option<f64>) -> f32 {
+    let p = 1.0_f64 / (1.0_f64 + (-yhat).exp());
+    let l = -(y * p.ln() + (1.0_f64 - y) * (1.0_f64 - p).ln());
+    match sample_weight {
+        Some(w) => (l * w) as f32,
+        None => l as f32,
+    }
 }

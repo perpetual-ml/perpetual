@@ -413,21 +413,38 @@ pub fn pivot_on_split(
     start: usize,
     stop: usize,
     idx: &mut [usize],
-    grad: &mut [f32],
-    hess: &mut [f32],
+    _grad: &mut [f32],
+    _hess: &mut [f32],
     feature: &[u16],
     split_value: u16,
     missing_right: bool,
     left_cats: &[u8],
 ) -> usize {
     let index = &mut idx[start..stop];
-    let g = &mut grad[start..stop];
-    let h = &mut hess[start..stop];
 
     let length = index.len();
     if length == 0 {
         return 0;
     }
+
+    // Fast path: non-categorical numerical partition
+    if left_cats.is_empty() {
+        let mut lo = 0usize;
+        let mut hi = length;
+        while lo < hi {
+            let val = unsafe { *feature.get_unchecked(*index.get_unchecked(lo)) };
+            let goes_right = if val == 0 { missing_right } else { val >= split_value };
+            if goes_right {
+                hi -= 1;
+                index.swap(lo, hi);
+            } else {
+                lo += 1;
+            }
+        }
+        return lo;
+    }
+
+    // Slow path: categorical splits
     let mut last_idx = length - 1;
     let mut rv = None;
 
@@ -440,8 +457,6 @@ pub fn pivot_on_split(
                 break;
             }
             index.swap(i, last_idx);
-            g.swap(i, last_idx);
-            h.swap(i, last_idx);
             if last_idx == 0 {
                 rv = Some(0);
                 break;
@@ -465,19 +480,37 @@ pub fn pivot_on_split_const_hess(
     start: usize,
     stop: usize,
     idx: &mut [usize],
-    grad: &mut [f32],
+    _grad: &mut [f32],
     feature: &[u16],
     split_value: u16,
     missing_right: bool,
     left_cats: &[u8],
 ) -> usize {
     let index = &mut idx[start..stop];
-    let g = &mut grad[start..stop];
 
     let length = index.len();
     if length == 0 {
         return 0;
     }
+
+    // Fast path: non-categorical numerical partition
+    if left_cats.is_empty() {
+        let mut lo = 0usize;
+        let mut hi = length;
+        while lo < hi {
+            let val = unsafe { *feature.get_unchecked(*index.get_unchecked(lo)) };
+            let goes_right = if val == 0 { missing_right } else { val >= split_value };
+            if goes_right {
+                hi -= 1;
+                index.swap(lo, hi);
+            } else {
+                lo += 1;
+            }
+        }
+        return lo;
+    }
+
+    // Slow path: categorical splits
     let mut last_idx = length - 1;
     let mut rv = None;
 
@@ -490,7 +523,6 @@ pub fn pivot_on_split_const_hess(
                 break;
             }
             index.swap(i, last_idx);
-            g.swap(i, last_idx);
             if last_idx == 0 {
                 rv = Some(0);
                 break;
@@ -529,36 +561,27 @@ pub fn pivot_on_split_exclude_missing(
     start: usize,
     stop: usize,
     idx: &mut [usize],
-    grad: &mut [f32],
-    hess: &mut [f32],
+    _grad: &mut [f32],
+    _hess: &mut [f32],
     feature: &[u16],
     split_value: u16,
     left_cats: &[u8],
 ) -> (usize, usize) {
     let index = &mut idx[start..stop];
-    let gr = &mut grad[start..stop];
-    let hs = &mut hess[start..stop];
+    // With absolute-indexing histograms, only the index array needs to be pivoted.
     let length = index.len();
     if length == 0 {
         return (0, 0);
     }
-    // I think we can do this in O(n) time...
     let mut low = 0;
     let mut high = length - 1;
-    // The index of the first value, that is not
-    // missing.
     let mut missing = 0;
     let max_idx = high;
     while low < high {
-        // Go until we find a low value that needs to
-        // be swapped, this will be the first value
-        // that our split value is less or equal to.
         while low < max_idx {
             let l = feature[index[low]];
             if l == 0 {
                 index.swap(missing, low);
-                gr.swap(missing, low);
-                hs.swap(missing, low);
                 missing += 1;
                 low += 1;
                 continue;
@@ -570,25 +593,13 @@ pub fn pivot_on_split_exclude_missing(
         }
         while high > low {
             let h = feature[index[high]];
-            // If this is missing, we need to
-            // swap this value with missing, and
-            // then that value with low.
             if h == 0 {
                 index.swap(missing, high);
-                gr.swap(missing, high);
-                hs.swap(missing, high);
                 missing += 1;
-                // Low must be at least equal to
-                // missing. Otherwise, we would get
-                // stuck, because low will be zero
-                // then...
                 if missing > low {
                     low = missing;
                 }
             }
-            // Go until we find a high value that needs to be
-            // swapped, this will be the first value that our
-            // split_value is greater than.
             match exclude_missing_compare(&split_value, h, left_cats) {
                 Ordering::Less | Ordering::Equal => high -= 1,
                 Ordering::Greater => break,
@@ -596,16 +607,12 @@ pub fn pivot_on_split_exclude_missing(
         }
         if low < high {
             index.swap(high, low);
-            gr.swap(high, low);
-            hs.swap(high, low);
         }
     }
     if low == high && low < length {
         let l = feature[index[low]];
         if l == 0 {
             index.swap(missing, low);
-            gr.swap(missing, low);
-            hs.swap(missing, low);
             missing += 1;
             low += 1;
         } else if exclude_missing_compare(&split_value, l, left_cats) == Ordering::Greater {
@@ -620,33 +627,26 @@ pub fn pivot_on_split_exclude_missing_const_hess(
     start: usize,
     stop: usize,
     idx: &mut [usize],
-    grad: &mut [f32],
+    _grad: &mut [f32],
     feature: &[u16],
     split_value: u16,
     left_cats: &[u8],
 ) -> (usize, usize) {
     let index = &mut idx[start..stop];
-    let gr = &mut grad[start..stop];
+    // With absolute-indexing histograms, only the index array needs to be pivoted.
     let length = index.len();
     if length == 0 {
         return (0, 0);
     }
-    // I think we can do this in O(n) time...
     let mut low = 0;
     let mut high = length - 1;
-    // The index of the first value, that is not
-    // missing.
     let mut missing = 0;
     let max_idx = high;
     while low < high {
-        // Go until we find a low value that needs to
-        // be swapped, this will be the first value
-        // that our split value is less or equal to.
         while low < max_idx {
             let l = feature[index[low]];
             if l == 0 {
                 index.swap(missing, low);
-                gr.swap(missing, low);
                 missing += 1;
                 low += 1;
                 continue;
@@ -658,24 +658,13 @@ pub fn pivot_on_split_exclude_missing_const_hess(
         }
         while high > low {
             let h = feature[index[high]];
-            // If this is missing, we need to
-            // swap this value with missing, and
-            // then that value with low.
             if h == 0 {
                 index.swap(missing, high);
-                gr.swap(missing, high);
                 missing += 1;
-                // Low must be at least equal to
-                // missing. Otherwise, we would get
-                // stuck, because low will be zero
-                // then...
                 if missing > low {
                     low = missing;
                 }
             }
-            // Go until we find a high value that needs to be
-            // swapped, this will be the first value that our
-            // split_value is greater than.
             match exclude_missing_compare(&split_value, h, left_cats) {
                 Ordering::Less | Ordering::Equal => high -= 1,
                 Ordering::Greater => break,
@@ -683,14 +672,12 @@ pub fn pivot_on_split_exclude_missing_const_hess(
         }
         if low < high {
             index.swap(high, low);
-            gr.swap(high, low);
         }
     }
     if low == high && low < length {
         let l = feature[index[low]];
         if l == 0 {
             index.swap(missing, low);
-            gr.swap(missing, low);
             missing += 1;
             low += 1;
         } else if exclude_missing_compare(&split_value, l, left_cats) == Ordering::Greater {

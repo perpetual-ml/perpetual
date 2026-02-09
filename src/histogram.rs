@@ -74,8 +74,8 @@ impl<'a> FeatureHistogram<'a> {
     ///
     /// # Arguments
     /// * `feature`: A slice of bin indices for each data element.
-    /// * `sorted_grad`: A slice of gradients corresponding to the data elements in this node.
-    /// * `sorted_hess`: An optional slice of Hessian values corresponding to the data elements.
+    /// * `sorted_grad`: The full gradient array (absolute indexing via `index`).
+    /// * `sorted_hess`: An optional full Hessian array (absolute indexing via `index`).
     /// * `index`: A slice of original indices for the data elements in this node.
     ///
     /// # Safety
@@ -84,48 +84,182 @@ impl<'a> FeatureHistogram<'a> {
     ///
     /// 1. The `feature` slice must be a valid bin index for every element.
     /// 2. All indices in the `index` slice must be within the bounds of the `feature` slice.
-    /// 3. The `sorted_grad` slice must have the same length as the `index` slice.
-    /// 4. If `sorted_hess` is `Some`, it must also have the same length as the `index` slice.
+    /// 3. The `sorted_grad` slice must cover all indices referenced by `index`.
+    /// 4. If `sorted_hess` is `Some`, it must also cover all indices referenced by `index`.
     /// 5. The internal `self.data` structure must not be modified externally while this function is running.
     /// 6. Each element in `self.data` must contain a valid `Some` value that can be mutated.
-    pub unsafe fn update(
-        &self,
-        feature: &[u16], // an array which shows the bin index for each element of the feature, length = whole length of data
-        sorted_grad: &[f32], // grad with length of data that falls into this node
-        sorted_hess: Option<&[f32]>, // hess with length of data that falls into this split
-        index: &[usize], // indices with length of data that falls into this node
-    ) {
+    pub unsafe fn update(&self, feature: &[u16], sorted_grad: &[f32], sorted_hess: Option<&[f32]>, index: &[usize]) {
+        let n_bins = self.data.len();
+        let n = index.len();
+
+        // For very small nodes, accumulate directly into Bin structs.
+        // The overhead of zeroing a 6 KB+ stack array dominates for < ~64 samples.
+        if n < 64 {
+            match sorted_hess {
+                Some(sorted_hess) => {
+                    self.data.iter().for_each(|b| {
+                        let bin = b.get().as_mut().unwrap_unchecked();
+                        bin.g_folded = [f32::ZERO; 5];
+                        bin.h_folded = [f32::ZERO; 5];
+                        bin.counts = [0; 5];
+                    });
+                    for k in 0..n {
+                        let i = *index.get_unchecked(k);
+                        let b = self.data.get_unchecked(*feature.get_unchecked(i) as usize).get();
+                        let bin = b.as_mut().unwrap_unchecked();
+                        let fold = i % 5;
+                        *bin.g_folded.get_unchecked_mut(fold) += *sorted_grad.get_unchecked(i);
+                        *bin.h_folded.get_unchecked_mut(fold) += *sorted_hess.get_unchecked(i);
+                        *bin.counts.get_unchecked_mut(fold) += 1;
+                    }
+                }
+                None => {
+                    self.data.iter().for_each(|b| {
+                        let bin = b.get().as_mut().unwrap_unchecked();
+                        bin.g_folded = [f32::ZERO; 5];
+                        bin.counts = [0; 5];
+                        bin.h_folded = [f32::ZERO; 5];
+                    });
+                    for k in 0..n {
+                        let i = *index.get_unchecked(k);
+                        let b = self.data.get_unchecked(*feature.get_unchecked(i) as usize).get();
+                        let bin = b.as_mut().unwrap_unchecked();
+                        let fold = i % 5;
+                        *bin.g_folded.get_unchecked_mut(fold) += *sorted_grad.get_unchecked(i);
+                        *bin.counts.get_unchecked_mut(fold) += 1;
+                    }
+                }
+            }
+            return;
+        }
+
+        // ── Flat-buffer histogram accumulation ──
+        //
+        // Instead of accumulating directly into 72-byte Bin structs (which causes
+        // cache-line thrashing on random scatter writes), we accumulate into compact
+        // flat arrays laid out as [bin0_fold0..bin0_fold4, bin1_fold0..].
+        //
+        // For 256 bins: grad = 256×5×4 = 5 KB, counts = 256×5×4 = 5 KB → 10 KB total,
+        // fitting entirely in L1 cache. This eliminates the dominant cache-miss cost
+        // of the histogram building phase.
+        //
+        // Stack-allocated with a compile-time max to avoid heap allocations.
+        const MAX_FLAT: usize = 300 * 5; // supports up to 300 bins
+        debug_assert!(n_bins * 5 <= MAX_FLAT, "n_bins {} exceeds flat buffer capacity", n_bins);
+        let flat_len = n_bins * 5;
+
+        // Use MaybeUninit to avoid zeroing the full MAX_FLAT array.
+        // Only zero the flat_len portion we actually use via write_bytes.
+        let mut flat_grad_storage: std::mem::MaybeUninit<[f32; MAX_FLAT]> = std::mem::MaybeUninit::uninit();
+        let mut flat_counts_storage: std::mem::MaybeUninit<[u32; MAX_FLAT]> = std::mem::MaybeUninit::uninit();
+        let gp = flat_grad_storage.as_mut_ptr() as *mut f32;
+        let cp = flat_counts_storage.as_mut_ptr() as *mut u32;
+        core::ptr::write_bytes(gp, 0, flat_len);
+        core::ptr::write_bytes(cp, 0, flat_len);
+        let flat_grad = core::slice::from_raw_parts_mut(gp, flat_len);
+        let flat_counts = core::slice::from_raw_parts_mut(cp, flat_len);
+
         match sorted_hess {
             Some(sorted_hess) => {
-                self.data.iter().for_each(|b| {
-                    let bin = b.get().as_mut().unwrap();
-                    bin.g_folded = [f32::ZERO; 5];
-                    bin.h_folded = [f32::ZERO; 5];
-                    bin.counts = [0; 5];
-                });
-                index.iter().zip(sorted_grad).zip(sorted_hess).for_each(|((i, g), h)| {
-                    let b = self.data.get_unchecked(feature[*i] as usize).get();
-                    let bin = b.as_mut().unwrap_unchecked();
-                    let fold = i % 5;
-                    bin.g_folded[fold] += *g;
-                    bin.h_folded[fold] += *h;
-                    bin.counts[fold] += 1;
-                });
+                let mut flat_hess_storage: std::mem::MaybeUninit<[f32; MAX_FLAT]> = std::mem::MaybeUninit::uninit();
+                let hp = flat_hess_storage.as_mut_ptr() as *mut f32;
+                core::ptr::write_bytes(hp, 0, flat_len);
+                let flat_hess = core::slice::from_raw_parts_mut(hp, flat_len);
+
+                // Prefetch source data to hide memory latency on reads
+                #[cfg(target_arch = "x86_64")]
+                {
+                    use core::arch::x86_64::{_mm_prefetch, _MM_HINT_T0, _MM_HINT_T1};
+                    const PF_FAR: usize = 16;
+                    const PF_NEAR: usize = 4;
+                    let n = index.len();
+                    for k in 0..n {
+                        if k + PF_FAR < n {
+                            let far = *index.get_unchecked(k + PF_FAR);
+                            _mm_prefetch(feature.as_ptr().add(far) as *const i8, _MM_HINT_T1);
+                            _mm_prefetch(sorted_grad.as_ptr().add(far) as *const i8, _MM_HINT_T1);
+                            _mm_prefetch(sorted_hess.as_ptr().add(far) as *const i8, _MM_HINT_T1);
+                        }
+                        if k + PF_NEAR < n {
+                            let near = *index.get_unchecked(k + PF_NEAR);
+                            _mm_prefetch(feature.as_ptr().add(near) as *const i8, _MM_HINT_T0);
+                            _mm_prefetch(sorted_grad.as_ptr().add(near) as *const i8, _MM_HINT_T0);
+                            _mm_prefetch(sorted_hess.as_ptr().add(near) as *const i8, _MM_HINT_T0);
+                        }
+                        let i = *index.get_unchecked(k);
+                        let bin_idx = *feature.get_unchecked(i) as usize;
+                        let slot = bin_idx * 5 + (i % 5);
+                        *flat_grad.get_unchecked_mut(slot) += *sorted_grad.get_unchecked(i);
+                        *flat_hess.get_unchecked_mut(slot) += *sorted_hess.get_unchecked(i);
+                        *flat_counts.get_unchecked_mut(slot) += 1;
+                    }
+                }
+                #[cfg(not(target_arch = "x86_64"))]
+                {
+                    for k in 0..index.len() {
+                        let i = *index.get_unchecked(k);
+                        let bin_idx = *feature.get_unchecked(i) as usize;
+                        let slot = bin_idx * 5 + (i % 5);
+                        *flat_grad.get_unchecked_mut(slot) += *sorted_grad.get_unchecked(i);
+                        *flat_hess.get_unchecked_mut(slot) += *sorted_hess.get_unchecked(i);
+                        *flat_counts.get_unchecked_mut(slot) += 1;
+                    }
+                }
+
+                // Scatter from flat buffers → Bin structs (sequential, cache-friendly)
+                for b_idx in 0..n_bins {
+                    let bin = self.data.get_unchecked(b_idx).get().as_mut().unwrap_unchecked();
+                    let base = b_idx * 5;
+                    bin.g_folded.copy_from_slice(flat_grad.get_unchecked(base..base + 5));
+                    bin.h_folded.copy_from_slice(flat_hess.get_unchecked(base..base + 5));
+                    bin.counts.copy_from_slice(flat_counts.get_unchecked(base..base + 5));
+                }
             }
             None => {
-                self.data.iter().for_each(|b| {
-                    let bin = b.get().as_mut().unwrap();
-                    bin.g_folded = [f32::ZERO; 5];
+                // const_hess path — no hessian
+                #[cfg(target_arch = "x86_64")]
+                {
+                    use core::arch::x86_64::{_mm_prefetch, _MM_HINT_T0, _MM_HINT_T1};
+                    const PF_FAR: usize = 16;
+                    const PF_NEAR: usize = 4;
+                    let n = index.len();
+                    for k in 0..n {
+                        if k + PF_FAR < n {
+                            let far = *index.get_unchecked(k + PF_FAR);
+                            _mm_prefetch(feature.as_ptr().add(far) as *const i8, _MM_HINT_T1);
+                            _mm_prefetch(sorted_grad.as_ptr().add(far) as *const i8, _MM_HINT_T1);
+                        }
+                        if k + PF_NEAR < n {
+                            let near = *index.get_unchecked(k + PF_NEAR);
+                            _mm_prefetch(feature.as_ptr().add(near) as *const i8, _MM_HINT_T0);
+                            _mm_prefetch(sorted_grad.as_ptr().add(near) as *const i8, _MM_HINT_T0);
+                        }
+                        let i = *index.get_unchecked(k);
+                        let bin_idx = *feature.get_unchecked(i) as usize;
+                        let slot = bin_idx * 5 + (i % 5);
+                        *flat_grad.get_unchecked_mut(slot) += *sorted_grad.get_unchecked(i);
+                        *flat_counts.get_unchecked_mut(slot) += 1;
+                    }
+                }
+                #[cfg(not(target_arch = "x86_64"))]
+                {
+                    for k in 0..index.len() {
+                        let i = *index.get_unchecked(k);
+                        let bin_idx = *feature.get_unchecked(i) as usize;
+                        let slot = bin_idx * 5 + (i % 5);
+                        *flat_grad.get_unchecked_mut(slot) += *sorted_grad.get_unchecked(i);
+                        *flat_counts.get_unchecked_mut(slot) += 1;
+                    }
+                }
+
+                // Scatter from flat buffers → Bin structs
+                for b_idx in 0..n_bins {
+                    let bin = self.data.get_unchecked(b_idx).get().as_mut().unwrap_unchecked();
+                    let base = b_idx * 5;
+                    bin.g_folded.copy_from_slice(flat_grad.get_unchecked(base..base + 5));
+                    bin.counts.copy_from_slice(flat_counts.get_unchecked(base..base + 5));
                     bin.h_folded = [f32::ZERO; 5];
-                    bin.counts = [0; 5];
-                });
-                index.iter().zip(sorted_grad).for_each(|(i, g)| {
-                    let b = self.data.get_unchecked(feature[*i] as usize).get();
-                    let bin = b.as_mut().unwrap_unchecked();
-                    let fold = i % 5;
-                    bin.g_folded[fold] += *g;
-                    bin.counts[fold] += 1;
-                });
+                }
             }
         }
     }
@@ -451,30 +585,19 @@ pub fn update_histogram(
     index: &[usize],
     col_index: &[usize],
     pool: &ThreadPool,
-    sort: bool,
+    _sort: bool,
 ) {
-    let (sorted_grad, sorted_hess) = match hess {
-        Some(hess) => {
-            if !sort {
-                (grad, Some(hess))
-            } else {
-                let g = &grad[start..stop];
-                let h = &hess[start..stop];
-                (g, Some(h))
-            }
-        }
-        None => {
-            if !sort {
-                (grad, None)
-            } else {
-                let g = &grad[start..stop];
-                (g, None)
-            }
-        }
-    };
+    // With absolute indexing, we always pass the full grad/hess arrays.
+    // The FeatureHistogram::update reads grad[index[k]] directly.
+    let sorted_grad = grad;
+    let sorted_hess = hess;
 
     unsafe {
-        if pool.current_num_threads() > 1 {
+        let n_samples = stop - start;
+        // For small nodes, the Rayon scope overhead (~1-5μs per scope) exceeds
+        // the parallelism benefit. Skip parallelism when there are fewer than
+        // 512 samples to process per feature.
+        if pool.current_num_threads() > 1 && n_samples >= 512 {
             pool.scope(|s| {
                 for (i, &col) in col_index.iter().enumerate().take(hist.data.len()) {
                     let h = hist.data.get_unchecked(i);
@@ -490,6 +613,156 @@ pub fn update_histogram(
                     .get_unchecked(i)
                     .update(data.get_col(*col), sorted_grad, sorted_hess, &index[start..stop]);
             });
+        }
+    }
+}
+
+/// Build histogram for the smaller child AND derive the larger child's
+/// histogram via subtraction from the parent, all in a single Rayon scope.
+///
+/// This fuses `update_histogram` + `NodeHistogram::from_parent_child` into one
+/// parallel step, eliminating a separate sequential subtraction pass and
+/// improving cache locality (each feature's histogram data is still hot in L1
+/// when the subtraction runs).
+///
+/// # Safety
+/// Same requirements as `update_histogram` plus:
+/// - `parent_num`, `child_num`, and `update_num` must be valid indices into `hist_tree`.
+/// - The parent histogram must already be populated.
+#[allow(clippy::too_many_arguments)]
+pub fn update_histogram_and_subtract(
+    hist_tree: &[NodeHistogram],
+    parent_num: usize,
+    child_num: usize,
+    update_num: usize,
+    start: usize,
+    stop: usize,
+    data: &Matrix<u16>,
+    grad: &[f32],
+    hess: Option<&[f32]>,
+    index: &[usize],
+    col_index: &[usize],
+    pool: &ThreadPool,
+) {
+    let sorted_grad = grad;
+    let sorted_hess = hess;
+
+    unsafe {
+        let child_hist = hist_tree.get_unchecked(child_num);
+        let parent_hist = hist_tree.get_unchecked(parent_num);
+        let update_hist = hist_tree.get_unchecked(update_num);
+        let n_samples = stop - start;
+
+        if pool.current_num_threads() > 1 && n_samples >= 512 {
+            pool.scope(|s| {
+                for (i, &col) in col_index.iter().enumerate().take(child_hist.data.len()) {
+                    let ch = child_hist.data.get_unchecked(i);
+                    let ph = parent_hist.data.get_unchecked(i);
+                    let uh = update_hist.data.get_unchecked(i);
+                    let feature = data.get_col(col);
+                    s.spawn(move |_| {
+                        // Step 1: Build child histogram
+                        ch.update(feature, sorted_grad, sorted_hess, &index[start..stop]);
+                        // Step 2: Derive sibling histogram via subtraction
+                        // (cache-local: child histogram data is still hot in L1)
+                        ph.data.iter().zip(ch.data.iter()).zip(uh.data.iter()).for_each(
+                            |((parent_cell, child_cell), update_cell)| {
+                                Bin::from_parent_child(parent_cell.get(), child_cell.get(), update_cell.get())
+                            },
+                        );
+                    });
+                }
+            });
+        } else {
+            // Sequential fallback: build child histogram then subtract
+            col_index.iter().enumerate().for_each(|(i, col)| {
+                child_hist.data.get_unchecked(i).update(
+                    data.get_col(*col),
+                    sorted_grad,
+                    sorted_hess,
+                    &index[start..stop],
+                );
+            });
+            NodeHistogram::from_parent_child(hist_tree, parent_num, child_num, update_num);
+        }
+    }
+}
+
+/// Build histograms for two smaller children AND derive the largest child's
+/// histogram via subtraction from the parent, all in a single Rayon scope.
+///
+/// Used when a node splits into 3 children (left, right, missing-branch).
+/// The two smaller children get their histograms built from data, and the
+/// largest child's histogram is derived as parent - first - second.
+#[allow(clippy::too_many_arguments)]
+pub fn update_two_histograms_and_subtract(
+    hist_tree: &[NodeHistogram],
+    parent_num: usize,
+    first_num: usize,
+    first_start: usize,
+    first_stop: usize,
+    second_num: usize,
+    second_start: usize,
+    second_stop: usize,
+    update_num: usize,
+    data: &Matrix<u16>,
+    grad: &[f32],
+    hess: Option<&[f32]>,
+    index: &[usize],
+    col_index: &[usize],
+    pool: &ThreadPool,
+) {
+    let sorted_grad = grad;
+    let sorted_hess = hess;
+
+    unsafe {
+        let first_hist = hist_tree.get_unchecked(first_num);
+        let second_hist = hist_tree.get_unchecked(second_num);
+        let parent_hist = hist_tree.get_unchecked(parent_num);
+        let update_hist = hist_tree.get_unchecked(update_num);
+        let n_samples = (first_stop - first_start) + (second_stop - second_start);
+
+        if pool.current_num_threads() > 1 && n_samples >= 512 {
+            pool.scope(|s| {
+                for (i, &col) in col_index.iter().enumerate().take(first_hist.data.len()) {
+                    let fh = first_hist.data.get_unchecked(i);
+                    let sh = second_hist.data.get_unchecked(i);
+                    let ph = parent_hist.data.get_unchecked(i);
+                    let uh = update_hist.data.get_unchecked(i);
+                    let feature = data.get_col(col);
+                    s.spawn(move |_| {
+                        // Build both children's histograms
+                        fh.update(feature, sorted_grad, sorted_hess, &index[first_start..first_stop]);
+                        sh.update(feature, sorted_grad, sorted_hess, &index[second_start..second_stop]);
+                        // Derive largest child via: update = parent - first - second
+                        ph.data
+                            .iter()
+                            .zip(fh.data.iter())
+                            .zip(sh.data.iter())
+                            .zip(uh.data.iter())
+                            .for_each(|(((pc, fc), sc), uc)| {
+                                Bin::from_parent_two_children(pc.get(), fc.get(), sc.get(), uc.get())
+                            });
+                    });
+                }
+            });
+        } else {
+            // Sequential fallback
+            col_index.iter().enumerate().for_each(|(i, col)| {
+                first_hist.data.get_unchecked(i).update(
+                    data.get_col(*col),
+                    sorted_grad,
+                    sorted_hess,
+                    &index[first_start..first_stop],
+                );
+                second_hist.data.get_unchecked(i).update(
+                    data.get_col(*col),
+                    sorted_grad,
+                    sorted_hess,
+                    &index[second_start..second_stop],
+                );
+            });
+            NodeHistogram::from_parent_two_children(hist_tree, parent_num, first_num, second_num, update_num);
         }
     }
 }

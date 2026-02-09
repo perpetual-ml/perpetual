@@ -100,4 +100,49 @@ impl ObjectiveFunction for SquaredLoss {
             }
         }
     }
+
+    fn gradient_and_loss_into(
+        &self,
+        y: &[f64],
+        yhat: &[f64],
+        sample_weight: Option<&[f64]>,
+        _group: Option<&[u64]>,
+        grad: &mut [f32],
+        hess: &mut Option<Vec<f32>>,
+        loss: &mut [f32],
+    ) {
+        let len = y.len();
+        match sample_weight {
+            Some(w) => {
+                let h = hess.get_or_insert_with(|| vec![0.0; len]);
+                for i in 0..len {
+                    let diff = yhat[i] - y[i];
+                    let w_val = w[i] as f32;
+                    grad[i] = diff as f32 * w_val;
+                    h[i] = w_val;
+                    loss[i] = (diff * diff * w[i]) as f32;
+                }
+            }
+            None => {
+                *hess = None;
+                for i in 0..len {
+                    let diff = yhat[i] - y[i];
+                    grad[i] = diff as f32;
+                    loss[i] = (diff * diff) as f32;
+                }
+            }
+        }
+    }
+}
+
+/// Compute squared loss for a single sample without heap allocation.
+#[inline]
+#[allow(dead_code)]
+pub fn squared_loss_single(y: f64, yhat: f64, sample_weight: Option<f64>) -> f32 {
+    let s = y - yhat;
+    let l = s * s;
+    match sample_weight {
+        Some(w) => (l * w) as f32,
+        None => l as f32,
+    }
 }

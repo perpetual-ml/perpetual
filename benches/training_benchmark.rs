@@ -6,7 +6,11 @@ use std::fs;
 use std::hint::black_box;
 use std::time::Duration;
 
-pub fn training_benchmark(c: &mut Criterion) {
+// Baseline results:
+// cal_housing: 5.66s -> 1.83s
+// cover_types: 9.07s -> 3.98s
+
+pub fn training_benchmark_cal_housing(c: &mut Criterion) {
     let file_content =
         fs::read_to_string("resources/cal_housing_train.csv").expect("Something went wrong reading the file");
 
@@ -14,7 +18,8 @@ pub fn training_benchmark(c: &mut Criterion) {
     let mut lines = file_content.lines();
     lines.next(); // Skip header line
 
-    let mut data_vec: Vec<f64> = Vec::new();
+    let n_features = 8;
+    let mut columns: Vec<Vec<f64>> = vec![Vec::new(); n_features];
     let mut y: Vec<f64> = Vec::new();
 
     for line in lines {
@@ -23,23 +28,26 @@ pub fn training_benchmark(c: &mut Criterion) {
             .map(|x| x.parse::<f64>().expect("Parse error"))
             .collect();
         // Last column is target
-        y.push(values[8]);
-        // First 8 columns are features
-        data_vec.extend_from_slice(&values[0..8]);
+        y.push(values[n_features]);
+        // First 8 columns are features (column-major order)
+        for j in 0..n_features {
+            columns[j].push(values[j]);
+        }
     }
 
-    let data = Matrix::new(&data_vec, y.len(), 8);
+    let data_vec: Vec<f64> = columns.into_iter().flatten().collect();
+    let data = Matrix::new(&data_vec, y.len(), n_features);
 
-    let mut group = c.benchmark_group("training_benchmark");
+    let mut group = c.benchmark_group("training_benchmark_cal_housing");
     group.warm_up_time(Duration::from_secs(5));
-    group.measurement_time(Duration::from_secs(60)); // Increased for stability
-    group.sample_size(40); // Increased from 10 to 40 to reduce outlier impact
+    group.measurement_time(Duration::from_secs(120)); // Increased for stability
+    group.sample_size(20); // Increased from 10 to 40 to reduce outlier impact
 
-    group.bench_function("train_booster_cal_housing", |b| {
+    group.bench_function("training_benchmark_cal_housing", |b| {
         b.iter(|| {
             let mut booster = PerpetualBooster::default()
                 .set_objective(Objective::SquaredLoss)
-                .set_budget(2.0);
+                .set_budget(1.0);
             // Using default parameters as baseline
             booster
                 .fit(black_box(&data), black_box(&y), black_box(None), black_box(None))
@@ -54,9 +62,10 @@ pub fn training_benchmark_cover_types(c: &mut Criterion) {
         fs::read_to_string("resources/cover_types_train.csv").expect("Something went wrong reading the file");
 
     // Skip header and limit rows
-    let lines = file_content.lines().skip(1).take(10000);
+    let lines = file_content.lines().skip(1).take(50000);
 
-    let mut data_vec: Vec<f64> = Vec::new();
+    let n_features = 20;
+    let mut columns: Vec<Vec<f64>> = vec![Vec::new(); n_features];
     let mut y: Vec<f64> = Vec::new();
 
     for line in lines {
@@ -66,19 +75,31 @@ pub fn training_benchmark_cover_types(c: &mut Criterion) {
             .collect();
         // Last column is target
         y.push(values[values.len() - 1]);
-        // Rest are features
-        data_vec.extend_from_slice(&values[0..10]);
+        // First columns are features (column-major order)
+        for j in 0..n_features {
+            columns[j].push(values[j]);
+        }
     }
 
-    let n_cols = data_vec.len() / y.len();
-    let data = Matrix::new(&data_vec, y.len(), n_cols);
+    // Convert to binary: find majority class → 0, rest → 1
+    let mut class_counts = std::collections::HashMap::new();
+    for &v in &y {
+        *class_counts.entry(v as i64).or_insert(0usize) += 1;
+    }
+    let majority_class = *class_counts.iter().max_by_key(|(_, c)| **c).unwrap().0;
+    for v in y.iter_mut() {
+        *v = if *v as i64 == majority_class { 0.0 } else { 1.0 };
+    }
 
-    let mut group = c.benchmark_group("training_benchmark_cover");
+    let data_vec: Vec<f64> = columns.into_iter().flatten().collect();
+    let data = Matrix::new(&data_vec, y.len(), n_features);
+
+    let mut group = c.benchmark_group("training_benchmark_cover_types");
     group.warm_up_time(Duration::from_secs(5));
-    group.measurement_time(Duration::from_secs(60));
-    group.sample_size(40);
+    group.measurement_time(Duration::from_secs(120));
+    group.sample_size(20);
 
-    group.bench_function("train_booster_cover_types", |b| {
+    group.bench_function("training_benchmark_cover_types", |b| {
         b.iter(|| {
             let mut booster = PerpetualBooster::default().set_objective(Objective::LogLoss);
             booster
@@ -89,5 +110,5 @@ pub fn training_benchmark_cover_types(c: &mut Criterion) {
     group.finish();
 }
 
-criterion_group!(benches, training_benchmark, training_benchmark_cover_types);
+criterion_group!(benches, training_benchmark_cal_housing, training_benchmark_cover_types);
 criterion_main!(benches);

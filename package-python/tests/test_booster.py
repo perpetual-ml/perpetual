@@ -740,7 +740,7 @@ def test_calibration():
     model = PerpetualBooster(objective="SquaredLoss")
     model.fit(X_train, y_train)
 
-    alpha = [0.1]
+    alpha = [0.2]
     model.calibrate(X_train, y_train, X_cal, y_cal, alpha)
     predicted_intervals = model.predict_intervals(X_test)
 

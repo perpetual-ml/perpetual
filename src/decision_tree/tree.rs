@@ -42,6 +42,14 @@ pub struct Tree {
     pub depth: usize,
     /// Number of leaf nodes.
     pub n_leaves: usize,
+    /// Training-time leaf info: `(weight_value, start_idx, stop_idx)` for each leaf.
+    /// Used for fast yhat updates without re-traversing the tree.
+    #[serde(skip)]
+    pub leaf_bounds: Vec<(f64, usize, usize)>,
+    /// The rearranged index from the most recent `fit()` call.
+    /// Samples belonging to the same leaf are contiguous.
+    #[serde(skip)]
+    pub train_index: Vec<usize>,
 }
 
 impl Default for Tree {
@@ -53,10 +61,12 @@ impl Default for Tree {
 impl Tree {
     pub fn new() -> Self {
         Tree {
-            nodes: HashMap::new(),
+            nodes: HashMap::with_capacity(16),
             stopper: TreeStopper::Generalization,
             depth: 0,
             n_leaves: 0,
+            leaf_bounds: Vec::new(),
+            train_index: Vec::new(),
         }
     }
 
@@ -174,6 +184,8 @@ impl Tree {
         let mut loss_decr_avg = 0.0_f32;
         let index_length = index.len() as f32;
 
+        let mut leaf_bounds: Vec<(f64, usize, usize)> = Vec::new();
+
         growable.add_node(root_node);
         while !growable.is_empty() {
             // If this will push us over the number of allocated nodes, break.
@@ -229,6 +241,9 @@ impl Tree {
             let n_new_nodes = new_nodes.len();
             if n_new_nodes == 0 {
                 self.n_leaves += 1;
+                // Node couldn't be split — record as leaf
+                let weight = self.nodes.get(&node.num).map(|n| n.weight_value as f64).unwrap_or(0.0);
+                leaf_bounds.push((weight, node.start_idx, node.stop_idx));
             } else {
                 // self.nodes[n_idx].make_parent_node(node);
                 if let Some(x) = self.nodes.get_mut(&n_idx) {
@@ -255,41 +270,72 @@ impl Tree {
                             }
 
                             let loss_new = objective_function.loss(y, y_hat_new, sample_weight, group);
+                            let inv_n = 1.0 / index_length;
+                            let mut delta_sum = 0.0f32;
                             for &i in node_indices {
-                                loss_decr_avg -= loss_decr[i] / index_length;
-                                loss_decr[i] = loss[i] - loss_new[i];
-                                loss_decr_avg += loss_decr[i] / index_length;
+                                let new_decr = loss[i] - loss_new[i];
+                                delta_sum += new_decr - loss_decr[i];
+                                loss_decr[i] = new_decr;
                             }
+                            loss_decr_avg += delta_sum * inv_n;
                         } else {
-                            for i in node_indices.iter() {
-                                let _i = *i;
-                                let s_weight: Vec<f64>;
-                                let s_w = match sample_weight {
-                                    Some(sample_weight) => {
-                                        s_weight = vec![sample_weight[_i]];
-                                        Some(&s_weight[..])
+                            // Hoist invariants: cast weight once, precompute reciprocal.
+                            // Split sample_weight branch outside the loop to avoid
+                            // per-iteration branching. Batch delta accumulation.
+                            let weight_f64 = node.weight_value as f64;
+                            let inv_n = 1.0 / index_length;
+                            let mut delta_sum = 0.0f32;
+                            match sample_weight {
+                                Some(sw) => {
+                                    for &_i in node_indices {
+                                        let yhat_new = yhat[_i] + weight_f64;
+                                        let loss_new = objective_function.loss_single(y[_i], yhat_new, Some(sw[_i]));
+                                        let new_decr = loss[_i] - loss_new;
+                                        delta_sum += new_decr - loss_decr[_i];
+                                        loss_decr[_i] = new_decr;
                                     }
-                                    None => None,
-                                };
-
-                                let yhat_new = yhat[_i] + node.weight_value as f64;
-                                let loss_new = objective_function.loss(&[y[_i]], &[yhat_new], s_w, None)[0];
-                                loss_decr_avg -= loss_decr[_i] / index_length;
-                                loss_decr[_i] = loss[_i] - loss_new;
-                                loss_decr_avg += loss_decr[_i] / index_length;
+                                }
+                                None => {
+                                    for &_i in node_indices {
+                                        let yhat_new = yhat[_i] + weight_f64;
+                                        let loss_new = objective_function.loss_single(y[_i], yhat_new, None);
+                                        let new_decr = loss[_i] - loss_new;
+                                        delta_sum += new_decr - loss_decr[_i];
+                                        loss_decr[_i] = new_decr;
+                                    }
+                                }
                             }
+                            loss_decr_avg += delta_sum * inv_n;
                         }
                     }
 
                     self.depth = max(self.depth, node.stats.as_ref().map_or(0, |s| s.depth));
+                    let node_weight = node.weight_value as f64;
                     self.nodes.insert(node.num, node);
 
                     if !n.is_missing_leaf {
                         growable.add_node(n)
+                    } else {
+                        // Missing-leaf nodes are terminal — record leaf bounds
+                        leaf_bounds.push((node_weight, n.start_idx, n.stop_idx));
                     }
                 }
             }
         }
+
+        // Drain remaining growable nodes — they are all leaves (early stop)
+        while !growable.is_empty() {
+            let remaining = growable.get_next_node();
+            let weight = self
+                .nodes
+                .get(&remaining.num)
+                .map(|n| n.weight_value as f64)
+                .unwrap_or(0.0);
+            leaf_bounds.push((weight, remaining.start_idx, remaining.stop_idx));
+        }
+
+        self.leaf_bounds = leaf_bounds;
+        self.train_index = index;
 
         // Any final post processing required.
         splitter.clean_up_splits(self);

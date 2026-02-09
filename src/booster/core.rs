@@ -335,12 +335,17 @@ impl PerpetualBooster {
         }
 
         // calculate gradient and hessian
-        // let (mut grad, mut hess) = gradient(y, &yhat, sample_weight);
-        let (mut grad, mut hess) = objective_fn.gradient(y, &yhat, sample_weight, group);
+        // Fuse initial gradient + loss computation into a single pass.
+        let (mut grad, mut hess, mut loss) = objective_fn.gradient_and_loss(y, &yhat, sample_weight, group);
 
-        let mut loss = objective_fn.loss(y, &yhat, sample_weight, group);
-        let loss_base = objective_fn.loss(y, &vec![self.base_score; y.len()], sample_weight, group);
-        let loss_avg = loss_base.iter().sum::<f32>() / loss_base.len() as f32;
+        // When reset=true (default), yhat == base_score for all samples,
+        // so loss == loss_base. Otherwise compute normally.
+        let loss_avg = if self.cfg.reset.unwrap_or(true) || self.trees.is_empty() {
+            loss.iter().sum::<f32>() / loss.len() as f32
+        } else {
+            let loss_base = objective_fn.loss(y, &vec![self.base_score; y.len()], sample_weight, group);
+            loss_base.iter().sum::<f32>() / loss_base.len() as f32
+        };
 
         let base = 10.0_f32;
         let n = base / self.cfg.budget;
@@ -408,6 +413,9 @@ impl PerpetualBooster {
         let mut split_info_vec: Vec<SplitInfo> = (0..col_amount).map(|_| SplitInfo::default()).collect();
         let mut split_info_slice = SplitInfoSlice::new(&mut split_info_vec);
 
+        // Pre-allocate index buffer, reused across iterations
+        let mut index_buf = data.index.to_owned();
+
         for i in 0..self.cfg.iteration_limit.unwrap_or(ITER_LIMIT) {
             let verbose = if self.cfg.log_iterations == 0 {
                 false
@@ -447,10 +455,12 @@ impl PerpetualBooster {
             }
 
             let mut tree = Tree::new();
+            // Reset index buffer to original ordering for this iteration
+            index_buf.copy_from_slice(&data.index);
             tree.fit(
                 objective_fn,
                 &bdata,
-                data.index.to_owned(),
+                index_buf,
                 col_index_fit,
                 &mut grad,
                 hess.as_deref_mut(),
@@ -465,11 +475,13 @@ impl PerpetualBooster {
                 is_const_hess,
                 &mut hist_tree,
                 self.cfg.categorical_features.as_ref(),
-                &mut split_info_slice, // Pass by value (already a SplitInfoSlice)
+                &mut split_info_slice,
                 n_nodes_alloc,
                 self.cfg.save_node_stats,
             );
             self.update_predictions_inplace(&mut yhat, &tree, data);
+            // Reclaim index buffer from tree for reuse
+            index_buf = std::mem::take(&mut tree.train_index);
 
             if tree.nodes.len() < 5 {
                 let generalization = tree
@@ -493,7 +505,7 @@ impl PerpetualBooster {
                 n_low_loss_rounds = 0;
             }
 
-            (grad, hess, loss) = objective_fn.gradient_and_loss(y, &yhat, sample_weight, group);
+            objective_fn.gradient_and_loss_into(y, &yhat, sample_weight, group, &mut grad, &mut hess, &mut loss);
 
             if verbose {
                 info!(
@@ -506,6 +518,9 @@ impl PerpetualBooster {
                 );
             }
 
+            // Free training-only data before storing the tree
+            tree.leaf_bounds.clear();
+            tree.train_index.clear();
             self.trees.push(tree);
 
             if stopping >= self.cfg.stopping_rounds.unwrap_or(STOPPING_ROUNDS) {
@@ -567,10 +582,13 @@ impl PerpetualBooster {
             yhat = self.predict_columnar(data, true);
         }
 
-        let (mut grad, mut hess) = objective_fn.gradient(y, &yhat, sample_weight, group);
-        let mut loss = objective_fn.loss(y, &yhat, sample_weight, group);
-        let loss_base = objective_fn.loss(y, &vec![self.base_score; y.len()], sample_weight, group);
-        let loss_avg = loss_base.iter().sum::<f32>() / loss_base.len() as f32;
+        let (mut grad, mut hess, mut loss) = objective_fn.gradient_and_loss(y, &yhat, sample_weight, group);
+        let loss_avg = if self.cfg.reset.unwrap_or(true) || self.trees.is_empty() {
+            loss.iter().sum::<f32>() / loss.len() as f32
+        } else {
+            let loss_base = objective_fn.loss(y, &vec![self.base_score; y.len()], sample_weight, group);
+            loss_base.iter().sum::<f32>() / loss_base.len() as f32
+        };
 
         let base = 10.0_f32;
         let n = base / self.cfg.budget;
@@ -631,6 +649,9 @@ impl PerpetualBooster {
         let mut split_info_vec: Vec<SplitInfo> = (0..col_amount).map(|_| SplitInfo::default()).collect();
         let mut split_info_slice = SplitInfoSlice::new(&mut split_info_vec);
 
+        // Pre-allocate index buffer, reused across iterations
+        let mut index_buf = data.index.to_owned();
+
         for i in 0..self.cfg.iteration_limit.unwrap_or(ITER_LIMIT) {
             let verbose = if self.cfg.log_iterations == 0 {
                 false
@@ -670,10 +691,12 @@ impl PerpetualBooster {
             }
 
             let mut tree = Tree::new();
+            // Reset index buffer to original ordering for this iteration
+            index_buf.copy_from_slice(&data.index);
             tree.fit(
                 objective_fn,
                 &bdata,
-                data.index.to_owned(),
+                index_buf,
                 col_index_fit,
                 &mut grad,
                 hess.as_deref_mut(),
@@ -694,6 +717,8 @@ impl PerpetualBooster {
             );
 
             self.update_predictions_inplace_columnar(&mut yhat, &tree, data);
+            // Reclaim index buffer from tree for reuse
+            index_buf = std::mem::take(&mut tree.train_index);
 
             if tree.nodes.len() < 5 {
                 let generalization = tree
@@ -716,7 +741,7 @@ impl PerpetualBooster {
                 n_low_loss_rounds = 0;
             }
 
-            (grad, hess, loss) = objective_fn.gradient_and_loss(y, &yhat, sample_weight, group);
+            objective_fn.gradient_and_loss_into(y, &yhat, sample_weight, group, &mut grad, &mut hess, &mut loss);
 
             if verbose {
                 info!(
@@ -729,6 +754,9 @@ impl PerpetualBooster {
                 );
             }
 
+            // Free training-only data before storing the tree
+            tree.leaf_bounds.clear();
+            tree.train_index.clear();
             self.trees.push(tree);
 
             if stopping >= self.cfg.stopping_rounds.unwrap_or(STOPPING_ROUNDS) {
@@ -738,13 +766,13 @@ impl PerpetualBooster {
 
             if let Some(t) = self.cfg.timeout {
                 if start.elapsed().as_secs_f32() > t {
-                    warn!("Reached timeout limit before auto stopping. Try to decrease the budget or increase the timeout for the best performance.");
+                    warn!("Reached timeout before auto stopping. Try to decrease the budget or increase the timeout for the best performance.");
                     break;
                 }
             }
 
             if i == self.cfg.iteration_limit.unwrap_or(ITER_LIMIT) - 1 {
-                warn!("Reached iteration limit before auto stopping. Try to decrease the budget for the best performance.");
+                warn!("Reached iteration limit before auto stopping. Try to decrease the budget or increase the iteration limit for the best performance.");
             }
         }
 
@@ -759,14 +787,32 @@ impl PerpetualBooster {
         Ok(())
     }
 
-    fn update_predictions_inplace(&self, yhat: &mut [f64], tree: &Tree, data: &Matrix<f64>) {
-        let preds = tree.predict(data, true, &self.cfg.missing);
-        yhat.iter_mut().zip(preds).for_each(|(i, j)| *i += j);
+    fn update_predictions_inplace(&self, yhat: &mut [f64], tree: &Tree, _data: &Matrix<f64>) {
+        // Fast path: use leaf bounds from training to avoid tree traversal
+        if !tree.leaf_bounds.is_empty() && !tree.train_index.is_empty() {
+            for &(weight, start, stop) in &tree.leaf_bounds {
+                for &i in &tree.train_index[start..stop] {
+                    yhat[i] += weight;
+                }
+            }
+        } else {
+            let preds = tree.predict(_data, true, &self.cfg.missing);
+            yhat.iter_mut().zip(preds).for_each(|(i, j)| *i += j);
+        }
     }
 
-    fn update_predictions_inplace_columnar(&self, yhat: &mut [f64], tree: &Tree, data: &ColumnarMatrix<f64>) {
-        let preds = tree.predict_columnar(data, true, &self.cfg.missing);
-        yhat.iter_mut().zip(preds).for_each(|(i, j)| *i += j);
+    fn update_predictions_inplace_columnar(&self, yhat: &mut [f64], tree: &Tree, _data: &ColumnarMatrix<f64>) {
+        // Fast path: use leaf bounds from training to avoid tree traversal
+        if !tree.leaf_bounds.is_empty() && !tree.train_index.is_empty() {
+            for &(weight, start, stop) in &tree.leaf_bounds {
+                for &i in &tree.train_index[start..stop] {
+                    yhat[i] += weight;
+                }
+            }
+        } else {
+            let preds = tree.predict_columnar(_data, true, &self.cfg.missing);
+            yhat.iter_mut().zip(preds).for_each(|(i, j)| *i += j);
+        }
     }
 
     /// Set model fitting eta which is step size to use at each iteration.

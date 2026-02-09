@@ -75,6 +75,27 @@ pub trait ObjectiveFunction: Send + Sync {
         let l = self.loss(y, yhat, sample_weight, group);
         (g, h, l)
     }
+
+    /// In-place version of [`gradient_and_loss`](ObjectiveFunction::gradient_and_loss).
+    ///
+    /// Writes into pre-allocated buffers to avoid per-iteration allocations.
+    /// Default implementation delegates to `gradient_and_loss` with fresh allocs.
+    #[allow(clippy::too_many_arguments)]
+    fn gradient_and_loss_into(
+        &self,
+        y: &[f64],
+        yhat: &[f64],
+        sample_weight: Option<&[f64]>,
+        group: Option<&[u64]>,
+        grad: &mut [f32],
+        hess: &mut Option<Vec<f32>>,
+        loss: &mut [f32],
+    ) {
+        let (g, h, l) = self.gradient_and_loss(y, yhat, sample_weight, group);
+        grad.copy_from_slice(&g);
+        *hess = h;
+        loss.copy_from_slice(&l);
+    }
 }
 
 /// The Objective function to minimize during training.
@@ -201,6 +222,52 @@ impl ObjectiveFunction for Objective {
         group: Option<&[u64]>,
     ) -> (Vec<f32>, Option<Vec<f32>>, Vec<f32>) {
         dispatch!(self, gradient_and_loss(y, yhat, sample_weight, group))
+    }
+
+    fn gradient_and_loss_into(
+        &self,
+        y: &[f64],
+        yhat: &[f64],
+        sample_weight: Option<&[f64]>,
+        group: Option<&[u64]>,
+        grad: &mut [f32],
+        hess: &mut Option<Vec<f32>>,
+        loss: &mut [f32],
+    ) {
+        dispatch!(
+            self,
+            gradient_and_loss_into(y, yhat, sample_weight, group, grad, hess, loss)
+        )
+    }
+}
+
+impl Objective {
+    /// Per-sample loss for a single observation (no heap allocation).
+    /// Used in the inner tree-growth loop to avoid Vec allocations.
+    pub fn loss_single(&self, y: f64, yhat: f64, sample_weight: Option<f64>) -> f32 {
+        match self {
+            Objective::SquaredLoss => {
+                let s = y - yhat;
+                let l = s * s;
+                match sample_weight {
+                    Some(w) => (l * w) as f32,
+                    None => l as f32,
+                }
+            }
+            Objective::LogLoss => {
+                let p = 1.0_f64 / (1.0_f64 + (-yhat).exp());
+                let l = -(y * p.ln() + (1.0_f64 - y) * (1.0_f64 - p).ln());
+                match sample_weight {
+                    Some(w) => (l * w) as f32,
+                    None => l as f32,
+                }
+            }
+            // Fall back to the slice-based loss for other objectives
+            _ => match sample_weight {
+                Some(w) => self.loss(&[y], &[yhat], Some(&[w]), None)[0],
+                None => self.loss(&[y], &[yhat], None, None)[0],
+            },
+        }
     }
 }
 
