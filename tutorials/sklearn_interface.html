@@ -6,7 +6,7 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Scikit-Learn Interface: Classification, Regression &amp; Ranking &mdash; Perpetual 1.4.0 documentation</title>
+  <title>Scikit-Learn Interface: Classification, Regression &amp; Ranking &mdash; Perpetual 1.5.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../_static/nbsphinx-code-cells.css?v=2aa19091" />
@@ -15,7 +15,7 @@
   
       <script src="../_static/jquery.js?v=5d32c60e"></script>
       <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../_static/documentation_options.js?v=9172181d"></script>
+      <script src="../_static/documentation_options.js?v=e0a75244"></script>
       <script src="../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
@@ -25,7 +25,7 @@
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
     <link rel="next" title="Performance Benchmarking" href="benchmark.html" />
-    <link rel="prev" title="Quick Start with Toy Datasets" href="toy_datasets.html" /> 
+    <link rel="prev" title="Handling Categorical Data" href="categorical_data.html" /> 
 </head>
 
 <body class="wy-body-for-nav"> 
@@ -54,7 +54,6 @@
 <li class="toctree-l1"><a class="reference internal" href="../api.html">API Reference</a></li>
 <li class="toctree-l1 current"><a class="reference internal" href="index.html">Tutorials</a><ul class="current">
 <li class="toctree-l2"><a class="reference internal" href="categorical_data.html">Handling Categorical Data</a></li>
-<li class="toctree-l2"><a class="reference internal" href="toy_datasets.html">Quick Start with Toy Datasets</a></li>
 <li class="toctree-l2 current"><a class="current reference internal" href="#">Scikit-Learn Interface: Classification, Regression &amp; Ranking</a><ul>
 <li class="toctree-l3"><a class="reference internal" href="#Part-1:-Classification-with-PerpetualClassifier">Part 1: Classification with PerpetualClassifier</a><ul>
 <li class="toctree-l4"><a class="reference internal" href="#Cross-Validation">Cross-Validation</a></li>
@@ -74,7 +73,7 @@
 </li>
 <li class="toctree-l2"><a class="reference internal" href="benchmark.html">Performance Benchmarking</a></li>
 <li class="toctree-l2"><a class="reference internal" href="custom_objective.html">Custom Objective Tutorial</a></li>
-<li class="toctree-l2"><a class="reference internal" href="causal/uplift_marketing.html">Uplift Modeling and Causal Inference</a></li>
+<li class="toctree-l2"><a class="reference internal" href="causal/uplift_marketing.html">Uplift Modeling with the Criteo Uplift Dataset</a></li>
 <li class="toctree-l2"><a class="reference internal" href="causal/iv_causal_effect.html">Instrumental Variables (Boosted IV)</a></li>
 <li class="toctree-l2"><a class="reference internal" href="causal/dml_wage_gap.html">Double Machine Learning: Estimating the Gender Wage Gap</a></li>
 <li class="toctree-l2"><a class="reference internal" href="causal/policy_learning.html">Policy Learning: Optimal Treatment Assignment</a></li>
@@ -130,7 +129,7 @@
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
-<div class="input_area highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">perpetual.sklearn</span><span class="w"> </span><span class="kn">import</span> <span class="n">PerpetualClassifier</span><span class="p">,</span> <span class="n">PerpetualRanker</span><span class="p">,</span> <span class="n">PerpetualRegressor</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">sklearn.datasets</span><span class="w"> </span><span class="kn">import</span> <span class="n">fetch_california_housing</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">sklearn.metrics</span><span class="w"> </span><span class="kn">import</span> <span class="n">accuracy_score</span><span class="p">,</span> <span class="n">r2_score</span><span class="p">,</span> <span class="n">roc_auc_score</span>
@@ -148,7 +147,7 @@
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
-<div class="input_area highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">sklearn.datasets</span><span class="w"> </span><span class="kn">import</span> <span class="n">fetch_covtype</span>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">sklearn.datasets</span><span class="w"> </span><span class="kn">import</span> <span class="n">fetch_covtype</span>
 
 <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Fetching Cover Type dataset...&quot;</span><span class="p">)</span>
 <span class="n">cov</span> <span class="o">=</span> <span class="n">fetch_covtype</span><span class="p">(</span><span class="n">as_frame</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
@@ -167,7 +166,7 @@
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
-<div class="input_area highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">clf</span> <span class="o">=</span> <span class="n">PerpetualClassifier</span><span class="p">(</span><span class="n">budget</span><span class="o">=</span><span class="mf">0.5</span><span class="p">)</span>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">clf</span> <span class="o">=</span> <span class="n">PerpetualClassifier</span><span class="p">(</span><span class="n">budget</span><span class="o">=</span><span class="mf">0.1</span><span class="p">)</span>
 <span class="n">clf</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">X_tr</span><span class="p">,</span> <span class="n">y_tr</span><span class="p">)</span>
 
 <span class="n">y_pred</span> <span class="o">=</span> <span class="n">clf</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="n">X_te</span><span class="p">)</span>
@@ -185,15 +184,15 @@
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
-<div class="input_area highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Use a smaller subset for faster CV</span>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># Use a smaller subset for faster CV</span>
 <span class="n">X_sub</span><span class="p">,</span> <span class="n">_</span><span class="p">,</span> <span class="n">y_sub</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">train_test_split</span><span class="p">(</span>
     <span class="n">X_cov</span><span class="p">,</span> <span class="n">y_cov</span><span class="p">,</span> <span class="n">train_size</span><span class="o">=</span><span class="mi">10000</span><span class="p">,</span> <span class="n">random_state</span><span class="o">=</span><span class="mi">42</span><span class="p">,</span> <span class="n">stratify</span><span class="o">=</span><span class="n">y_cov</span>
 <span class="p">)</span>
 
 <span class="n">scores</span> <span class="o">=</span> <span class="n">cross_val_score</span><span class="p">(</span>
-    <span class="n">PerpetualClassifier</span><span class="p">(</span><span class="n">budget</span><span class="o">=</span><span class="mf">0.4</span><span class="p">),</span> <span class="n">X_sub</span><span class="p">,</span> <span class="n">y_sub</span><span class="p">,</span> <span class="n">cv</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span> <span class="n">scoring</span><span class="o">=</span><span class="s2">&quot;roc_auc&quot;</span>
+    <span class="n">PerpetualClassifier</span><span class="p">(</span><span class="n">budget</span><span class="o">=</span><span class="mf">0.1</span><span class="p">),</span> <span class="n">X_sub</span><span class="p">,</span> <span class="n">y_sub</span><span class="p">,</span> <span class="n">cv</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">scoring</span><span class="o">=</span><span class="s2">&quot;roc_auc&quot;</span>
 <span class="p">)</span>
-<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;5-Fold CV AUC: </span><span class="si">{</span><span class="n">scores</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2"> ± </span><span class="si">{</span><span class="n">scores</span><span class="o">.</span><span class="n">std</span><span class="p">()</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;CV AUC: </span><span class="si">{</span><span class="n">scores</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2"> ± </span><span class="si">{</span><span class="n">scores</span><span class="o">.</span><span class="n">std</span><span class="p">()</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 </pre></div>
 </div>
 </div>
@@ -204,10 +203,10 @@
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
-<div class="input_area highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">pipe</span> <span class="o">=</span> <span class="n">Pipeline</span><span class="p">(</span>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">pipe</span> <span class="o">=</span> <span class="n">Pipeline</span><span class="p">(</span>
     <span class="p">[</span>
         <span class="p">(</span><span class="s2">&quot;scaler&quot;</span><span class="p">,</span> <span class="n">StandardScaler</span><span class="p">()),</span>
-        <span class="p">(</span><span class="s2">&quot;clf&quot;</span><span class="p">,</span> <span class="n">PerpetualClassifier</span><span class="p">(</span><span class="n">budget</span><span class="o">=</span><span class="mf">0.5</span><span class="p">)),</span>
+        <span class="p">(</span><span class="s2">&quot;clf&quot;</span><span class="p">,</span> <span class="n">PerpetualClassifier</span><span class="p">(</span><span class="n">budget</span><span class="o">=</span><span class="mf">0.1</span><span class="p">)),</span>
     <span class="p">]</span>
 <span class="p">)</span>
 <span class="n">pipe</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">X_tr</span><span class="p">[:</span><span class="mi">5000</span><span class="p">],</span> <span class="n">y_tr</span><span class="p">[:</span><span class="mi">5000</span><span class="p">])</span>
@@ -226,7 +225,7 @@
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
-<div class="input_area highlight-python notranslate"><div class="highlight"><pre><span></span><span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Fetching California Housing dataset...&quot;</span><span class="p">)</span>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Fetching California Housing dataset...&quot;</span><span class="p">)</span>
 <span class="n">housing</span> <span class="o">=</span> <span class="n">fetch_california_housing</span><span class="p">(</span><span class="n">as_frame</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="n">X_h</span> <span class="o">=</span> <span class="n">housing</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">values</span>
 <span class="n">y_h</span> <span class="o">=</span> <span class="n">housing</span><span class="o">.</span><span class="n">target</span><span class="o">.</span><span class="n">values</span>
@@ -242,7 +241,7 @@
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
-<div class="input_area highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">reg</span> <span class="o">=</span> <span class="n">PerpetualRegressor</span><span class="p">(</span><span class="n">budget</span><span class="o">=</span><span class="mf">0.5</span><span class="p">)</span>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">reg</span> <span class="o">=</span> <span class="n">PerpetualRegressor</span><span class="p">(</span><span class="n">budget</span><span class="o">=</span><span class="mf">0.1</span><span class="p">)</span>
 <span class="n">reg</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">X_tr_h</span><span class="p">,</span> <span class="n">y_tr_h</span><span class="p">)</span>
 
 <span class="n">y_pred_h</span> <span class="o">=</span> <span class="n">reg</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="n">X_te_h</span><span class="p">)</span>
@@ -257,8 +256,8 @@
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
-<div class="input_area highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">scores_r2</span> <span class="o">=</span> <span class="n">cross_val_score</span><span class="p">(</span>
-    <span class="n">PerpetualRegressor</span><span class="p">(</span><span class="n">budget</span><span class="o">=</span><span class="mf">0.5</span><span class="p">),</span> <span class="n">X_h</span><span class="p">,</span> <span class="n">y_h</span><span class="p">,</span> <span class="n">cv</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span> <span class="n">scoring</span><span class="o">=</span><span class="s2">&quot;r2&quot;</span>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">scores_r2</span> <span class="o">=</span> <span class="n">cross_val_score</span><span class="p">(</span>
+    <span class="n">PerpetualRegressor</span><span class="p">(</span><span class="n">budget</span><span class="o">=</span><span class="mf">0.1</span><span class="p">),</span> <span class="n">X_h</span><span class="p">,</span> <span class="n">y_h</span><span class="p">,</span> <span class="n">cv</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span> <span class="n">scoring</span><span class="o">=</span><span class="s2">&quot;r2&quot;</span>
 <span class="p">)</span>
 <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;5-Fold CV R²: </span><span class="si">{</span><span class="n">scores_r2</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2"> ± </span><span class="si">{</span><span class="n">scores_r2</span><span class="o">.</span><span class="n">std</span><span class="p">()</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 </pre></div>
@@ -274,7 +273,7 @@
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
-<div class="input_area highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">seed</span><span class="p">(</span><span class="mi">42</span><span class="p">)</span>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">seed</span><span class="p">(</span><span class="mi">42</span><span class="p">)</span>
 
 <span class="n">n_queries</span> <span class="o">=</span> <span class="mi">200</span>
 <span class="n">docs_per_query</span> <span class="o">=</span> <span class="mi">20</span>
@@ -311,8 +310,12 @@
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
-<div class="input_area highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">ranker</span> <span class="o">=</span> <span class="n">PerpetualRanker</span><span class="p">(</span><span class="n">budget</span><span class="o">=</span><span class="mf">0.5</span><span class="p">)</span>
-<span class="n">ranker</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">X_rank</span><span class="p">[</span><span class="n">train_q</span><span class="p">],</span> <span class="n">y_rank</span><span class="p">[</span><span class="n">train_q</span><span class="p">],</span> <span class="n">qid</span><span class="o">=</span><span class="n">qid</span><span class="p">[</span><span class="n">train_q</span><span class="p">])</span>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">ranker</span> <span class="o">=</span> <span class="n">PerpetualRanker</span><span class="p">(</span><span class="n">budget</span><span class="o">=</span><span class="mf">0.1</span><span class="p">)</span>
+
+<span class="c1"># PerpetualRanker expects an array of group sizes (lengths of each query),</span>
+<span class="c1"># not the raw query IDs themselves.</span>
+<span class="n">_</span><span class="p">,</span> <span class="n">train_group_sizes</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">unique</span><span class="p">(</span><span class="n">qid</span><span class="p">[</span><span class="n">train_q</span><span class="p">],</span> <span class="n">return_counts</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="n">ranker</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">X_rank</span><span class="p">[</span><span class="n">train_q</span><span class="p">],</span> <span class="n">y_rank</span><span class="p">[</span><span class="n">train_q</span><span class="p">],</span> <span class="n">group</span><span class="o">=</span><span class="n">train_group_sizes</span><span class="p">)</span>
 
 <span class="n">scores_rank</span> <span class="o">=</span> <span class="n">ranker</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="n">X_rank</span><span class="p">[</span><span class="n">test_q</span><span class="p">])</span>
 <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Predicted score range: [</span><span class="si">{</span><span class="n">scores_rank</span><span class="o">.</span><span class="n">min</span><span class="p">()</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2">, </span><span class="si">{</span><span class="n">scores_rank</span><span class="o">.</span><span class="n">max</span><span class="p">()</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2">]&quot;</span><span class="p">)</span>
@@ -328,7 +331,7 @@
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
-<div class="input_area highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">sklearn.metrics</span><span class="w"> </span><span class="kn">import</span> <span class="n">ndcg_score</span>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">sklearn.metrics</span><span class="w"> </span><span class="kn">import</span> <span class="n">ndcg_score</span>
 
 <span class="c1"># Evaluate per query, then average</span>
 <span class="n">test_qids</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">unique</span><span class="p">(</span><span class="n">qid</span><span class="p">[</span><span class="n">test_q</span><span class="p">])</span>
@@ -392,7 +395,7 @@
            </div>
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
-        <a href="toy_datasets.html" class="btn btn-neutral float-left" title="Quick Start with Toy Datasets" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="categorical_data.html" class="btn btn-neutral float-left" title="Handling Categorical Data" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
         <a href="benchmark.html" class="btn btn-neutral float-right" title="Performance Benchmarking" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 

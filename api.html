@@ -6,7 +6,7 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>API Reference &mdash; Perpetual 1.4.0 documentation</title>
+  <title>API Reference &mdash; Perpetual 1.5.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="_static/custom.css?v=9cdd1368" />
@@ -14,7 +14,7 @@
   
       <script src="_static/jquery.js?v=5d32c60e"></script>
       <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="_static/documentation_options.js?v=9172181d"></script>
+      <script src="_static/documentation_options.js?v=e0a75244"></script>
       <script src="_static/doctools.js?v=fd6eb6e6"></script>
       <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
@@ -186,6 +186,7 @@
 <li class="toctree-l4"><a class="reference internal" href="#perpetual.fairness.FairClassifier.fit"><code class="docutils literal notranslate"><span class="pre">FairClassifier.fit()</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="#perpetual.fairness.FairClassifier.predict"><code class="docutils literal notranslate"><span class="pre">FairClassifier.predict()</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="#perpetual.fairness.FairClassifier.predict_proba"><code class="docutils literal notranslate"><span class="pre">FairClassifier.predict_proba()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#perpetual.fairness.FairClassifier.predict_contributions"><code class="docutils literal notranslate"><span class="pre">FairClassifier.predict_contributions()</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="#perpetual.fairness.FairClassifier.decision_function"><code class="docutils literal notranslate"><span class="pre">FairClassifier.decision_function()</span></code></a></li>
 </ul>
 </li>
@@ -2045,6 +2046,27 @@ contain binary (0/1) values.</p></li>
 </dd></dl>
 
 <dl class="py method">
+<dt class="sig sig-object py" id="perpetual.fairness.FairClassifier.predict_contributions">
+<span class="sig-name descname"><span class="pre">predict_contributions</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">X</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">method</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><span class="pre">str</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'Average'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">parallel</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><span class="pre">bool</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="(in NumPy v2.4)"><span class="pre">ndarray</span></a></span></span><a class="reference internal" href="_modules/perpetual/fairness.html#FairClassifier.predict_contributions"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#perpetual.fairness.FairClassifier.predict_contributions" title="Link to this definition"></a></dt>
+<dd><p>Predict feature contributions (SHAP-like values) for new data.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>X</strong> (<em>array-like</em><em> of </em><em>shape</em><em> (</em><em>n_samples</em><em>, </em><em>n_features</em><em>)</em>) – Input features.</p></li>
+<li><p><strong>method</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em>, </em><em>default=&quot;Average&quot;</em>) – Method to calculate contributions.</p></li>
+<li><p><strong>parallel</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><em>bool</em></a><em>, </em><em>optional</em>) – Whether to run prediction in parallel.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Feature contributions.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>ndarray of shape (n_samples, n_features + 1)</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
 <dt class="sig sig-object py" id="perpetual.fairness.FairClassifier.decision_function">
 <span class="sig-name descname"><span class="pre">decision_function</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">X</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="(in NumPy v2.4)"><span class="pre">ndarray</span></a></span></span><a class="reference internal" href="_modules/perpetual/fairness.html#FairClassifier.decision_function"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#perpetual.fairness.FairClassifier.decision_function" title="Link to this definition"></a></dt>
 <dd><p>Return raw log-odds scores.</p>
@@ -2087,24 +2109,34 @@ to specific features.</p>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="perpetual.risk.PerpetualRiskEngine.generate_reason_codes">
-<span class="sig-name descname"><span class="pre">generate_reason_codes</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">X</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">threshold</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><span class="pre">float</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_codes</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">3</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">method</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><span class="pre">str</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'Weight'</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.List" title="(in Python v3.14)"><span class="pre">List</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.List" title="(in Python v3.14)"><span class="pre">List</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><span class="pre">str</span></a><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="_modules/perpetual/risk.html#PerpetualRiskEngine.generate_reason_codes"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#perpetual.risk.PerpetualRiskEngine.generate_reason_codes" title="Link to this definition"></a></dt>
-<dd><p>Generate reason codes for samples that fall below the approval threshold.</p>
+<span class="sig-name descname"><span class="pre">generate_reason_codes</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">X</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">threshold</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><span class="pre">float</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_codes</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">3</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">method</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><span class="pre">str</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'Average'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">rejection_direction</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><span class="pre">str</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'lower'</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.List" title="(in Python v3.14)"><span class="pre">List</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.List" title="(in Python v3.14)"><span class="pre">List</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><span class="pre">str</span></a><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="_modules/perpetual/risk.html#PerpetualRiskEngine.generate_reason_codes"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#perpetual.risk.PerpetualRiskEngine.generate_reason_codes" title="Link to this definition"></a></dt>
+<dd><p>Generate reason codes for samples that fall below/above the approval threshold.</p>
 <p>Logic:
 1. Predict score for X.
-2. If score &lt; threshold (Rejection), calculate feature contributions.
-3. Identify top N features dragging the score DOWN.</p>
+2. Identify rejected samples based on <code class="docutils literal notranslate"><span class="pre">rejection_direction</span></code>:</p>
+<blockquote>
+<div><ul class="simple">
+<li><p>“lower”: score &lt; threshold (e.g. FICO score)</p></li>
+<li><p>“higher”: score &gt; threshold (e.g. Default probability)</p></li>
+</ul>
+</div></blockquote>
+<ol class="arabic simple" start="3">
+<li><p>Identify top N features dragging the score in the rejected direction.</p></li>
+</ol>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
 <li><p><strong>X</strong> (<em>array-like</em>) – Applicant data.</p></li>
-<li><p><strong>threshold</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><em>float</em></a>) – Approval threshold. Scores below this are considered rejections.</p></li>
-<li><p><strong>n_codes</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a>) – Number of reason codes to return per applicant.</p></li>
-<li><p><strong>method</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a>) – Contribution method. “Weight” is standard SHAP-like contribution.</p></li>
+<li><p><strong>threshold</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><em>float</em></a>) – Approval threshold.</p></li>
+<li><p><strong>n_codes</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a><em>, </em><em>default=3</em>) – Number of reason codes to return per applicant.</p></li>
+<li><p><strong>method</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em>, </em><em>default=&quot;Average&quot;</em>) – Contribution method.</p></li>
+<li><p><strong>rejection_direction</strong> (<em>{&quot;lower&quot;</em><em>, </em><em>&quot;higher&quot;}</em><em>, </em><em>default=&quot;lower&quot;</em>) – Direction of rejection. If “lower”, scores below threshold are
+rejected. If “higher”, scores above threshold are rejected.</p></li>
 </ul>
 </dd>
 <dt class="field-even">Returns<span class="colon">:</span></dt>
-<dd class="field-even"><p><strong>reasons</strong> – For each sample, a list of reason-code strings (e.g.
-<code class="docutils literal notranslate"><span class="pre">&quot;feature_name:</span> <span class="pre">-0.1234&quot;</span></code>).  Approved samples get an empty list.</p>
+<dd class="field-even"><p><strong>reasons</strong> – For each sample, a list of reason-code strings.
+Approved samples get an empty list.</p>
 </dd>
 <dt class="field-odd">Return type<span class="colon">:</span></dt>
 <dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)">list</a> of <a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)">list</a> of <a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)">str</a></p>

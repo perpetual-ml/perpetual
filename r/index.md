@@ -72,17 +72,17 @@ dataset (regression):
 
 | Perpetual budget | LightGBM n_estimators | Perpetual mse | LightGBM mse | Speed-up wall time | Speed-up cpu time |
 |:-----------------|:----------------------|:--------------|:-------------|:-------------------|:------------------|
-| 0.76             | 50                    | 0.201         | 0.201        | 39x                | 57x               |
-| 0.85             | 100                   | 0.196         | 0.196        | 60x                | 87x               |
-| 1.15             | 200                   | 0.190         | 0.190        | 230x               | 259x              |
+| 0.76             | 50                    | 0.201         | 0.201        | 72x                | 326x              |
+| 0.85             | 100                   | 0.196         | 0.196        | 113x               | 613x              |
+| 1.15             | 200                   | 0.190         | 0.190        | 405x               | 1985x             |
 
 The following table summarizes the results for the [Pumpkin
 Seeds](https://www.openml.org/search?type=data&status=active&id=46951)
 dataset (classification):
 
-| Perpetual budget | LightGBM n_estimators | Perpetual ROC AUC | LightGBM ROC AUC | Speed-up wall time | Speed-up cpu time |
-|:-----------------|:----------------------|:------------------|:-----------------|:-------------------|:------------------|
-| 1.0              | 100                   | 0.944             | 0.945            | 39x                | 130x              |
+| Perpetual budget | LightGBM n_estimators | Perpetual auc | LightGBM auc | Speed-up wall time | Speed-up cpu time |
+|:-----------------|:----------------------|:--------------|:-------------|:-------------------|:------------------|
+| 1.0              | 100                   | 0.944         | 0.945        | 91x                | 184x              |
 
 The results can be reproduced using the scripts in the
 [examples](https://perpetual-ml.github.io/perpetual/r/package-python/examples)

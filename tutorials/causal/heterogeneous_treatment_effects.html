@@ -6,7 +6,7 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Heterogeneous Treatment Effects with Meta-Learners &mdash; Perpetual 1.4.0 documentation</title>
+  <title>Heterogeneous Treatment Effects with Meta-Learners &mdash; Perpetual 1.5.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../../_static/nbsphinx-code-cells.css?v=2aa19091" />
@@ -15,7 +15,7 @@
   
       <script src="../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../_static/documentation_options.js?v=9172181d"></script>
+      <script src="../../_static/documentation_options.js?v=e0a75244"></script>
       <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
@@ -54,11 +54,10 @@
 <li class="toctree-l1"><a class="reference internal" href="../../api.html">API Reference</a></li>
 <li class="toctree-l1 current"><a class="reference internal" href="../index.html">Tutorials</a><ul class="current">
 <li class="toctree-l2"><a class="reference internal" href="../categorical_data.html">Handling Categorical Data</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../toy_datasets.html">Quick Start with Toy Datasets</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../sklearn_interface.html">Scikit-Learn Interface: Classification, Regression &amp; Ranking</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../benchmark.html">Performance Benchmarking</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../custom_objective.html">Custom Objective Tutorial</a></li>
-<li class="toctree-l2"><a class="reference internal" href="uplift_marketing.html">Uplift Modeling and Causal Inference</a></li>
+<li class="toctree-l2"><a class="reference internal" href="uplift_marketing.html">Uplift Modeling with the Criteo Uplift Dataset</a></li>
 <li class="toctree-l2"><a class="reference internal" href="iv_causal_effect.html">Instrumental Variables (Boosted IV)</a></li>
 <li class="toctree-l2"><a class="reference internal" href="dml_wage_gap.html">Double Machine Learning: Estimating the Gender Wage Gap</a></li>
 <li class="toctree-l2"><a class="reference internal" href="policy_learning.html">Policy Learning: Optimal Treatment Assignment</a></li>
@@ -132,7 +131,7 @@
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
-<div class="input_area highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">matplotlib.pyplot</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">plt</span>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">matplotlib.pyplot</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">plt</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pd</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">perpetual.causal_metrics</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
@@ -155,34 +154,56 @@
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
-<div class="input_area highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">dataset</span> <span class="o">=</span> <span class="n">fetch_openml</span><span class="p">(</span><span class="n">data_id</span><span class="o">=</span><span class="mi">41473</span><span class="p">,</span> <span class="n">as_frame</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">parser</span><span class="o">=</span><span class="s2">&quot;auto&quot;</span><span class="p">)</span>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># Load COVID-19 Hospitals Treatment Plan dataset from OpenML</span>
+<span class="n">dataset</span> <span class="o">=</span> <span class="n">fetch_openml</span><span class="p">(</span><span class="n">data_id</span><span class="o">=</span><span class="mi">43550</span><span class="p">,</span> <span class="n">as_frame</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="n">df</span> <span class="o">=</span> <span class="n">dataset</span><span class="o">.</span><span class="n">frame</span>
+<span class="c1"># Binary treatment: surgery department vs. others</span>
+<span class="n">df</span><span class="p">[</span><span class="s2">&quot;treatment&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="n">df</span><span class="p">[</span><span class="s2">&quot;Department&quot;</span><span class="p">]</span> <span class="o">==</span> <span class="s2">&quot;surgery&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">int</span><span class="p">)</span>
 
-<span class="c1"># Binary treatment: any e-mail vs. control</span>
-<span class="n">df</span><span class="p">[</span><span class="s2">&quot;treatment&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="n">df</span><span class="p">[</span><span class="s2">&quot;segment&quot;</span><span class="p">]</span> <span class="o">!=</span> <span class="s2">&quot;No E-Mail&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">int</span><span class="p">)</span>
 
-<span class="c1"># We use &quot;conversion&quot; (purchase) as the outcome</span>
-<span class="n">y</span> <span class="o">=</span> <span class="n">df</span><span class="p">[</span><span class="s2">&quot;conversion&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">int</span><span class="p">)</span><span class="o">.</span><span class="n">values</span>
+<span class="c1"># Binary outcome: Stay_Days 0-10 = 0, &gt;10 = 1</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">binarize_stay</span><span class="p">(</span><span class="n">x</span><span class="p">):</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">low</span><span class="p">,</span> <span class="n">high</span> <span class="o">=</span> <span class="n">x</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;-&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="nb">int</span><span class="p">(</span><span class="nb">float</span><span class="p">(</span><span class="n">high</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">10</span><span class="p">)</span>
+    <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+        <span class="k">return</span> <span class="mi">0</span>
+
+
+<span class="n">y</span> <span class="o">=</span> <span class="n">df</span><span class="p">[</span><span class="s2">&quot;Stay_Days&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">apply</span><span class="p">(</span><span class="n">binarize_stay</span><span class="p">)</span><span class="o">.</span><span class="n">values</span>
 <span class="n">w</span> <span class="o">=</span> <span class="n">df</span><span class="p">[</span><span class="s2">&quot;treatment&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">values</span>
-
+<span class="c1"># Select features (exclude outcome, treatment, and obvious IDs)</span>
 <span class="n">features</span> <span class="o">=</span> <span class="p">[</span>
-    <span class="s2">&quot;recency&quot;</span><span class="p">,</span>
-    <span class="s2">&quot;history_segment&quot;</span><span class="p">,</span>
-    <span class="s2">&quot;history&quot;</span><span class="p">,</span>
-    <span class="s2">&quot;mens&quot;</span><span class="p">,</span>
-    <span class="s2">&quot;womens&quot;</span><span class="p">,</span>
-    <span class="s2">&quot;zip_code&quot;</span><span class="p">,</span>
-    <span class="s2">&quot;newbie&quot;</span><span class="p">,</span>
-    <span class="s2">&quot;channel&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;Hospital&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;Hospital_type&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;Hospital_city&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;Hospital_region&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;Available_Extra_Rooms_in_Hospital&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;Ward_Type&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;Ward_Facility&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;Bed_Grade&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;City_Code_Patient&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;Type_of_Admission&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;Illness_Severity&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;Patient_Visitors&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;Age&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;Admission_Deposit&quot;</span><span class="p">,</span>
 <span class="p">]</span>
 <span class="n">X</span> <span class="o">=</span> <span class="n">df</span><span class="p">[</span><span class="n">features</span><span class="p">]</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
-
 <span class="c1"># Mark categoricals so Perpetual handles them natively</span>
-<span class="k">for</span> <span class="n">col</span> <span class="ow">in</span> <span class="p">[</span><span class="s2">&quot;history_segment&quot;</span><span class="p">,</span> <span class="s2">&quot;zip_code&quot;</span><span class="p">,</span> <span class="s2">&quot;channel&quot;</span><span class="p">]:</span>
+<span class="k">for</span> <span class="n">col</span> <span class="ow">in</span> <span class="p">[</span>
+    <span class="s2">&quot;Hospital_type&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;Hospital_city&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;Hospital_region&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;Ward_Type&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;Ward_Facility&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;Type_of_Admission&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;Illness_Severity&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;Age&quot;</span><span class="p">,</span>
+<span class="p">]:</span>
     <span class="n">X</span><span class="p">[</span><span class="n">col</span><span class="p">]</span> <span class="o">=</span> <span class="n">X</span><span class="p">[</span><span class="n">col</span><span class="p">]</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="s2">&quot;category&quot;</span><span class="p">)</span>
-
 <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Samples: </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">df</span><span class="p">)</span><span class="si">:</span><span class="s2">,</span><span class="si">}</span><span class="s2">  |  Treatment rate: </span><span class="si">{</span><span class="n">w</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span><span class="si">:</span><span class="s2">.2%</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Outcome (purchase) rate: </span><span class="si">{</span><span class="n">y</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span><span class="si">:</span><span class="s2">.2%</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Outcome (long stay) rate: </span><span class="si">{</span><span class="n">y</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span><span class="si">:</span><span class="s2">.2%</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 <span class="n">df</span><span class="o">.</span><span class="n">head</span><span class="p">()</span>
 </pre></div>
 </div>
@@ -191,7 +212,7 @@
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
-<div class="input_area highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">X_train</span><span class="p">,</span> <span class="n">X_test</span><span class="p">,</span> <span class="n">w_train</span><span class="p">,</span> <span class="n">w_test</span><span class="p">,</span> <span class="n">y_train</span><span class="p">,</span> <span class="n">y_test</span> <span class="o">=</span> <span class="n">train_test_split</span><span class="p">(</span>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">X_train</span><span class="p">,</span> <span class="n">X_test</span><span class="p">,</span> <span class="n">w_train</span><span class="p">,</span> <span class="n">w_test</span><span class="p">,</span> <span class="n">y_train</span><span class="p">,</span> <span class="n">y_test</span> <span class="o">=</span> <span class="n">train_test_split</span><span class="p">(</span>
     <span class="n">X</span><span class="p">,</span> <span class="n">w</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">test_size</span><span class="o">=</span><span class="mf">0.3</span><span class="p">,</span> <span class="n">random_state</span><span class="o">=</span><span class="mi">42</span><span class="p">,</span> <span class="n">stratify</span><span class="o">=</span><span class="n">w</span>
 <span class="p">)</span>
 <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Train: </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">X_train</span><span class="p">)</span><span class="si">:</span><span class="s2">,</span><span class="si">}</span><span class="s2">  |  Test: </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">X_test</span><span class="p">)</span><span class="si">:</span><span class="s2">,</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
@@ -205,7 +226,7 @@
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
-<div class="input_area highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">ate</span> <span class="o">=</span> <span class="n">y_train</span><span class="p">[</span><span class="n">w_train</span> <span class="o">==</span> <span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span> <span class="o">-</span> <span class="n">y_train</span><span class="p">[</span><span class="n">w_train</span> <span class="o">==</span> <span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">ate</span> <span class="o">=</span> <span class="n">y_train</span><span class="p">[</span><span class="n">w_train</span> <span class="o">==</span> <span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span> <span class="o">-</span> <span class="n">y_train</span><span class="p">[</span><span class="n">w_train</span> <span class="o">==</span> <span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span>
 <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Naive ATE (difference in means): </span><span class="si">{</span><span class="n">ate</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  Treated purchase rate:  </span><span class="si">{</span><span class="n">y_train</span><span class="p">[</span><span class="n">w_train</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  Control purchase rate:  </span><span class="si">{</span><span class="n">y_train</span><span class="p">[</span><span class="n">w_train</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
@@ -221,7 +242,7 @@
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
-<div class="input_area highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">learners</span> <span class="o">=</span> <span class="p">{</span>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">learners</span> <span class="o">=</span> <span class="p">{</span>
     <span class="s2">&quot;S-Learner&quot;</span><span class="p">:</span> <span class="n">SLearner</span><span class="p">(</span><span class="n">budget</span><span class="o">=</span><span class="mf">0.2</span><span class="p">),</span>
     <span class="s2">&quot;T-Learner&quot;</span><span class="p">:</span> <span class="n">TLearner</span><span class="p">(</span><span class="n">budget</span><span class="o">=</span><span class="mf">0.2</span><span class="p">),</span>
     <span class="s2">&quot;X-Learner&quot;</span><span class="p">:</span> <span class="n">XLearner</span><span class="p">(</span><span class="n">budget</span><span class="o">=</span><span class="mf">0.2</span><span class="p">),</span>
@@ -250,7 +271,7 @@
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
-<div class="input_area highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">fig</span><span class="p">,</span> <span class="n">axes</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">subplots</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">12</span><span class="p">,</span> <span class="mi">8</span><span class="p">),</span> <span class="n">sharey</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">fig</span><span class="p">,</span> <span class="n">axes</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">subplots</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">12</span><span class="p">,</span> <span class="mi">8</span><span class="p">),</span> <span class="n">sharey</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
 
 <span class="k">for</span> <span class="n">ax</span><span class="p">,</span> <span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">learner</span><span class="p">)</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">axes</span><span class="o">.</span><span class="n">flat</span><span class="p">,</span> <span class="n">learners</span><span class="o">.</span><span class="n">items</span><span class="p">()):</span>
     <span class="n">importances</span> <span class="o">=</span> <span class="n">learner</span><span class="o">.</span><span class="n">feature_importances_</span>
@@ -274,7 +295,7 @@
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
-<div class="input_area highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Use DR-Learner CATE scores</span>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># Use DR-Learner CATE scores</span>
 <span class="n">tau_hat</span> <span class="o">=</span> <span class="n">cate_preds</span><span class="p">[</span><span class="s2">&quot;DR-Learner&quot;</span><span class="p">]</span>
 
 <span class="c1"># Quintile bins</span>
@@ -306,7 +327,7 @@
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
-<div class="input_area highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">fig</span><span class="p">,</span> <span class="n">ax</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">subplots</span><span class="p">(</span><span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">8</span><span class="p">,</span> <span class="mi">4</span><span class="p">))</span>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">fig</span><span class="p">,</span> <span class="n">ax</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">subplots</span><span class="p">(</span><span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">8</span><span class="p">,</span> <span class="mi">4</span><span class="p">))</span>
 <span class="n">x</span> <span class="o">=</span> <span class="n">subgroup_df</span><span class="p">[</span><span class="s2">&quot;Quintile&quot;</span><span class="p">]</span>
 <span class="n">width</span> <span class="o">=</span> <span class="mf">0.35</span>
 <span class="n">ax</span><span class="o">.</span><span class="n">bar</span><span class="p">(</span><span class="n">x</span> <span class="o">-</span> <span class="n">width</span> <span class="o">/</span> <span class="mi">2</span><span class="p">,</span> <span class="n">subgroup_df</span><span class="p">[</span><span class="s2">&quot;Avg Predicted CATE&quot;</span><span class="p">],</span> <span class="n">width</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s2">&quot;Predicted CATE&quot;</span><span class="p">)</span>
@@ -329,7 +350,7 @@
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
-<div class="input_area highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Uplift curves</span>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># Uplift curves</span>
 <span class="n">plt</span><span class="o">.</span><span class="n">figure</span><span class="p">(</span><span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span> <span class="mi">5</span><span class="p">))</span>
 <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">scores</span> <span class="ow">in</span> <span class="n">cate_preds</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
     <span class="n">fracs</span><span class="p">,</span> <span class="n">gains</span> <span class="o">=</span> <span class="n">cumulative_gain_curve</span><span class="p">(</span><span class="n">y_test</span><span class="p">,</span> <span class="n">w_test</span><span class="p">,</span> <span class="n">scores</span><span class="p">)</span>
@@ -349,7 +370,7 @@
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
-<div class="input_area highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Summary table</span>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># Summary table</span>
 <span class="n">rows</span> <span class="o">=</span> <span class="p">[]</span>
 <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">scores</span> <span class="ow">in</span> <span class="n">cate_preds</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
     <span class="n">a</span> <span class="o">=</span> <span class="n">auuc</span><span class="p">(</span><span class="n">y_test</span><span class="p">,</span> <span class="n">w_test</span><span class="p">,</span> <span class="n">scores</span><span class="p">,</span> <span class="n">normalize</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
@@ -368,7 +389,7 @@
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
-<div class="input_area highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">plt</span><span class="o">.</span><span class="n">figure</span><span class="p">(</span><span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span> <span class="mi">5</span><span class="p">))</span>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">plt</span><span class="o">.</span><span class="n">figure</span><span class="p">(</span><span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span> <span class="mi">5</span><span class="p">))</span>
 <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">scores</span> <span class="ow">in</span> <span class="n">cate_preds</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
     <span class="n">fracs</span><span class="p">,</span> <span class="n">qvals</span> <span class="o">=</span> <span class="n">qini_curve</span><span class="p">(</span><span class="n">y_test</span><span class="p">,</span> <span class="n">w_test</span><span class="p">,</span> <span class="n">scores</span><span class="p">)</span>
     <span class="n">plt</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">fracs</span><span class="p">,</span> <span class="n">qvals</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="n">name</span><span class="p">)</span>

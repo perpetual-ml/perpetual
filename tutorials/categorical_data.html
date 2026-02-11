@@ -6,7 +6,7 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Handling Categorical Data &mdash; Perpetual 1.4.0 documentation</title>
+  <title>Handling Categorical Data &mdash; Perpetual 1.5.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../_static/nbsphinx-code-cells.css?v=2aa19091" />
@@ -15,7 +15,7 @@
   
       <script src="../_static/jquery.js?v=5d32c60e"></script>
       <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../_static/documentation_options.js?v=9172181d"></script>
+      <script src="../_static/documentation_options.js?v=e0a75244"></script>
       <script src="../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
@@ -24,7 +24,7 @@
     <script src="../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
-    <link rel="next" title="Quick Start with Toy Datasets" href="toy_datasets.html" />
+    <link rel="next" title="Scikit-Learn Interface: Classification, Regression &amp; Ranking" href="sklearn_interface.html" />
     <link rel="prev" title="Tutorials" href="index.html" /> 
 </head>
 
@@ -54,11 +54,10 @@
 <li class="toctree-l1"><a class="reference internal" href="../api.html">API Reference</a></li>
 <li class="toctree-l1 current"><a class="reference internal" href="index.html">Tutorials</a><ul class="current">
 <li class="toctree-l2 current"><a class="current reference internal" href="#">Handling Categorical Data</a></li>
-<li class="toctree-l2"><a class="reference internal" href="toy_datasets.html">Quick Start with Toy Datasets</a></li>
 <li class="toctree-l2"><a class="reference internal" href="sklearn_interface.html">Scikit-Learn Interface: Classification, Regression &amp; Ranking</a></li>
 <li class="toctree-l2"><a class="reference internal" href="benchmark.html">Performance Benchmarking</a></li>
 <li class="toctree-l2"><a class="reference internal" href="custom_objective.html">Custom Objective Tutorial</a></li>
-<li class="toctree-l2"><a class="reference internal" href="causal/uplift_marketing.html">Uplift Modeling and Causal Inference</a></li>
+<li class="toctree-l2"><a class="reference internal" href="causal/uplift_marketing.html">Uplift Modeling with the Criteo Uplift Dataset</a></li>
 <li class="toctree-l2"><a class="reference internal" href="causal/iv_causal_effect.html">Instrumental Variables (Boosted IV)</a></li>
 <li class="toctree-l2"><a class="reference internal" href="causal/dml_wage_gap.html">Double Machine Learning: Estimating the Gender Wage Gap</a></li>
 <li class="toctree-l2"><a class="reference internal" href="causal/policy_learning.html">Policy Learning: Optimal Treatment Assignment</a></li>
@@ -155,7 +154,7 @@
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># fetch dataset: https://archive.ics.uci.edu/dataset/2/adult</span>
-<span class="n">adult</span> <span class="o">=</span> <span class="n">fetch_openml</span><span class="p">(</span><span class="n">data_id</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">as_frame</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="n">adult</span> <span class="o">=</span> <span class="n">fetch_openml</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;adult&quot;</span><span class="p">,</span> <span class="n">version</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">as_frame</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 </pre></div>
 </div>
 </div>
@@ -163,7 +162,7 @@
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
-<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">adult</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">features</span><span class="o">.</span><span class="n">head</span><span class="p">()</span>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">adult</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">head</span><span class="p">()</span>
 </pre></div>
 </div>
 </div>
@@ -171,10 +170,8 @@
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
-<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">data</span> <span class="o">=</span> <span class="n">adult</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">features</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
-<span class="n">data</span><span class="p">[</span><span class="s2">&quot;sex&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">get_dummies</span><span class="p">(</span>
-    <span class="n">adult</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">features</span><span class="p">[</span><span class="s2">&quot;sex&quot;</span><span class="p">],</span> <span class="n">drop_first</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">float</span>
-<span class="p">)</span><span class="o">.</span><span class="n">to_numpy</span><span class="p">()</span>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">data</span> <span class="o">=</span> <span class="n">adult</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+<span class="n">data</span><span class="p">[</span><span class="s2">&quot;sex&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">get_dummies</span><span class="p">(</span><span class="n">adult</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;sex&quot;</span><span class="p">],</span> <span class="n">drop_first</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">float</span><span class="p">)</span><span class="o">.</span><span class="n">to_numpy</span><span class="p">()</span>
 <span class="n">cols</span> <span class="o">=</span> <span class="p">[</span>
     <span class="s2">&quot;workclass&quot;</span><span class="p">,</span>
     <span class="s2">&quot;education&quot;</span><span class="p">,</span>
@@ -193,7 +190,7 @@
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
-<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">y</span> <span class="o">=</span> <span class="n">adult</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">targets</span><span class="p">[</span><span class="s2">&quot;income&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">str</span><span class="o">.</span><span class="n">contains</span><span class="p">(</span><span class="s2">&quot;&lt;&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">to_numpy</span><span class="p">()</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">int</span><span class="p">)</span>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">y</span> <span class="o">=</span> <span class="n">adult</span><span class="o">.</span><span class="n">target</span><span class="o">.</span><span class="n">str</span><span class="o">.</span><span class="n">contains</span><span class="p">(</span><span class="s2">&quot;&lt;&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">to_numpy</span><span class="p">()</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">int</span><span class="p">)</span>
 <span class="n">y</span>
 </pre></div>
 </div>
@@ -202,7 +199,7 @@
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
-<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="nb">set</span><span class="p">(</span><span class="n">adult</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">targets</span><span class="p">[</span><span class="s2">&quot;income&quot;</span><span class="p">])</span>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="nb">set</span><span class="p">(</span><span class="n">adult</span><span class="o">.</span><span class="n">target</span><span class="p">)</span>
 </pre></div>
 </div>
 </div>
@@ -421,7 +418,7 @@
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
-<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">model</span> <span class="o">=</span> <span class="n">PerpetualBooster</span><span class="p">(</span><span class="n">budget</span><span class="o">=</span><span class="mf">0.35</span><span class="p">,</span> <span class="n">objective</span><span class="o">=</span><span class="s2">&quot;LogLoss&quot;</span><span class="p">)</span>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">model</span> <span class="o">=</span> <span class="n">PerpetualBooster</span><span class="p">(</span><span class="n">objective</span><span class="o">=</span><span class="s2">&quot;LogLoss&quot;</span><span class="p">)</span>
 <span class="n">model</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">X_train</span><span class="p">,</span> <span class="n">y_train</span><span class="p">)</span>
 </pre></div>
 </div>
@@ -487,7 +484,7 @@
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
         <a href="index.html" class="btn btn-neutral float-left" title="Tutorials" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
-        <a href="toy_datasets.html" class="btn btn-neutral float-right" title="Quick Start with Toy Datasets" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="sklearn_interface.html" class="btn btn-neutral float-right" title="Scikit-Learn Interface: Classification, Regression &amp; Ranking" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 
   <hr/>

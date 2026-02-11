@@ -6,7 +6,6 @@ Tutorials
    :caption: Tutorials
 
    categorical_data
-   toy_datasets
    sklearn_interface.ipynb
    benchmark
    custom_objective.ipynb

@@ -6,7 +6,7 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Policy Learning: Optimal Treatment Assignment &mdash; Perpetual 1.4.0 documentation</title>
+  <title>Policy Learning: Optimal Treatment Assignment &mdash; Perpetual 1.5.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../../_static/nbsphinx-code-cells.css?v=2aa19091" />
@@ -15,7 +15,7 @@
   
       <script src="../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../_static/documentation_options.js?v=9172181d"></script>
+      <script src="../../_static/documentation_options.js?v=e0a75244"></script>
       <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
@@ -54,11 +54,10 @@
 <li class="toctree-l1"><a class="reference internal" href="../../api.html">API Reference</a></li>
 <li class="toctree-l1 current"><a class="reference internal" href="../index.html">Tutorials</a><ul class="current">
 <li class="toctree-l2"><a class="reference internal" href="../categorical_data.html">Handling Categorical Data</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../toy_datasets.html">Quick Start with Toy Datasets</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../sklearn_interface.html">Scikit-Learn Interface: Classification, Regression &amp; Ranking</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../benchmark.html">Performance Benchmarking</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../custom_objective.html">Custom Objective Tutorial</a></li>
-<li class="toctree-l2"><a class="reference internal" href="uplift_marketing.html">Uplift Modeling and Causal Inference</a></li>
+<li class="toctree-l2"><a class="reference internal" href="uplift_marketing.html">Uplift Modeling with the Criteo Uplift Dataset</a></li>
 <li class="toctree-l2"><a class="reference internal" href="iv_causal_effect.html">Instrumental Variables (Boosted IV)</a></li>
 <li class="toctree-l2"><a class="reference internal" href="dml_wage_gap.html">Double Machine Learning: Estimating the Gender Wage Gap</a></li>
 <li class="toctree-l2 current"><a class="current reference internal" href="#">Policy Learning: Optimal Treatment Assignment</a><ul>
@@ -127,7 +126,7 @@
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
-<div class="input_area highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pd</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">perpetual.causal_metrics</span><span class="w"> </span><span class="kn">import</span> <span class="n">auuc</span><span class="p">,</span> <span class="n">qini_coefficient</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">perpetual.policy</span><span class="w"> </span><span class="kn">import</span> <span class="n">PolicyLearner</span>
@@ -143,7 +142,7 @@
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
-<div class="input_area highlight-python notranslate"><div class="highlight"><pre><span></span><span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Fetching Bank Marketing dataset...&quot;</span><span class="p">)</span>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Fetching Bank Marketing dataset...&quot;</span><span class="p">)</span>
 <span class="n">data</span> <span class="o">=</span> <span class="n">fetch_openml</span><span class="p">(</span><span class="n">data_id</span><span class="o">=</span><span class="mi">1461</span><span class="p">,</span> <span class="n">as_frame</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">parser</span><span class="o">=</span><span class="s2">&quot;auto&quot;</span><span class="p">)</span>
 <span class="n">df</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">frame</span>
 <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Shape: </span><span class="si">{</span><span class="n">df</span><span class="o">.</span><span class="n">shape</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
@@ -159,7 +158,7 @@
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
-<div class="input_area highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">seed</span><span class="p">(</span><span class="mi">42</span><span class="p">)</span>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">seed</span><span class="p">(</span><span class="mi">42</span><span class="p">)</span>
 
 <span class="c1"># Encode target</span>
 <span class="n">y_col</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">columns</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
@@ -209,7 +208,7 @@
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
-<div class="input_area highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">X_train</span><span class="p">,</span> <span class="n">X_test</span><span class="p">,</span> <span class="n">w_train</span><span class="p">,</span> <span class="n">w_test</span><span class="p">,</span> <span class="n">y_train</span><span class="p">,</span> <span class="n">y_test</span><span class="p">,</span> <span class="n">cate_train</span><span class="p">,</span> <span class="n">cate_test</span> <span class="o">=</span> <span class="p">(</span>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">X_train</span><span class="p">,</span> <span class="n">X_test</span><span class="p">,</span> <span class="n">w_train</span><span class="p">,</span> <span class="n">w_test</span><span class="p">,</span> <span class="n">y_train</span><span class="p">,</span> <span class="n">y_test</span><span class="p">,</span> <span class="n">cate_train</span><span class="p">,</span> <span class="n">cate_test</span> <span class="o">=</span> <span class="p">(</span>
     <span class="n">train_test_split</span><span class="p">(</span><span class="n">X_all</span><span class="p">,</span> <span class="n">w_all</span><span class="p">,</span> <span class="n">y_sim</span><span class="p">,</span> <span class="n">true_cate</span><span class="p">,</span> <span class="n">test_size</span><span class="o">=</span><span class="mf">0.3</span><span class="p">,</span> <span class="n">random_state</span><span class="o">=</span><span class="mi">42</span><span class="p">)</span>
 <span class="p">)</span>
 <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Train: </span><span class="si">{</span><span class="n">X_train</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="si">}</span><span class="s2">, Test: </span><span class="si">{</span><span class="n">X_test</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
@@ -224,7 +223,7 @@
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
-<div class="input_area highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Since we simulated an RCT, we know the propensity is 0.5 for all samples.</span>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># Since we simulated an RCT, we know the propensity is 0.5 for all samples.</span>
 <span class="n">prop_train</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">full</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">w_train</span><span class="p">),</span> <span class="mf">0.5</span><span class="p">)</span>
 
 <span class="n">pl_ipw</span> <span class="o">=</span> <span class="n">PolicyLearner</span><span class="p">(</span><span class="n">budget</span><span class="o">=</span><span class="mf">0.5</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="s2">&quot;ipw&quot;</span><span class="p">)</span>
@@ -243,7 +242,7 @@
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
-<div class="input_area highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">pl_aipw</span> <span class="o">=</span> <span class="n">PolicyLearner</span><span class="p">(</span><span class="n">budget</span><span class="o">=</span><span class="mf">0.5</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="s2">&quot;aipw&quot;</span><span class="p">)</span>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">pl_aipw</span> <span class="o">=</span> <span class="n">PolicyLearner</span><span class="p">(</span><span class="n">budget</span><span class="o">=</span><span class="mf">0.5</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="s2">&quot;aipw&quot;</span><span class="p">)</span>
 <span class="n">pl_aipw</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">X_train</span><span class="p">,</span> <span class="n">w_train</span><span class="p">,</span> <span class="n">y_train</span><span class="p">,</span> <span class="n">propensity</span><span class="o">=</span><span class="n">prop_train</span><span class="p">)</span>
 
 <span class="n">policy_aipw</span> <span class="o">=</span> <span class="n">pl_aipw</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="n">X_test</span><span class="p">)</span>
@@ -259,7 +258,7 @@
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
-<div class="input_area highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">def</span><span class="w"> </span><span class="nf">policy_value</span><span class="p">(</span><span class="n">policy</span><span class="p">,</span> <span class="n">true_cate</span><span class="p">):</span>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="k">def</span><span class="w"> </span><span class="nf">policy_value</span><span class="p">(</span><span class="n">policy</span><span class="p">,</span> <span class="n">true_cate</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Expected improvement from a targeting policy vs. no treatment.&quot;&quot;&quot;</span>
     <span class="k">return</span> <span class="p">(</span><span class="n">policy</span> <span class="o">*</span> <span class="n">true_cate</span><span class="p">)</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span>
 
@@ -296,7 +295,7 @@
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
-<div class="input_area highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">importances</span> <span class="o">=</span> <span class="n">pl_aipw</span><span class="o">.</span><span class="n">feature_importances_</span>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">importances</span> <span class="o">=</span> <span class="n">pl_aipw</span><span class="o">.</span><span class="n">feature_importances_</span>
 <span class="n">top_k</span> <span class="o">=</span> <span class="mi">10</span>
 <span class="n">top_idx</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">argsort</span><span class="p">(</span><span class="n">importances</span><span class="p">)[::</span><span class="o">-</span><span class="mi">1</span><span class="p">][:</span><span class="n">top_k</span><span class="p">]</span>
 
@@ -314,7 +313,7 @@
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
-<div class="input_area highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Use the continuous policy score as the uplift score</span>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># Use the continuous policy score as the uplift score</span>
 <span class="n">uplift_score</span> <span class="o">=</span> <span class="n">pl_aipw</span><span class="o">.</span><span class="n">predict_proba</span><span class="p">(</span><span class="n">X_test</span><span class="p">)</span>
 
 <span class="n">aipw_auuc</span> <span class="o">=</span> <span class="n">auuc</span><span class="p">(</span><span class="n">y_test</span><span class="p">,</span> <span class="n">w_test</span><span class="p">,</span> <span class="n">uplift_score</span><span class="p">)</span>

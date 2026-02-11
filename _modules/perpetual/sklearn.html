@@ -5,7 +5,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>perpetual.sklearn &mdash; Perpetual 1.4.0 documentation</title>
+  <title>perpetual.sklearn &mdash; Perpetual 1.5.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../../_static/custom.css?v=9cdd1368" />
@@ -13,7 +13,7 @@
   
       <script src="../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../_static/documentation_options.js?v=9172181d"></script>
+      <script src="../../_static/documentation_options.js?v=e0a75244"></script>
       <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
@@ -103,6 +103,8 @@
 <span class="sd">    A scikit-learn compatible classifier based on PerpetualBooster.</span>
 <span class="sd">    Uses &#39;LogLoss&#39; as the default objective.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">_estimator_type</span> <span class="o">=</span> <span class="s2">&quot;classifier&quot;</span>
 
     <span class="c1"># Expose the objective explicitly in the __init__ signature to allow</span>
     <span class="c1"># scikit-learn to correctly discover and set it via set_params.</span>
@@ -266,6 +268,7 @@
             <span class="p">)</span>
 
         <span class="c1"># In classification, the labels (classes_) are set in the base fit.</span>
+
         <span class="k">return</span> <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">sample_weight</span><span class="o">=</span><span class="n">sample_weight</span><span class="p">,</span> <span class="o">**</span><span class="n">fit_params</span><span class="p">)</span></div>
 </div>
 
@@ -278,6 +281,8 @@
 <span class="sd">    A scikit-learn compatible regressor based on PerpetualBooster.</span>
 <span class="sd">    Uses &#39;SquaredLoss&#39; as the default objective.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">_estimator_type</span> <span class="o">=</span> <span class="s2">&quot;regressor&quot;</span>
 
 <div class="viewcode-block" id="PerpetualRegressor.__init__">
 <a class="viewcode-back" href="../../api.html#perpetual.sklearn.PerpetualRegressor.__init__">[docs]</a>

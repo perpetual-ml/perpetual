@@ -6,7 +6,7 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Risk, Compliance, and Interpretability &mdash; Perpetual 1.4.0 documentation</title>
+  <title>Risk, Compliance, and Interpretability &mdash; Perpetual 1.5.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../../_static/nbsphinx-code-cells.css?v=2aa19091" />
@@ -15,7 +15,7 @@
   
       <script src="../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../_static/documentation_options.js?v=9172181d"></script>
+      <script src="../../_static/documentation_options.js?v=e0a75244"></script>
       <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
@@ -54,11 +54,10 @@
 <li class="toctree-l1"><a class="reference internal" href="../../api.html">API Reference</a></li>
 <li class="toctree-l1 current"><a class="reference internal" href="../index.html">Tutorials</a><ul class="current">
 <li class="toctree-l2"><a class="reference internal" href="../categorical_data.html">Handling Categorical Data</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../toy_datasets.html">Quick Start with Toy Datasets</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../sklearn_interface.html">Scikit-Learn Interface: Classification, Regression &amp; Ranking</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../benchmark.html">Performance Benchmarking</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../custom_objective.html">Custom Objective Tutorial</a></li>
-<li class="toctree-l2"><a class="reference internal" href="uplift_marketing.html">Uplift Modeling and Causal Inference</a></li>
+<li class="toctree-l2"><a class="reference internal" href="uplift_marketing.html">Uplift Modeling with the Criteo Uplift Dataset</a></li>
 <li class="toctree-l2"><a class="reference internal" href="iv_causal_effect.html">Instrumental Variables (Boosted IV)</a></li>
 <li class="toctree-l2"><a class="reference internal" href="dml_wage_gap.html">Double Machine Learning: Estimating the Gender Wage Gap</a></li>
 <li class="toctree-l2"><a class="reference internal" href="policy_learning.html">Policy Learning: Optimal Treatment Assignment</a></li>
@@ -184,15 +183,21 @@
 <span class="n">probs</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">predict_proba</span><span class="p">(</span><span class="n">X_test</span><span class="p">)</span>
 
 <span class="c1"># Find a high-risk applicant (rejected)</span>
-<span class="n">high_risk_idx</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">probs</span> <span class="o">&gt;</span> <span class="mf">0.6</span><span class="p">)[</span><span class="mi">0</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>
+<span class="n">high_risk_idx</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">probs</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">]</span> <span class="o">&gt;</span> <span class="mf">0.5</span><span class="p">)[</span><span class="mi">0</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>
 <span class="n">applicant</span> <span class="o">=</span> <span class="n">X_test</span><span class="o">.</span><span class="n">iloc</span><span class="p">[[</span><span class="n">high_risk_idx</span><span class="p">]]</span>
 
 <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Analyzing applicant at index </span><span class="si">{</span><span class="n">high_risk_idx</span><span class="si">}</span><span class="s2">...&quot;</span><span class="p">)</span>
-<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Probability of Default: </span><span class="si">{</span><span class="n">probs</span><span class="p">[</span><span class="n">high_risk_idx</span><span class="p">]</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="c1"># If probs is 2D (n_samples, 2), use probs[high_risk_idx][1]; if 1D, use .item()</span>
+<span class="n">prob_default</span> <span class="o">=</span> <span class="p">(</span>
+    <span class="n">probs</span><span class="p">[</span><span class="n">high_risk_idx</span><span class="p">][</span><span class="mi">1</span><span class="p">]</span> <span class="k">if</span> <span class="n">probs</span><span class="o">.</span><span class="n">ndim</span> <span class="o">==</span> <span class="mi">2</span> <span class="k">else</span> <span class="n">probs</span><span class="p">[</span><span class="n">high_risk_idx</span><span class="p">]</span><span class="o">.</span><span class="n">item</span><span class="p">()</span>
+<span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Probability of Default: </span><span class="si">{</span><span class="n">prob_default</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 
 <span class="c1"># Generate reason codes</span>
 <span class="c1"># threshold: the baseline probability to compare against (e.g., average default rate or approval threshold)</span>
-<span class="n">reasons</span> <span class="o">=</span> <span class="n">engine</span><span class="o">.</span><span class="n">generate_reason_codes</span><span class="p">(</span><span class="n">applicant</span><span class="p">,</span> <span class="n">threshold</span><span class="o">=</span><span class="mf">0.2</span><span class="p">)</span>
+<span class="n">reasons</span> <span class="o">=</span> <span class="n">engine</span><span class="o">.</span><span class="n">generate_reason_codes</span><span class="p">(</span>
+    <span class="n">applicant</span><span class="p">,</span> <span class="n">threshold</span><span class="o">=</span><span class="mf">0.2</span><span class="p">,</span> <span class="n">rejection_direction</span><span class="o">=</span><span class="s2">&quot;higher&quot;</span>
+<span class="p">)</span>
 
 <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">Adverse Action Reasons:&quot;</span><span class="p">)</span>
 <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">reason_list</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">reasons</span><span class="p">):</span>

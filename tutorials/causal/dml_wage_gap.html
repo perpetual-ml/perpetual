@@ -6,7 +6,7 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Double Machine Learning: Estimating the Gender Wage Gap &mdash; Perpetual 1.4.0 documentation</title>
+  <title>Double Machine Learning: Estimating the Gender Wage Gap &mdash; Perpetual 1.5.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../../_static/nbsphinx-code-cells.css?v=2aa19091" />
@@ -15,7 +15,7 @@
   
       <script src="../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../_static/documentation_options.js?v=9172181d"></script>
+      <script src="../../_static/documentation_options.js?v=e0a75244"></script>
       <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
@@ -54,11 +54,10 @@
 <li class="toctree-l1"><a class="reference internal" href="../../api.html">API Reference</a></li>
 <li class="toctree-l1 current"><a class="reference internal" href="../index.html">Tutorials</a><ul class="current">
 <li class="toctree-l2"><a class="reference internal" href="../categorical_data.html">Handling Categorical Data</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../toy_datasets.html">Quick Start with Toy Datasets</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../sklearn_interface.html">Scikit-Learn Interface: Classification, Regression &amp; Ranking</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../benchmark.html">Performance Benchmarking</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../custom_objective.html">Custom Objective Tutorial</a></li>
-<li class="toctree-l2"><a class="reference internal" href="uplift_marketing.html">Uplift Modeling and Causal Inference</a></li>
+<li class="toctree-l2"><a class="reference internal" href="uplift_marketing.html">Uplift Modeling with the Criteo Uplift Dataset</a></li>
 <li class="toctree-l2"><a class="reference internal" href="iv_causal_effect.html">Instrumental Variables (Boosted IV)</a></li>
 <li class="toctree-l2 current"><a class="current reference internal" href="#">Double Machine Learning: Estimating the Gender Wage Gap</a><ul>
 <li class="toctree-l3"><a class="reference internal" href="#1.-Load-the-CPS-1985-Wages-Dataset">1. Load the CPS 1985 Wages Dataset</a></li>
@@ -69,10 +68,8 @@
 <li class="toctree-l3"><a class="reference internal" href="#6.-Feature-Importance">6. Feature Importance</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#7.-Compare-with-Naive-Estimate">7. Compare with Naive Estimate</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#8.-Subgroup-Analysis">8. Subgroup Analysis</a></li>
-<li class="toctree-l3"><a class="reference internal" href="#Summary">Summary</a><ul>
-<li class="toctree-l4"><a class="reference internal" href="#References">References</a></li>
-</ul>
-</li>
+<li class="toctree-l3"><a class="reference internal" href="#Comparison-to-Linear-Regression-and-DML-Advantages">Comparison to Linear Regression and DML Advantages</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#Summary-and-References">Summary and References</a></li>
 </ul>
 </li>
 <li class="toctree-l2"><a class="reference internal" href="policy_learning.html">Policy Learning: Optimal Treatment Assignment</a></li>
@@ -127,7 +124,7 @@
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
-<div class="input_area highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pd</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">perpetual.dml</span><span class="w"> </span><span class="kn">import</span> <span class="n">DMLEstimator</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">sklearn.datasets</span><span class="w"> </span><span class="kn">import</span> <span class="n">fetch_openml</span>
@@ -142,7 +139,7 @@
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
-<div class="input_area highlight-python notranslate"><div class="highlight"><pre><span></span><span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Fetching CPS 1985 Wages dataset...&quot;</span><span class="p">)</span>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Fetching CPS 1985 Wages dataset...&quot;</span><span class="p">)</span>
 <span class="n">data</span> <span class="o">=</span> <span class="n">fetch_openml</span><span class="p">(</span><span class="n">data_id</span><span class="o">=</span><span class="mi">534</span><span class="p">,</span> <span class="n">as_frame</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">parser</span><span class="o">=</span><span class="s2">&quot;auto&quot;</span><span class="p">)</span>
 <span class="n">df</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">frame</span>
 <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Shape: </span><span class="si">{</span><span class="n">df</span><span class="o">.</span><span class="n">shape</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
@@ -158,10 +155,10 @@
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
-<div class="input_area highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Encode categorical variables</span>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># Encode categorical variables</span>
 <span class="n">df_encoded</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">get_dummies</span><span class="p">(</span>
     <span class="n">df</span><span class="p">,</span>
-    <span class="n">columns</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;sex&quot;</span><span class="p">,</span> <span class="s2">&quot;marr&quot;</span><span class="p">,</span> <span class="s2">&quot;union&quot;</span><span class="p">,</span> <span class="s2">&quot;race&quot;</span><span class="p">,</span> <span class="s2">&quot;south&quot;</span><span class="p">,</span> <span class="s2">&quot;smsa&quot;</span><span class="p">,</span> <span class="s2">&quot;sector&quot;</span><span class="p">],</span>
+    <span class="n">columns</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;SOUTH&quot;</span><span class="p">,</span> <span class="s2">&quot;SEX&quot;</span><span class="p">,</span> <span class="s2">&quot;UNION&quot;</span><span class="p">,</span> <span class="s2">&quot;RACE&quot;</span><span class="p">,</span> <span class="s2">&quot;OCCUPATION&quot;</span><span class="p">,</span> <span class="s2">&quot;SECTOR&quot;</span><span class="p">,</span> <span class="s2">&quot;MARR&quot;</span><span class="p">],</span>
     <span class="n">drop_first</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
     <span class="n">dtype</span><span class="o">=</span><span class="nb">float</span><span class="p">,</span>
 <span class="p">)</span>
@@ -173,19 +170,19 @@
     <span class="k">else</span> <span class="p">(</span>
         <span class="mf">1.0</span> <span class="o">-</span> <span class="n">df_encoded</span><span class="p">[</span><span class="s2">&quot;sex_male&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">values</span>
         <span class="k">if</span> <span class="s2">&quot;sex_male&quot;</span> <span class="ow">in</span> <span class="n">df_encoded</span><span class="o">.</span><span class="n">columns</span>
-        <span class="k">else</span> <span class="n">df</span><span class="p">[</span><span class="s2">&quot;sex&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">map</span><span class="p">({</span><span class="s2">&quot;female&quot;</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span> <span class="s2">&quot;male&quot;</span><span class="p">:</span> <span class="mi">0</span><span class="p">})</span><span class="o">.</span><span class="n">values</span>
+        <span class="k">else</span> <span class="n">df</span><span class="p">[</span><span class="s2">&quot;SEX&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">map</span><span class="p">({</span><span class="s2">&quot;female&quot;</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span> <span class="s2">&quot;male&quot;</span><span class="p">:</span> <span class="mi">0</span><span class="p">})</span><span class="o">.</span><span class="n">values</span>
     <span class="p">)</span>
 <span class="p">)</span>
 
 <span class="c1"># Outcome: log wage (log transform for normality)</span>
-<span class="n">y</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">log1p</span><span class="p">(</span><span class="n">df_encoded</span><span class="p">[</span><span class="s2">&quot;wage&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">values</span><span class="p">)</span>
+<span class="n">y</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">log1p</span><span class="p">(</span><span class="n">df_encoded</span><span class="p">[</span><span class="s2">&quot;WAGE&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">values</span><span class="p">)</span>
 
 <span class="c1"># Covariates: everything except wage and the treatment column</span>
-<span class="n">drop_cols</span> <span class="o">=</span> <span class="p">[</span><span class="n">c</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">df_encoded</span><span class="o">.</span><span class="n">columns</span> <span class="k">if</span> <span class="n">c</span> <span class="ow">in</span> <span class="p">[</span><span class="s2">&quot;wage&quot;</span><span class="p">,</span> <span class="s2">&quot;sex_female&quot;</span><span class="p">,</span> <span class="s2">&quot;sex_male&quot;</span><span class="p">]]</span>
+<span class="n">drop_cols</span> <span class="o">=</span> <span class="p">[</span><span class="n">c</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">df_encoded</span><span class="o">.</span><span class="n">columns</span> <span class="k">if</span> <span class="n">c</span> <span class="ow">in</span> <span class="p">[</span><span class="s2">&quot;WAGE&quot;</span><span class="p">,</span> <span class="s2">&quot;sex_female&quot;</span><span class="p">,</span> <span class="s2">&quot;sex_male&quot;</span><span class="p">]]</span>
 <span class="n">X</span> <span class="o">=</span> <span class="n">df_encoded</span><span class="o">.</span><span class="n">drop</span><span class="p">(</span><span class="n">columns</span><span class="o">=</span><span class="n">drop_cols</span><span class="p">)</span><span class="o">.</span><span class="n">values</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">float</span><span class="p">)</span>
 <span class="n">feature_names</span> <span class="o">=</span> <span class="p">[</span><span class="n">c</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">df_encoded</span><span class="o">.</span><span class="n">columns</span> <span class="k">if</span> <span class="n">c</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">drop_cols</span><span class="p">]</span>
 
-<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;X shape: </span><span class="si">{</span><span class="n">X</span><span class="o">.</span><span class="n">shape</span><span class="si">}</span><span class="s2">, Treatment mean: </span><span class="si">{</span><span class="n">w</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="n">w</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">w</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">float</span><span class="p">)</span>
 </pre></div>
 </div>
 </div>
@@ -196,10 +193,12 @@
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
-<div class="input_area highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">X_train</span><span class="p">,</span> <span class="n">X_test</span><span class="p">,</span> <span class="n">w_train</span><span class="p">,</span> <span class="n">w_test</span><span class="p">,</span> <span class="n">y_train</span><span class="p">,</span> <span class="n">y_test</span> <span class="o">=</span> <span class="n">train_test_split</span><span class="p">(</span>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">X_train</span><span class="p">,</span> <span class="n">X_test</span><span class="p">,</span> <span class="n">w_train</span><span class="p">,</span> <span class="n">w_test</span><span class="p">,</span> <span class="n">y_train</span><span class="p">,</span> <span class="n">y_test</span> <span class="o">=</span> <span class="n">train_test_split</span><span class="p">(</span>
     <span class="n">X</span><span class="p">,</span> <span class="n">w</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">test_size</span><span class="o">=</span><span class="mf">0.3</span><span class="p">,</span> <span class="n">random_state</span><span class="o">=</span><span class="mi">42</span>
 <span class="p">)</span>
 <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Train: </span><span class="si">{</span><span class="n">X_train</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="si">}</span><span class="s2">, Test: </span><span class="si">{</span><span class="n">X_test</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;w_train mean: </span><span class="si">{</span><span class="n">w_train</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2">, w_test mean: </span><span class="si">{</span><span class="n">w_test</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;y_train mean: </span><span class="si">{</span><span class="n">y_train</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2">, y_test mean: </span><span class="si">{</span><span class="n">y_test</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 </pre></div>
 </div>
 </div>
@@ -217,7 +216,7 @@
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
-<div class="input_area highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">dml</span> <span class="o">=</span> <span class="n">DMLEstimator</span><span class="p">(</span><span class="n">budget</span><span class="o">=</span><span class="mf">0.5</span><span class="p">,</span> <span class="n">n_folds</span><span class="o">=</span><span class="mi">3</span><span class="p">)</span>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">dml</span> <span class="o">=</span> <span class="n">DMLEstimator</span><span class="p">(</span><span class="n">budget</span><span class="o">=</span><span class="mf">2.0</span><span class="p">,</span> <span class="n">n_folds</span><span class="o">=</span><span class="mi">5</span><span class="p">)</span>
 <span class="n">dml</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">X_train</span><span class="p">,</span> <span class="n">w_train</span><span class="p">,</span> <span class="n">y_train</span><span class="p">)</span>
 <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;DML model fitted.&quot;</span><span class="p">)</span>
 </pre></div>
@@ -231,7 +230,7 @@
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
-<div class="input_area highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">cate_test</span> <span class="o">=</span> <span class="n">dml</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="n">X_test</span><span class="p">)</span>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">cate_test</span> <span class="o">=</span> <span class="n">dml</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="n">X_test</span><span class="p">)</span>
 
 <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Average Treatment Effect (ATE): </span><span class="si">{</span><span class="n">cate_test</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  (in wage terms: </span><span class="si">{</span><span class="n">np</span><span class="o">.</span><span class="n">expm1</span><span class="p">(</span><span class="n">cate_test</span><span class="o">.</span><span class="n">mean</span><span class="p">())</span><span class="si">:</span><span class="s2">.2%</span><span class="si">}</span><span class="s2"> change)&quot;</span><span class="p">)</span>
@@ -249,7 +248,7 @@
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
-<div class="input_area highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">importances</span> <span class="o">=</span> <span class="n">dml</span><span class="o">.</span><span class="n">feature_importances_</span>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">importances</span> <span class="o">=</span> <span class="n">dml</span><span class="o">.</span><span class="n">feature_importances_</span>
 <span class="n">top_k</span> <span class="o">=</span> <span class="mi">10</span>
 <span class="n">top_idx</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">argsort</span><span class="p">(</span><span class="n">importances</span><span class="p">)[::</span><span class="o">-</span><span class="mi">1</span><span class="p">][:</span><span class="n">top_k</span><span class="p">]</span>
 
@@ -267,7 +266,7 @@
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
-<div class="input_area highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">naive_ate</span> <span class="o">=</span> <span class="n">y_test</span><span class="p">[</span><span class="n">w_test</span> <span class="o">==</span> <span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span> <span class="o">-</span> <span class="n">y_test</span><span class="p">[</span><span class="n">w_test</span> <span class="o">==</span> <span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">naive_ate</span> <span class="o">=</span> <span class="n">y_test</span><span class="p">[</span><span class="n">w_test</span> <span class="o">==</span> <span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span> <span class="o">-</span> <span class="n">y_test</span><span class="p">[</span><span class="n">w_test</span> <span class="o">==</span> <span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span>
 <span class="n">dml_ate</span> <span class="o">=</span> <span class="n">cate_test</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span>
 
 <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Naive ATE (difference in means): </span><span class="si">{</span><span class="n">naive_ate</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
@@ -284,7 +283,7 @@
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
-<div class="input_area highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Split by median CATE</span>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># Split by median CATE</span>
 <span class="n">median_cate</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">median</span><span class="p">(</span><span class="n">cate_test</span><span class="p">)</span>
 <span class="n">high_effect</span> <span class="o">=</span> <span class="n">cate_test</span> <span class="o">&gt;=</span> <span class="n">median_cate</span>
 <span class="n">low_effect</span> <span class="o">=</span> <span class="n">cate_test</span> <span class="o">&lt;</span> <span class="n">median_cate</span>
@@ -296,23 +295,52 @@
 </pre></div>
 </div>
 </div>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># Linear regression comparison for treatment effect</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">sklearn.linear_model</span><span class="w"> </span><span class="kn">import</span> <span class="n">LinearRegression</span>
+
+<span class="c1"># Fit model: y ~ w + X</span>
+<span class="n">X_lr</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">column_stack</span><span class="p">([</span><span class="n">w_train</span><span class="p">,</span> <span class="n">X_train</span><span class="p">])</span>
+<span class="n">lr</span> <span class="o">=</span> <span class="n">LinearRegression</span><span class="p">()</span>
+<span class="n">lr</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">X_lr</span><span class="p">,</span> <span class="n">y_train</span><span class="p">)</span>
+
+<span class="c1"># Coefficient for treatment (w)</span>
+<span class="n">treatment_coef</span> <span class="o">=</span> <span class="n">lr</span><span class="o">.</span><span class="n">coef_</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Linear regression treatment effect (log scale): </span><span class="si">{</span><span class="n">treatment_coef</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  (in wage terms: </span><span class="si">{</span><span class="n">np</span><span class="o">.</span><span class="n">expm1</span><span class="p">(</span><span class="n">treatment_coef</span><span class="p">)</span><span class="si">:</span><span class="s2">.2%</span><span class="si">}</span><span class="s2"> change)&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
 </section>
-<section id="Summary">
-<h2>Summary<a class="headerlink" href="#Summary" title="Link to this heading"></a></h2>
-<p>In this tutorial we:</p>
-<ol class="arabic simple">
-<li><p>Used <strong>DMLEstimator</strong> with real-world CPS wage data.</p></li>
-<li><p>Estimated the <strong>heterogeneous causal effect</strong> of gender on wages.</p></li>
-<li><p>Leveraged cross-fitting to avoid overfitting nuisance models.</p></li>
-<li><p>Identified which features drive <strong>variation</strong> in the wage gap.</p></li>
-<li><p>Compared the DML estimate with a naive difference-in-means.</p></li>
-</ol>
-<section id="References">
-<h3>References<a class="headerlink" href="#References" title="Link to this heading"></a></h3>
+<section id="Comparison-to-Linear-Regression-and-DML-Advantages">
+<h2>Comparison to Linear Regression and DML Advantages<a class="headerlink" href="#Comparison-to-Linear-Regression-and-DML-Advantages" title="Link to this heading"></a></h2>
+<p>The linear regression model estimates the average treatment effect (ATE) by fitting a single coefficient for the treatment (gender), assuming the effect is constant across all individuals. This approach is simple and interpretable, but it cannot capture heterogeneity in treatment effects or account for complex confounding.</p>
+<p>Our Double Machine Learning (DML) implementation, by contrast, estimates heterogeneous treatment effects (CATE) for each individual, leveraging cross-fitting and flexible nuisance models. DML is robust to high-dimensional confounders and avoids overfitting by separating the estimation of nuisance functions from the effect model. This allows for more accurate and nuanced causal inference, especially when treatment effects vary across subgroups or covariate patterns.</p>
+<p><strong>Advantages of DML:</strong></p>
+<ul class="simple">
+<li><p>Estimates individual-level (heterogeneous) treatment effects, not just a single average.</p></li>
+<li><p>Robust to high-dimensional confounders and flexible feature sets.</p></li>
+<li><p>Uses cross-fitting to reduce bias and overfitting.</p></li>
+<li><p>Provides feature importance for understanding drivers of effect heterogeneity.</p></li>
+<li><p>More reliable causal estimates in complex, real-world data.</p></li>
+</ul>
+</section>
+<section id="Summary-and-References">
+<h2>Summary and References<a class="headerlink" href="#Summary-and-References" title="Link to this heading"></a></h2>
+<p>This notebook demonstrated Double Machine Learning (DML) for estimating the gender wage gap using the CPS 1985 dataset. Key steps included:</p>
+<ul class="simple">
+<li><p>Using DML to estimate heterogeneous causal effects of gender on wages.</p></li>
+<li><p>Leveraging cross-fitting to avoid overfitting nuisance models.</p></li>
+<li><p>Comparing DML results to naive difference-in-means and linear regression.</p></li>
+<li><p>Identifying features that drive variation in the wage gap.</p></li>
+</ul>
+<p><strong>References:</strong></p>
 <ul class="simple">
 <li><p>Chernozhukov, V. et al. (2018). <em>Double/Debiased Machine Learning for Treatment and Structural Parameters</em>. The Econometrics Journal, 21(1).</p></li>
 </ul>
-</section>
 </section>
 </section>
 

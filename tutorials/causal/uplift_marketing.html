@@ -6,7 +6,7 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Uplift Modeling and Causal Inference &mdash; Perpetual 1.4.0 documentation</title>
+  <title>Uplift Modeling with the Criteo Uplift Dataset &mdash; Perpetual 1.5.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../../_static/nbsphinx-code-cells.css?v=2aa19091" />
@@ -15,7 +15,7 @@
   
       <script src="../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../_static/documentation_options.js?v=9172181d"></script>
+      <script src="../../_static/documentation_options.js?v=e0a75244"></script>
       <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
@@ -54,14 +54,12 @@
 <li class="toctree-l1"><a class="reference internal" href="../../api.html">API Reference</a></li>
 <li class="toctree-l1 current"><a class="reference internal" href="../index.html">Tutorials</a><ul class="current">
 <li class="toctree-l2"><a class="reference internal" href="../categorical_data.html">Handling Categorical Data</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../toy_datasets.html">Quick Start with Toy Datasets</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../sklearn_interface.html">Scikit-Learn Interface: Classification, Regression &amp; Ranking</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../benchmark.html">Performance Benchmarking</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../custom_objective.html">Custom Objective Tutorial</a></li>
-<li class="toctree-l2 current"><a class="current reference internal" href="#">Uplift Modeling and Causal Inference</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="#1.-Load-the-Dataset">1. Load the Dataset</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">Uplift Modeling with the Criteo Uplift Dataset</a><ul>
 <li class="toctree-l3"><a class="reference internal" href="#2.-R-Learner-(UpliftBooster)">2. R-Learner (UpliftBooster)</a><ul>
-<li class="toctree-l4"><a class="reference internal" href="#2.1-Domain-Knowledge:-Interaction-Constraints">2.1 Domain Knowledge: Interaction Constraints</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#2.1-Interaction-Constraints">2.1 Interaction Constraints</a></li>
 </ul>
 </li>
 <li class="toctree-l3"><a class="reference internal" href="#3.-Comparing-with-Meta-Learners">3. Comparing with Meta-Learners</a></li>
@@ -99,7 +97,7 @@
   <ul class="wy-breadcrumbs">
       <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
           <li class="breadcrumb-item"><a href="../index.html">Tutorials</a></li>
-      <li class="breadcrumb-item active">Uplift Modeling and Causal Inference</li>
+      <li class="breadcrumb-item active">Uplift Modeling with the Criteo Uplift Dataset</li>
       <li class="wy-breadcrumbs-aside">
             <a href="../../_sources/tutorials/causal/uplift_marketing.ipynb.txt" rel="nofollow"> View page source</a>
       </li>
@@ -109,96 +107,115 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
              
-  <section id="Uplift-Modeling-and-Causal-Inference">
-<h1>Uplift Modeling and Causal Inference<a class="headerlink" href="#Uplift-Modeling-and-Causal-Inference" title="Link to this heading"></a></h1>
-<p>Uplift modeling (also known as CATE — Conditional Average Treatment Effect) aims to predict the incremental impact of an action (the “treatment”) on an individual’s behavioral outcome.</p>
-<p>In this tutorial, we will use the <strong>Hillstrom (MineThatData)</strong> dataset, a standard benchmark in marketing analytics, to demonstrate how to use Perpetual’s causal inference tools:</p>
+  <section id="Uplift-Modeling-with-the-Criteo-Uplift-Dataset">
+<h1>Uplift Modeling with the Criteo Uplift Dataset<a class="headerlink" href="#Uplift-Modeling-with-the-Criteo-Uplift-Dataset" title="Link to this heading"></a></h1>
+<p>This notebook demonstrates uplift modeling using the Criteo Uplift Dataset. Uplift modeling (also known as CATE — Conditional Average Treatment Effect) aims to predict the incremental impact of an action (the “treatment”) on an individual’s behavioral outcome.</p>
+<p>We will demonstrate how to use Perpetual’s causal inference tools:</p>
 <ul class="simple">
 <li><p><code class="docutils literal notranslate"><span class="pre">UpliftBooster</span></code> (R-Learner)</p></li>
-<li><p><code class="docutils literal notranslate"><span class="pre">SLearner</span></code></p></li>
-<li><p><code class="docutils literal notranslate"><span class="pre">TLearner</span></code></p></li>
-<li><p><code class="docutils literal notranslate"><span class="pre">XLearner</span></code></p></li>
-<li><p><code class="docutils literal notranslate"><span class="pre">DRLearner</span></code> (Doubly Robust)</p></li>
+<li><p>Meta-learners: <code class="docutils literal notranslate"><span class="pre">SLearner</span></code>, <code class="docutils literal notranslate"><span class="pre">TLearner</span></code>, <code class="docutils literal notranslate"><span class="pre">XLearner</span></code>, <code class="docutils literal notranslate"><span class="pre">DRLearner</span></code> (Doubly Robust)</p></li>
 </ul>
 <div class="nbinput nblast docutils container">
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
-<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">matplotlib.pyplot</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">plt</span>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">os</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">matplotlib.pyplot</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">plt</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pd</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">requests</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">perpetual.causal_metrics</span><span class="w"> </span><span class="kn">import</span> <span class="n">auuc</span><span class="p">,</span> <span class="n">cumulative_gain_curve</span><span class="p">,</span> <span class="n">qini_coefficient</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">perpetual.meta_learners</span><span class="w"> </span><span class="kn">import</span> <span class="n">DRLearner</span><span class="p">,</span> <span class="n">SLearner</span><span class="p">,</span> <span class="n">TLearner</span><span class="p">,</span> <span class="n">XLearner</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">perpetual.uplift</span><span class="w"> </span><span class="kn">import</span> <span class="n">UpliftBooster</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">sklearn.datasets</span><span class="w"> </span><span class="kn">import</span> <span class="n">fetch_openml</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">sklearn.model_selection</span><span class="w"> </span><span class="kn">import</span> <span class="n">train_test_split</span>
-</pre></div>
-</div>
-</div>
-<section id="1.-Load-the-Dataset">
-<h2>1. Load the Dataset<a class="headerlink" href="#1.-Load-the-Dataset" title="Link to this heading"></a></h2>
-<p>The Hillstrom dataset contains 64,000 customers who were randomly assigned to one of three groups:</p>
-<ol class="arabic simple">
-<li><p>E-mail for Mens merchandise.</p></li>
-<li><p>E-mail for Womens merchandise.</p></li>
-<li><p>No e-mail (Control group).</p></li>
-</ol>
-<p>We will simplify this to a binary case: E-mail (any) vs. No E-mail.</p>
-<div class="nbinput nblast docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
-</pre></div>
-</div>
-<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Fetching dataset...&quot;</span><span class="p">)</span>
-<span class="n">dataset</span> <span class="o">=</span> <span class="n">fetch_openml</span><span class="p">(</span><span class="n">data_id</span><span class="o">=</span><span class="mi">41473</span><span class="p">,</span> <span class="n">as_frame</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">parser</span><span class="o">=</span><span class="s2">&quot;auto&quot;</span><span class="p">)</span>
-<span class="n">df</span> <span class="o">=</span> <span class="n">dataset</span><span class="o">.</span><span class="n">frame</span>
-<span class="n">df</span><span class="o">.</span><span class="n">head</span><span class="p">()</span>
-</pre></div>
-</div>
-</div>
-<div class="nbinput nblast docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
-</pre></div>
-</div>
-<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># Preprocessing</span>
-<span class="c1"># Create binary treatment indicator (segment != &#39;No E-mail&#39;)</span>
-<span class="n">df</span><span class="p">[</span><span class="s2">&quot;treatment&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="n">df</span><span class="p">[</span><span class="s2">&quot;segment&quot;</span><span class="p">]</span> <span class="o">!=</span> <span class="s2">&quot;No E-mail&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">int</span><span class="p">)</span>
 
-<span class="c1"># Target variable: purchase (binary) or visit (binary)</span>
-<span class="n">y</span> <span class="o">=</span> <span class="n">df</span><span class="p">[</span><span class="s2">&quot;visit&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">int</span><span class="p">)</span>
+<span class="c1"># 1. Download Criteo Uplift Dataset</span>
+<span class="n">dataset_gz</span> <span class="o">=</span> <span class="s2">&quot;criteo-uplift-v2.1.csv.gz&quot;</span>
+
+<span class="n">mirrors</span> <span class="o">=</span> <span class="p">[</span>
+    <span class="s2">&quot;http://go.criteo.net/criteo-research-uplift-v2.1.csv.gz&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;https://criteostorage.blob.core.windows.net/criteo-research-datasets/criteo-uplift-v2.1.csv.gz&quot;</span><span class="p">,</span>
+<span class="p">]</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">download_dataset</span><span class="p">(</span><span class="n">url</span><span class="p">,</span> <span class="n">filename</span><span class="p">):</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Attempting to download from: </span><span class="si">{</span><span class="n">url</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">response</span> <span class="o">=</span> <span class="n">requests</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">url</span><span class="p">,</span> <span class="n">stream</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">timeout</span><span class="o">=</span><span class="mi">10</span><span class="p">)</span>
+        <span class="n">response</span><span class="o">.</span><span class="n">raise_for_status</span><span class="p">()</span>
+        <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">filename</span><span class="p">,</span> <span class="s2">&quot;wb&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">chunk</span> <span class="ow">in</span> <span class="n">response</span><span class="o">.</span><span class="n">iter_content</span><span class="p">(</span><span class="n">chunk_size</span><span class="o">=</span><span class="mi">8192</span><span class="p">):</span>
+                <span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">chunk</span><span class="p">)</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Download complete.&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="kc">True</span>
+    <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Download failed from </span><span class="si">{</span><span class="n">url</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="kc">False</span>
+
+
+<span class="k">if</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">dataset_gz</span><span class="p">):</span>
+    <span class="n">success</span> <span class="o">=</span> <span class="kc">False</span>
+    <span class="k">for</span> <span class="n">url</span> <span class="ow">in</span> <span class="n">mirrors</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">download_dataset</span><span class="p">(</span><span class="n">url</span><span class="p">,</span> <span class="n">dataset_gz</span><span class="p">):</span>
+            <span class="n">success</span> <span class="o">=</span> <span class="kc">True</span>
+            <span class="k">break</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">success</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span>
+            <span class="s2">&quot;Download failed. Please download manually and place in this folder.&quot;</span>
+        <span class="p">)</span>
+<span class="k">else</span><span class="p">:</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Dataset &#39;</span><span class="si">{</span><span class="n">dataset_gz</span><span class="si">}</span><span class="s2">&#39; already exists.&quot;</span><span class="p">)</span>
+
+<span class="c1"># 2. Load and Preprocess</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Loading dataset...&quot;</span><span class="p">)</span>
+<span class="n">df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span><span class="n">dataset_gz</span><span class="p">,</span> <span class="n">compression</span><span class="o">=</span><span class="s2">&quot;gzip&quot;</span><span class="p">)</span>
+
+<span class="c1"># --- PERFORMANCE OPTIMIZATION ---</span>
+<span class="c1"># The full dataset has ~25M rows. We subsample to 50k rows for this tutorial</span>
+<span class="c1"># to ensure all models fit in under 10 seconds.</span>
+<span class="n">SAMPLE_SIZE</span> <span class="o">=</span> <span class="mi">50_000</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Subsampling to </span><span class="si">{</span><span class="n">SAMPLE_SIZE</span><span class="si">}</span><span class="s2"> rows for speed...&quot;</span><span class="p">)</span>
+<span class="n">df</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">sample</span><span class="p">(</span><span class="n">n</span><span class="o">=</span><span class="n">SAMPLE_SIZE</span><span class="p">,</span> <span class="n">random_state</span><span class="o">=</span><span class="mi">42</span><span class="p">)</span><span class="o">.</span><span class="n">reset_index</span><span class="p">(</span><span class="n">drop</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="c1"># --------------------------------</span>
+
+<span class="n">y</span> <span class="o">=</span> <span class="n">df</span><span class="p">[</span><span class="s2">&quot;conversion&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">int</span><span class="p">)</span>
 <span class="n">w</span> <span class="o">=</span> <span class="n">df</span><span class="p">[</span><span class="s2">&quot;treatment&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">int</span><span class="p">)</span>
-
-<span class="c1"># Select features</span>
 <span class="n">features</span> <span class="o">=</span> <span class="p">[</span>
-    <span class="s2">&quot;recency&quot;</span><span class="p">,</span>
-    <span class="s2">&quot;history_segment&quot;</span><span class="p">,</span>
-    <span class="s2">&quot;history&quot;</span><span class="p">,</span>
-    <span class="s2">&quot;mens&quot;</span><span class="p">,</span>
-    <span class="s2">&quot;womens&quot;</span><span class="p">,</span>
-    <span class="s2">&quot;zip_code&quot;</span><span class="p">,</span>
-    <span class="s2">&quot;newbie&quot;</span><span class="p">,</span>
-    <span class="s2">&quot;channel&quot;</span><span class="p">,</span>
+    <span class="n">col</span>
+    <span class="k">for</span> <span class="n">col</span> <span class="ow">in</span> <span class="n">df</span><span class="o">.</span><span class="n">columns</span>
+    <span class="k">if</span> <span class="n">col</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">[</span><span class="s2">&quot;treatment&quot;</span><span class="p">,</span> <span class="s2">&quot;conversion&quot;</span><span class="p">,</span> <span class="s2">&quot;exposure&quot;</span><span class="p">,</span> <span class="s2">&quot;visit&quot;</span><span class="p">]</span>
 <span class="p">]</span>
 <span class="n">X</span> <span class="o">=</span> <span class="n">df</span><span class="p">[</span><span class="n">features</span><span class="p">]</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
-
-<span class="c1"># Handle categorical features for Perpetual (automatic or categorical type)</span>
-<span class="k">for</span> <span class="n">col</span> <span class="ow">in</span> <span class="p">[</span><span class="s2">&quot;history_segment&quot;</span><span class="p">,</span> <span class="s2">&quot;zip_code&quot;</span><span class="p">,</span> <span class="s2">&quot;channel&quot;</span><span class="p">]:</span>
-    <span class="n">X</span><span class="p">[</span><span class="n">col</span><span class="p">]</span> <span class="o">=</span> <span class="n">X</span><span class="p">[</span><span class="n">col</span><span class="p">]</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="s2">&quot;category&quot;</span><span class="p">)</span>
 
 <span class="n">X_train</span><span class="p">,</span> <span class="n">X_test</span><span class="p">,</span> <span class="n">w_train</span><span class="p">,</span> <span class="n">w_test</span><span class="p">,</span> <span class="n">y_train</span><span class="p">,</span> <span class="n">y_test</span> <span class="o">=</span> <span class="n">train_test_split</span><span class="p">(</span>
     <span class="n">X</span><span class="p">,</span> <span class="n">w</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">test_size</span><span class="o">=</span><span class="mf">0.3</span><span class="p">,</span> <span class="n">random_state</span><span class="o">=</span><span class="mi">42</span>
 <span class="p">)</span>
 <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Training set size: </span><span class="si">{</span><span class="n">X_train</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="n">df</span><span class="o">.</span><span class="n">head</span><span class="p">()</span>
 </pre></div>
 </div>
 </div>
-</section>
 <section id="2.-R-Learner-(UpliftBooster)">
 <h2>2. R-Learner (UpliftBooster)<a class="headerlink" href="#2.-R-Learner-(UpliftBooster)" title="Link to this heading"></a></h2>
-<p>The <code class="docutils literal notranslate"><span class="pre">UpliftBooster</span></code> uses the <strong>R-Learner</strong> meta-algorithm, which is highly robust to selection bias and effectively optimizes the residual-on-residual loss.</p>
+<p>The <code class="docutils literal notranslate"><span class="pre">UpliftBooster</span></code> uses the <strong>R-Learner</strong> meta-algorithm. We use small budgets and an <code class="docutils literal notranslate"><span class="pre">iteration_limit</span></code> to keep the tutorial fast.</p>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">budget</span> <span class="o">=</span> <span class="mf">0.1</span>
+</pre></div>
+</div>
+</div>
 <div class="nbinput nblast docutils container">
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># Initialize and fit UpliftBooster</span>
-<span class="n">ub</span> <span class="o">=</span> <span class="n">UpliftBooster</span><span class="p">(</span><span class="n">outcome_budget</span><span class="o">=</span><span class="mf">0.1</span><span class="p">,</span> <span class="n">propensity_budget</span><span class="o">=</span><span class="mf">0.01</span><span class="p">,</span> <span class="n">effect_budget</span><span class="o">=</span><span class="mf">0.1</span><span class="p">)</span>
+<span class="n">ub</span> <span class="o">=</span> <span class="n">UpliftBooster</span><span class="p">(</span>
+    <span class="n">outcome_budget</span><span class="o">=</span><span class="n">budget</span><span class="p">,</span>
+    <span class="n">propensity_budget</span><span class="o">=</span><span class="n">budget</span><span class="p">,</span>
+    <span class="n">effect_budget</span><span class="o">=</span><span class="n">budget</span><span class="p">,</span>
+<span class="p">)</span>
 <span class="n">ub</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">X_train</span><span class="p">,</span> <span class="n">w_train</span><span class="p">,</span> <span class="n">y_train</span><span class="p">)</span>
 
 <span class="c1"># Predicted Treatment Effect</span>
@@ -207,21 +224,19 @@
 </pre></div>
 </div>
 </div>
-<section id="2.1-Domain-Knowledge:-Interaction-Constraints">
-<h3>2.1 Domain Knowledge: Interaction Constraints<a class="headerlink" href="#2.1-Domain-Knowledge:-Interaction-Constraints" title="Link to this heading"></a></h3>
-<p>Perpetual allows you to enforce <strong>Interaction Constraints</strong>. This is useful when you know (from domain expertise) that certain features should only interact with each other, or should not interact at all.</p>
-<p>For example, we might want to allow interactions only within a specific set of features.</p>
+<section id="2.1-Interaction-Constraints">
+<h3>2.1 Interaction Constraints<a class="headerlink" href="#2.1-Interaction-Constraints" title="Link to this heading"></a></h3>
+<p>Perpetual allows you to enforce <strong>Interaction Constraints</strong>. This is useful when you know that certain features should only interact with each other, or should not interact at all.</p>
 <div class="nbinput nblast docutils container">
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
-<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># Enforce that &#39;recency&#39; and &#39;history&#39; can interact, but other features cannot interact with them</span>
-<span class="c1"># Feature indices in &#39;features&#39; list: 0: recency, 2: history</span>
-<span class="n">interaction_constraints</span> <span class="o">=</span> <span class="p">[[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">2</span><span class="p">]]</span>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># Enforce that feature 0 and feature 1 can interact</span>
+<span class="n">interaction_constraints</span> <span class="o">=</span> <span class="p">[[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">]]</span>
 <span class="n">ub_constrained</span> <span class="o">=</span> <span class="n">UpliftBooster</span><span class="p">(</span>
-    <span class="n">outcome_budget</span><span class="o">=</span><span class="mf">0.1</span><span class="p">,</span>
-    <span class="n">propensity_budget</span><span class="o">=</span><span class="mf">0.01</span><span class="p">,</span>
-    <span class="n">effect_budget</span><span class="o">=</span><span class="mf">0.1</span><span class="p">,</span>
+    <span class="n">outcome_budget</span><span class="o">=</span><span class="n">budget</span><span class="p">,</span>
+    <span class="n">propensity_budget</span><span class="o">=</span><span class="n">budget</span><span class="p">,</span>
+    <span class="n">effect_budget</span><span class="o">=</span><span class="n">budget</span><span class="p">,</span>
     <span class="n">interaction_constraints</span><span class="o">=</span><span class="n">interaction_constraints</span><span class="p">,</span>
 <span class="p">)</span>
 <span class="n">ub_constrained</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">X_train</span><span class="p">,</span> <span class="n">w_train</span><span class="p">,</span> <span class="n">y_train</span><span class="p">)</span>
@@ -241,22 +256,22 @@
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># S-Learner: Single model with treatment as feature</span>
-<span class="n">sl</span> <span class="o">=</span> <span class="n">SLearner</span><span class="p">(</span><span class="n">budget</span><span class="o">=</span><span class="mf">0.2</span><span class="p">)</span>
+<span class="n">sl</span> <span class="o">=</span> <span class="n">SLearner</span><span class="p">(</span><span class="n">budget</span><span class="o">=</span><span class="n">budget</span><span class="p">)</span>
 <span class="n">sl</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">X_train</span><span class="p">,</span> <span class="n">w_train</span><span class="p">,</span> <span class="n">y_train</span><span class="p">)</span>
 <span class="n">uplift_s</span> <span class="o">=</span> <span class="n">sl</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="n">X_test</span><span class="p">)</span>
 
 <span class="c1"># T-Learner: Two models (one per treatment group)</span>
-<span class="n">tl</span> <span class="o">=</span> <span class="n">TLearner</span><span class="p">(</span><span class="n">budget</span><span class="o">=</span><span class="mf">0.2</span><span class="p">)</span>
+<span class="n">tl</span> <span class="o">=</span> <span class="n">TLearner</span><span class="p">(</span><span class="n">budget</span><span class="o">=</span><span class="n">budget</span><span class="p">)</span>
 <span class="n">tl</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">X_train</span><span class="p">,</span> <span class="n">w_train</span><span class="p">,</span> <span class="n">y_train</span><span class="p">)</span>
 <span class="n">uplift_t</span> <span class="o">=</span> <span class="n">tl</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="n">X_test</span><span class="p">)</span>
 
 <span class="c1"># X-Learner: Two-stage learner with imputation</span>
-<span class="n">xl</span> <span class="o">=</span> <span class="n">XLearner</span><span class="p">(</span><span class="n">budget</span><span class="o">=</span><span class="mf">0.2</span><span class="p">)</span>
+<span class="n">xl</span> <span class="o">=</span> <span class="n">XLearner</span><span class="p">(</span><span class="n">budget</span><span class="o">=</span><span class="n">budget</span><span class="p">)</span>
 <span class="n">xl</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">X_train</span><span class="p">,</span> <span class="n">w_train</span><span class="p">,</span> <span class="n">y_train</span><span class="p">)</span>
 <span class="n">uplift_x</span> <span class="o">=</span> <span class="n">xl</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="n">X_test</span><span class="p">)</span>
 
 <span class="c1"># DR-Learner: Doubly Robust / AIPW</span>
-<span class="n">dr</span> <span class="o">=</span> <span class="n">DRLearner</span><span class="p">(</span><span class="n">budget</span><span class="o">=</span><span class="mf">0.2</span><span class="p">,</span> <span class="n">clip</span><span class="o">=</span><span class="mf">0.01</span><span class="p">)</span>
+<span class="n">dr</span> <span class="o">=</span> <span class="n">DRLearner</span><span class="p">(</span><span class="n">budget</span><span class="o">=</span><span class="n">budget</span><span class="p">,</span> <span class="n">clip</span><span class="o">=</span><span class="mf">0.01</span><span class="p">)</span>
 <span class="n">dr</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">X_train</span><span class="p">,</span> <span class="n">w_train</span><span class="p">,</span> <span class="n">y_train</span><span class="p">)</span>
 <span class="n">uplift_dr</span> <span class="o">=</span> <span class="n">dr</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="n">X_test</span><span class="p">)</span>
 
@@ -286,7 +301,7 @@
     <span class="n">plt</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">fracs</span><span class="p">,</span> <span class="n">gains</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="n">label</span><span class="p">)</span>
 
 <span class="n">plt</span><span class="o">.</span><span class="n">plot</span><span class="p">([</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">],</span> <span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">],</span> <span class="s2">&quot;k--&quot;</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s2">&quot;Random&quot;</span><span class="p">)</span>
-<span class="n">plt</span><span class="o">.</span><span class="n">title</span><span class="p">(</span><span class="s2">&quot;Cumulative Uplift Gain — Hillstrom Dataset&quot;</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">title</span><span class="p">(</span><span class="s2">&quot;Cumulative Uplift Gain — Criteo Dataset (Subsampled)&quot;</span><span class="p">)</span>
 <span class="n">plt</span><span class="o">.</span><span class="n">xlabel</span><span class="p">(</span><span class="s2">&quot;Population % Sorted by Predicted Uplift&quot;</span><span class="p">)</span>
 <span class="n">plt</span><span class="o">.</span><span class="n">ylabel</span><span class="p">(</span><span class="s2">&quot;Cumulative Gain&quot;</span><span class="p">)</span>
 <span class="n">plt</span><span class="o">.</span><span class="n">legend</span><span class="p">()</span>
