@@ -178,16 +178,20 @@ impl ObjectiveFunction for LogLoss {
             }
         }
     }
+
+    fn requires_batch_evaluation(&self) -> bool {
+        false
+    }
 }
 
-/// Compute log loss for a single sample without heap allocation.
-#[inline]
-#[allow(dead_code)]
-pub fn log_loss_single(y: f64, yhat: f64, sample_weight: Option<f64>) -> f32 {
-    let p = 1.0_f64 / (1.0_f64 + (-yhat).exp());
-    let l = -(y * p.ln() + (1.0_f64 - y) * (1.0_f64 - p).ln());
-    match sample_weight {
-        Some(w) => (l * w) as f32,
-        None => l as f32,
+impl LogLoss {
+    #[inline]
+    pub fn loss_single(&self, y: f64, yhat: f64, sample_weight: Option<f64>) -> f32 {
+        let p = 1.0_f64 / (1.0_f64 + (-yhat).exp());
+        let l = -(y * p.ln() + (1.0_f64 - y) * (1.0_f64 - p).ln());
+        match sample_weight {
+            Some(w) => (l * w) as f32,
+            None => l as f32,
+        }
     }
 }

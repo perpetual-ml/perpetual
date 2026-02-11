@@ -24,8 +24,10 @@ package-r/src/entrypoint.o
 # Log files
 *.log
 
-# CSV files
+# CSV and ZIP files
 *.csv
+*.zip
+*.csv.gz
 
 # Debug and temporary files
 debug_*.R

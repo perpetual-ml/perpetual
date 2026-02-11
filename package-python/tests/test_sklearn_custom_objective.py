@@ -38,4 +38,4 @@ def test_sklearn_custom_objective(data):
     preds_custom = model_custom.predict(X_test)
     preds_standard = model_standard.predict(X_test)
 
-    assert np.allclose(preds_custom, preds_standard, atol=1e-5)
+    assert np.allclose(preds_custom, preds_standard)

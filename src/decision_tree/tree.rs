@@ -180,7 +180,7 @@ impl Tree {
 
         let mut growable = BinaryHeap::<SplittableNode>::default();
 
-        let mut loss_decr = vec![0.0_f32; index.len()];
+        let mut loss_decr = vec![0.0_f32; y.len()];
         let mut loss_decr_avg = 0.0_f32;
         let index_length = index.len() as f32;
 
@@ -285,23 +285,38 @@ impl Tree {
                             let weight_f64 = node.weight_value as f64;
                             let inv_n = 1.0 / index_length;
                             let mut delta_sum = 0.0f32;
-                            match sample_weight {
-                                Some(sw) => {
-                                    for &_i in node_indices {
-                                        let yhat_new = yhat[_i] + weight_f64;
-                                        let loss_new = objective_function.loss_single(y[_i], yhat_new, Some(sw[_i]));
-                                        let new_decr = loss[_i] - loss_new;
-                                        delta_sum += new_decr - loss_decr[_i];
-                                        loss_decr[_i] = new_decr;
+
+                            if objective_function.requires_batch_evaluation() {
+                                delta_sum = self.update_layer_loss_batch(
+                                    objective_function,
+                                    node_indices,
+                                    y,
+                                    yhat,
+                                    sample_weight,
+                                    loss,
+                                    &mut loss_decr,
+                                    weight_f64,
+                                );
+                            } else {
+                                match sample_weight {
+                                    Some(sw) => {
+                                        for &_i in node_indices {
+                                            let yhat_new = yhat[_i] + weight_f64;
+                                            let loss_new =
+                                                objective_function.loss_single(y[_i], yhat_new, Some(sw[_i]));
+                                            let new_decr = loss[_i] - loss_new;
+                                            delta_sum += new_decr - loss_decr[_i];
+                                            loss_decr[_i] = new_decr;
+                                        }
                                     }
-                                }
-                                None => {
-                                    for &_i in node_indices {
-                                        let yhat_new = yhat[_i] + weight_f64;
-                                        let loss_new = objective_function.loss_single(y[_i], yhat_new, None);
-                                        let new_decr = loss[_i] - loss_new;
-                                        delta_sum += new_decr - loss_decr[_i];
-                                        loss_decr[_i] = new_decr;
+                                    None => {
+                                        for &_i in node_indices {
+                                            let yhat_new = yhat[_i] + weight_f64;
+                                            let loss_new = objective_function.loss_single(y[_i], yhat_new, None);
+                                            let new_decr = loss[_i] - loss_new;
+                                            delta_sum += new_decr - loss_decr[_i];
+                                            loss_decr[_i] = new_decr;
+                                        }
                                     }
                                 }
                             }
@@ -309,7 +324,7 @@ impl Tree {
                         }
                     }
 
-                    self.depth = max(self.depth, node.stats.as_ref().map_or(0, |s| s.depth));
+                    self.depth = max(self.depth, n.stats.as_ref().map_or(0, |s| s.depth));
                     let node_weight = node.weight_value as f64;
                     self.nodes.insert(node.num, node);
 
@@ -436,6 +451,33 @@ impl Tree {
 
     pub fn calculate_importance_cover(&self, stats: &mut HashMap<usize, (f32, usize)>) {
         self.get_node_stats(&|n: &Node| n.hessian_sum, stats);
+    }
+
+    #[inline(never)]
+    #[allow(clippy::too_many_arguments)]
+    fn update_layer_loss_batch(
+        &self,
+        objective_function: &Objective,
+        node_indices: &[usize],
+        y: &[f64],
+        yhat: &[f64],
+        sample_weight: Option<&[f64]>,
+        loss: &[f32],
+        loss_decr: &mut [f32],
+        weight_value: f64,
+    ) -> f32 {
+        let mut yhat_new = yhat.to_vec();
+        for &i in node_indices {
+            yhat_new[i] += weight_value;
+        }
+        let loss_new = objective_function.loss(y, &yhat_new, sample_weight, None);
+        let mut delta_sum = 0.0f32;
+        for &i in node_indices {
+            let new_decr = loss[i] - loss_new[i];
+            delta_sum += new_decr - loss_decr[i];
+            loss_decr[i] = new_decr;
+        }
+        delta_sum
     }
 }
 

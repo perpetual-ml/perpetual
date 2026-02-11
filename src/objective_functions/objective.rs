@@ -96,6 +96,14 @@ pub trait ObjectiveFunction: Send + Sync {
         *hess = h;
         loss.copy_from_slice(&l);
     }
+
+    /// Whether this objective requires batch evaluation (e.g. for Python custom objectives).
+    ///
+    /// If true, `loss()` will be called with the full vector instead of `loss_single()` in a loop.
+    /// Defaults to `true` as `loss_single` is an optional optimization.
+    fn requires_batch_evaluation(&self) -> bool {
+        true
+    }
 }
 
 /// The Objective function to minimize during training.
@@ -168,6 +176,38 @@ impl Objective {
     {
         Objective::Custom(Arc::new(objective))
     }
+
+    /// Per-sample loss for a single observation (no heap allocation).
+    /// Used in the inner tree-growth loop to avoid Vec allocations.
+    ///
+    /// # Note on Implementation
+    /// `loss_single` is implemented here rather than in the `ObjectiveFunction` trait to avoid
+    /// the overhead of dynamic dispatch and, more importantly, FFI boundary crossing for
+    /// `Custom` (Python) objectives.
+    ///
+    /// For native Rust objectives (`LogLoss`, `SquaredLoss`, etc.), we perform static dispatch
+    /// to their inherent `loss_single` methods, ensuring maximum performance in hot loops.
+    ///
+    /// For `Custom` objectives, this method panics because they should always rely on `loss` (batch)
+    /// evaluation, as indicated by `requires_batch_evaluation()` returning `true`.
+    #[inline]
+    pub fn loss_single(&self, y: f64, yhat: f64, sample_weight: Option<f64>) -> f32 {
+        match self {
+            Objective::LogLoss => LogLoss::default().loss_single(y, yhat, sample_weight),
+            Objective::SquaredLoss => SquaredLoss::default().loss_single(y, yhat, sample_weight),
+            Objective::QuantileLoss { quantile } => {
+                QuantileLoss { quantile: *quantile }.loss_single(y, yhat, sample_weight)
+            }
+            Objective::HuberLoss { delta } => HuberLoss { delta: *delta }.loss_single(y, yhat, sample_weight),
+            Objective::AdaptiveHuberLoss { quantile } => {
+                AdaptiveHuberLoss { quantile: *quantile }.loss_single(y, yhat, sample_weight)
+            }
+            Objective::ListNetLoss => ListNetLoss::default().loss_single(y, yhat, sample_weight),
+            Objective::Custom(_) => {
+                panic!("loss_single should not be called for Custom objectives. Use batch loss instead.")
+            }
+        }
+    }
 }
 
 /// Dispatch a method call through the `Objective` enum to the concrete loss.
@@ -239,35 +279,9 @@ impl ObjectiveFunction for Objective {
             gradient_and_loss_into(y, yhat, sample_weight, group, grad, hess, loss)
         )
     }
-}
 
-impl Objective {
-    /// Per-sample loss for a single observation (no heap allocation).
-    /// Used in the inner tree-growth loop to avoid Vec allocations.
-    pub fn loss_single(&self, y: f64, yhat: f64, sample_weight: Option<f64>) -> f32 {
-        match self {
-            Objective::SquaredLoss => {
-                let s = y - yhat;
-                let l = s * s;
-                match sample_weight {
-                    Some(w) => (l * w) as f32,
-                    None => l as f32,
-                }
-            }
-            Objective::LogLoss => {
-                let p = 1.0_f64 / (1.0_f64 + (-yhat).exp());
-                let l = -(y * p.ln() + (1.0_f64 - y) * (1.0_f64 - p).ln());
-                match sample_weight {
-                    Some(w) => (l * w) as f32,
-                    None => l as f32,
-                }
-            }
-            // Fall back to the slice-based loss for other objectives
-            _ => match sample_weight {
-                Some(w) => self.loss(&[y], &[yhat], Some(&[w]), None)[0],
-                None => self.loss(&[y], &[yhat], None, None)[0],
-            },
-        }
+    fn requires_batch_evaluation(&self) -> bool {
+        dispatch!(self, requires_batch_evaluation())
     }
 }
 

@@ -32,33 +32,46 @@ class PerpetualRiskEngine:
         self.booster = model
 
     def generate_reason_codes(
-        self, X, threshold: float, n_codes: int = 3, method: str = "Weight"
+        self,
+        X,
+        threshold: float,
+        n_codes: int = 3,
+        method: str = "Average",
+        rejection_direction: str = "lower",
     ) -> List[List[str]]:
         """
-        Generate reason codes for samples that fall below the approval threshold.
+        Generate reason codes for samples that fall below/above the approval threshold.
 
         Logic:
         1. Predict score for X.
-        2. If score < threshold (Rejection), calculate feature contributions.
-        3. Identify top N features dragging the score DOWN.
+        2. Identify rejected samples based on ``rejection_direction``:
+           - "lower": score < threshold (e.g. FICO score)
+           - "higher": score > threshold (e.g. Default probability)
+        3. Identify top N features dragging the score in the rejected direction.
 
         Parameters
         ----------
         X : array-like
             Applicant data.
         threshold : float
-            Approval threshold. Scores below this are considered rejections.
-        n_codes : int
+            Approval threshold.
+        n_codes : int, default=3
             Number of reason codes to return per applicant.
-        method : str
-            Contribution method. "Weight" is standard SHAP-like contribution.
+        method : str, default="Average"
+            Contribution method.
+        rejection_direction : {"lower", "higher"}, default="lower"
+            Direction of rejection. If "lower", scores below threshold are
+            rejected. If "higher", scores above threshold are rejected.
 
         Returns
         -------
         reasons : list of list of str
-            For each sample, a list of reason-code strings (e.g.
-            ``"feature_name: -0.1234"``).  Approved samples get an empty list.
+            For each sample, a list of reason-code strings.
+            Approved samples get an empty list.
         """
+        if rejection_direction not in ("lower", "higher"):
+            raise ValueError("rejection_direction must be 'lower' or 'higher'")
+
         # Get predictions
         if len(getattr(self.booster, "classes_", [])) == 2:
             # For binary classification, use probability of positive class
@@ -78,27 +91,24 @@ class PerpetualRiskEngine:
 
         for i, score in enumerate(preds):
             sample_reasons = []
-            if score < threshold:
-                # Identify negative contributors
-                # We want the features with the lowest (most negative) impact
-                # OR the features that differ most from the "ideal" applicant?
-                # Standard approach: Features pushing score DOWN the most.
+            is_rejected = (
+                (score < threshold)
+                if rejection_direction == "lower"
+                else (score > threshold)
+            )
 
+            if is_rejected:
+                # Identify contributors
                 row_contribs = feature_contribs[i]
 
-                # Sort indices by contribution value (ascending)
-                # Lowest values (most negative) first
-                sorted_indices = np.argsort(row_contribs)
+                if rejection_direction == "lower":
+                    # Lowest values (most negative) drag score DOWN
+                    indices = np.argsort(row_contribs)[:n_codes]
+                else:
+                    # Highest values (most positive) push score UP
+                    indices = np.argsort(row_contribs)[-n_codes:][::-1]
 
-                # Take bottom N
-                top_negative_indices = sorted_indices[:n_codes]
-
-                for idx in top_negative_indices:
-                    # Only include if contribution is actually negative?
-                    # Risk models usually imply 0 is neutral.
-                    # If all contribs are positive but score is low, it's tricky.
-                    # Standard implementation takes lowest algebraic values.
-
+                for idx in indices:
                     val = row_contribs[idx]
                     name = feature_names[idx] if feature_names else str(idx)
                     sample_reasons.append(f"{name}: {val:.4f}")

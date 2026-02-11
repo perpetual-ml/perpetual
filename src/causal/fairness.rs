@@ -112,6 +112,9 @@ impl ObjectiveFunction for FairnessObjective {
         // Compute predicted probabilities.
         let probs: Vec<f64> = yhat.iter().map(|yh| 1.0 / (1.0 + (-yh).exp())).collect();
 
+        // Scale fairness gradient by N to match LogLoss scale (sum over N).
+        let n_f64 = n as f64;
+
         match &self.fairness_type {
             FairnessType::DemographicParity => {
                 // Compute mean predicted probability per sensitive group.
@@ -135,9 +138,9 @@ impl ObjectiveFunction for FairnessObjective {
 
                     // d(diff^2)/dscore_i
                     let fairness_grad = if self.sensitive_attr[i] == 1 {
-                        2.0 * (self.lambda as f64) * diff * (1.0 / s1.safe_count()) * dp
+                        2.0 * (self.lambda as f64) * diff * (1.0 / s1.safe_count()) * dp * n_f64
                     } else {
-                        2.0 * (self.lambda as f64) * diff * (-1.0 / s0.safe_count()) * dp
+                        2.0 * (self.lambda as f64) * diff * (-1.0 / s0.safe_count()) * dp * n_f64
                     };
                     g += fairness_grad;
 
@@ -194,9 +197,9 @@ impl ObjectiveFunction for FairnessObjective {
                     };
 
                     let fairness_grad = if self.sensitive_attr[i] == 1 {
-                        2.0 * (self.lambda as f64) * diff * (1.0 / cnt_s1) * dp
+                        2.0 * (self.lambda as f64) * diff * (1.0 / cnt_s1) * dp * n_f64
                     } else {
-                        2.0 * (self.lambda as f64) * diff * (-1.0 / cnt_s0) * dp
+                        2.0 * (self.lambda as f64) * diff * (-1.0 / cnt_s0) * dp * n_f64
                     };
                     g += fairness_grad;
 

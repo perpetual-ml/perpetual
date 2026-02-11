@@ -65,7 +65,7 @@ The following table summarizes the results for the <a href="https://scikit-learn
 
 The following table summarizes the results for the <a href="https://www.openml.org/search?type=data&status=active&id=46951" target="_blank">Pumpkin Seeds</a> dataset (classification):
 
-| Perpetual budget | LightGBM n_estimators | Perpetual ROC AUC  | LightGBM ROC AUC  | Speed-up wall time | Speed-up cpu time |
+| Perpetual budget | LightGBM n_estimators | Perpetual auc      | LightGBM auc      | Speed-up wall time | Speed-up cpu time |
 | :--------------- | :-------------------- | :----------------- | :---------------- | :----------------- | :---------------- |
 | 1.0              | 100                   | 0.944              | 0.945             | 91x                | 184x              |
 

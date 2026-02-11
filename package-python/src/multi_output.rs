@@ -1,5 +1,7 @@
 //! PyO3 wrapper around the Multi-Output Booster.
 use crate::custom_objective::CustomObjective;
+use crate::fairness::PyFairnessObjective;
+use crate::policy::PyPolicyObjective;
 use crate::utils::int_map_to_constraint_map;
 use crate::utils::to_value_error;
 use numpy::IntoPyArray;
@@ -56,7 +58,7 @@ impl MultiOutputBooster {
     ))]
     pub fn new<'py>(
         n_boosters: usize,
-        objective: Option<&str>,
+        objective: Option<Bound<'py, PyAny>>,
         budget: f32,
         max_bin: u16,
         num_threads: Option<usize>,
@@ -81,12 +83,32 @@ impl MultiOutputBooster {
         init: Option<Bound<'py, PyAny>>,
     ) -> PyResult<Self> {
         let objective_ = match objective {
-            Some(obj) => to_value_error(serde_plain::from_str(obj))?,
-            None => Objective::Custom(Arc::new(CustomObjective {
-                loss: loss.unwrap().to_owned().into(),
-                grad: grad.unwrap().to_owned().into(),
-                init: init.unwrap().to_owned().into(),
-            })),
+            Some(obj) => {
+                if let Ok(s) = obj.extract::<String>() {
+                    to_value_error(serde_plain::from_str(&s))?
+                } else if let Ok(fairness) = obj.extract::<PyFairnessObjective>() {
+                    Objective::Custom(Arc::new(fairness.inner))
+                } else if let Ok(policy) = obj.extract::<PyPolicyObjective>() {
+                    Objective::Custom(Arc::new(policy.inner))
+                } else {
+                    return Err(PyValueError::new_err(
+                        "objective must be a string, PolicyObjective, or FairnessObjective",
+                    ));
+                }
+            }
+            None => {
+                let loss_val =
+                    loss.ok_or_else(|| PyValueError::new_err("loss must be provided for custom objectives"))?;
+                let grad_val =
+                    grad.ok_or_else(|| PyValueError::new_err("grad must be provided for custom objectives"))?;
+                let init_val =
+                    init.ok_or_else(|| PyValueError::new_err("init must be provided for custom objectives"))?;
+                Objective::Custom(Arc::new(CustomObjective {
+                    loss: loss_val.to_owned().into(),
+                    grad: grad_val.to_owned().into(),
+                    init: init_val.to_owned().into(),
+                }))
+            }
         };
         let missing_node_treatment_ = to_value_error(serde_plain::from_str(missing_node_treatment))?;
         let monotone_constraints_ = int_map_to_constraint_map(monotone_constraints)?;

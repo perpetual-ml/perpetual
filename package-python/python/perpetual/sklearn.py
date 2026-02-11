@@ -22,6 +22,8 @@ class PerpetualClassifier(PerpetualBooster, ClassifierMixin):
     Uses 'LogLoss' as the default objective.
     """
 
+    _estimator_type = "classifier"
+
     # Expose the objective explicitly in the __init__ signature to allow
     # scikit-learn to correctly discover and set it via set_params.
     def __init__(
@@ -176,6 +178,7 @@ class PerpetualClassifier(PerpetualBooster, ClassifierMixin):
             )
 
         # In classification, the labels (classes_) are set in the base fit.
+
         return super().fit(X, y, sample_weight=sample_weight, **fit_params)
 
 
@@ -184,6 +187,8 @@ class PerpetualRegressor(PerpetualBooster, RegressorMixin):
     A scikit-learn compatible regressor based on PerpetualBooster.
     Uses 'SquaredLoss' as the default objective.
     """
+
+    _estimator_type = "regressor"
 
     def __init__(
         self,

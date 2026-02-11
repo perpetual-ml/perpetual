@@ -200,16 +200,20 @@ class PerpetualBooster:
             {} if monotone_constraints is None else monotone_constraints
         )
 
+        self.objective = objective
         if isinstance(objective, str):
-            self.objective = objective
             self.loss = None
             self.grad = None
             self.init = None
-        else:
-            self.objective = None
+        elif isinstance(objective, tuple):
             self.loss = objective[0]
             self.grad = objective[1]
             self.init = objective[2]
+        else:
+            # Assume it is a PolicyObjective or similar object
+            self.loss = None
+            self.grad = None
+            self.init = None
         self.budget = budget
         self.num_threads = num_threads
         self.monotone_constraints = monotone_constraints_
@@ -233,7 +237,7 @@ class PerpetualBooster:
         self.interaction_constraints = interaction_constraints
 
         booster = CratePerpetualBooster(
-            objective=self.objective,
+            objective=self.objective if not isinstance(self.objective, tuple) else None,
             budget=self.budget,
             max_bin=self.max_bin,
             num_threads=self.num_threads,
@@ -258,6 +262,7 @@ class PerpetualBooster:
             init=self.init,
         )
         self.booster = cast(BoosterType, booster)
+        self.classes_ = np.array([])
 
     def fit(self, X, y, sample_weight=None, group=None) -> Self:
         """
@@ -310,8 +315,16 @@ class PerpetualBooster:
         self.cat_mapping = cat_mapping
         self.feature_names_in_ = features_
 
-        y_, classes_ = convert_input_array(y, self.objective, is_target=True)
-        self.classes_ = np.array(classes_).tolist()
+        # Detect task type from scikit-learn estimator type if present
+        is_classification = getattr(self, "_estimator_type", None)
+        if isinstance(is_classification, str):
+            is_classification = is_classification == "classifier"
+
+        y_, classes_ = convert_input_array(
+            y, self.objective, is_target=True, is_classification=is_classification
+        )
+
+        self.classes_ = np.array(classes_)
 
         if sample_weight is None:
             sample_weight_ = None
@@ -322,6 +335,16 @@ class PerpetualBooster:
             group_ = None
         else:
             group_, _ = convert_input_array(group, self.objective, is_int=True)
+            if np.sum(group_) != len(y_):
+                if len(group_) == len(y_):
+                    raise ValueError(
+                        f"Sum of group sizes ({np.sum(group_)}) does not match number of samples ({len(y_)}). "
+                        "It looks like you passed Query IDs instead of Group Sizes. "
+                        "Please pass an array of group sizes (e.g. [10, 10, ...] for 10 queries of 10 docs each)."
+                    )
+                raise ValueError(
+                    f"Sum of group sizes ({np.sum(group_)}) does not match number of samples ({len(y_)})."
+                )
 
         # Convert the monotone constraints into the form needed
         # by the rust code.
@@ -332,7 +355,9 @@ class PerpetualBooster:
             len(classes_) > 1 and self.objective == "SquaredLoss"
         ):
             booster = CratePerpetualBooster(
-                objective=self.objective,
+                objective=self.objective
+                if not isinstance(self.objective, tuple)
+                else None,
                 budget=self.budget,
                 max_bin=self.max_bin,
                 num_threads=self.num_threads,
@@ -360,7 +385,9 @@ class PerpetualBooster:
         else:
             booster = CrateMultiOutputBooster(
                 n_boosters=len(classes_),
-                objective=self.objective,
+                objective=self.objective
+                if not isinstance(self.objective, tuple)
+                else None,
                 budget=self.budget,
                 max_bin=self.max_bin,
                 num_threads=self.num_threads,
@@ -1075,6 +1102,8 @@ class PerpetualBooster:
         for m in c.metadata_attributes:
             try:
                 m_ = c._get_metadata_attributes(m)
+                if m == "classes_" and isinstance(m_, list):
+                    m_ = np.array(m_)
                 setattr(c, m, m_)
                 # If "feature_names_in_" is present, we know a
                 # pandas dataframe was used for fitting, in this case
@@ -1231,8 +1260,11 @@ class PerpetualBooster:
         params : dict
             Parameter names mapped to their values.
         """
-        args = inspect.getfullargspec(PerpetualBooster).kwonlyargs
-        return {param: getattr(self, param) for param in args}
+        signature = inspect.signature(self.__init__)
+        parameters = signature.parameters.keys()
+        return {
+            param: getattr(self, param) for param in parameters if hasattr(self, param)
+        }
 
     def set_params(self, **params: Any) -> Self:
         """
@@ -1248,9 +1280,11 @@ class PerpetualBooster:
         self : object
             Returns self.
         """
-        old_params = self.get_params()
-        old_params.update(params)
-        PerpetualBooster.__init__(self, **old_params)
+        for key, value in params.items():
+            setattr(self, key, value)
+
+        # Re-initialize the booster with updated parameters
+        self.__init__(**self.get_params())
         return self
 
     def get_node_lists(self, map_features_names: bool = True) -> List[List[Node]]:

@@ -3,7 +3,7 @@
 //! Strategies for sampling data before fitting new trees, allowing for stochastic
 //! gradient boosting and better regularization.
 use rand::rngs::StdRng;
-use rand::Rng;
+use rand::RngExt;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize)]
@@ -36,7 +36,7 @@ impl Sampler for RandomSampler {
         let mut chosen = Vec::new();
         let mut excluded = Vec::new();
         for i in index {
-            if rng.random_range(0.0..1.0) < subsample {
+            if rng.random::<f32>() < subsample {
                 chosen.push(*i);
             } else {
                 excluded.push(*i)

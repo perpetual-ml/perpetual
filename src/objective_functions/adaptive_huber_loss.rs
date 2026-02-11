@@ -160,4 +160,29 @@ impl ObjectiveFunction for AdaptiveHuberLoss {
         }
         (g, Some(h), l)
     }
+
+    fn requires_batch_evaluation(&self) -> bool {
+        false
+    }
+}
+
+impl AdaptiveHuberLoss {
+    #[inline]
+    pub fn loss_single(&self, y: f64, yhat: f64, sample_weight: Option<f64>) -> f32 {
+        // We use a fixed delta of 1.0 as a heuristic during tree-growth
+        // to ensure stability and performance. The true adaptive delta
+        // is used during gradient and global loss calculation at the start of each iteration.
+        let delta = 1.0;
+        let r = y - yhat;
+        let ar = r.abs();
+        let l = if ar <= delta {
+            0.5 * r * r
+        } else {
+            delta * (ar - 0.5 * delta)
+        };
+        match sample_weight {
+            Some(w) => (l * w) as f32,
+            None => l as f32,
+        }
+    }
 }

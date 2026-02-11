@@ -19,7 +19,7 @@ use crate::splitter::{MissingBranchSplitter, MissingImputerSplitter, SplitInfo, 
 use core::{f32, f64};
 use log::{info, warn};
 use rand::rngs::StdRng;
-use rand::seq::IteratorRandom;
+use rand::seq::IndexedRandom;
 use rand::SeedableRng;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
@@ -432,12 +432,7 @@ impl PerpetualBooster {
             let col_index_sample: Vec<usize> = if col_amount == col_index.len() {
                 Vec::new()
             } else {
-                let mut v: Vec<usize> = col_index
-                    .iter()
-                    .choose_multiple(&mut rng, col_amount)
-                    .iter()
-                    .map(|i| **i)
-                    .collect();
+                let mut v: Vec<usize> = col_index.sample(&mut rng, col_amount).copied().collect();
                 v.sort();
                 v
             };
@@ -530,13 +525,13 @@ impl PerpetualBooster {
 
             if let Some(t) = self.cfg.timeout {
                 if start.elapsed().as_secs_f32() > t {
-                    warn!("Reached timeout limit before auto stopping. Try to decrease the budget or increase the timeout for the best performance.");
+                    warn!("Reached timeout before auto stopping. Try to decrease the budget or increase the timeout for the best performance.");
                     break;
                 }
             }
 
             if i == self.cfg.iteration_limit.unwrap_or(ITER_LIMIT) - 1 {
-                warn!("Reached iteration limit before auto stopping. Try to decrease the budget for the best performance.");
+                warn!("Reached iteration limit before auto stopping. Try to decrease the budget or increase the iteration limit for the best performance.");
             }
         }
 
@@ -668,12 +663,7 @@ impl PerpetualBooster {
             let col_index_sample: Vec<usize> = if col_amount == col_index.len() {
                 Vec::new()
             } else {
-                let mut v: Vec<usize> = col_index
-                    .iter()
-                    .choose_multiple(&mut rng, col_amount)
-                    .iter()
-                    .map(|i| **i)
-                    .collect();
+                let mut v: Vec<usize> = col_index.sample(&mut rng, col_amount).copied().collect();
                 v.sort();
                 v
             };
@@ -996,7 +986,7 @@ mod perpetual_booster_test {
     use crate::utils::between;
     use crate::{Matrix, PerpetualBooster};
     use approx::assert_relative_eq;
-    use rand::Rng;
+    use rand::RngExt;
     use serde::{Deserialize, Serialize};
     use std::collections::HashMap;
     use std::collections::HashSet;

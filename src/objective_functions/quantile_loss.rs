@@ -167,4 +167,21 @@ impl ObjectiveFunction for QuantileLoss {
             }
         }
     }
+
+    fn requires_batch_evaluation(&self) -> bool {
+        false
+    }
+}
+
+impl QuantileLoss {
+    #[inline]
+    pub fn loss_single(&self, y: f64, yhat: f64, sample_weight: Option<f64>) -> f32 {
+        let q = self.quantile.unwrap();
+        let s = y - yhat;
+        let l = if s >= 0.0 { q * s } else { (q - 1.0) * s };
+        match sample_weight {
+            Some(w) => (l * w) as f32,
+            None => l as f32,
+        }
+    }
 }

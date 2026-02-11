@@ -36,7 +36,9 @@ def type_series(y):
         return ""
 
 
-def convert_input_array(x, objective, is_target=False, is_int=False) -> np.ndarray:
+def convert_input_array(
+    x, objective, is_target=False, is_int=False, is_classification=None
+) -> np.ndarray:
     """Convert an array-like input to a flat ``float64`` (or ``uint64``) NumPy array.
 
     Returns
@@ -60,12 +62,25 @@ def convert_input_array(x, objective, is_target=False, is_int=False) -> np.ndarr
     else:
         x_ = x.to_numpy()
 
-    if is_target and objective == "LogLoss" and len(x_.shape) == 1:
-        classes_, x_index = np.unique(x_, return_inverse=True)
-        if len(classes_) > 2:
-            x_ = np.eye(len(classes_))[x_index]
+    # Determine if we should perform class detection
+    do_class_detection = False
+    if is_target and len(x_.shape) == 1:
+        if is_classification is True:
+            do_class_detection = True
+        elif is_classification is False:
+            do_class_detection = False
         else:
-            x_ = x_index.astype("float64")
+            # Fallback to heuristic if not explicitly set
+            do_class_detection = objective == "LogLoss"
+
+    if do_class_detection:
+        classes_, x_index = np.unique(x_, return_inverse=True)
+
+        if len(classes_) > 1:
+            if len(classes_) > 2:
+                x_ = np.eye(len(classes_))[x_index]
+            else:
+                x_ = x_index.astype("float64")
 
     if is_int and not np.issubdtype(x_.dtype, "uint64"):
         x_ = x_.astype(dtype="uint64", copy=False)

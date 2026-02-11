@@ -148,4 +148,26 @@ impl ObjectiveFunction for HuberLoss {
         }
         (g, Some(h), l)
     }
+
+    fn requires_batch_evaluation(&self) -> bool {
+        false
+    }
+}
+
+impl HuberLoss {
+    #[inline]
+    pub fn loss_single(&self, y: f64, yhat: f64, sample_weight: Option<f64>) -> f32 {
+        let delta = self.delta.unwrap_or(1.0);
+        let r = y - yhat;
+        let ar = r.abs();
+        let l = if ar <= delta {
+            0.5 * r * r
+        } else {
+            delta * (ar - 0.5 * delta)
+        };
+        match sample_weight {
+            Some(w) => (l * w) as f32,
+            None => l as f32,
+        }
+    }
 }

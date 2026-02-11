@@ -47,9 +47,11 @@ if __name__ == "__main__":
 
     print(f"\nAnalyzing reject for applicant at idx {rejected_idx}:")
     print(X_rejected)
-    print(f"Probability of Default: {probs_test[rejected_idx]:.4f}")
+    print(f"Probability of Default: {probs_test[rejected_idx, 1]:.4f}")
 
-    reasons = engine.generate_reason_codes(X_rejected, threshold=0.3)
+    reasons = engine.generate_reason_codes(
+        X_rejected, threshold=0.3, rejection_direction="higher"
+    )
 
     print("\nAdverse Action Codes (Top Reasons for rejection):")
     for r in reasons[0]:

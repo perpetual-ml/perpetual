@@ -1,0 +1,10 @@
+﻿uv :    Building perpetual @ file:///C:/work/perpetual/ru
+st_project/forust-main-perp-oss/package-python
+At line:1 char:1
++ uv run maturin develop --release > build_log.txt 2>&1
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (   Building 
+    per.../package-python:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+

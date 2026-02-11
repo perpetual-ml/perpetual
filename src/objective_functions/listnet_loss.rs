@@ -103,6 +103,15 @@ impl ObjectiveFunction for ListNetLoss {
         if y.len() < 2 {
             return vec![LOSS_FOR_SINGLE_GROUP; y.len()];
         }
+        if let Some(group_sizes) = group {
+            if group_sizes.iter().sum::<u64>() != y.len() as u64 {
+                panic!(
+                    "Sum of group sizes ({}) does not match number of samples ({}).",
+                    group_sizes.iter().sum::<u64>(),
+                    y.len()
+                );
+            }
+        }
         let mut losses = vec![0.0f32; y.len()];
 
         if let Some(group_sizes) = group {
@@ -153,6 +162,15 @@ impl ObjectiveFunction for ListNetLoss {
     ) -> (Vec<f32>, Option<Vec<f32>>) {
         if y.len() < 2 {
             return (vec![0.0f32; y.len()], None);
+        }
+        if let Some(group_sizes) = group {
+            if group_sizes.iter().sum::<u64>() != y.len() as u64 {
+                panic!(
+                    "Sum of group sizes ({}) does not match number of samples ({}).",
+                    group_sizes.iter().sum::<u64>(),
+                    y.len()
+                );
+            }
         }
 
         let mut gradients = vec![0.0f32; y.len()];
@@ -217,6 +235,15 @@ impl ObjectiveFunction for ListNetLoss {
         if y.len() < 2 {
             return (vec![0.0f32; y.len()], None, vec![LOSS_FOR_SINGLE_GROUP; y.len()]);
         }
+        if let Some(group_sizes) = group {
+            if group_sizes.iter().sum::<u64>() != y.len() as u64 {
+                panic!(
+                    "Sum of group sizes ({}) does not match number of samples ({}).",
+                    group_sizes.iter().sum::<u64>(),
+                    y.len()
+                );
+            }
+        }
 
         let mut gradients = vec![0.0f32; y.len()];
         let mut hessians = vec![0.0f32; y.len()];
@@ -263,5 +290,12 @@ impl ObjectiveFunction for ListNetLoss {
         }
 
         (gradients, Some(hessians), losses)
+    }
+}
+
+impl ListNetLoss {
+    #[inline]
+    pub fn loss_single(&self, _y: f64, _yhat: f64, _sample_weight: Option<f64>) -> f32 {
+        LOSS_FOR_SINGLE_GROUP
     }
 }

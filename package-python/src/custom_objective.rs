@@ -63,5 +63,9 @@ impl ObjectiveFunction for CustomObjective {
         .expect("Python initial_value function failed")
     }
 
+    fn requires_batch_evaluation(&self) -> bool {
+        true
+    }
+
     // Uses the trait default (`RootMeanSquaredError`).
 }

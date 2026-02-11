@@ -17,68 +17,11 @@ import numpy as np
 from typing_extensions import Self
 
 from perpetual.booster import PerpetualBooster
+from perpetual.perpetual import PolicyObjective
 
 # ---------------------------------------------------------------------------
-# Custom objective helpers  (mirror Rust PolicyObjective)
+# Custom objective helpers
 # ---------------------------------------------------------------------------
-
-_PROPENSITY_CLIP = 1e-3
-
-
-def _pseudo_outcomes_ipw(y, treatment, propensity):
-    """Compute IPW pseudo-outcomes."""
-    w = treatment.astype(float)
-    p = np.clip(propensity, _PROPENSITY_CLIP, 1.0 - _PROPENSITY_CLIP)
-    return y * w / p - y * (1.0 - w) / (1.0 - p)
-
-
-def _pseudo_outcomes_aipw(y, treatment, propensity, mu_hat):
-    """Compute AIPW (doubly robust) pseudo-outcomes."""
-    w = treatment.astype(float)
-    p = np.clip(propensity, _PROPENSITY_CLIP, 1.0 - _PROPENSITY_CLIP)
-    return w * (y - mu_hat) / p - (1.0 - w) * (y - mu_hat) / (1.0 - p)
-
-
-def _policy_loss(gamma):
-    """Return a weighted logistic loss callable."""
-
-    def loss(y, yhat, sample_weight, group):
-        yhat = np.asarray(yhat)
-        sigma = 1.0 / (1.0 + np.exp(-yhat))
-        target = (gamma >= 0).astype(float)
-        weight = np.abs(gamma)
-        ll = -(
-            target * np.log(np.maximum(sigma, 1e-15))
-            + (1.0 - target) * np.log(np.maximum(1.0 - sigma, 1e-15))
-        )
-        return (weight * ll).tolist()
-
-    return loss
-
-
-def _policy_gradient(gamma):
-    """Return a weighted logistic gradient callable."""
-
-    def gradient(y, yhat, sample_weight, group):
-        yhat = np.asarray(yhat)
-        sigma = 1.0 / (1.0 + np.exp(-yhat))
-        target = (gamma >= 0).astype(float)
-        weight = np.abs(gamma)
-
-        grad = weight * (sigma - target)
-        hess = weight * sigma * (1.0 - sigma)
-        return grad.tolist(), hess.tolist()
-
-    return gradient
-
-
-def _policy_initial_value():
-    """Return an initial-value callable."""
-
-    def initial_value(y, sample_weight, group):
-        return 0.0
-
-    return initial_value
 
 
 # ---------------------------------------------------------------------------
@@ -194,11 +137,9 @@ class PolicyLearner:
             log_odds = prop_model.predict(X_arr)
             p_hat = 1.0 / (1.0 + np.exp(-log_odds))
 
-        # Pseudo-outcomes
-        if self.mode == "ipw":
-            gamma = _pseudo_outcomes_ipw(y_arr, w_arr, p_hat)
-        else:
-            # AIPW
+        # Baseline outcome model for AIPW
+        mu = None
+        if self.mode == "aipw":
             if mu_hat is not None:
                 mu = np.asarray(mu_hat, dtype=float)
             else:
@@ -207,21 +148,23 @@ class PolicyLearner:
                 )
                 mu_model.fit(X_arr, y_arr)
                 mu = mu_model.predict(X_arr)
-            gamma = _pseudo_outcomes_aipw(y_arr, w_arr, p_hat, mu)
 
-        # Policy model via custom objective
-        objective = (
-            _policy_loss(gamma),
-            _policy_gradient(gamma),
-            _policy_initial_value(),
+        # Policy model via Rust PolicyObjective
+        objective = PolicyObjective(
+            treatment=w_arr.astype("uint8"),
+            propensity=p_hat,
+            mode=self.mode,
+            mu_hat=mu,
         )
 
         self._policy_model = PerpetualBooster(
             budget=self.budget, objective=objective, **self._kwargs
         )
-        # The target passed to the booster is unused by the custom objective.
-        self._policy_model.fit(X_arr, (gamma >= 0).astype(float))
+        # Pass observed outcome y_arr. The definition of Gamma is handled internally
+        # by the RustPolicyObjective, which implements pseudo_outcome using y.
+        self._policy_model.fit(X_arr, y_arr)
         self.feature_importances_ = self._policy_model.feature_importances_
+
         return self
 
     def predict(self, X) -> np.ndarray:

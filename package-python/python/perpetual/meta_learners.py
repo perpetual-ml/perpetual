@@ -74,12 +74,26 @@ class SLearner:
         self
             Fitted estimator.
         """
+        import pandas as pd
+
         w_arr = _validate_binary_treatment(w)
-        X_arr = np.asarray(X)
-        X_aug = np.column_stack([X_arr, w_arr])
+        # If X is not a DataFrame, convert to DataFrame with default column names
+        if not hasattr(X, "columns"):
+            X = pd.DataFrame(
+                X, columns=[f"f{i}" for i in range(np.asarray(X).shape[1])]
+            )
+        X_aug = X.copy()
+        X_aug["treatment"] = w_arr
         self.learner.fit(X_aug, y)
-        # Feature importances: drop the appended treatment column.
-        self.feature_importances_ = self.learner.feature_importances_[:-1]
+        # Feature importances: drop the appended treatment column if present
+        if (
+            hasattr(self.learner, "feature_importances_")
+            and len(self.learner.feature_importances_) == X_aug.shape[1]
+        ):
+            self.feature_importances_ = self.learner.feature_importances_[:-1]
+        else:
+            self.feature_importances_ = self.learner.feature_importances_
+
         return self
 
     def predict(self, X) -> np.ndarray:
@@ -95,9 +109,18 @@ class SLearner:
         ndarray of shape (n_samples,)
             Estimated treatment effect for each sample.
         """
-        X_arr = np.asarray(X)
-        X_1 = np.column_stack([X_arr, np.ones(X_arr.shape[0])])
-        X_0 = np.column_stack([X_arr, np.zeros(X_arr.shape[0])])
+        import pandas as pd
+
+        # If X is not a DataFrame, convert to DataFrame with default column names
+        if not hasattr(X, "columns"):
+            X = pd.DataFrame(
+                X, columns=[f"f{i}" for i in range(np.asarray(X).shape[1])]
+            )
+        X_1 = X.copy()
+        X_1["treatment"] = 1
+        X_0 = X.copy()
+        X_0["treatment"] = 0
+
         return self.learner.predict(X_1) - self.learner.predict(X_0)
 
 
@@ -150,15 +173,22 @@ class TLearner:
         self
             Fitted estimator.
         """
+        import pandas as pd
+
         w_arr = _validate_binary_treatment(w)
-        X_arr = np.asarray(X)
-        y_arr = np.asarray(y)
+        # If X is not a DataFrame, convert to DataFrame with default column names
+        if not hasattr(X, "columns"):
+            X = pd.DataFrame(
+                X, columns=[f"f{i}" for i in range(np.asarray(X).shape[1])]
+            )
         mask_0 = w_arr == 0
         mask_1 = w_arr == 1
-
-        self.m0.fit(X_arr[mask_0], y_arr[mask_0])
-        self.m1.fit(X_arr[mask_1], y_arr[mask_1])
-
+        X_0 = X.loc[mask_0].copy()
+        X_1 = X.loc[mask_1].copy()
+        y_0 = np.asarray(y)[mask_0]
+        y_1 = np.asarray(y)[mask_1]
+        self.m0.fit(X_0, y_0)
+        self.m1.fit(X_1, y_1)
         # Average feature importances across both arms.
         self.feature_importances_ = (
             self.m0.feature_importances_ + self.m1.feature_importances_
@@ -254,30 +284,33 @@ class XLearner:
         self
             Fitted estimator.
         """
+        import pandas as pd
+
         w_arr = _validate_binary_treatment(w)
-        X_arr = np.asarray(X)
-        y_arr = np.asarray(y)
+        # If X is not a DataFrame, convert to DataFrame with default column names
+        if not hasattr(X, "columns"):
+            X = pd.DataFrame(
+                X, columns=[f"f{i}" for i in range(np.asarray(X).shape[1])]
+            )
         mask_0 = w_arr == 0
         mask_1 = w_arr == 1
-
+        X_0 = X.loc[mask_0].copy()
+        X_1 = X.loc[mask_1].copy()
+        y_0 = np.asarray(y)[mask_0]
+        y_1 = np.asarray(y)[mask_1]
         # Stage 1
-        self.m0.fit(X_arr[mask_0], y_arr[mask_0])
-        self.m1.fit(X_arr[mask_1], y_arr[mask_1])
-
+        self.m0.fit(X_0, y_0)
+        self.m1.fit(X_1, y_1)
         # Stage 2
-        pred_m0_on_1 = self.m0.predict(X_arr[mask_1])
-        pred_m1_on_0 = self.m1.predict(X_arr[mask_0])
-
-        d1 = y_arr[mask_1] - pred_m0_on_1
-        d0 = pred_m1_on_0 - y_arr[mask_0]
-
+        pred_m0_on_1 = self.m0.predict(X_1)
+        pred_m1_on_0 = self.m1.predict(X_0)
+        d1 = y_1 - pred_m0_on_1
+        d0 = pred_m1_on_0 - y_0
         # Stage 3
-        self.tau1.fit(X_arr[mask_1], d1)
-        self.tau0.fit(X_arr[mask_0], d0)
-
+        self.tau1.fit(X_1, d1)
+        self.tau0.fit(X_0, d0)
         # Propensity
-        self.g.fit(X_arr, w_arr)
-
+        self.g.fit(X, w_arr)
         # Average feature importances from the two effect models.
         self.feature_importances_ = (
             self.tau0.feature_importances_ + self.tau1.feature_importances_
@@ -390,34 +423,38 @@ class DRLearner:
         self
             Fitted estimator.
         """
+        import pandas as pd
+
         w_arr = _validate_binary_treatment(w)
-        X_arr = np.asarray(X, dtype=float)
-        y_arr = np.asarray(y, dtype=float)
+        # If X is not a DataFrame, convert to DataFrame with default column names
+        if not hasattr(X, "columns"):
+            X = pd.DataFrame(
+                X, columns=[f"f{i}" for i in range(np.asarray(X).shape[1])]
+            )
         mask_0 = w_arr == 0
         mask_1 = w_arr == 1
-
+        X_0 = X.loc[mask_0].copy()
+        X_1 = X.loc[mask_1].copy()
+        y_0 = np.asarray(y, dtype=float)[mask_0]
+        y_1 = np.asarray(y, dtype=float)[mask_1]
         # Stage 1: Outcome models per arm.
-        self.mu0.fit(X_arr[mask_0], y_arr[mask_0])
-        self.mu1.fit(X_arr[mask_1], y_arr[mask_1])
-
-        mu0_hat = self.mu0.predict(X_arr)
-        mu1_hat = self.mu1.predict(X_arr)
-
+        self.mu0.fit(X_0, y_0)
+        self.mu1.fit(X_1, y_1)
+        mu0_hat = self.mu0.predict(X)
+        mu1_hat = self.mu1.predict(X)
         # Stage 2: Propensity model.
-        self.propensity.fit(X_arr, w_arr)
-        log_odds = self.propensity.predict(X_arr)
+        self.propensity.fit(X, w_arr)
+        log_odds = self.propensity.predict(X)
         p_hat = np.clip(1.0 / (1.0 + np.exp(-log_odds)), self.clip, 1.0 - self.clip)
-
         # Stage 3: AIPW pseudo-outcomes.
         gamma = (
             mu1_hat
             - mu0_hat
-            + w_arr * (y_arr - mu1_hat) / p_hat
-            - (1 - w_arr) * (y_arr - mu0_hat) / (1 - p_hat)
+            + w_arr * (np.asarray(y, dtype=float) - mu1_hat) / p_hat
+            - (1 - w_arr) * (np.asarray(y, dtype=float) - mu0_hat) / (1 - p_hat)
         )
-
         # Stage 4: Final effect model.
-        self.effect.fit(X_arr, gamma)
+        self.effect.fit(X, gamma)
         self.feature_importances_ = self.effect.feature_importances_
         return self
 

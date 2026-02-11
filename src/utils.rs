@@ -752,7 +752,7 @@ mod tests {
     use super::*;
     use rand::rngs::StdRng;
     use rand::seq::IndexedRandom;
-    use rand::Rng;
+    use rand::RngExt;
     use rand::SeedableRng;
     #[test]
     fn test_round() {
@@ -910,7 +910,7 @@ mod tests {
         let index = (0..100).collect::<Vec<usize>>();
         let mut rng = StdRng::seed_from_u64(0);
         let f = (0..100).map(|_| rng.random_range(0..15)).collect::<Vec<u16>>();
-        let mut idx = index.choose_multiple(&mut rng, 73).copied().collect::<Vec<usize>>();
+        let mut idx = index.sample(&mut rng, 73).copied().collect::<Vec<usize>>();
         let mut grad = idx.iter().map(|i| *i as f32).collect::<Vec<f32>>();
         let mut hess = grad.clone();
         let split_i = pivot_on_split(0, idx.len(), &mut idx, &mut grad, &mut hess, &f, 7, true, &[]);
@@ -929,7 +929,7 @@ mod tests {
         let index = (0..100).collect::<Vec<usize>>();
         let mut rng = StdRng::seed_from_u64(0);
         let f = (0..100).map(|_| rng.random_range(1..15)).collect::<Vec<u16>>();
-        let mut idx = index.choose_multiple(&mut rng, 73).copied().collect::<Vec<usize>>();
+        let mut idx = index.sample(&mut rng, 73).copied().collect::<Vec<usize>>();
         let mut grad = idx.iter().map(|i| *i as f32).collect::<Vec<f32>>();
         let mut hess = grad.clone();
         let split_i = pivot_on_split(0, idx.len(), &mut idx, &mut grad, &mut hess, &f, 5, true, &[]);
@@ -939,7 +939,7 @@ mod tests {
         let index = (0..100).collect::<Vec<usize>>();
         let mut rng = StdRng::seed_from_u64(0);
         let f = (0..100).map(|_| rng.random_range(0..15)).collect::<Vec<u16>>();
-        let mut idx = index.choose_multiple(&mut rng, 73).copied().collect::<Vec<usize>>();
+        let mut idx = index.sample(&mut rng, 73).copied().collect::<Vec<usize>>();
         let sv = idx.iter().map(|i| f[*i]).max().unwrap();
         let mut grad = idx.iter().map(|i| *i as f32).collect::<Vec<f32>>();
         let mut hess = grad.clone();
@@ -950,7 +950,7 @@ mod tests {
         let index = (0..100).collect::<Vec<usize>>();
         let mut rng = StdRng::seed_from_u64(0);
         let f = (0..100).map(|_| rng.random_range(0..15)).collect::<Vec<u16>>();
-        let mut idx = index.choose_multiple(&mut rng, 73).copied().collect::<Vec<usize>>();
+        let mut idx = index.sample(&mut rng, 73).copied().collect::<Vec<usize>>();
         let sv = idx.iter().filter(|i| f[**i] > 0).map(|i| f[*i]).min().unwrap();
         let mut grad = idx.iter().map(|i| *i as f32).collect::<Vec<f32>>();
         let mut hess = grad.clone();
@@ -961,7 +961,7 @@ mod tests {
         let index = (0..100).collect::<Vec<usize>>();
         let mut rng = StdRng::seed_from_u64(0);
         let f = (0..100).map(|_| rng.random_range(1..15)).collect::<Vec<u16>>();
-        let mut idx = index.choose_multiple(&mut rng, 73).copied().collect::<Vec<usize>>();
+        let mut idx = index.sample(&mut rng, 73).copied().collect::<Vec<usize>>();
         let sv = idx.iter().filter(|i| f[**i] > 0).map(|i| f[*i]).min().unwrap();
         let mut grad = idx.iter().map(|i| *i as f32).collect::<Vec<f32>>();
         let mut hess = grad.clone();
@@ -972,7 +972,7 @@ mod tests {
         let index = (0..100).collect::<Vec<usize>>();
         let mut rng = StdRng::seed_from_u64(0);
         let f = (0..100).map(|_| rng.random_range(0..15)).collect::<Vec<u16>>();
-        let mut idx = index.choose_multiple(&mut rng, 73).copied().collect::<Vec<usize>>();
+        let mut idx = index.sample(&mut rng, 73).copied().collect::<Vec<usize>>();
         let mut grad = idx.iter().map(|i| *i as f32).collect::<Vec<f32>>();
         let mut hess = grad.clone();
         let split_i = pivot_on_split(0, idx.len(), &mut idx, &mut grad, &mut hess, &f, 7, false, &[]);
@@ -991,7 +991,7 @@ mod tests {
         let index = (0..100).collect::<Vec<usize>>();
         let mut rng = StdRng::seed_from_u64(0);
         let f = (0..100).map(|_| rng.random_range(1..15)).collect::<Vec<u16>>();
-        let mut idx = index.choose_multiple(&mut rng, 73).copied().collect::<Vec<usize>>();
+        let mut idx = index.sample(&mut rng, 73).copied().collect::<Vec<usize>>();
         let mut grad = idx.iter().map(|i| *i as f32).collect::<Vec<f32>>();
         let mut hess = grad.clone();
         let split_i = pivot_on_split(0, idx.len(), &mut idx, &mut grad, &mut hess, &f, 5, false, &[]);
@@ -1001,7 +1001,7 @@ mod tests {
         let index = (0..100).collect::<Vec<usize>>();
         let mut rng = StdRng::seed_from_u64(0);
         let f = (0..100).map(|_| rng.random_range(0..15)).collect::<Vec<u16>>();
-        let mut idx = index.choose_multiple(&mut rng, 73).copied().collect::<Vec<usize>>();
+        let mut idx = index.sample(&mut rng, 73).copied().collect::<Vec<usize>>();
         let sv = idx.iter().map(|i| f[*i]).max().unwrap();
         let mut grad = idx.iter().map(|i| *i as f32).collect::<Vec<f32>>();
         let mut hess = grad.clone();
@@ -1012,7 +1012,7 @@ mod tests {
         let index = (0..100).collect::<Vec<usize>>();
         let mut rng = StdRng::seed_from_u64(0);
         let f = (0..100).map(|_| rng.random_range(0..15)).collect::<Vec<u16>>();
-        let mut idx = index.choose_multiple(&mut rng, 73).copied().collect::<Vec<usize>>();
+        let mut idx = index.sample(&mut rng, 73).copied().collect::<Vec<usize>>();
         let sv = idx.iter().filter(|i| f[**i] > 0).map(|i| f[*i]).min().unwrap();
         let mut grad = idx.iter().map(|i| *i as f32).collect::<Vec<f32>>();
         let mut hess = grad.clone();
@@ -1023,7 +1023,7 @@ mod tests {
         let index = (0..100).collect::<Vec<usize>>();
         let mut rng = StdRng::seed_from_u64(0);
         let f = (0..100).map(|_| rng.random_range(1..15)).collect::<Vec<u16>>();
-        let mut idx = index.choose_multiple(&mut rng, 73).copied().collect::<Vec<usize>>();
+        let mut idx = index.sample(&mut rng, 73).copied().collect::<Vec<usize>>();
         let sv = idx.iter().filter(|i| f[**i] > 0).map(|i| f[*i]).min().unwrap();
         let mut grad = idx.iter().map(|i| *i as f32).collect::<Vec<f32>>();
         let mut hess = grad.clone();
@@ -1124,7 +1124,7 @@ mod tests {
         let index = (0..100).collect::<Vec<usize>>();
         let mut rng = StdRng::seed_from_u64(0);
         let f = (0..100).map(|_| rng.random_range(0..15)).collect::<Vec<u16>>();
-        let mut idx = index.choose_multiple(&mut rng, 73).copied().collect::<Vec<usize>>();
+        let mut idx = index.sample(&mut rng, 73).copied().collect::<Vec<usize>>();
         let mut grad = idx.iter().map(|i| *i as f32).collect::<Vec<f32>>();
         let mut hess = grad.clone();
         let split_i = pivot_on_split_exclude_missing(0, idx.len(), &mut idx, &mut grad, &mut hess, &f, 10, &[]);
@@ -1138,7 +1138,7 @@ mod tests {
         let index = (0..100).collect::<Vec<usize>>();
         let mut rng = StdRng::seed_from_u64(0);
         let f = (0..100).map(|_| rng.random_range(1..15)).collect::<Vec<u16>>();
-        let mut idx = index.choose_multiple(&mut rng, 73).copied().collect::<Vec<usize>>();
+        let mut idx = index.sample(&mut rng, 73).copied().collect::<Vec<usize>>();
         let mut grad = idx.iter().map(|i| *i as f32).collect::<Vec<f32>>();
         let mut hess = grad.clone();
         let split_i = pivot_on_split_exclude_missing(0, idx.len(), &mut idx, &mut grad, &mut hess, &f, 5, &[]);
@@ -1150,7 +1150,7 @@ mod tests {
         let index = (0..100).collect::<Vec<usize>>();
         let mut rng = StdRng::seed_from_u64(0);
         let f = (0..100).map(|_| rng.random_range(0..15)).collect::<Vec<u16>>();
-        let mut idx = index.choose_multiple(&mut rng, 73).copied().collect::<Vec<usize>>();
+        let mut idx = index.sample(&mut rng, 73).copied().collect::<Vec<usize>>();
         let sv = idx.iter().map(|i| f[*i]).max().unwrap();
         let mut grad = idx.iter().map(|i| *i as f32).collect::<Vec<f32>>();
         let mut hess = grad.clone();
@@ -1161,7 +1161,7 @@ mod tests {
         let index = (0..100).collect::<Vec<usize>>();
         let mut rng = StdRng::seed_from_u64(0);
         let f = (0..100).map(|_| rng.random_range(0..15)).collect::<Vec<u16>>();
-        let mut idx = index.choose_multiple(&mut rng, 73).copied().collect::<Vec<usize>>();
+        let mut idx = index.sample(&mut rng, 73).copied().collect::<Vec<usize>>();
         let sv = idx.iter().filter(|i| f[**i] > 0).map(|i| f[*i]).min().unwrap();
         let mut grad = idx.iter().map(|i| *i as f32).collect::<Vec<f32>>();
         let mut hess = grad.clone();
@@ -1172,7 +1172,7 @@ mod tests {
         let index = (0..100).collect::<Vec<usize>>();
         let mut rng = StdRng::seed_from_u64(0);
         let f = (0..100).map(|_| rng.random_range(1..15)).collect::<Vec<u16>>();
-        let mut idx = index.choose_multiple(&mut rng, 73).copied().collect::<Vec<usize>>();
+        let mut idx = index.sample(&mut rng, 73).copied().collect::<Vec<usize>>();
         let sv = idx.iter().filter(|i| f[**i] > 0).map(|i| f[*i]).min().unwrap();
         let mut grad = idx.iter().map(|i| *i as f32).collect::<Vec<f32>>();
         let mut hess = grad.clone();

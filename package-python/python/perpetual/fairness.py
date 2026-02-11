@@ -23,111 +23,21 @@ from typing_extensions import Self
 
 from perpetual.booster import PerpetualBooster
 
-# ---------------------------------------------------------------------------
-# Custom objective helpers  (mirror Rust FairnessObjective)
-# ---------------------------------------------------------------------------
+from .perpetual import FairnessObjective
 
 _VALID_FAIRNESS_TYPES = ("demographic_parity", "equalized_odds")
 
 
-def _fair_loss(sensitive_attr):
-    """Return a loss callable (standard log-loss; penalty is gradient-only)."""
-
-    def loss(y, yhat, sample_weight, group):
-        y = np.asarray(y)
-        yhat = np.asarray(yhat)
-        p = 1.0 / (1.0 + np.exp(-yhat))
-        score = -(
-            y * np.log(np.maximum(p, 1e-15))
-            + (1.0 - y) * np.log(np.maximum(1.0 - p, 1e-15))
-        )
-        return score.tolist()
-
-    return loss
-
-
-def _fair_gradient_dp(sensitive_attr, lam):
-    """Gradient for Demographic Parity fairness."""
-    s = np.asarray(sensitive_attr)
-
-    def gradient(y, yhat, sample_weight, group):
-        y = np.asarray(y)
-        yhat = np.asarray(yhat)
-        p = 1.0 / (1.0 + np.exp(-yhat))
-        dp = p * (1.0 - p)
-
-        # Group means
-        mask1 = s == 1
-        mask0 = ~mask1
-        n1 = float(mask1.sum()) or 1.0
-        n0 = float(mask0.sum()) or 1.0
-        mean1 = p[mask1].sum() / n1
-        mean0 = p[mask0].sum() / n0
-        diff = mean1 - mean0
-
-        grad = p - y  # standard log-loss gradient
-
-        # Fairness penalty gradient
-        fair_grad = np.where(
-            mask1,
-            2.0 * lam * diff * (1.0 / n1) * dp,
-            2.0 * lam * diff * (-1.0 / n0) * dp,
-        )
-        grad = grad + fair_grad
-        hess = dp
-
-        return grad.tolist(), hess.tolist()
-
-    return gradient
-
-
-def _fair_gradient_eo(sensitive_attr, lam):
-    """Gradient for Equalized Odds fairness."""
-    s = np.asarray(sensitive_attr)
-
-    def gradient(y, yhat, sample_weight, group):
-        y = np.asarray(y)
-        yhat = np.asarray(yhat)
-        p = 1.0 / (1.0 + np.exp(-yhat))
-        dp = p * (1.0 - p)
-        label = (y >= 0.5).astype(int)
-
-        grad = p - y  # standard log-loss gradient
-        hess = dp.copy()
-
-        for lbl in (0, 1):
-            lbl_mask = label == lbl
-            s1_lbl = (s == 1) & lbl_mask
-            s0_lbl = (s == 0) & lbl_mask
-            n1 = float(s1_lbl.sum()) or 1.0
-            n0 = float(s0_lbl.sum()) or 1.0
-            mean1 = p[s1_lbl].sum() / n1 if s1_lbl.any() else 0.0
-            mean0 = p[s0_lbl].sum() / n0 if s0_lbl.any() else 0.0
-            diff = mean1 - mean0
-
-            fair_grad = np.where(
-                s1_lbl,
-                2.0 * lam * diff * (1.0 / n1) * dp,
-                np.where(
-                    s0_lbl,
-                    2.0 * lam * diff * (-1.0 / n0) * dp,
-                    0.0,
-                ),
-            )
-            grad = grad + fair_grad
-
-        return grad.tolist(), hess.tolist()
-
-    return gradient
-
-
-def _fair_initial_value():
-    """Return an initial-value callable."""
-
-    def initial_value(y, sample_weight, group):
-        return 0.0
-
-    return initial_value
+def stable_sigmoid(x):
+    """Numerically stable sigmoid function."""
+    x = np.asarray(x)
+    out = np.empty_like(x, dtype=float)
+    pos_mask = x >= 0
+    neg_mask = ~pos_mask
+    out[pos_mask] = 1.0 / (1.0 + np.exp(-x[pos_mask]))
+    exp_x = np.exp(x[neg_mask])
+    out[neg_mask] = exp_x / (1.0 + exp_x)
+    return out
 
 
 # ---------------------------------------------------------------------------
@@ -220,18 +130,10 @@ class FairClassifier:
         """
         X_arr = np.asarray(X, dtype=float)
         y_arr = np.asarray(y, dtype=float)
-        sensitive_attr = X_arr[:, self.sensitive_feature].astype(int)
+        # Ensure int32 for Rust compatibility
+        sensitive_attr = X_arr[:, self.sensitive_feature].astype(np.int32)
 
-        if self.fairness_type == "demographic_parity":
-            grad_fn = _fair_gradient_dp(sensitive_attr, self.lam)
-        else:
-            grad_fn = _fair_gradient_eo(sensitive_attr, self.lam)
-
-        objective = (
-            _fair_loss(sensitive_attr),
-            grad_fn,
-            _fair_initial_value(),
-        )
+        objective = FairnessObjective(sensitive_attr, self.lam, self.fairness_type)
 
         self._model = PerpetualBooster(
             budget=self.budget, objective=objective, **self._kwargs
@@ -270,8 +172,29 @@ class FairClassifier:
             Predicted probabilities for class 0 and class 1.
         """
         scores = self._model.predict(X)
-        p1 = 1.0 / (1.0 + np.exp(-scores))
+        p1 = stable_sigmoid(scores)
         return np.column_stack([1.0 - p1, p1])
+
+    def predict_contributions(
+        self, X, method: str = "Average", parallel: Optional[bool] = None
+    ) -> np.ndarray:
+        """Predict feature contributions (SHAP-like values) for new data.
+
+        Parameters
+        ----------
+        X : array-like of shape (n_samples, n_features)
+            Input features.
+        method : str, default="Average"
+            Method to calculate contributions.
+        parallel : bool, optional
+            Whether to run prediction in parallel.
+
+        Returns
+        -------
+        ndarray of shape (n_samples, n_features + 1)
+            Feature contributions.
+        """
+        return self._model.predict_contributions(X, method=method, parallel=parallel)
 
     def decision_function(self, X) -> np.ndarray:
         """Return raw log-odds scores.

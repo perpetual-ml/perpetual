@@ -1,6 +1,6 @@
 Set-Location package-python
-python -m ruff check --fix .
-python -m ruff format .
-maturin develop --release
-pytest .
+uv run python -m ruff check --fix .
+uv run python -m ruff format .
+uv run maturin develop --release
+uv run pytest .
 Set-Location ..

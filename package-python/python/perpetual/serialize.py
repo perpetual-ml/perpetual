@@ -58,6 +58,8 @@ class ObjectSerializer(BaseSerializer[ObjectItem]):
     """Serializer for JSON-compatible objects (lists, dicts, scalars)."""
 
     def serialize(self, obj: ObjectItem) -> str:
+        if isinstance(obj, np.ndarray):
+            obj = obj.tolist()
         return json.dumps(obj)
 
     def deserialize(self, obj_repr: str) -> ObjectItem:

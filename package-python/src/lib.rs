@@ -4,8 +4,10 @@
 //! and [`IVBooster`] to Python via [PyO3](https://pyo3.rs).
 mod booster;
 mod custom_objective;
+mod fairness;
 mod iv;
 mod multi_output;
+mod policy;
 mod uplift;
 mod utils;
 
@@ -28,6 +30,8 @@ fn perpetual(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<MultiOutputBooster>()?;
     m.add_class::<UpliftBooster>()?;
     m.add_class::<IVBooster>()?;
+    m.add_class::<crate::fairness::PyFairnessObjective>()?;
+    m.add_class::<crate::policy::PyPolicyObjective>()?;
 
     Ok(())
 }

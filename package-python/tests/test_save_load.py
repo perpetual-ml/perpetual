@@ -86,19 +86,18 @@ class TestSaveLoadFunctions:
                     c_v, perpetual.booster.CratePerpetualBooster
                 ) or isinstance(v, perpetual.booster.CrateMultiOutputBooster)
             else:
-                print("else_block:")
-                print(k)
-                print(v)
-                print(c_v)
-                assert v == c_v, k
+                if isinstance(v, (np.ndarray, pd.Series, pd.DataFrame)):
+                    assert np.array_equal(v, c_v), k
+                else:
+                    assert v == c_v, k
         loaded_preds = loaded.predict(X)
+
         assert np.allclose(preds, loaded_preds)
 
     def test_booster_saving(self, X_y, tmp_path, load_func, save_func):
         # SquaredLoss
         f64_model_path = tmp_path / "modelf64_sl.json"
         X, y = X_y()
-        X = X
         model = PerpetualBooster(
             objective="SquaredLoss", budget=0.1, iteration_limit=10, memory_limit=1.0
         )
