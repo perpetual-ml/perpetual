@@ -6,7 +6,7 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Instrumental Variables (Boosted IV) &mdash; Perpetual 1.5.0 documentation</title>
+  <title>Instrumental Variables (Boosted IV) &mdash; Perpetual 1.6.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../../_static/nbsphinx-code-cells.css?v=2aa19091" />
@@ -15,7 +15,7 @@
   
       <script src="../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../_static/documentation_options.js?v=e0a75244"></script>
+      <script src="../../_static/documentation_options.js?v=72d88caf"></script>
       <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
@@ -52,10 +52,13 @@
 <li class="toctree-l1"><a class="reference internal" href="../../installation.html">Installation</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../quickstart.html">Quickstart</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../api.html">API Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../calibration.html">Calibration and Uncertainty Quantification</a></li>
 <li class="toctree-l1 current"><a class="reference internal" href="../index.html">Tutorials</a><ul class="current">
 <li class="toctree-l2"><a class="reference internal" href="../categorical_data.html">Handling Categorical Data</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../sklearn_interface.html">Scikit-Learn Interface: Classification, Regression &amp; Ranking</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../benchmark.html">Performance Benchmarking</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../calibration/regression_calibration.html">Mastering Regression Calibration: From Theoretical Basics to Advanced Methods</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../calibration/classification_calibration.html">Classification Calibration: Prediction Sets with Perpetual</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../custom_objective.html">Custom Objective Tutorial</a></li>
 <li class="toctree-l2"><a class="reference internal" href="uplift_marketing.html">Uplift Modeling with the Criteo Uplift Dataset</a></li>
 <li class="toctree-l2 current"><a class="current reference internal" href="#">Instrumental Variables (Boosted IV)</a><ul>
@@ -112,7 +115,7 @@
 <h1>Instrumental Variables (Boosted IV)<a class="headerlink" href="#Instrumental-Variables-(Boosted-IV)" title="Link to this heading"></a></h1>
 <p>Instrumental variables (IV) are a powerful tool in causal inference for estimating causal effects when there is unobserved confounding between the treatment <span class="math notranslate nohighlight">\(W\)</span> and the outcome <span class="math notranslate nohighlight">\(Y\)</span>.</p>
 <p>In this tutorial, we will use the <strong>Card (1995)</strong> dataset to estimate the causal effect of education on earnings. The problem is that factors like “ability” are unobserved and affect both education levels and earnings (confounding). Card proposed using “proximity to college” as an <strong>instrument</strong> (<span class="math notranslate nohighlight">\(Z\)</span>), assuming it affects education but has no direct effect on earnings.</p>
-<p>Perpetual’s <code class="docutils literal notranslate"><span class="pre">BraidedBooster</span></code> implements a boosted 2-Stage Least Squares (2SLS) approach.</p>
+<p>Perpetual’s <code class="docutils literal notranslate"><span class="pre">BraidedBooster</span></code> implements a boosted <strong>Control Function</strong> approach, which avoids the biased “Forbidden Regression” often found in naive boosted IV implementations.</p>
 <div class="nbinput nblast docutils container">
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>

@@ -5,7 +5,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Index &mdash; Perpetual 1.5.0 documentation</title>
+  <title>Index &mdash; Perpetual 1.6.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="_static/custom.css?v=9cdd1368" />
@@ -13,7 +13,7 @@
   
       <script src="_static/jquery.js?v=5d32c60e"></script>
       <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="_static/documentation_options.js?v=e0a75244"></script>
+      <script src="_static/documentation_options.js?v=72d88caf"></script>
       <script src="_static/doctools.js?v=fd6eb6e6"></script>
       <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
@@ -46,6 +46,7 @@
 <li class="toctree-l1"><a class="reference internal" href="installation.html">Installation</a></li>
 <li class="toctree-l1"><a class="reference internal" href="quickstart.html">Quickstart</a></li>
 <li class="toctree-l1"><a class="reference internal" href="api.html">API Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="calibration.html">Calibration and Uncertainty Quantification</a></li>
 <li class="toctree-l1"><a class="reference internal" href="tutorials/index.html">Tutorials</a></li>
 <li class="toctree-l1"><a class="reference internal" href="causal_ml/index.html">Causal ML</a></li>
 <li class="toctree-l1"><a class="reference internal" href="architecture.html">Architecture</a></li>
@@ -165,6 +166,8 @@
 </li>
   </ul></td>
   <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="api.html#perpetual.PerpetualBooster.calibrate_conformal">calibrate_conformal() (perpetual.PerpetualBooster method)</a>
+</li>
       <li><a href="api.html#perpetual.PerpetualBooster.classes_">classes_ (perpetual.PerpetualBooster attribute)</a>
 </li>
       <li><a href="api.html#perpetual.causal_metrics.cumulative_gain_curve">cumulative_gain_curve() (in module perpetual.causal_metrics)</a>
@@ -198,6 +201,14 @@
       <li><a href="api.html#perpetual.fairness.FairClassifier.feature_importances_">feature_importances_ (perpetual.fairness.FairClassifier attribute)</a>
 
       <ul>
+        <li><a href="api.html#perpetual.meta_learners.DRLearner.feature_importances_">(perpetual.meta_learners.DRLearner property)</a>
+</li>
+        <li><a href="api.html#perpetual.meta_learners.SLearner.feature_importances_">(perpetual.meta_learners.SLearner property)</a>
+</li>
+        <li><a href="api.html#perpetual.meta_learners.TLearner.feature_importances_">(perpetual.meta_learners.TLearner property)</a>
+</li>
+        <li><a href="api.html#perpetual.meta_learners.XLearner.feature_importances_">(perpetual.meta_learners.XLearner property)</a>
+</li>
         <li><a href="api.html#perpetual.PerpetualBooster.feature_importances_">(perpetual.PerpetualBooster attribute)</a>
 </li>
         <li><a href="api.html#id0">(perpetual.PerpetualBooster property)</a>
@@ -367,6 +378,8 @@
         <li><a href="api.html#perpetual.policy.PolicyLearner.predict_proba">(perpetual.policy.PolicyLearner method)</a>
 </li>
       </ul></li>
+      <li><a href="api.html#perpetual.PerpetualBooster.predict_sets">predict_sets() (perpetual.PerpetualBooster method)</a>
+</li>
       <li><a href="api.html#perpetual.PerpetualBooster.prune">prune() (perpetual.PerpetualBooster method)</a>
 </li>
   </ul></td>

@@ -1,0 +1,200 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="./">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Calibration and Uncertainty Quantification &mdash; Perpetual 1.6.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="_static/custom.css?v=9cdd1368" />
+
+  
+      <script src="_static/jquery.js?v=5d32c60e"></script>
+      <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="_static/documentation_options.js?v=72d88caf"></script>
+      <script src="_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
+      <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Tutorials" href="tutorials/index.html" />
+    <link rel="prev" title="API Reference" href="api.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            Perpetual
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="api.html">API Reference</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Calibration and Uncertainty Quantification</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#the-fundamental-advantage-post-hoc-calibration">The Fundamental Advantage: Post-Hoc Calibration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#probability-calibration-classification">Probability Calibration (Classification)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#uncertainty-quantification-regression">Uncertainty Quantification (Regression)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#why-perpetual-is-better">Why Perpetual is Better</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#tutorials">Tutorials</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#next-steps">Next Steps</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="tutorials/index.html">Tutorials</a></li>
+<li class="toctree-l1"><a class="reference internal" href="causal_ml/index.html">Causal ML</a></li>
+<li class="toctree-l1"><a class="reference internal" href="architecture.html">Architecture</a></li>
+<li class="toctree-l1"><a class="reference internal" href="parameters_tuning.html">Parameters Tuning</a></li>
+<li class="toctree-l1"><a class="reference internal" href="faq.html">Frequently Asked Questions</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">Perpetual</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Calibration and Uncertainty Quantification</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/calibration.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="calibration-and-uncertainty-quantification">
+<h1>Calibration and Uncertainty Quantification<a class="headerlink" href="#calibration-and-uncertainty-quantification" title="Link to this heading"></a></h1>
+<p>PerpetualBooster provides native, high-performance calibration methods for both regression (Prediction Intervals) and classification (Probability Calibration).</p>
+<section id="the-fundamental-advantage-post-hoc-calibration">
+<h2>The Fundamental Advantage: Post-Hoc Calibration<a class="headerlink" href="#the-fundamental-advantage-post-hoc-calibration" title="Link to this heading"></a></h2>
+<p>Traditional gradient boosting frameworks often require expensive modifications to the training process to produce well-calibrated outputs. For example:
+- <strong>Quantile Regression</strong>: Requires retraining multiple models (one for each quantile).
+- <strong>CV-based Calibration</strong>: Requires K-fold cross-validation or nested cross-validation, increasing training time by a factor of K.
+- <strong>Conformal Prediction Wrappers</strong>: Often require splitting data and wrapping external models, leading to complexity.</p>
+<p><strong>PerpetualBooster</strong> changes this paradigm by offering <strong>post-hoc calibration</strong>. You train your model <em>once</em> with standard settings (ensuring <code class="docutils literal notranslate"><span class="pre">save_node_stats=True</span></code> is set). You can then apply various calibration methods to the already-trained model using a small calibration set. This process is instantaneous and does not modify the underlying ensemble.</p>
+</section>
+<section id="probability-calibration-classification">
+<h2>Probability Calibration (Classification)<a class="headerlink" href="#probability-calibration-classification" title="Link to this heading"></a></h2>
+<p>In classification, calibration ensures that the output probabilities reflect true frequencies. A well-calibrated model that predicts a 90% probability of a “fraudulent” transaction should indeed be correct 90% of the time.</p>
+<p>Perpetual utilizes the <strong>Pool Adjacent Violators Algorithm (PAVA)</strong> for <strong>Isotonic Regression</strong> natively in Rust.</p>
+<p>### Available Methods</p>
+<p>Perpetual allows you to drive the Isotonic calibration using different internal uncertainty scores:</p>
+<ol class="arabic simple">
+<li><p><strong>Conformal (Default)</strong>: Uses raw probabilities to fit the Isotonic curve. This is the standard approach to probability calibration.</p></li>
+<li><p><strong>WeightVariance / GRP / MinMax</strong>: These methods use method-specific uncertainty scores (calculated from node statistics) to drive the Isotonic calibration. By weighting probabilities by the model’s confidence in specific regions of the feature space, Perpetual can achieve even lower <strong>Expected Calibration Error (ECE)</strong>.</p></li>
+</ol>
+<p>### Example</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">perpetual</span><span class="w"> </span><span class="kn">import</span> <span class="n">PerpetualBooster</span>
+
+<span class="c1"># 1. Train once</span>
+<span class="n">model</span> <span class="o">=</span> <span class="n">PerpetualBooster</span><span class="p">(</span><span class="n">objective</span><span class="o">=</span><span class="s2">&quot;LogLoss&quot;</span><span class="p">)</span>
+<span class="n">model</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">X_train</span><span class="p">,</span> <span class="n">y_train</span><span class="p">,</span> <span class="n">save_node_stats</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+<span class="c1"># 2. Calibrate post-hoc on a small set</span>
+<span class="n">model</span><span class="o">.</span><span class="n">calibrate</span><span class="p">(</span><span class="n">X_cal</span><span class="p">,</span> <span class="n">y_cal</span><span class="p">)</span>
+
+<span class="c1"># 3. Predict well-calibrated probabilities</span>
+<span class="n">probs</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">predict_proba</span><span class="p">(</span><span class="n">X_test</span><span class="p">,</span> <span class="n">calibrated</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="uncertainty-quantification-regression">
+<h2>Uncertainty Quantification (Regression)<a class="headerlink" href="#uncertainty-quantification-regression" title="Link to this heading"></a></h2>
+<p>For regression, Perpetual provides rigorous <strong>Prediction Intervals</strong>. Instead of a point estimate, you receive a range <code class="docutils literal notranslate"><span class="pre">[lower,</span> <span class="pre">upper]</span></code> that is guaranteed to contain the true value with a specific probability (e.g., 90%).</p>
+<p>### Native Calibration Methods</p>
+<ul class="simple">
+<li><p><strong>Conformal</strong>: Implements a method similar to Split Conformal Prediction or CQR. It ensures conservative coverage on any unseen data distributed similarly to the calibration set.</p></li>
+<li><p><strong>MinMax</strong>: A proprietary method that uses the range of target values observed in the leaves of the ensemble to drive local uncertainty.</p></li>
+<li><p><strong>GRP (Generalized Residual Percentiles)</strong>: Uses log-odds percentiles and statistical spreads within trees to generate extremely efficient and narrow intervals that still respect the coverage guarantees.</p></li>
+</ul>
+<p>### Example</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Define desired coverage (alpha=0.1 means 90% confidence)</span>
+<span class="n">model</span><span class="o">.</span><span class="n">calibrate</span><span class="p">(</span><span class="n">X_cal</span><span class="p">,</span> <span class="n">y_cal</span><span class="p">,</span> <span class="n">alpha</span><span class="o">=</span><span class="mf">0.1</span><span class="p">,</span> <span class="n">method</span><span class="o">=</span><span class="s2">&quot;GRP&quot;</span><span class="p">)</span>
+
+<span class="c1"># Get lower/upper bounds</span>
+<span class="n">intervals</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="n">X_test</span><span class="p">,</span> <span class="n">interval</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="why-perpetual-is-better">
+<h2>Why Perpetual is Better<a class="headerlink" href="#why-perpetual-is-better" title="Link to this heading"></a></h2>
+<ol class="arabic simple">
+<li><p><strong>Superior ECE</strong>: In benchmarks against LightGBM and Scikit-Learn, Perpetual consistently delivers lower Expected Calibration Error, making it the preferred choice for risk assessment and financial modeling.</p></li>
+<li><p><strong>Narrower Intervals</strong>: Perpetual’s internal methods (GRP, MinMax) often produce significantly narrower prediction intervals than standard conformal wrappers while maintaining the requested coverage.</p></li>
+<li><p><strong>Rust Efficiency</strong>: Calibration occurs at the C-layer speed, meaning thousands of calibration points can be processed in milliseconds.</p></li>
+<li><p><strong>API Simplicity</strong>: A single <code class="docutils literal notranslate"><span class="pre">calibrate()</span></code> method handles everything. The booster automatically detects the task (classification vs regression) and chooses the most appropriate internal engine.</p></li>
+</ol>
+</section>
+<section id="tutorials">
+<h2>Tutorials<a class="headerlink" href="#tutorials" title="Link to this heading"></a></h2>
+<p>For deep-dives and performance comparisons:</p>
+<ul class="simple">
+<li><p><a class="reference internal" href="tutorials/calibration/regression_calibration.html"><span class="doc">Mastering Regression Calibration: From Theoretical Basics to Advanced Methods</span></a>: In-depth comparison of GRP vs Conformal vs Mapie.</p></li>
+<li><p><a class="reference internal" href="tutorials/calibration/classification_calibration.html"><span class="doc">Classification Calibration: Prediction Sets with Perpetual</span></a>: Detailed ECE analysis and Reliability Diagrams comparing Perpetual, Sklearn, and LightGBM.</p></li>
+</ul>
+</section>
+<section id="next-steps">
+<h2>Next Steps<a class="headerlink" href="#next-steps" title="Link to this heading"></a></h2>
+<p>Always ensure that your calibration set is independent of your training set to avoid “over-confidence” in your calibration metrics. A 75/25 split of your non-test data is usually a good starting point.</p>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="api.html" class="btn btn-neutral float-left" title="API Reference" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="tutorials/index.html" class="btn btn-neutral float-right" title="Tutorials" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2026, Mutlu Simsek, Serkan Korkmaz, Pieter Pel.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

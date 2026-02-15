@@ -5,7 +5,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>perpetual.booster &mdash; Perpetual 1.5.0 documentation</title>
+  <title>perpetual.booster &mdash; Perpetual 1.6.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../../_static/custom.css?v=9cdd1368" />
@@ -13,7 +13,7 @@
   
       <script src="../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../_static/documentation_options.js?v=e0a75244"></script>
+      <script src="../../_static/documentation_options.js?v=72d88caf"></script>
       <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
@@ -46,6 +46,7 @@
 <li class="toctree-l1"><a class="reference internal" href="../../installation.html">Installation</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../quickstart.html">Quickstart</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../api.html">API Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../calibration.html">Calibration and Uncertainty Quantification</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../tutorials/index.html">Tutorials</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../causal_ml/index.html">Causal ML</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../architecture.html">Architecture</a></li>
@@ -83,6 +84,7 @@
 <span class="kn">import</span><span class="w"> </span><span class="nn">inspect</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">json</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">warnings</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">enum</span><span class="w"> </span><span class="kn">import</span> <span class="n">Enum</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">types</span><span class="w"> </span><span class="kn">import</span> <span class="n">FunctionType</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Dict</span><span class="p">,</span> <span class="n">Iterable</span><span class="p">,</span> <span class="n">List</span><span class="p">,</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">Set</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">,</span> <span class="n">Union</span><span class="p">,</span> <span class="n">cast</span>
 
@@ -107,6 +109,15 @@
     <span class="n">transform_input_frame_columnar</span><span class="p">,</span>
     <span class="n">type_df</span><span class="p">,</span>
 <span class="p">)</span>
+
+
+<span class="k">class</span><span class="w"> </span><span class="nc">CalibrationMethod</span><span class="p">(</span><span class="nb">str</span><span class="p">,</span> <span class="n">Enum</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Calibration methods for prediction intervals.&quot;&quot;&quot;</span>
+
+    <span class="n">Conformal</span> <span class="o">=</span> <span class="s2">&quot;Conformal&quot;</span>
+    <span class="n">MinMax</span> <span class="o">=</span> <span class="s2">&quot;MinMax&quot;</span>
+    <span class="n">GRP</span> <span class="o">=</span> <span class="s2">&quot;GRP&quot;</span>
+    <span class="n">WeightVariance</span> <span class="o">=</span> <span class="s2">&quot;WeightVariance&quot;</span>
 
 
 <div class="viewcode-block" id="PerpetualBooster">
@@ -164,12 +175,16 @@
         <span class="n">max_bin</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">256</span><span class="p">,</span>
         <span class="n">max_cat</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1000</span><span class="p">,</span>
         <span class="n">interaction_constraints</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="nb">int</span><span class="p">]]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">save_node_stats</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
     <span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Gradient Boosting Machine with Perpetual Learning.</span>
 
 <span class="sd">        A self-generalizing gradient boosting machine that doesn&#39;t need hyperparameter optimization.</span>
-<span class="sd">        It automatically finds the best configuration based on the provided budget.</span>
+<span class="sd">        It automatically finds the best configuration based on the provided budget. The budget</span>
+<span class="sd">        acts as a complexity control: a higher budget allows for more trees and potentially</span>
+<span class="sd">        better fit, while a lower budget ensures faster training and better generalization</span>
+<span class="sd">        for simpler datasets.</span>
 
 <span class="sd">        Parameters</span>
 <span class="sd">        ----------</span>
@@ -237,6 +252,8 @@
 <span class="sd">            Maximum unique categories before a feature is treated as numerical.</span>
 <span class="sd">        interaction_constraints : list of list of int, optional</span>
 <span class="sd">            Interaction constraints.</span>
+<span class="sd">        save_node_stats : bool, default=False</span>
+<span class="sd">            Whether to save node statistics (gradients, hessians) for analysis.</span>
 
 <span class="sd">        Attributes</span>
 <span class="sd">        ----------</span>
@@ -319,6 +336,7 @@
         <span class="bp">self</span><span class="o">.</span><span class="n">max_bin</span> <span class="o">=</span> <span class="n">max_bin</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">max_cat</span> <span class="o">=</span> <span class="n">max_cat</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">interaction_constraints</span> <span class="o">=</span> <span class="n">interaction_constraints</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">save_node_stats</span> <span class="o">=</span> <span class="n">save_node_stats</span>
 
         <span class="n">booster</span> <span class="o">=</span> <span class="n">CratePerpetualBooster</span><span class="p">(</span>
             <span class="n">objective</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">objective</span> <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">objective</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">)</span> <span class="k">else</span> <span class="kc">None</span><span class="p">,</span>
@@ -344,6 +362,7 @@
             <span class="n">loss</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">loss</span><span class="p">,</span>
             <span class="n">grad</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">grad</span><span class="p">,</span>
             <span class="n">init</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">init</span><span class="p">,</span>
+            <span class="n">save_node_stats</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">save_node_stats</span><span class="p">,</span>
         <span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">booster</span> <span class="o">=</span> <span class="n">cast</span><span class="p">(</span><span class="n">BoosterType</span><span class="p">,</span> <span class="n">booster</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">classes_</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([])</span></div>
@@ -467,6 +486,7 @@
                 <span class="n">loss</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">loss</span><span class="p">,</span>
                 <span class="n">grad</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">grad</span><span class="p">,</span>
                 <span class="n">init</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">init</span><span class="p">,</span>
+                <span class="n">save_node_stats</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">save_node_stats</span><span class="p">,</span>
             <span class="p">)</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">booster</span> <span class="o">=</span> <span class="n">cast</span><span class="p">(</span><span class="n">BoosterType</span><span class="p">,</span> <span class="n">booster</span><span class="p">)</span>
         <span class="k">else</span><span class="p">:</span>
@@ -497,6 +517,7 @@
                 <span class="n">loss</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">loss</span><span class="p">,</span>
                 <span class="n">grad</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">grad</span><span class="p">,</span>
                 <span class="n">init</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">init</span><span class="p">,</span>
+                <span class="n">save_node_stats</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">save_node_stats</span><span class="p">,</span>
             <span class="p">)</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">booster</span> <span class="o">=</span> <span class="n">cast</span><span class="p">(</span><span class="n">MultiOutputBoosterType</span><span class="p">,</span> <span class="n">booster</span><span class="p">)</span>
 
@@ -589,19 +610,88 @@
 <div class="viewcode-block" id="PerpetualBooster.calibrate">
 <a class="viewcode-back" href="../../api.html#perpetual.PerpetualBooster.calibrate">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">calibrate</span><span class="p">(</span>
-        <span class="bp">self</span><span class="p">,</span> <span class="n">X_train</span><span class="p">,</span> <span class="n">y_train</span><span class="p">,</span> <span class="n">X_cal</span><span class="p">,</span> <span class="n">y_cal</span><span class="p">,</span> <span class="n">alpha</span><span class="p">,</span> <span class="n">sample_weight</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">group</span><span class="o">=</span><span class="kc">None</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">X_cal</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
+        <span class="n">y_cal</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
+        <span class="n">alpha</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="n">Iterable</span><span class="p">[</span><span class="nb">float</span><span class="p">]],</span>
+        <span class="n">method</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Self</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">        Calibrate the gradient booster for prediction intervals.</span>
-
-<span class="sd">        Uses the provided training and calibration sets to compute scaling factors</span>
-<span class="sd">        for intervals.</span>
+<span class="sd">        Calibrate the gradient booster for prediction intervals using a selected method.</span>
 
 <span class="sd">        Parameters</span>
 <span class="sd">        ----------</span>
-<span class="sd">        X_train : array-like</span>
-<span class="sd">            Data used to train the base model.</span>
-<span class="sd">        y_train : array-like</span>
+<span class="sd">        X_cal : array-like</span>
+<span class="sd">            Independent calibration dataset.</span>
+<span class="sd">        y_cal : array-like</span>
+<span class="sd">            Targets for calibration data.</span>
+<span class="sd">        alpha : float or array-like</span>
+<span class="sd">            Significance level(s) for the intervals (1 - coverage).</span>
+<span class="sd">        method : str, optional</span>
+<span class="sd">            Calibration method to use. Options are &quot;MinMax&quot;,</span>
+<span class="sd">            &quot;GRP&quot;, &quot;WeightVariance&quot;. If None, defaults to &quot;WeightVariance&quot;.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        self : object</span>
+<span class="sd">            Returns self.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="n">is_polars</span> <span class="o">=</span> <span class="n">type_df</span><span class="p">(</span><span class="n">X_cal</span><span class="p">)</span> <span class="o">==</span> <span class="s2">&quot;polars_df&quot;</span>
+        <span class="k">if</span> <span class="n">is_polars</span><span class="p">:</span>
+            <span class="n">features_cal</span><span class="p">,</span> <span class="n">cols_cal</span><span class="p">,</span> <span class="n">masks_cal</span><span class="p">,</span> <span class="n">rows_cal</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="n">transform_input_frame_columnar</span><span class="p">(</span><span class="n">X_cal</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">cat_mapping</span><span class="p">)</span>
+            <span class="p">)</span>
+            <span class="n">y_cal_</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">convert_input_array</span><span class="p">(</span><span class="n">y_cal</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">objective</span><span class="p">)</span>
+
+            <span class="bp">self</span><span class="o">.</span><span class="n">booster</span><span class="o">.</span><span class="n">calibrate_columnar</span><span class="p">(</span>
+                <span class="n">method</span><span class="o">=</span><span class="n">method</span><span class="p">,</span>
+                <span class="n">columns_cal</span><span class="o">=</span><span class="n">cols_cal</span><span class="p">,</span>
+                <span class="n">masks_cal</span><span class="o">=</span><span class="n">masks_cal</span><span class="p">,</span>
+                <span class="n">rows_cal</span><span class="o">=</span><span class="n">rows_cal</span><span class="p">,</span>
+                <span class="n">y_cal</span><span class="o">=</span><span class="n">y_cal_</span><span class="p">,</span>
+                <span class="n">alpha</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">atleast_1d</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">alpha</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">)),</span>
+            <span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">_</span><span class="p">,</span> <span class="n">flat_data_cal</span><span class="p">,</span> <span class="n">rows_cal</span><span class="p">,</span> <span class="n">cols_cal</span> <span class="o">=</span> <span class="n">transform_input_frame</span><span class="p">(</span>
+                <span class="n">X_cal</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">cat_mapping</span>
+            <span class="p">)</span>
+            <span class="n">y_cal_</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">convert_input_array</span><span class="p">(</span><span class="n">y_cal</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">objective</span><span class="p">)</span>
+
+            <span class="n">alpha_arr</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">atleast_1d</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">alpha</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">))</span>
+
+            <span class="bp">self</span><span class="o">.</span><span class="n">booster</span><span class="o">.</span><span class="n">calibrate</span><span class="p">(</span>
+                <span class="n">method</span><span class="o">=</span><span class="n">method</span><span class="p">,</span>
+                <span class="n">flat_data_cal</span><span class="o">=</span><span class="n">flat_data_cal</span><span class="p">,</span>
+                <span class="n">rows_cal</span><span class="o">=</span><span class="n">rows_cal</span><span class="p">,</span>
+                <span class="n">cols_cal</span><span class="o">=</span><span class="n">cols_cal</span><span class="p">,</span>
+                <span class="n">y_cal</span><span class="o">=</span><span class="n">y_cal_</span><span class="p">,</span>
+                <span class="n">alpha</span><span class="o">=</span><span class="n">alpha_arr</span><span class="p">,</span>
+            <span class="p">)</span>
+
+        <span class="k">return</span> <span class="bp">self</span></div>
+
+
+<div class="viewcode-block" id="PerpetualBooster.calibrate_conformal">
+<a class="viewcode-back" href="../../api.html#perpetual.PerpetualBooster.calibrate_conformal">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">calibrate_conformal</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">X</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
+        <span class="n">y</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
+        <span class="n">X_cal</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
+        <span class="n">y_cal</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
+        <span class="n">alpha</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="n">Iterable</span><span class="p">[</span><span class="nb">float</span><span class="p">]],</span>
+        <span class="n">sample_weight</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">group</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Self</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Calibrate the gradient booster using Conformal Prediction (CQR).</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        X : array-like</span>
+<span class="sd">            Independent training dataset.</span>
+<span class="sd">        y : array-like</span>
 <span class="sd">            Targets for training data.</span>
 <span class="sd">        X_cal : array-like</span>
 <span class="sd">            Independent calibration dataset.</span>
@@ -610,9 +700,9 @@
 <span class="sd">        alpha : float or array-like</span>
 <span class="sd">            Significance level(s) for the intervals (1 - coverage).</span>
 <span class="sd">        sample_weight : array-like, optional</span>
-<span class="sd">            Sample weights.</span>
+<span class="sd">            Weights for training data.</span>
 <span class="sd">        group : array-like, optional</span>
-<span class="sd">            Group labels.</span>
+<span class="sd">            Group IDs for training data.</span>
 
 <span class="sd">        Returns</span>
 <span class="sd">        -------</span>
@@ -620,66 +710,72 @@
 <span class="sd">            Returns self.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
 
-        <span class="n">is_polars</span> <span class="o">=</span> <span class="n">type_df</span><span class="p">(</span><span class="n">X_train</span><span class="p">)</span> <span class="o">==</span> <span class="s2">&quot;polars_df&quot;</span>
+        <span class="n">is_polars</span> <span class="o">=</span> <span class="n">type_df</span><span class="p">(</span><span class="n">X_cal</span><span class="p">)</span> <span class="o">==</span> <span class="s2">&quot;polars_df&quot;</span>
         <span class="k">if</span> <span class="n">is_polars</span><span class="p">:</span>
-            <span class="n">features_train</span><span class="p">,</span> <span class="n">cols_train</span><span class="p">,</span> <span class="n">masks_train</span><span class="p">,</span> <span class="n">rows_train</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="p">(</span>
-                <span class="n">transform_input_frame_columnar</span><span class="p">(</span><span class="n">X_train</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">cat_mapping</span><span class="p">)</span>
+            <span class="n">features</span><span class="p">,</span> <span class="n">cols</span><span class="p">,</span> <span class="n">masks</span><span class="p">,</span> <span class="n">rows</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">transform_input_frame_columnar</span><span class="p">(</span>
+                <span class="n">X</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">cat_mapping</span>
             <span class="p">)</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">_validate_features</span><span class="p">(</span><span class="n">features_train</span><span class="p">)</span>
-            <span class="n">features_cal</span><span class="p">,</span> <span class="n">cols_cal</span><span class="p">,</span> <span class="n">masks_cal</span><span class="p">,</span> <span class="n">rows_cal</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="p">(</span>
-                <span class="n">transform_input_frame_columnar</span><span class="p">(</span><span class="n">X_cal</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">cat_mapping</span><span class="p">)</span>
-            <span class="p">)</span>
-            <span class="c1"># Use columnar calibration</span>
-            <span class="n">y_train_</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">convert_input_array</span><span class="p">(</span><span class="n">y_train</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">objective</span><span class="p">)</span>
-            <span class="n">y_cal_</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">convert_input_array</span><span class="p">(</span><span class="n">y_cal</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">objective</span><span class="p">)</span>
+            <span class="n">y_</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">convert_input_array</span><span class="p">(</span><span class="n">y</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">objective</span><span class="p">)</span>
+
             <span class="k">if</span> <span class="n">sample_weight</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
                 <span class="n">sample_weight_</span> <span class="o">=</span> <span class="kc">None</span>
             <span class="k">else</span><span class="p">:</span>
                 <span class="n">sample_weight_</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">convert_input_array</span><span class="p">(</span><span class="n">sample_weight</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">objective</span><span class="p">)</span>
 
-            <span class="bp">self</span><span class="o">.</span><span class="n">booster</span><span class="o">.</span><span class="n">calibrate_columnar</span><span class="p">(</span>
-                <span class="n">columns</span><span class="o">=</span><span class="n">cols_train</span><span class="p">,</span>
-                <span class="n">masks</span><span class="o">=</span><span class="n">masks_train</span><span class="p">,</span>
-                <span class="n">rows</span><span class="o">=</span><span class="n">rows_train</span><span class="p">,</span>
-                <span class="n">y</span><span class="o">=</span><span class="n">y_train_</span><span class="p">,</span>
+            <span class="k">if</span> <span class="n">group</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="n">group_</span> <span class="o">=</span> <span class="kc">None</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">group_</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">convert_input_array</span><span class="p">(</span><span class="n">group</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">objective</span><span class="p">,</span> <span class="n">is_int</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+            <span class="n">features_cal</span><span class="p">,</span> <span class="n">cols_cal</span><span class="p">,</span> <span class="n">masks_cal</span><span class="p">,</span> <span class="n">rows_cal</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="n">transform_input_frame_columnar</span><span class="p">(</span><span class="n">X_cal</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">cat_mapping</span><span class="p">)</span>
+            <span class="p">)</span>
+            <span class="n">y_cal_</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">convert_input_array</span><span class="p">(</span><span class="n">y_cal</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">objective</span><span class="p">)</span>
+
+            <span class="bp">self</span><span class="o">.</span><span class="n">booster</span><span class="o">.</span><span class="n">calibrate_conformal_columnar</span><span class="p">(</span>
+                <span class="n">columns</span><span class="o">=</span><span class="n">cols</span><span class="p">,</span>
+                <span class="n">masks</span><span class="o">=</span><span class="n">masks</span><span class="p">,</span>
+                <span class="n">rows</span><span class="o">=</span><span class="n">rows</span><span class="p">,</span>
+                <span class="n">y</span><span class="o">=</span><span class="n">y_</span><span class="p">,</span>
+                <span class="n">sample_weight</span><span class="o">=</span><span class="n">sample_weight_</span><span class="p">,</span>
+                <span class="n">group</span><span class="o">=</span><span class="n">group_</span><span class="p">,</span>
                 <span class="n">columns_cal</span><span class="o">=</span><span class="n">cols_cal</span><span class="p">,</span>
                 <span class="n">masks_cal</span><span class="o">=</span><span class="n">masks_cal</span><span class="p">,</span>
                 <span class="n">rows_cal</span><span class="o">=</span><span class="n">rows_cal</span><span class="p">,</span>
                 <span class="n">y_cal</span><span class="o">=</span><span class="n">y_cal_</span><span class="p">,</span>
-                <span class="n">alpha</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">alpha</span><span class="p">),</span>
-                <span class="n">sample_weight</span><span class="o">=</span><span class="n">sample_weight_</span><span class="p">,</span>  <span class="c1"># type: ignore</span>
-                <span class="n">group</span><span class="o">=</span><span class="n">group</span><span class="p">,</span>
+                <span class="n">alpha</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">atleast_1d</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">alpha</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">)),</span>
             <span class="p">)</span>
         <span class="k">else</span><span class="p">:</span>
-            <span class="n">_</span><span class="p">,</span> <span class="n">flat_data_train</span><span class="p">,</span> <span class="n">rows_train</span><span class="p">,</span> <span class="n">cols_train</span> <span class="o">=</span> <span class="n">transform_input_frame</span><span class="p">(</span>
-                <span class="n">X_train</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">cat_mapping</span>
-            <span class="p">)</span>
-
-            <span class="n">y_train_</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">convert_input_array</span><span class="p">(</span><span class="n">y_train</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">objective</span><span class="p">)</span>
-
-            <span class="n">_</span><span class="p">,</span> <span class="n">flat_data_cal</span><span class="p">,</span> <span class="n">rows_cal</span><span class="p">,</span> <span class="n">cols_cal</span> <span class="o">=</span> <span class="n">transform_input_frame</span><span class="p">(</span>
-                <span class="n">X_cal</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">cat_mapping</span>
-            <span class="p">)</span>
-
-            <span class="n">y_cal_</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">convert_input_array</span><span class="p">(</span><span class="n">y_cal</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">objective</span><span class="p">)</span>
+            <span class="n">_</span><span class="p">,</span> <span class="n">flat_data</span><span class="p">,</span> <span class="n">rows</span><span class="p">,</span> <span class="n">cols</span> <span class="o">=</span> <span class="n">transform_input_frame</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">cat_mapping</span><span class="p">)</span>
+            <span class="n">y_</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">convert_input_array</span><span class="p">(</span><span class="n">y</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">objective</span><span class="p">)</span>
 
             <span class="k">if</span> <span class="n">sample_weight</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
                 <span class="n">sample_weight_</span> <span class="o">=</span> <span class="kc">None</span>
             <span class="k">else</span><span class="p">:</span>
                 <span class="n">sample_weight_</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">convert_input_array</span><span class="p">(</span><span class="n">sample_weight</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">objective</span><span class="p">)</span>
 
-            <span class="bp">self</span><span class="o">.</span><span class="n">booster</span><span class="o">.</span><span class="n">calibrate</span><span class="p">(</span>
-                <span class="n">flat_data</span><span class="o">=</span><span class="n">flat_data_train</span><span class="p">,</span>
-                <span class="n">rows</span><span class="o">=</span><span class="n">rows_train</span><span class="p">,</span>
-                <span class="n">cols</span><span class="o">=</span><span class="n">cols_train</span><span class="p">,</span>
-                <span class="n">y</span><span class="o">=</span><span class="n">y_train_</span><span class="p">,</span>
+            <span class="k">if</span> <span class="n">group</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="n">group_</span> <span class="o">=</span> <span class="kc">None</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">group_</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">convert_input_array</span><span class="p">(</span><span class="n">group</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">objective</span><span class="p">,</span> <span class="n">is_int</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+            <span class="n">_</span><span class="p">,</span> <span class="n">flat_data_cal</span><span class="p">,</span> <span class="n">rows_cal</span><span class="p">,</span> <span class="n">cols_cal</span> <span class="o">=</span> <span class="n">transform_input_frame</span><span class="p">(</span>
+                <span class="n">X_cal</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">cat_mapping</span>
+            <span class="p">)</span>
+            <span class="n">y_cal_</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">convert_input_array</span><span class="p">(</span><span class="n">y_cal</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">objective</span><span class="p">)</span>
+
+            <span class="bp">self</span><span class="o">.</span><span class="n">booster</span><span class="o">.</span><span class="n">calibrate_conformal</span><span class="p">(</span>
+                <span class="n">flat_data</span><span class="o">=</span><span class="n">flat_data</span><span class="p">,</span>
+                <span class="n">rows</span><span class="o">=</span><span class="n">rows</span><span class="p">,</span>
+                <span class="n">cols</span><span class="o">=</span><span class="n">cols</span><span class="p">,</span>
+                <span class="n">y</span><span class="o">=</span><span class="n">y_</span><span class="p">,</span>
+                <span class="n">sample_weight</span><span class="o">=</span><span class="n">sample_weight_</span><span class="p">,</span>
+                <span class="n">group</span><span class="o">=</span><span class="n">group_</span><span class="p">,</span>
                 <span class="n">flat_data_cal</span><span class="o">=</span><span class="n">flat_data_cal</span><span class="p">,</span>
                 <span class="n">rows_cal</span><span class="o">=</span><span class="n">rows_cal</span><span class="p">,</span>
                 <span class="n">cols_cal</span><span class="o">=</span><span class="n">cols_cal</span><span class="p">,</span>
                 <span class="n">y_cal</span><span class="o">=</span><span class="n">y_cal_</span><span class="p">,</span>
-                <span class="n">alpha</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">alpha</span><span class="p">),</span>
-                <span class="n">sample_weight</span><span class="o">=</span><span class="n">sample_weight_</span><span class="p">,</span>  <span class="c1"># type: ignore</span>
-                <span class="n">group</span><span class="o">=</span><span class="n">group</span><span class="p">,</span>
+                <span class="n">alpha</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">atleast_1d</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">alpha</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">)),</span>
             <span class="p">)</span>
 
         <span class="k">return</span> <span class="bp">self</span></div>
@@ -732,6 +828,46 @@
         <span class="p">)</span></div>
 
 
+<div class="viewcode-block" id="PerpetualBooster.predict_sets">
+<a class="viewcode-back" href="../../api.html#perpetual.PerpetualBooster.predict_sets">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">predict_sets</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">X</span><span class="p">,</span> <span class="n">parallel</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">bool</span><span class="p">,</span> <span class="kc">None</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Predict sets with the fitted booster on new data.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        X : array-like of shape (n_samples, n_features)</span>
+<span class="sd">            New data for prediction.</span>
+<span class="sd">        parallel : bool, optional</span>
+<span class="sd">            Whether to run prediction in parallel. If None, uses class default.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        sets : dict</span>
+<span class="sd">            A dictionary containing prediction sets for the specified alpha levels.</span>
+<span class="sd">            Each set is a list of labels (e.g., [1.0], [0.0], or [0.0, 1.0]).</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">is_polars</span> <span class="o">=</span> <span class="n">type_df</span><span class="p">(</span><span class="n">X</span><span class="p">)</span> <span class="o">==</span> <span class="s2">&quot;polars_df&quot;</span>
+        <span class="k">if</span> <span class="n">is_polars</span><span class="p">:</span>
+            <span class="n">features_</span><span class="p">,</span> <span class="n">columns</span><span class="p">,</span> <span class="n">masks</span><span class="p">,</span> <span class="n">rows</span><span class="p">,</span> <span class="n">cols</span> <span class="o">=</span> <span class="n">transform_input_frame_columnar</span><span class="p">(</span>
+                <span class="n">X</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">cat_mapping</span>
+            <span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_validate_features</span><span class="p">(</span><span class="n">features_</span><span class="p">)</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">booster</span><span class="o">.</span><span class="n">predict_sets_columnar</span><span class="p">(</span>
+                <span class="n">columns</span><span class="o">=</span><span class="n">columns</span><span class="p">,</span> <span class="n">masks</span><span class="o">=</span><span class="n">masks</span><span class="p">,</span> <span class="n">rows</span><span class="o">=</span><span class="n">rows</span><span class="p">,</span> <span class="n">parallel</span><span class="o">=</span><span class="n">parallel</span>
+            <span class="p">)</span>
+
+        <span class="n">features_</span><span class="p">,</span> <span class="n">flat_data</span><span class="p">,</span> <span class="n">rows</span><span class="p">,</span> <span class="n">cols</span> <span class="o">=</span> <span class="n">transform_input_frame</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">cat_mapping</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_validate_features</span><span class="p">(</span><span class="n">features_</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">booster</span><span class="o">.</span><span class="n">predict_sets</span><span class="p">(</span>
+            <span class="n">flat_data</span><span class="o">=</span><span class="n">flat_data</span><span class="p">,</span>
+            <span class="n">rows</span><span class="o">=</span><span class="n">rows</span><span class="p">,</span>
+            <span class="n">cols</span><span class="o">=</span><span class="n">cols</span><span class="p">,</span>
+            <span class="n">parallel</span><span class="o">=</span><span class="n">parallel</span><span class="p">,</span>
+        <span class="p">)</span></div>
+
+
 <div class="viewcode-block" id="PerpetualBooster.predict">
 <a class="viewcode-back" href="../../api.html#perpetual.PerpetualBooster.predict">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">predict</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">X</span><span class="p">,</span> <span class="n">parallel</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">bool</span><span class="p">,</span> <span class="kc">None</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
@@ -773,12 +909,20 @@
             <span class="k">if</span> <span class="n">is_polars</span><span class="p">:</span>
                 <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">rint</span><span class="p">(</span>
                     <span class="bp">self</span><span class="o">.</span><span class="n">booster</span><span class="o">.</span><span class="n">predict_proba_columnar</span><span class="p">(</span>
-                        <span class="n">columns</span><span class="o">=</span><span class="n">columns</span><span class="p">,</span> <span class="n">masks</span><span class="o">=</span><span class="n">masks</span><span class="p">,</span> <span class="n">rows</span><span class="o">=</span><span class="n">rows</span><span class="p">,</span> <span class="n">parallel</span><span class="o">=</span><span class="n">parallel</span>
+                        <span class="n">columns</span><span class="o">=</span><span class="n">columns</span><span class="p">,</span>
+                        <span class="n">masks</span><span class="o">=</span><span class="n">masks</span><span class="p">,</span>
+                        <span class="n">rows</span><span class="o">=</span><span class="n">rows</span><span class="p">,</span>
+                        <span class="n">parallel</span><span class="o">=</span><span class="n">parallel</span><span class="p">,</span>
+                        <span class="n">calibrated</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
                     <span class="p">)</span>
                 <span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">int</span><span class="p">)</span>
             <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">rint</span><span class="p">(</span>
                 <span class="bp">self</span><span class="o">.</span><span class="n">booster</span><span class="o">.</span><span class="n">predict_proba</span><span class="p">(</span>
-                    <span class="n">flat_data</span><span class="o">=</span><span class="n">flat_data</span><span class="p">,</span> <span class="n">rows</span><span class="o">=</span><span class="n">rows</span><span class="p">,</span> <span class="n">cols</span><span class="o">=</span><span class="n">cols</span><span class="p">,</span> <span class="n">parallel</span><span class="o">=</span><span class="n">parallel</span>
+                    <span class="n">flat_data</span><span class="o">=</span><span class="n">flat_data</span><span class="p">,</span>
+                    <span class="n">rows</span><span class="o">=</span><span class="n">rows</span><span class="p">,</span>
+                    <span class="n">cols</span><span class="o">=</span><span class="n">cols</span><span class="p">,</span>
+                    <span class="n">parallel</span><span class="o">=</span><span class="n">parallel</span><span class="p">,</span>
+                    <span class="n">calibrated</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
                 <span class="p">)</span>
             <span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">int</span><span class="p">)</span>
         <span class="k">else</span><span class="p">:</span>
@@ -797,7 +941,9 @@
 
 <div class="viewcode-block" id="PerpetualBooster.predict_proba">
 <a class="viewcode-back" href="../../api.html#perpetual.PerpetualBooster.predict_proba">[docs]</a>
-    <span class="k">def</span><span class="w"> </span><span class="nf">predict_proba</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">X</span><span class="p">,</span> <span class="n">parallel</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">bool</span><span class="p">,</span> <span class="kc">None</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">predict_proba</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">X</span><span class="p">,</span> <span class="n">parallel</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">bool</span><span class="p">,</span> <span class="kc">None</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">calibrated</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Predict class probabilities with the fitted booster on new data.</span>
 
@@ -809,6 +955,8 @@
 <span class="sd">            Input features.</span>
 <span class="sd">        parallel : bool, optional</span>
 <span class="sd">            Whether to run prediction in parallel.</span>
+<span class="sd">        calibrated : bool, default=False</span>
+<span class="sd">            Whether to return calibrated probabilities (requires calibration).</span>
 
 <span class="sd">        Returns</span>
 <span class="sd">        -------</span>
@@ -829,21 +977,37 @@
         <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">classes_</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">2</span><span class="p">:</span>
             <span class="k">if</span> <span class="n">is_polars</span><span class="p">:</span>
                 <span class="n">probabilities</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">booster</span><span class="o">.</span><span class="n">predict_proba_columnar</span><span class="p">(</span>
-                    <span class="n">columns</span><span class="o">=</span><span class="n">columns</span><span class="p">,</span> <span class="n">masks</span><span class="o">=</span><span class="n">masks</span><span class="p">,</span> <span class="n">rows</span><span class="o">=</span><span class="n">rows</span><span class="p">,</span> <span class="n">parallel</span><span class="o">=</span><span class="n">parallel</span>
+                    <span class="n">columns</span><span class="o">=</span><span class="n">columns</span><span class="p">,</span>
+                    <span class="n">masks</span><span class="o">=</span><span class="n">masks</span><span class="p">,</span>
+                    <span class="n">rows</span><span class="o">=</span><span class="n">rows</span><span class="p">,</span>
+                    <span class="n">parallel</span><span class="o">=</span><span class="n">parallel</span><span class="p">,</span>
+                    <span class="n">calibrated</span><span class="o">=</span><span class="n">calibrated</span><span class="p">,</span>
                 <span class="p">)</span>
             <span class="k">else</span><span class="p">:</span>
                 <span class="n">probabilities</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">booster</span><span class="o">.</span><span class="n">predict_proba</span><span class="p">(</span>
-                    <span class="n">flat_data</span><span class="o">=</span><span class="n">flat_data</span><span class="p">,</span> <span class="n">rows</span><span class="o">=</span><span class="n">rows</span><span class="p">,</span> <span class="n">cols</span><span class="o">=</span><span class="n">cols</span><span class="p">,</span> <span class="n">parallel</span><span class="o">=</span><span class="n">parallel</span>
+                    <span class="n">flat_data</span><span class="o">=</span><span class="n">flat_data</span><span class="p">,</span>
+                    <span class="n">rows</span><span class="o">=</span><span class="n">rows</span><span class="p">,</span>
+                    <span class="n">cols</span><span class="o">=</span><span class="n">cols</span><span class="p">,</span>
+                    <span class="n">parallel</span><span class="o">=</span><span class="n">parallel</span><span class="p">,</span>
+                    <span class="n">calibrated</span><span class="o">=</span><span class="n">calibrated</span><span class="p">,</span>
                 <span class="p">)</span>
             <span class="k">return</span> <span class="n">probabilities</span><span class="o">.</span><span class="n">reshape</span><span class="p">((</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">classes_</span><span class="p">)),</span> <span class="n">order</span><span class="o">=</span><span class="s2">&quot;C&quot;</span><span class="p">)</span>
         <span class="k">elif</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">classes_</span><span class="p">)</span> <span class="o">==</span> <span class="mi">2</span><span class="p">:</span>
             <span class="k">if</span> <span class="n">is_polars</span><span class="p">:</span>
                 <span class="n">probabilities</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">booster</span><span class="o">.</span><span class="n">predict_proba_columnar</span><span class="p">(</span>
-                    <span class="n">columns</span><span class="o">=</span><span class="n">columns</span><span class="p">,</span> <span class="n">masks</span><span class="o">=</span><span class="n">masks</span><span class="p">,</span> <span class="n">rows</span><span class="o">=</span><span class="n">rows</span><span class="p">,</span> <span class="n">parallel</span><span class="o">=</span><span class="n">parallel</span>
+                    <span class="n">columns</span><span class="o">=</span><span class="n">columns</span><span class="p">,</span>
+                    <span class="n">masks</span><span class="o">=</span><span class="n">masks</span><span class="p">,</span>
+                    <span class="n">rows</span><span class="o">=</span><span class="n">rows</span><span class="p">,</span>
+                    <span class="n">parallel</span><span class="o">=</span><span class="n">parallel</span><span class="p">,</span>
+                    <span class="n">calibrated</span><span class="o">=</span><span class="n">calibrated</span><span class="p">,</span>
                 <span class="p">)</span>
             <span class="k">else</span><span class="p">:</span>
                 <span class="n">probabilities</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">booster</span><span class="o">.</span><span class="n">predict_proba</span><span class="p">(</span>
-                    <span class="n">flat_data</span><span class="o">=</span><span class="n">flat_data</span><span class="p">,</span> <span class="n">rows</span><span class="o">=</span><span class="n">rows</span><span class="p">,</span> <span class="n">cols</span><span class="o">=</span><span class="n">cols</span><span class="p">,</span> <span class="n">parallel</span><span class="o">=</span><span class="n">parallel</span>
+                    <span class="n">flat_data</span><span class="o">=</span><span class="n">flat_data</span><span class="p">,</span>
+                    <span class="n">rows</span><span class="o">=</span><span class="n">rows</span><span class="p">,</span>
+                    <span class="n">cols</span><span class="o">=</span><span class="n">cols</span><span class="p">,</span>
+                    <span class="n">parallel</span><span class="o">=</span><span class="n">parallel</span><span class="p">,</span>
+                    <span class="n">calibrated</span><span class="o">=</span><span class="n">calibrated</span><span class="p">,</span>
                 <span class="p">)</span>
             <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">concatenate</span><span class="p">(</span>
                 <span class="p">[(</span><span class="mf">1.0</span> <span class="o">-</span> <span class="n">probabilities</span><span class="p">)</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">),</span> <span class="n">probabilities</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">)],</span>
@@ -1216,9 +1380,18 @@
 <span class="sd">            The loaded booster object.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">try</span><span class="p">:</span>
-            <span class="n">booster</span> <span class="o">=</span> <span class="n">CratePerpetualBooster</span><span class="o">.</span><span class="n">load_booster</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">path</span><span class="p">))</span>
-        <span class="k">except</span> <span class="ne">ValueError</span><span class="p">:</span>
-            <span class="n">booster</span> <span class="o">=</span> <span class="n">CrateMultiOutputBooster</span><span class="o">.</span><span class="n">load_booster</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">path</span><span class="p">))</span>
+            <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">path</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+                <span class="n">dump</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">f</span><span class="p">)</span>
+            <span class="k">if</span> <span class="s2">&quot;boosters&quot;</span> <span class="ow">in</span> <span class="n">dump</span> <span class="ow">or</span> <span class="s2">&quot;n_boosters&quot;</span> <span class="ow">in</span> <span class="n">dump</span><span class="p">:</span>
+                <span class="n">booster</span> <span class="o">=</span> <span class="n">CrateMultiOutputBooster</span><span class="o">.</span><span class="n">load_booster</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">path</span><span class="p">))</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">booster</span> <span class="o">=</span> <span class="n">CratePerpetualBooster</span><span class="o">.</span><span class="n">load_booster</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">path</span><span class="p">))</span>
+        <span class="k">except</span> <span class="p">(</span><span class="ne">ValueError</span><span class="p">,</span> <span class="ne">KeyError</span><span class="p">,</span> <span class="n">json</span><span class="o">.</span><span class="n">JSONDecodeError</span><span class="p">):</span>
+            <span class="c1"># Fallback for older models or unexpected formats</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">booster</span> <span class="o">=</span> <span class="n">CratePerpetualBooster</span><span class="o">.</span><span class="n">load_booster</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">path</span><span class="p">))</span>
+            <span class="k">except</span> <span class="ne">ValueError</span><span class="p">:</span>
+                <span class="n">booster</span> <span class="o">=</span> <span class="n">CrateMultiOutputBooster</span><span class="o">.</span><span class="n">load_booster</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">path</span><span class="p">))</span>
 
         <span class="n">params</span> <span class="o">=</span> <span class="n">booster</span><span class="o">.</span><span class="n">get_params</span><span class="p">()</span>
         <span class="k">with</span> <span class="n">warnings</span><span class="o">.</span><span class="n">catch_warnings</span><span class="p">():</span>
@@ -1466,6 +1639,13 @@
             <span class="k">for</span> <span class="n">t</span> <span class="ow">in</span> <span class="n">booster_trees</span><span class="p">:</span>
                 <span class="n">nodes</span> <span class="o">=</span> <span class="p">[]</span>
                 <span class="k">for</span> <span class="n">node</span> <span class="ow">in</span> <span class="n">t</span><span class="p">[</span><span class="s2">&quot;nodes&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">values</span><span class="p">():</span>
+                    <span class="c1"># Flatten stats if present</span>
+                    <span class="k">if</span> <span class="s2">&quot;stats&quot;</span> <span class="ow">in</span> <span class="n">node</span> <span class="ow">and</span> <span class="n">node</span><span class="p">[</span><span class="s2">&quot;stats&quot;</span><span class="p">]</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                        <span class="n">stats</span> <span class="o">=</span> <span class="n">node</span><span class="p">[</span><span class="s2">&quot;stats&quot;</span><span class="p">]</span>
+                        <span class="k">for</span> <span class="n">key</span> <span class="ow">in</span> <span class="p">[</span><span class="s2">&quot;depth&quot;</span><span class="p">,</span> <span class="s2">&quot;count&quot;</span><span class="p">,</span> <span class="s2">&quot;generalization&quot;</span><span class="p">,</span> <span class="s2">&quot;weights&quot;</span><span class="p">]:</span>
+                            <span class="k">if</span> <span class="n">key</span> <span class="ow">in</span> <span class="n">stats</span><span class="p">:</span>
+                                <span class="n">node</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="n">stats</span><span class="p">[</span><span class="n">key</span><span class="p">]</span>
+
                     <span class="k">if</span> <span class="ow">not</span> <span class="n">node</span><span class="p">[</span><span class="s2">&quot;is_leaf&quot;</span><span class="p">]:</span>
                         <span class="n">node</span><span class="p">[</span><span class="s2">&quot;split_feature&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">feature_map</span><span class="p">[</span><span class="n">node</span><span class="p">[</span><span class="s2">&quot;split_feature&quot;</span><span class="p">]]</span>
                     <span class="k">else</span><span class="p">:</span>
@@ -2135,6 +2315,114 @@
         <span class="n">onnx</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">model_def</span><span class="p">,</span> <span class="n">path</span><span class="p">)</span></div>
 </div>
 
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">compute_calibration_curve</span><span class="p">(</span>
+    <span class="n">y_true</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
+    <span class="n">y_prob</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
+    <span class="n">n_bins</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">10</span><span class="p">,</span>
+    <span class="n">strategy</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;uniform&quot;</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Compute true and predicted probabilities for a calibration curve.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    y_true : array-like of shape (n_samples,)</span>
+<span class="sd">        True targets.</span>
+<span class="sd">    y_prob : array-like of shape (n_samples,)</span>
+<span class="sd">        Probabilities of the positive class.</span>
+<span class="sd">    n_bins : int, default=10</span>
+<span class="sd">        Number of bins to discretize the [0, 1] interval.</span>
+<span class="sd">    strategy : {&quot;uniform&quot;, &quot;quantile&quot;}, default=&quot;uniform&quot;</span>
+<span class="sd">        Strategy used to define the widths of the bins.</span>
+<span class="sd">        uniform: The bins have identical widths.</span>
+<span class="sd">        quantile: The bins have the same number of samples.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    prob_true : ndarray of shape (n_bins,) or smaller</span>
+<span class="sd">        The proportion of samples whose class is the positive class, in each bin.</span>
+<span class="sd">    prob_pred : ndarray of shape (n_bins,) or smaller</span>
+<span class="sd">        The mean predicted probability in each bin.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">y_true</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">y_true</span><span class="p">)</span>
+    <span class="n">y_prob</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">y_prob</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">strategy</span> <span class="o">==</span> <span class="s2">&quot;uniform&quot;</span><span class="p">:</span>
+        <span class="n">bins</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">,</span> <span class="n">n_bins</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span>
+    <span class="k">elif</span> <span class="n">strategy</span> <span class="o">==</span> <span class="s2">&quot;quantile&quot;</span><span class="p">:</span>
+        <span class="n">bins</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">percentile</span><span class="p">(</span><span class="n">y_prob</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">100</span><span class="p">,</span> <span class="n">n_bins</span> <span class="o">+</span> <span class="mi">1</span><span class="p">))</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="s2">&quot;Invalid strategy: strategies can be specified as uniform or quantile&quot;</span>
+        <span class="p">)</span>
+
+    <span class="n">binids</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">searchsorted</span><span class="p">(</span><span class="n">bins</span><span class="p">[</span><span class="mi">1</span><span class="p">:</span><span class="o">-</span><span class="mi">1</span><span class="p">],</span> <span class="n">y_prob</span><span class="p">)</span>
+
+    <span class="n">bin_sums</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">bincount</span><span class="p">(</span><span class="n">binids</span><span class="p">,</span> <span class="n">weights</span><span class="o">=</span><span class="n">y_prob</span><span class="p">,</span> <span class="n">minlength</span><span class="o">=</span><span class="nb">len</span><span class="p">(</span><span class="n">bins</span><span class="p">))</span>
+    <span class="n">bin_true</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">bincount</span><span class="p">(</span><span class="n">binids</span><span class="p">,</span> <span class="n">weights</span><span class="o">=</span><span class="n">y_true</span><span class="p">,</span> <span class="n">minlength</span><span class="o">=</span><span class="nb">len</span><span class="p">(</span><span class="n">bins</span><span class="p">))</span>
+    <span class="n">bin_total</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">bincount</span><span class="p">(</span><span class="n">binids</span><span class="p">,</span> <span class="n">minlength</span><span class="o">=</span><span class="nb">len</span><span class="p">(</span><span class="n">bins</span><span class="p">))</span>
+
+    <span class="n">nonzero</span> <span class="o">=</span> <span class="n">bin_total</span> <span class="o">!=</span> <span class="mi">0</span>
+    <span class="n">prob_true</span> <span class="o">=</span> <span class="n">bin_true</span><span class="p">[</span><span class="n">nonzero</span><span class="p">]</span> <span class="o">/</span> <span class="n">bin_total</span><span class="p">[</span><span class="n">nonzero</span><span class="p">]</span>
+    <span class="n">prob_pred</span> <span class="o">=</span> <span class="n">bin_sums</span><span class="p">[</span><span class="n">nonzero</span><span class="p">]</span> <span class="o">/</span> <span class="n">bin_total</span><span class="p">[</span><span class="n">nonzero</span><span class="p">]</span>
+
+    <span class="k">return</span> <span class="n">prob_true</span><span class="p">,</span> <span class="n">prob_pred</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">expected_calibration_error</span><span class="p">(</span>
+    <span class="n">y_true</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
+    <span class="n">y_prob</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
+    <span class="n">n_bins</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">10</span><span class="p">,</span>
+    <span class="n">strategy</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;uniform&quot;</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Compute Expected Calibration Error (ECE).</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    y_true : array-like of shape (n_samples,)</span>
+<span class="sd">        True targets.</span>
+<span class="sd">    y_prob : array-like of shape (n_samples,)</span>
+<span class="sd">        Probabilities of the positive class.</span>
+<span class="sd">    n_bins : int, default=10</span>
+<span class="sd">        Number of bins.</span>
+<span class="sd">    strategy : {&quot;uniform&quot;, &quot;quantile&quot;}, default=&quot;uniform&quot;</span>
+<span class="sd">        Strategy used to define the widths of the bins.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    ece : float</span>
+<span class="sd">        The expected calibration error.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">y_true</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">y_true</span><span class="p">)</span>
+    <span class="n">y_prob</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">y_prob</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">strategy</span> <span class="o">==</span> <span class="s2">&quot;uniform&quot;</span><span class="p">:</span>
+        <span class="n">bins</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">,</span> <span class="n">n_bins</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span>
+    <span class="k">elif</span> <span class="n">strategy</span> <span class="o">==</span> <span class="s2">&quot;quantile&quot;</span><span class="p">:</span>
+        <span class="n">bins</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">percentile</span><span class="p">(</span><span class="n">y_prob</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">100</span><span class="p">,</span> <span class="n">n_bins</span> <span class="o">+</span> <span class="mi">1</span><span class="p">))</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="s2">&quot;Invalid strategy: strategies can be specified as uniform or quantile&quot;</span>
+        <span class="p">)</span>
+
+    <span class="n">binids</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">searchsorted</span><span class="p">(</span><span class="n">bins</span><span class="p">[</span><span class="mi">1</span><span class="p">:</span><span class="o">-</span><span class="mi">1</span><span class="p">],</span> <span class="n">y_prob</span><span class="p">)</span>
+
+    <span class="n">bin_total</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">bincount</span><span class="p">(</span><span class="n">binids</span><span class="p">,</span> <span class="n">minlength</span><span class="o">=</span><span class="nb">len</span><span class="p">(</span><span class="n">bins</span><span class="p">))</span>
+
+    <span class="n">nonzero</span> <span class="o">=</span> <span class="n">bin_total</span> <span class="o">!=</span> <span class="mi">0</span>
+
+    <span class="n">bin_true_sums</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">bincount</span><span class="p">(</span><span class="n">binids</span><span class="p">,</span> <span class="n">weights</span><span class="o">=</span><span class="n">y_true</span><span class="p">,</span> <span class="n">minlength</span><span class="o">=</span><span class="nb">len</span><span class="p">(</span><span class="n">bins</span><span class="p">))</span>
+    <span class="n">bin_prob_sums</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">bincount</span><span class="p">(</span><span class="n">binids</span><span class="p">,</span> <span class="n">weights</span><span class="o">=</span><span class="n">y_prob</span><span class="p">,</span> <span class="n">minlength</span><span class="o">=</span><span class="nb">len</span><span class="p">(</span><span class="n">bins</span><span class="p">))</span>
+
+    <span class="c1"># Avoid division by zero</span>
+    <span class="n">prob_true</span> <span class="o">=</span> <span class="n">bin_true_sums</span><span class="p">[</span><span class="n">nonzero</span><span class="p">]</span> <span class="o">/</span> <span class="n">bin_total</span><span class="p">[</span><span class="n">nonzero</span><span class="p">]</span>
+    <span class="n">prob_pred</span> <span class="o">=</span> <span class="n">bin_prob_sums</span><span class="p">[</span><span class="n">nonzero</span><span class="p">]</span> <span class="o">/</span> <span class="n">bin_total</span><span class="p">[</span><span class="n">nonzero</span><span class="p">]</span>
+
+    <span class="n">ece</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">prob_true</span> <span class="o">-</span> <span class="n">prob_pred</span><span class="p">)</span> <span class="o">*</span> <span class="p">(</span><span class="n">bin_total</span><span class="p">[</span><span class="n">nonzero</span><span class="p">]</span> <span class="o">/</span> <span class="nb">len</span><span class="p">(</span><span class="n">y_true</span><span class="p">)))</span>
+    <span class="k">return</span> <span class="n">ece</span>
 </pre></div>
 
            </div>

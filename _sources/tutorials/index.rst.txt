@@ -8,6 +8,8 @@ Tutorials
    categorical_data
    sklearn_interface.ipynb
    benchmark
+   calibration/regression_calibration.ipynb
+   calibration/classification_calibration.ipynb
    custom_objective.ipynb
    causal/uplift_marketing.ipynb
    causal/iv_causal_effect.ipynb

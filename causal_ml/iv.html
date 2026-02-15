@@ -6,7 +6,7 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Instrumental Variables (BoostIV) &mdash; Perpetual 1.5.0 documentation</title>
+  <title>Instrumental Variables (BoostIV) &mdash; Perpetual 1.6.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../_static/custom.css?v=9cdd1368" />
@@ -14,7 +14,7 @@
   
       <script src="../_static/jquery.js?v=5d32c60e"></script>
       <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../_static/documentation_options.js?v=e0a75244"></script>
+      <script src="../_static/documentation_options.js?v=72d88caf"></script>
       <script src="../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
@@ -51,6 +51,7 @@
 <li class="toctree-l1"><a class="reference internal" href="../installation.html">Installation</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../quickstart.html">Quickstart</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../api.html">API Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../calibration.html">Calibration and Uncertainty Quantification</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../tutorials/index.html">Tutorials</a></li>
 <li class="toctree-l1 current"><a class="reference internal" href="index.html">Causal ML</a><ul class="current">
 <li class="toctree-l2"><a class="reference internal" href="uplift.html">Uplift Modeling</a></li>
@@ -98,10 +99,10 @@
 <p>Unobserved confounding violates the consistency of standard estimators (like Ordinary Least Squares or standard Gradient Boosting). An <strong>instrument</strong> <span class="math notranslate nohighlight">\(Z\)</span> is a variable that is correlated with the treatment but has no direct effect on the outcome except through the treatment.</p>
 <section id="boosted-instrumental-variables">
 <h2>Boosted Instrumental Variables<a class="headerlink" href="#boosted-instrumental-variables" title="Link to this heading"></a></h2>
-<p>The <code class="xref py py-class docutils literal notranslate"><span class="pre">iv.BraidedBooster</span></code> implements a <strong>2-Stage Least Squares (2SLS)</strong> approach using Gradient Boosting. This allows for capturing complex non-linear relationships in both the first stage (treatment assignment) and the second stage (outcome estimation).</p>
+<p>The <code class="xref py py-class docutils literal notranslate"><span class="pre">iv.BraidedBooster</span></code> implements a <strong>Control Function</strong> approach using Gradient Boosting. This method avoids the biased “Forbidden Regression” by explicitly modeling the first-stage residuals to account for endogeneity.</p>
 <ol class="arabic simple">
-<li><p><strong>Stage 1</strong>: Model the treatment <span class="math notranslate nohighlight">\(W\)</span> as a function of covariates <span class="math notranslate nohighlight">\(X\)</span> and instruments <span class="math notranslate nohighlight">\(Z\)</span>: <span class="math notranslate nohighlight">\(\hat{W} = f(X, Z)\)</span>.</p></li>
-<li><p><strong>Stage 2</strong>: Model the outcome <span class="math notranslate nohighlight">\(Y\)</span> as a function of covariates <span class="math notranslate nohighlight">\(X\)</span> and the predicted treatment from the first stage <span class="math notranslate nohighlight">\(\hat{W}\)</span>: <span class="math notranslate nohighlight">\(\hat{Y} = g(X, \hat{W})\)</span>.</p></li>
+<li><p><strong>Stage 1 (Treatment Model)</strong>: Model the treatment <span class="math notranslate nohighlight">\(W\)</span> as a function of covariates <span class="math notranslate nohighlight">\(X\)</span> and instruments <span class="math notranslate nohighlight">\(Z\)</span>: <span class="math notranslate nohighlight">\(\hat{W} = f(X, Z)\)</span>. Then compute residuals <span class="math notranslate nohighlight">\(V = W - \hat{W}\)</span>.</p></li>
+<li><p><strong>Stage 2 (Outcome Model)</strong>: Model the outcome <span class="math notranslate nohighlight">\(Y\)</span> as a function of covariates <span class="math notranslate nohighlight">\(X\)</span>, predicted treatment <span class="math notranslate nohighlight">\(\hat{W}\)</span>, and the residuals <span class="math notranslate nohighlight">\(V\)</span>: <span class="math notranslate nohighlight">\(\hat{Y} = g(X, \hat{W}, V)\)</span>.</p></li>
 </ol>
 <p>Example:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">perpetual.iv</span><span class="w"> </span><span class="kn">import</span> <span class="n">BraidedBooster</span>

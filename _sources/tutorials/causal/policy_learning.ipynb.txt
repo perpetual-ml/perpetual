@@ -177,7 +177,7 @@
    "source": [
     "## 4. Learn an AIPW (Doubly Robust) Policy\n",
     "\n",
-    "AIPW reduces variance by incorporating a baseline outcome model."
+    "AIPW reduces variance by incorporating baseline outcome models for both treatment and control groups (Doubly Robust)."
    ]
   },
   {

@@ -1,0 +1,473 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Mastering Regression Calibration: From Theoretical Basics to Advanced Methods &mdash; Perpetual 1.6.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="../../_static/nbsphinx-code-cells.css?v=2aa19091" />
+      <link rel="stylesheet" type="text/css" href="../../_static/custom.css?v=9cdd1368" />
+
+  
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=72d88caf"></script>
+      <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+      <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+      <script>window.MathJax = {"tex": {"inlineMath": [["$", "$"], ["\\(", "\\)"]], "processEscapes": true}, "options": {"ignoreHtmlClass": "tex2jax_ignore|mathjax_ignore|document", "processHtmlClass": "tex2jax_process|mathjax_process|math|output_area"}}</script>
+      <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@4/tex-mml-chtml.js"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+    <link rel="next" title="Classification Calibration: Prediction Sets with Perpetual" href="classification_calibration.html" />
+    <link rel="prev" title="Performance Benchmarking" href="../benchmark.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            Perpetual
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../../installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../api.html">API Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../calibration.html">Calibration and Uncertainty Quantification</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../index.html">Tutorials</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../categorical_data.html">Handling Categorical Data</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../sklearn_interface.html">Scikit-Learn Interface: Classification, Regression &amp; Ranking</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../benchmark.html">Performance Benchmarking</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">Mastering Regression Calibration: From Theoretical Basics to Advanced Methods</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#1.-Introduction-to-Calibration">1. Introduction to Calibration</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#What-is-a-Prediction-Interval?">What is a Prediction Interval?</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#The-Need-for-Calibration">The Need for Calibration</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#2.-Dataset-Preparation">2. Dataset Preparation</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#3.-Training-the-Base-Model">3. Training the Base Model</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#4.-Perpetual-Calibration-Methods">4. Perpetual Calibration Methods</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#4.1-Theory">4.1 Theory</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#5.-MAPIE-Calibration-Methods">5. MAPIE Calibration Methods</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#5.1-Overview">5.1 Overview</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#6.-Comprehensive-Result-Comparison">6. Comprehensive Result Comparison</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#7.-Global-Visualization">7. Global Visualization</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#8.-Analyzing-Interval-Width-Distributions-(Adaptive-vs.-Fixed)">8. Analyzing Interval Width Distributions (Adaptive vs. Fixed)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#9.-Comparison-of-Calibration-Approaches">9. Comparison of Calibration Approaches</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#1.-Perpetual-Conformal-vs.-MAPIE-CQR">1. Perpetual Conformal vs. MAPIE CQR</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#2.-Advantages-of-Perpetual's-Internal-Methods-(MinMax,-GRP,-WeightVariance)">2. Advantages of Perpetual’s Internal Methods (MinMax, GRP, WeightVariance)</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="classification_calibration.html">Classification Calibration: Prediction Sets with Perpetual</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../custom_objective.html">Custom Objective Tutorial</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../causal/uplift_marketing.html">Uplift Modeling with the Criteo Uplift Dataset</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../causal/iv_causal_effect.html">Instrumental Variables (Boosted IV)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../causal/dml_wage_gap.html">Double Machine Learning: Estimating the Gender Wage Gap</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../causal/policy_learning.html">Policy Learning: Optimal Treatment Assignment</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../causal/risk_compliance.html">Risk, Compliance, and Interpretability</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../causal/heterogeneous_treatment_effects.html">Heterogeneous Treatment Effects with Meta-Learners</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../causal/fairness_aware_modeling.html">Fairness-Aware Credit Scoring</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../causal/fair_classification.html">Fairness-Aware Classification with FairClassifier</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../causal/customer_retention_uplift.html">Customer Retention: Uplift Modeling for Churn Prevention</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../causal_ml/index.html">Causal ML</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../architecture.html">Architecture</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../parameters_tuning.html">Parameters Tuning</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../faq.html">Frequently Asked Questions</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">Perpetual</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">Tutorials</a></li>
+      <li class="breadcrumb-item active">Mastering Regression Calibration: From Theoretical Basics to Advanced Methods</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../_sources/tutorials/calibration/regression_calibration.ipynb.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="Mastering-Regression-Calibration:-From-Theoretical-Basics-to-Advanced-Methods">
+<h1>Mastering Regression Calibration: From Theoretical Basics to Advanced Methods<a class="headerlink" href="#Mastering-Regression-Calibration:-From-Theoretical-Basics-to-Advanced-Methods" title="Link to this heading"></a></h1>
+<section id="1.-Introduction-to-Calibration">
+<h2>1. Introduction to Calibration<a class="headerlink" href="#1.-Introduction-to-Calibration" title="Link to this heading"></a></h2>
+<p>In regression, we often care about more than just a single point estimate (the mean). We want to know the <strong>uncertainty</strong> associated with that prediction. <strong>Calibration</strong> is the process of ensuring that our uncertainty estimates (like prediction intervals) are “honest.”</p>
+<section id="What-is-a-Prediction-Interval?">
+<h3>What is a Prediction Interval?<a class="headerlink" href="#What-is-a-Prediction-Interval?" title="Link to this heading"></a></h3>
+<p>A prediction interval for a given target <span class="math notranslate nohighlight">\(y\)</span> at a confidence level <span class="math notranslate nohighlight">\((1 - \alpha)\)</span> is an interval <span class="math notranslate nohighlight">\([L, U]\)</span> such that:</p>
+<div class="math notranslate nohighlight">
+\[P(y \in [L, U]) \geq 1 - \alpha\]</div>
+<p>If we say we have a 90% prediction interval (<span class="math notranslate nohighlight">\(\alpha = 0.1\)</span>), we expect that in 90% of future cases, the true value will fall within those bounds.</p>
+</section>
+<section id="The-Need-for-Calibration">
+<h3>The Need for Calibration<a class="headerlink" href="#The-Need-for-Calibration" title="Link to this heading"></a></h3>
+<p>Most machine learning models (Boosted Trees, Neural Networks, etc.) are optimized to minimize a loss function (like MSE) but do not inherently produce calibrated probability distributions or intervals. Calibration methods take a pre-trained model and “fine-tune” its uncertainty estimates using a held-out <strong>Calibration Set</strong>.</p>
+<p>In this tutorial, we will explore two families of calibration methods:</p>
+<ol class="arabic simple">
+<li><p><strong>Perpetual-native methods</strong>: Leverage internal statistics from the <code class="docutils literal notranslate"><span class="pre">PerpetualBooster</span></code> (leaf fold weights).</p></li>
+<li><p><strong>MAPIE methods</strong>: Model-agnostic conformal prediction methods that work with any regressor.</p></li>
+</ol>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">warnings</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">matplotlib.pyplot</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">plt</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pd</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">seaborn</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">sns</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">mapie.regression</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">ConformalizedQuantileRegressor</span><span class="p">,</span>
+    <span class="n">CrossConformalRegressor</span><span class="p">,</span>
+    <span class="n">SplitConformalRegressor</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">perpetual</span><span class="w"> </span><span class="kn">import</span> <span class="n">PerpetualBooster</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">sklearn.datasets</span><span class="w"> </span><span class="kn">import</span> <span class="n">fetch_california_housing</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">sklearn.metrics</span><span class="w"> </span><span class="kn">import</span> <span class="n">mean_squared_error</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">sklearn.model_selection</span><span class="w"> </span><span class="kn">import</span> <span class="n">train_test_split</span>
+
+<span class="n">warnings</span><span class="o">.</span><span class="n">filterwarnings</span><span class="p">(</span><span class="s2">&quot;ignore&quot;</span><span class="p">)</span>
+<span class="n">sns</span><span class="o">.</span><span class="n">set_theme</span><span class="p">(</span><span class="n">style</span><span class="o">=</span><span class="s2">&quot;whitegrid&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Libraries imported successfully.&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</section>
+</section>
+<section id="2.-Dataset-Preparation">
+<h2>2. Dataset Preparation<a class="headerlink" href="#2.-Dataset-Preparation" title="Link to this heading"></a></h2>
+<p>We use the California Housing dataset.</p>
+<ul class="simple">
+<li><p><strong>Train Set</strong>: Used to train the base model.</p></li>
+<li><p><strong>Calibration Set</strong>: Used to learn the residuals or interval scaling.</p></li>
+<li><p><strong>Test Set</strong>: Used for final evaluation of coverage and width.</p></li>
+</ul>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># Load data</span>
+<span class="n">data</span> <span class="o">=</span> <span class="n">fetch_california_housing</span><span class="p">(</span><span class="n">as_frame</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="n">X</span><span class="p">,</span> <span class="n">y</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">data</span><span class="p">,</span> <span class="n">data</span><span class="o">.</span><span class="n">target</span>
+
+<span class="c1"># Split into Train (60%), Calibration (20%), and Test (20%)</span>
+<span class="n">X_rest</span><span class="p">,</span> <span class="n">X_test</span><span class="p">,</span> <span class="n">y_rest</span><span class="p">,</span> <span class="n">y_test</span> <span class="o">=</span> <span class="n">train_test_split</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">test_size</span><span class="o">=</span><span class="mf">0.2</span><span class="p">,</span> <span class="n">random_state</span><span class="o">=</span><span class="mi">42</span><span class="p">)</span>
+<span class="n">X_train</span><span class="p">,</span> <span class="n">X_cal</span><span class="p">,</span> <span class="n">y_train</span><span class="p">,</span> <span class="n">y_cal</span> <span class="o">=</span> <span class="n">train_test_split</span><span class="p">(</span>
+    <span class="n">X_rest</span><span class="p">,</span> <span class="n">y_rest</span><span class="p">,</span> <span class="n">test_size</span><span class="o">=</span><span class="mf">0.25</span><span class="p">,</span> <span class="n">random_state</span><span class="o">=</span><span class="mi">42</span>
+<span class="p">)</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Train size:       </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">X_train</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Calibration size: </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">X_cal</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Test size:        </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">X_test</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</section>
+<section id="3.-Training-the-Base-Model">
+<h2>3. Training the Base Model<a class="headerlink" href="#3.-Training-the-Base-Model" title="Link to this heading"></a></h2>
+<p>We train a <code class="docutils literal notranslate"><span class="pre">PerpetualBooster</span></code> on the training set.</p>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">model</span> <span class="o">=</span> <span class="n">PerpetualBooster</span><span class="p">(</span><span class="n">objective</span><span class="o">=</span><span class="s2">&quot;SquaredLoss&quot;</span><span class="p">,</span> <span class="n">budget</span><span class="o">=</span><span class="mf">1.0</span><span class="p">)</span>
+<span class="n">model</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">X_train</span><span class="p">,</span> <span class="n">y_train</span><span class="p">)</span>
+
+<span class="n">test_preds</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="n">X_test</span><span class="p">)</span>
+<span class="n">rmse</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">mean_squared_error</span><span class="p">(</span><span class="n">y_test</span><span class="p">,</span> <span class="n">test_preds</span><span class="p">))</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Base Model RMSE: </span><span class="si">{</span><span class="n">rmse</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</section>
+<section id="4.-Perpetual-Calibration-Methods">
+<h2>4. Perpetual Calibration Methods<a class="headerlink" href="#4.-Perpetual-Calibration-Methods" title="Link to this heading"></a></h2>
+<p>Perpetual provides four algorithms to derive prediction intervals from the learned trees.</p>
+<section id="4.1-Theory">
+<h3>4.1 Theory<a class="headerlink" href="#4.1-Theory" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p><strong>Conformal</strong>: A traditional split-conformal approach where absolute residuals on the calibration set determine a quantile correction.</p></li>
+<li><p><strong>MinMax</strong>: Each leaf stores the min/max weight across folds. The interval is inferred from the sum of these ranges across trees.</p></li>
+<li><p><strong>GRP (Global Relative Position)</strong>: A more refined version of MinMax using the relative position of the target within weight spans.</p></li>
+<li><p><strong>Weight Variance</strong>: Estimates uncertainty based on the standard deviation of fold weights in reached leaves.</p></li>
+</ul>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">methods</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;Conformal&quot;</span><span class="p">,</span> <span class="s2">&quot;MinMax&quot;</span><span class="p">,</span> <span class="s2">&quot;GRP&quot;</span><span class="p">,</span> <span class="s2">&quot;WeightVariance&quot;</span><span class="p">]</span>
+<span class="n">alpha</span> <span class="o">=</span> <span class="mf">0.1</span>  <span class="c1"># Goal: 90% coverage</span>
+<span class="n">results</span> <span class="o">=</span> <span class="p">[]</span>
+<span class="n">method_data</span> <span class="o">=</span> <span class="p">{}</span>  <span class="c1"># To store intervals for viz</span>
+
+<span class="k">for</span> <span class="n">method</span> <span class="ow">in</span> <span class="n">methods</span><span class="p">:</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Running Perpetual </span><span class="si">{</span><span class="n">method</span><span class="si">}</span><span class="s2">...&quot;</span><span class="p">)</span>
+    <span class="n">m</span> <span class="o">=</span> <span class="n">PerpetualBooster</span><span class="p">(</span><span class="n">objective</span><span class="o">=</span><span class="s2">&quot;SquaredLoss&quot;</span><span class="p">,</span> <span class="n">budget</span><span class="o">=</span><span class="mf">0.5</span><span class="p">,</span> <span class="n">save_node_stats</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">m</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">X_train</span><span class="p">,</span> <span class="n">y_train</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">method</span> <span class="o">==</span> <span class="s2">&quot;Conformal&quot;</span><span class="p">:</span>
+        <span class="n">m</span><span class="o">.</span><span class="n">calibrate_conformal</span><span class="p">(</span><span class="n">X_train</span><span class="p">,</span> <span class="n">y_train</span><span class="p">,</span> <span class="n">X_cal</span><span class="p">,</span> <span class="n">y_cal</span><span class="p">,</span> <span class="n">alpha</span><span class="o">=</span><span class="p">[</span><span class="n">alpha</span><span class="p">])</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">m</span><span class="o">.</span><span class="n">calibrate</span><span class="p">(</span><span class="n">X_cal</span><span class="p">,</span> <span class="n">y_cal</span><span class="p">,</span> <span class="n">alpha</span><span class="o">=</span><span class="p">[</span><span class="n">alpha</span><span class="p">],</span> <span class="n">method</span><span class="o">=</span><span class="n">method</span><span class="p">)</span>
+
+    <span class="n">ints</span> <span class="o">=</span> <span class="n">m</span><span class="o">.</span><span class="n">predict_intervals</span><span class="p">(</span><span class="n">X_test</span><span class="p">)</span>
+    <span class="n">lower</span> <span class="o">=</span> <span class="n">ints</span><span class="p">[</span><span class="nb">str</span><span class="p">(</span><span class="n">alpha</span><span class="p">)][:,</span> <span class="mi">0</span><span class="p">]</span>
+    <span class="n">upper</span> <span class="o">=</span> <span class="n">ints</span><span class="p">[</span><span class="nb">str</span><span class="p">(</span><span class="n">alpha</span><span class="p">)][:,</span> <span class="mi">1</span><span class="p">]</span>
+
+    <span class="n">coverage</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">((</span><span class="n">y_test</span> <span class="o">&gt;=</span> <span class="n">lower</span><span class="p">)</span> <span class="o">&amp;</span> <span class="p">(</span><span class="n">y_test</span> <span class="o">&lt;=</span> <span class="n">upper</span><span class="p">))</span>
+    <span class="n">width</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">upper</span> <span class="o">-</span> <span class="n">lower</span><span class="p">)</span>
+    <span class="n">results</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+        <span class="p">{</span>
+            <span class="s2">&quot;Library&quot;</span><span class="p">:</span> <span class="s2">&quot;Perpetual&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;Method&quot;</span><span class="p">:</span> <span class="n">method</span><span class="p">,</span>
+            <span class="s2">&quot;Coverage&quot;</span><span class="p">:</span> <span class="n">coverage</span><span class="p">,</span>
+            <span class="s2">&quot;Avg Width&quot;</span><span class="p">:</span> <span class="n">width</span><span class="p">,</span>
+        <span class="p">}</span>
+    <span class="p">)</span>
+    <span class="n">method_data</span><span class="p">[</span><span class="sa">f</span><span class="s2">&quot;Perp_</span><span class="si">{</span><span class="n">method</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="n">lower</span><span class="p">,</span> <span class="n">upper</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</section>
+</section>
+<section id="5.-MAPIE-Calibration-Methods">
+<h2>5. MAPIE Calibration Methods<a class="headerlink" href="#5.-MAPIE-Calibration-Methods" title="Link to this heading"></a></h2>
+<p>MAPIE implements variants of conformal prediction.</p>
+<section id="5.1-Overview">
+<h3>5.1 Overview<a class="headerlink" href="#5.1-Overview" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p><strong>Split</strong>: Residuals on a held-out set. Usually constant width.</p></li>
+<li><p><strong>Jackknife / CV</strong>: Resampling methods providing tighter bounds at the cost of training time.</p></li>
+<li><p><strong>CQR (Conformalized Quantile Regression)</strong>: Uses a quantile-based model to produce <strong>adaptive widths</strong>.</p></li>
+</ul>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">sklearn.ensemble</span><span class="w"> </span><span class="kn">import</span> <span class="n">GradientBoostingRegressor</span><span class="p">,</span> <span class="n">HistGradientBoostingRegressor</span>
+
+<span class="n">base_est</span> <span class="o">=</span> <span class="n">GradientBoostingRegressor</span><span class="p">(</span><span class="n">random_state</span><span class="o">=</span><span class="mi">42</span><span class="p">)</span>
+<span class="n">target_confidence</span> <span class="o">=</span> <span class="mi">1</span> <span class="o">-</span> <span class="n">alpha</span>
+
+<span class="n">mapie_configs</span> <span class="o">=</span> <span class="p">[</span>
+    <span class="p">(</span><span class="s2">&quot;Split&quot;</span><span class="p">,</span> <span class="s2">&quot;split&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">),</span>
+    <span class="p">(</span><span class="s2">&quot;Jackknife+&quot;</span><span class="p">,</span> <span class="s2">&quot;plus&quot;</span><span class="p">,</span> <span class="mi">20</span><span class="p">),</span>  <span class="c1"># Use high-k CV instead of LOO for speed</span>
+    <span class="p">(</span><span class="s2">&quot;Jackknife-minmax&quot;</span><span class="p">,</span> <span class="s2">&quot;minmax&quot;</span><span class="p">,</span> <span class="mi">20</span><span class="p">),</span>  <span class="c1"># on large datasets (12k samples)</span>
+    <span class="p">(</span><span class="s2">&quot;CV+&quot;</span><span class="p">,</span> <span class="s2">&quot;plus&quot;</span><span class="p">,</span> <span class="mi">5</span><span class="p">),</span>
+    <span class="p">(</span><span class="s2">&quot;CV-minmax&quot;</span><span class="p">,</span> <span class="s2">&quot;minmax&quot;</span><span class="p">,</span> <span class="mi">5</span><span class="p">),</span>
+<span class="p">]</span>
+
+<span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">method</span><span class="p">,</span> <span class="n">cv_strategy</span> <span class="ow">in</span> <span class="n">mapie_configs</span><span class="p">:</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Running MAPIE </span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2">...&quot;</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">method</span> <span class="o">==</span> <span class="s2">&quot;split&quot;</span><span class="p">:</span>
+        <span class="n">base_est</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">X_train</span><span class="p">,</span> <span class="n">y_train</span><span class="p">)</span>
+        <span class="c1"># In 1.3.0, SplitConformalRegressor takes confidence_level and prefit=True</span>
+        <span class="n">mapie</span> <span class="o">=</span> <span class="n">SplitConformalRegressor</span><span class="p">(</span>
+            <span class="n">base_est</span><span class="p">,</span> <span class="n">confidence_level</span><span class="o">=</span><span class="n">target_confidence</span><span class="p">,</span> <span class="n">prefit</span><span class="o">=</span><span class="kc">True</span>
+        <span class="p">)</span>
+        <span class="n">mapie</span><span class="o">.</span><span class="n">conformalize</span><span class="p">(</span><span class="n">X_cal</span><span class="p">,</span> <span class="n">y_cal</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="c1"># In 1.3.0, CrossConformalRegressor uses fit_conformalize</span>
+        <span class="n">mapie</span> <span class="o">=</span> <span class="n">CrossConformalRegressor</span><span class="p">(</span>
+            <span class="n">base_est</span><span class="p">,</span> <span class="n">confidence_level</span><span class="o">=</span><span class="n">target_confidence</span><span class="p">,</span> <span class="n">method</span><span class="o">=</span><span class="n">method</span><span class="p">,</span> <span class="n">cv</span><span class="o">=</span><span class="n">cv_strategy</span>
+        <span class="p">)</span>
+        <span class="n">mapie</span><span class="o">.</span><span class="n">fit_conformalize</span><span class="p">(</span><span class="n">X_rest</span><span class="p">,</span> <span class="n">y_rest</span><span class="p">)</span>
+
+    <span class="n">_</span><span class="p">,</span> <span class="n">y_pis</span> <span class="o">=</span> <span class="n">mapie</span><span class="o">.</span><span class="n">predict_interval</span><span class="p">(</span><span class="n">X_test</span><span class="p">)</span>
+    <span class="c1"># Shape is (n_samples, 2, n_confidence_levels)</span>
+    <span class="n">lower</span><span class="p">,</span> <span class="n">upper</span> <span class="o">=</span> <span class="n">y_pis</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">],</span> <span class="n">y_pis</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span>
+
+    <span class="n">coverage</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">((</span><span class="n">y_test</span> <span class="o">&gt;=</span> <span class="n">lower</span><span class="p">)</span> <span class="o">&amp;</span> <span class="p">(</span><span class="n">y_test</span> <span class="o">&lt;=</span> <span class="n">upper</span><span class="p">))</span>
+    <span class="n">width</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">upper</span> <span class="o">-</span> <span class="n">lower</span><span class="p">)</span>
+    <span class="n">results</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+        <span class="p">{</span><span class="s2">&quot;Library&quot;</span><span class="p">:</span> <span class="s2">&quot;MAPIE&quot;</span><span class="p">,</span> <span class="s2">&quot;Method&quot;</span><span class="p">:</span> <span class="n">name</span><span class="p">,</span> <span class="s2">&quot;Coverage&quot;</span><span class="p">:</span> <span class="n">coverage</span><span class="p">,</span> <span class="s2">&quot;Avg Width&quot;</span><span class="p">:</span> <span class="n">width</span><span class="p">}</span>
+    <span class="p">)</span>
+    <span class="n">method_data</span><span class="p">[</span><span class="sa">f</span><span class="s2">&quot;MAPIE_</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="n">lower</span><span class="p">,</span> <span class="n">upper</span><span class="p">)</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Running MAPIE CQR...&quot;</span><span class="p">)</span>
+<span class="n">cqr_est</span> <span class="o">=</span> <span class="n">HistGradientBoostingRegressor</span><span class="p">(</span><span class="n">loss</span><span class="o">=</span><span class="s2">&quot;quantile&quot;</span><span class="p">,</span> <span class="n">quantile</span><span class="o">=</span><span class="mf">0.5</span><span class="p">,</span> <span class="n">random_state</span><span class="o">=</span><span class="mi">42</span><span class="p">)</span>
+<span class="n">mapie_cqr</span> <span class="o">=</span> <span class="n">ConformalizedQuantileRegressor</span><span class="p">(</span><span class="n">cqr_est</span><span class="p">,</span> <span class="n">confidence_level</span><span class="o">=</span><span class="n">target_confidence</span><span class="p">)</span>
+<span class="n">mapie_cqr</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">X_train</span><span class="p">,</span> <span class="n">y_train</span><span class="p">)</span><span class="o">.</span><span class="n">conformalize</span><span class="p">(</span><span class="n">X_cal</span><span class="p">,</span> <span class="n">y_cal</span><span class="p">)</span>
+<span class="n">_</span><span class="p">,</span> <span class="n">y_pis</span> <span class="o">=</span> <span class="n">mapie_cqr</span><span class="o">.</span><span class="n">predict_interval</span><span class="p">(</span><span class="n">X_test</span><span class="p">)</span>
+<span class="n">lower</span><span class="p">,</span> <span class="n">upper</span> <span class="o">=</span> <span class="n">y_pis</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">],</span> <span class="n">y_pis</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span>
+<span class="n">coverage</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">((</span><span class="n">y_test</span> <span class="o">&gt;=</span> <span class="n">lower</span><span class="p">)</span> <span class="o">&amp;</span> <span class="p">(</span><span class="n">y_test</span> <span class="o">&lt;=</span> <span class="n">upper</span><span class="p">))</span>
+<span class="n">width</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">upper</span> <span class="o">-</span> <span class="n">lower</span><span class="p">)</span>
+<span class="n">results</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+    <span class="p">{</span><span class="s2">&quot;Library&quot;</span><span class="p">:</span> <span class="s2">&quot;MAPIE&quot;</span><span class="p">,</span> <span class="s2">&quot;Method&quot;</span><span class="p">:</span> <span class="s2">&quot;CQR&quot;</span><span class="p">,</span> <span class="s2">&quot;Coverage&quot;</span><span class="p">:</span> <span class="n">coverage</span><span class="p">,</span> <span class="s2">&quot;Avg Width&quot;</span><span class="p">:</span> <span class="n">width</span><span class="p">}</span>
+<span class="p">)</span>
+<span class="n">method_data</span><span class="p">[</span><span class="s2">&quot;MAPIE_CQR&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="n">lower</span><span class="p">,</span> <span class="n">upper</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</section>
+</section>
+<section id="6.-Comprehensive-Result-Comparison">
+<h2>6. Comprehensive Result Comparison<a class="headerlink" href="#6.-Comprehensive-Result-Comparison" title="Link to this heading"></a></h2>
+<p>We compare all methods side-by-side. The key metrics are:</p>
+<ol class="arabic simple">
+<li><p><strong>Coverage</strong>: Should be very close to 0.90.</p></li>
+<li><p><strong>Avg Width</strong>: Smaller is better (means tighter intervals with same confidence).</p></li>
+</ol>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">df_res</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">results</span><span class="p">)</span>
+<span class="n">df_res</span><span class="p">[</span><span class="s2">&quot;Coverage Error&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">df_res</span><span class="p">[</span><span class="s2">&quot;Coverage&quot;</span><span class="p">]</span> <span class="o">-</span> <span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="n">alpha</span><span class="p">))</span>
+<span class="n">df_res</span><span class="o">.</span><span class="n">sort_values</span><span class="p">(</span><span class="n">by</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;Library&quot;</span><span class="p">,</span> <span class="s2">&quot;Avg Width&quot;</span><span class="p">],</span> <span class="n">ascending</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">inplace</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="n">display</span><span class="p">(</span><span class="n">df_res</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</section>
+<section id="7.-Global-Visualization">
+<h2>7. Global Visualization<a class="headerlink" href="#7.-Global-Visualization" title="Link to this heading"></a></h2>
+<p>Let’s visualize the tradeoff between interval width and coverage.</p>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">plt</span><span class="o">.</span><span class="n">figure</span><span class="p">(</span><span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">14</span><span class="p">,</span> <span class="mi">7</span><span class="p">))</span>
+<span class="n">sns</span><span class="o">.</span><span class="n">scatterplot</span><span class="p">(</span>
+    <span class="n">data</span><span class="o">=</span><span class="n">df_res</span><span class="p">,</span> <span class="n">x</span><span class="o">=</span><span class="s2">&quot;Avg Width&quot;</span><span class="p">,</span> <span class="n">y</span><span class="o">=</span><span class="s2">&quot;Coverage&quot;</span><span class="p">,</span> <span class="n">hue</span><span class="o">=</span><span class="s2">&quot;Library&quot;</span><span class="p">,</span> <span class="n">style</span><span class="o">=</span><span class="s2">&quot;Method&quot;</span><span class="p">,</span> <span class="n">s</span><span class="o">=</span><span class="mi">200</span>
+<span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">axhline</span><span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="n">alpha</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">&quot;red&quot;</span><span class="p">,</span> <span class="n">linestyle</span><span class="o">=</span><span class="s2">&quot;--&quot;</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s2">&quot;Target Coverage (90%)&quot;</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">title</span><span class="p">(</span><span class="s2">&quot;Calibration Benchmarking: Coverage vs. Efficiency (Width)&quot;</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">ylabel</span><span class="p">(</span><span class="s2">&quot;Observed Coverage&quot;</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">xlabel</span><span class="p">(</span><span class="s2">&quot;Average Interval Width (lower is better)&quot;</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">grid</span><span class="p">(</span><span class="kc">True</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">legend</span><span class="p">(</span><span class="n">bbox_to_anchor</span><span class="o">=</span><span class="p">(</span><span class="mf">1.05</span><span class="p">,</span> <span class="mi">1</span><span class="p">),</span> <span class="n">loc</span><span class="o">=</span><span class="s2">&quot;upper left&quot;</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+</pre></div>
+</div>
+</div>
+</section>
+<section id="8.-Analyzing-Interval-Width-Distributions-(Adaptive-vs.-Fixed)">
+<h2>8. Analyzing Interval Width Distributions (Adaptive vs. Fixed)<a class="headerlink" href="#8.-Analyzing-Interval-Width-Distributions-(Adaptive-vs.-Fixed)" title="Link to this heading"></a></h2>
+<p>One of the hallmarks of a good calibration method is its ability to produce <strong>adaptive intervals</strong>.</p>
+<ul class="simple">
+<li><p><strong>Fixed-width methods</strong>: produce the same uncertainty regardless of the input sample.</p></li>
+<li><p><strong>Adaptive methods</strong>: identify regions of high uncertainty and widen the bounds locally.</p></li>
+</ul>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">width_data</span> <span class="o">=</span> <span class="p">[]</span>
+<span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="p">(</span><span class="n">low</span><span class="p">,</span> <span class="n">high</span><span class="p">)</span> <span class="ow">in</span> <span class="n">method_data</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+    <span class="n">widths</span> <span class="o">=</span> <span class="n">high</span> <span class="o">-</span> <span class="n">low</span>
+    <span class="k">for</span> <span class="n">w</span> <span class="ow">in</span> <span class="n">widths</span><span class="p">:</span>
+        <span class="n">width_data</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+            <span class="p">{</span>
+                <span class="s2">&quot;Method&quot;</span><span class="p">:</span> <span class="n">name</span><span class="p">,</span>
+                <span class="s2">&quot;Width&quot;</span><span class="p">:</span> <span class="n">w</span><span class="p">,</span>
+                <span class="s2">&quot;Library&quot;</span><span class="p">:</span> <span class="s2">&quot;Perpetual&quot;</span> <span class="k">if</span> <span class="s2">&quot;Perp&quot;</span> <span class="ow">in</span> <span class="n">name</span> <span class="k">else</span> <span class="s2">&quot;MAPIE&quot;</span><span class="p">,</span>
+            <span class="p">}</span>
+        <span class="p">)</span>
+
+<span class="n">df_widths</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">width_data</span><span class="p">)</span>
+
+<span class="n">plt</span><span class="o">.</span><span class="n">figure</span><span class="p">(</span><span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">15</span><span class="p">,</span> <span class="mi">8</span><span class="p">))</span>
+<span class="n">sns</span><span class="o">.</span><span class="n">boxplot</span><span class="p">(</span><span class="n">data</span><span class="o">=</span><span class="n">df_widths</span><span class="p">,</span> <span class="n">x</span><span class="o">=</span><span class="s2">&quot;Method&quot;</span><span class="p">,</span> <span class="n">y</span><span class="o">=</span><span class="s2">&quot;Width&quot;</span><span class="p">,</span> <span class="n">hue</span><span class="o">=</span><span class="s2">&quot;Library&quot;</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">xticks</span><span class="p">(</span><span class="n">rotation</span><span class="o">=</span><span class="mi">45</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">title</span><span class="p">(</span><span class="s2">&quot;Distribution of Prediction Interval Widths Across Methods&quot;</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">ylabel</span><span class="p">(</span><span class="s2">&quot;Interval Width&quot;</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+</pre></div>
+</div>
+</div>
+</section>
+<section id="9.-Comparison-of-Calibration-Approaches">
+<h2>9. Comparison of Calibration Approaches<a class="headerlink" href="#9.-Comparison-of-Calibration-Approaches" title="Link to this heading"></a></h2>
+<p>Perpetual’s calibration methods offer distinct advantages depending on the use case:</p>
+<section id="1.-Perpetual-Conformal-vs.-MAPIE-CQR">
+<h3>1. Perpetual Conformal vs. MAPIE CQR<a class="headerlink" href="#1.-Perpetual-Conformal-vs.-MAPIE-CQR" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p><strong>Perpetual Conformal</strong> is conceptually similar to <strong>MAPIE CQR</strong> (Conformalized Quantile Regression). Both aim to provide adaptive intervals that vary based on the predicted uncertainty.</p></li>
+<li><p>Both methods typically require a <strong>calibration set</strong> to determine the final scaling or quantile adjustments necessary to guarantee the desired coverage level.</p></li>
+</ul>
+</section>
+<section id="2.-Advantages-of-Perpetual's-Internal-Methods-(MinMax,-GRP,-WeightVariance)">
+<h3>2. Advantages of Perpetual’s Internal Methods (MinMax, GRP, WeightVariance)<a class="headerlink" href="#2.-Advantages-of-Perpetual's-Internal-Methods-(MinMax,-GRP,-WeightVariance)" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p><strong>No Model Re-training</strong>: Unlike methods that might require training multiple models (like Jackknife/CV) or specific quantile regressors, Perpetual’s internal methods (MinMax, GRP, WeightVariance) leverage statistics collected <strong>during the initial training pass</strong> (with <code class="docutils literal notranslate"><span class="pre">save_node_stats=True</span></code>).</p></li>
+<li><p><strong>Efficiency</strong>: Because the necessary information (fold weights/ranges) is already part of the trained model structure, calibrating these methods is extremely fast, involving only lightweight calculations on the calibration set.</p></li>
+<li><p><strong>Separate Calibration Set</strong>: It is important to note that <strong>all</strong> methods, including Perpetual’s internal ones, still require a separate held-out <strong>calibration set</strong> to strictly validate coverage guarantees. While you save on training time/resources, you must reserve data for calibration to ensure valid prediction intervals.</p></li>
+</ul>
+</section>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="../benchmark.html" class="btn btn-neutral float-left" title="Performance Benchmarking" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="classification_calibration.html" class="btn btn-neutral float-right" title="Classification Calibration: Prediction Sets with Perpetual" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2026, Mutlu Simsek, Serkan Korkmaz, Pieter Pel.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

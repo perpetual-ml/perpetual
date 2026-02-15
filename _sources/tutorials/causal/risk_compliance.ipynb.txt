@@ -130,7 +130,7 @@
  ],
  "metadata": {
   "kernelspec": {
-   "display_name": ".venv",
+   "display_name": "forust-main-perp-oss (3.13.7)",
    "language": "python",
    "name": "python3"
   },

@@ -5,7 +5,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>perpetual.meta_learners &mdash; Perpetual 1.5.0 documentation</title>
+  <title>perpetual.meta_learners &mdash; Perpetual 1.6.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../../_static/custom.css?v=9cdd1368" />
@@ -13,7 +13,7 @@
   
       <script src="../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../_static/documentation_options.js?v=e0a75244"></script>
+      <script src="../../_static/documentation_options.js?v=72d88caf"></script>
       <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
@@ -46,6 +46,7 @@
 <li class="toctree-l1"><a class="reference internal" href="../../installation.html">Installation</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../quickstart.html">Quickstart</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../api.html">API Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../calibration.html">Calibration and Uncertainty Quantification</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../tutorials/index.html">Tutorials</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../causal_ml/index.html">Causal ML</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../architecture.html">Architecture</a></li>
@@ -81,22 +82,33 @@
 <span></span><span class="sd">&quot;&quot;&quot;Meta-learner strategies for heterogeneous treatment effect estimation.</span>
 
 <span class="sd">Provides S-Learner, T-Learner, X-Learner, and DR-Learner wrappers around</span>
-<span class="sd">`PerpetualBooster` for estimating the Conditional Average Treatment</span>
+<span class="sd">optimized Rust implementations for estimating the Conditional Average Treatment</span>
 <span class="sd">Effect (CATE) from observational data.</span>
 
 <span class="sd">All learners follow a consistent API:</span>
-<span class="sd">    - ``fit(X, w, y)`` – fit on covariates, binary treatment, and outcome.</span>
-<span class="sd">    - ``predict(X)`` – return estimated CATE for each row.</span>
-<span class="sd">    - ``feature_importances_`` – feature importance from the final effect</span>
+<span class="sd">    - ``fit(X, w, y)`` - fit on covariates, binary treatment, and outcome.</span>
+<span class="sd">    - ``predict(X)`` - return estimated CATE for each row.</span>
+<span class="sd">    - ``feature_importances_`` - feature importance from the final effect</span>
 <span class="sd">      model (available after ``fit``).</span>
 <span class="sd">&quot;&quot;&quot;</span>
 
-<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Optional</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Dict</span><span class="p">,</span> <span class="n">Optional</span>
 
 <span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">typing_extensions</span><span class="w"> </span><span class="kn">import</span> <span class="n">Self</span>
 
-<span class="kn">from</span><span class="w"> </span><span class="nn">perpetual.booster</span><span class="w"> </span><span class="kn">import</span> <span class="n">PerpetualBooster</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">perpetual.perpetual</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">DRLearner</span> <span class="k">as</span> <span class="n">RustDRLearner</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">perpetual.perpetual</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">SLearner</span> <span class="k">as</span> <span class="n">RustSLearner</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">perpetual.perpetual</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">TLearner</span> <span class="k">as</span> <span class="n">RustTLearner</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">perpetual.perpetual</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">XLearner</span> <span class="k">as</span> <span class="n">RustXLearner</span><span class="p">,</span>
+<span class="p">)</span>
 
 
 <span class="k">def</span><span class="w"> </span><span class="nf">_validate_binary_treatment</span><span class="p">(</span><span class="n">w</span><span class="p">):</span>
@@ -104,7 +116,35 @@
     <span class="n">w_arr</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">w</span><span class="p">)</span>
     <span class="k">if</span> <span class="ow">not</span> <span class="n">np</span><span class="o">.</span><span class="n">all</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">isin</span><span class="p">(</span><span class="n">w_arr</span><span class="p">,</span> <span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">])):</span>
         <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Treatment &#39;w&#39; must be binary (0 or 1).&quot;</span><span class="p">)</span>
-    <span class="k">return</span> <span class="n">w_arr</span>
+    <span class="k">return</span> <span class="n">w_arr</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">)</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_prepare_params</span><span class="p">(</span><span class="n">budget</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">kwargs</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Prepare parameters for the Rust backend with defaults matching PerpetualBooster.&quot;&quot;&quot;</span>
+    <span class="n">params</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="s2">&quot;budget&quot;</span><span class="p">:</span> <span class="n">budget</span><span class="p">,</span>
+        <span class="s2">&quot;max_bin&quot;</span><span class="p">:</span> <span class="mi">255</span><span class="p">,</span>
+        <span class="s2">&quot;num_threads&quot;</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="s2">&quot;monotone_constraints&quot;</span><span class="p">:</span> <span class="p">{},</span>
+        <span class="s2">&quot;interaction_constraints&quot;</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="s2">&quot;force_children_to_bound_parent&quot;</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span>
+        <span class="s2">&quot;missing&quot;</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span><span class="p">,</span>
+        <span class="s2">&quot;allow_missing_splits&quot;</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span>
+        <span class="s2">&quot;create_missing_branch&quot;</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span>
+        <span class="s2">&quot;terminate_missing_features&quot;</span><span class="p">:</span> <span class="nb">set</span><span class="p">(),</span>
+        <span class="s2">&quot;missing_node_treatment&quot;</span><span class="p">:</span> <span class="s2">&quot;AssignToParent&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;log_iterations&quot;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>
+        <span class="s2">&quot;seed&quot;</span><span class="p">:</span> <span class="mi">42</span><span class="p">,</span>
+        <span class="s2">&quot;quantile&quot;</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="s2">&quot;reset&quot;</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="s2">&quot;categorical_features&quot;</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="s2">&quot;timeout&quot;</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="s2">&quot;iteration_limit&quot;</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="s2">&quot;memory_limit&quot;</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="s2">&quot;stopping_rounds&quot;</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="p">}</span>
+    <span class="n">params</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">kwargs</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">params</span>
 
 
 <span class="c1"># ---------------------------------------------------------------------------</span>
@@ -132,14 +172,14 @@
 <span class="sd">        Parameters</span>
 <span class="sd">        ----------</span>
 <span class="sd">        budget : float, default=0.5</span>
-<span class="sd">            Fitting budget forwarded to `PerpetualBooster`.</span>
+<span class="sd">            Fitting budget forwarded to the Rust backend.</span>
 <span class="sd">        **kwargs</span>
 <span class="sd">            Additional keyword arguments forwarded to `PerpetualBooster`.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">budget</span> <span class="o">=</span> <span class="n">budget</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_kwargs</span> <span class="o">=</span> <span class="n">kwargs</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">learner</span> <span class="o">=</span> <span class="n">PerpetualBooster</span><span class="p">(</span><span class="n">budget</span><span class="o">=</span><span class="n">budget</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">feature_importances_</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span></div>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_params</span> <span class="o">=</span> <span class="n">_prepare_params</span><span class="p">(</span><span class="n">budget</span><span class="p">,</span> <span class="n">kwargs</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">learner</span> <span class="o">=</span> <span class="n">RustSLearner</span><span class="p">(</span><span class="o">**</span><span class="bp">self</span><span class="o">.</span><span class="n">_params</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_n_features</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span></div>
 
 
 <div class="viewcode-block" id="SLearner.fit">
@@ -161,28 +201,24 @@
 <span class="sd">        self</span>
 <span class="sd">            Fitted estimator.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
-        <span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pd</span>
-
         <span class="n">w_arr</span> <span class="o">=</span> <span class="n">_validate_binary_treatment</span><span class="p">(</span><span class="n">w</span><span class="p">)</span>
-        <span class="c1"># If X is not a DataFrame, convert to DataFrame with default column names</span>
-        <span class="k">if</span> <span class="ow">not</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="s2">&quot;columns&quot;</span><span class="p">):</span>
-            <span class="n">X</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span>
-                <span class="n">X</span><span class="p">,</span> <span class="n">columns</span><span class="o">=</span><span class="p">[</span><span class="sa">f</span><span class="s2">&quot;f</span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2">&quot;</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">X</span><span class="p">)</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">])]</span>
-            <span class="p">)</span>
-        <span class="n">X_aug</span> <span class="o">=</span> <span class="n">X</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
-        <span class="n">X_aug</span><span class="p">[</span><span class="s2">&quot;treatment&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">w_arr</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">learner</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">X_aug</span><span class="p">,</span> <span class="n">y</span><span class="p">)</span>
-        <span class="c1"># Feature importances: drop the appended treatment column if present</span>
-        <span class="k">if</span> <span class="p">(</span>
-            <span class="nb">hasattr</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">learner</span><span class="p">,</span> <span class="s2">&quot;feature_importances_&quot;</span><span class="p">)</span>
-            <span class="ow">and</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">learner</span><span class="o">.</span><span class="n">feature_importances_</span><span class="p">)</span> <span class="o">==</span> <span class="n">X_aug</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
-        <span class="p">):</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">feature_importances_</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">learner</span><span class="o">.</span><span class="n">feature_importances_</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
-        <span class="k">else</span><span class="p">:</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">feature_importances_</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">learner</span><span class="o">.</span><span class="n">feature_importances_</span>
+        <span class="n">x_arr</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">float</span><span class="p">,</span> <span class="n">order</span><span class="o">=</span><span class="s2">&quot;F&quot;</span><span class="p">)</span>
+        <span class="n">y_arr</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">y</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">float</span><span class="p">)</span>
 
+        <span class="bp">self</span><span class="o">.</span><span class="n">_n_features</span> <span class="o">=</span> <span class="n">x_arr</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">learner</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">x_arr</span><span class="o">.</span><span class="n">ravel</span><span class="p">(),</span> <span class="n">x_arr</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">x_arr</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">w_arr</span><span class="p">,</span> <span class="n">y_arr</span><span class="p">)</span>
         <span class="k">return</span> <span class="bp">self</span></div>
 
+
+    <span class="nd">@property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">feature_importances_</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Feature importance of the single model (excluding treatment feature).&quot;&quot;&quot;</span>
+        <span class="n">importances_map</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">learner</span><span class="o">.</span><span class="n">calculate_feature_importance</span><span class="p">(</span><span class="s2">&quot;Gain&quot;</span><span class="p">,</span> <span class="kc">True</span><span class="p">)</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_n_features</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+        <span class="c1"># Return only the FIRST n_features (the covariates).</span>
+        <span class="c1"># We assume treatment was appended at index n_features.</span>
+        <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="n">importances_map</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">)</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_n_features</span><span class="p">)])</span>
 
 <div class="viewcode-block" id="SLearner.predict">
 <a class="viewcode-back" href="../../api.html#perpetual.meta_learners.SLearner.predict">[docs]</a>
@@ -199,19 +235,8 @@
 <span class="sd">        ndarray of shape (n_samples,)</span>
 <span class="sd">            Estimated treatment effect for each sample.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
-        <span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pd</span>
-
-        <span class="c1"># If X is not a DataFrame, convert to DataFrame with default column names</span>
-        <span class="k">if</span> <span class="ow">not</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="s2">&quot;columns&quot;</span><span class="p">):</span>
-            <span class="n">X</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span>
-                <span class="n">X</span><span class="p">,</span> <span class="n">columns</span><span class="o">=</span><span class="p">[</span><span class="sa">f</span><span class="s2">&quot;f</span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2">&quot;</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">X</span><span class="p">)</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">])]</span>
-            <span class="p">)</span>
-        <span class="n">X_1</span> <span class="o">=</span> <span class="n">X</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
-        <span class="n">X_1</span><span class="p">[</span><span class="s2">&quot;treatment&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="mi">1</span>
-        <span class="n">X_0</span> <span class="o">=</span> <span class="n">X</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
-        <span class="n">X_0</span><span class="p">[</span><span class="s2">&quot;treatment&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="mi">0</span>
-
-        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">learner</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="n">X_1</span><span class="p">)</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">learner</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="n">X_0</span><span class="p">)</span></div>
+        <span class="n">x_arr</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">float</span><span class="p">,</span> <span class="n">order</span><span class="o">=</span><span class="s2">&quot;F&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">learner</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="n">x_arr</span><span class="o">.</span><span class="n">ravel</span><span class="p">(),</span> <span class="n">x_arr</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">x_arr</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span></div>
 </div>
 
 
@@ -242,75 +267,43 @@
 <span class="sd">        Parameters</span>
 <span class="sd">        ----------</span>
 <span class="sd">        budget : float, default=0.5</span>
-<span class="sd">            Fitting budget forwarded to each `PerpetualBooster`.</span>
+<span class="sd">            Fitting budget forwarded to the Rust backend.</span>
 <span class="sd">        **kwargs</span>
 <span class="sd">            Additional keyword arguments forwarded to `PerpetualBooster`.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">budget</span> <span class="o">=</span> <span class="n">budget</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_kwargs</span> <span class="o">=</span> <span class="n">kwargs</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">m0</span> <span class="o">=</span> <span class="n">PerpetualBooster</span><span class="p">(</span><span class="n">budget</span><span class="o">=</span><span class="n">budget</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">m1</span> <span class="o">=</span> <span class="n">PerpetualBooster</span><span class="p">(</span><span class="n">budget</span><span class="o">=</span><span class="n">budget</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">feature_importances_</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span></div>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_params</span> <span class="o">=</span> <span class="n">_prepare_params</span><span class="p">(</span><span class="n">budget</span><span class="p">,</span> <span class="n">kwargs</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">learner</span> <span class="o">=</span> <span class="n">RustTLearner</span><span class="p">(</span><span class="o">**</span><span class="bp">self</span><span class="o">.</span><span class="n">_params</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_n_features</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span></div>
 
 
 <div class="viewcode-block" id="TLearner.fit">
 <a class="viewcode-back" href="../../api.html#perpetual.meta_learners.TLearner.fit">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">fit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">X</span><span class="p">,</span> <span class="n">w</span><span class="p">,</span> <span class="n">y</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Self</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Fit separate models on control and treated groups.</span>
-
-<span class="sd">        Parameters</span>
-<span class="sd">        ----------</span>
-<span class="sd">        X : array-like of shape (n_samples, n_features)</span>
-<span class="sd">            Covariate matrix.</span>
-<span class="sd">        w : array-like of shape (n_samples,)</span>
-<span class="sd">            Binary treatment indicator (0 or 1).</span>
-<span class="sd">        y : array-like of shape (n_samples,)</span>
-<span class="sd">            Observed outcome.</span>
-
-<span class="sd">        Returns</span>
-<span class="sd">        -------</span>
-<span class="sd">        self</span>
-<span class="sd">            Fitted estimator.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
-        <span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pd</span>
-
-        <span class="n">w_arr</span> <span class="o">=</span> <span class="n">_validate_binary_treatment</span><span class="p">(</span><span class="n">w</span><span class="p">)</span>
-        <span class="c1"># If X is not a DataFrame, convert to DataFrame with default column names</span>
-        <span class="k">if</span> <span class="ow">not</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="s2">&quot;columns&quot;</span><span class="p">):</span>
-            <span class="n">X</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span>
-                <span class="n">X</span><span class="p">,</span> <span class="n">columns</span><span class="o">=</span><span class="p">[</span><span class="sa">f</span><span class="s2">&quot;f</span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2">&quot;</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">X</span><span class="p">)</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">])]</span>
-            <span class="p">)</span>
-        <span class="n">mask_0</span> <span class="o">=</span> <span class="n">w_arr</span> <span class="o">==</span> <span class="mi">0</span>
-        <span class="n">mask_1</span> <span class="o">=</span> <span class="n">w_arr</span> <span class="o">==</span> <span class="mi">1</span>
-        <span class="n">X_0</span> <span class="o">=</span> <span class="n">X</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">mask_0</span><span class="p">]</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
-        <span class="n">X_1</span> <span class="o">=</span> <span class="n">X</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">mask_1</span><span class="p">]</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
-        <span class="n">y_0</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">y</span><span class="p">)[</span><span class="n">mask_0</span><span class="p">]</span>
-        <span class="n">y_1</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">y</span><span class="p">)[</span><span class="n">mask_1</span><span class="p">]</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">m0</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">X_0</span><span class="p">,</span> <span class="n">y_0</span><span class="p">)</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">m1</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">X_1</span><span class="p">,</span> <span class="n">y_1</span><span class="p">)</span>
-        <span class="c1"># Average feature importances across both arms.</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">feature_importances_</span> <span class="o">=</span> <span class="p">(</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">m0</span><span class="o">.</span><span class="n">feature_importances_</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">m1</span><span class="o">.</span><span class="n">feature_importances_</span>
-        <span class="p">)</span> <span class="o">/</span> <span class="mf">2.0</span>
+        <span class="n">x_arr</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">float</span><span class="p">,</span> <span class="n">order</span><span class="o">=</span><span class="s2">&quot;F&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_n_features</span> <span class="o">=</span> <span class="n">x_arr</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">learner</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span>
+            <span class="n">x_arr</span><span class="o">.</span><span class="n">ravel</span><span class="p">(),</span>
+            <span class="n">x_arr</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span>
+            <span class="n">x_arr</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span>
+            <span class="n">_validate_binary_treatment</span><span class="p">(</span><span class="n">w</span><span class="p">),</span>
+            <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">y</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">float</span><span class="p">),</span>
+        <span class="p">)</span>
         <span class="k">return</span> <span class="bp">self</span></div>
 
+
+    <span class="nd">@property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">feature_importances_</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Aggregated feature importance from mu0 and mu1.&quot;&quot;&quot;</span>
+        <span class="n">importances_map</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">learner</span><span class="o">.</span><span class="n">calculate_feature_importance</span><span class="p">(</span><span class="s2">&quot;Gain&quot;</span><span class="p">,</span> <span class="kc">True</span><span class="p">)</span>
+        <span class="n">n</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_n_features</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_n_features</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="mi">0</span>
+        <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="n">importances_map</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">)</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n</span><span class="p">)])</span>
 
 <div class="viewcode-block" id="TLearner.predict">
 <a class="viewcode-back" href="../../api.html#perpetual.meta_learners.TLearner.predict">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">predict</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">X</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Estimate the CATE as ``M1(X) - M0(X)``.</span>
-
-<span class="sd">        Parameters</span>
-<span class="sd">        ----------</span>
-<span class="sd">        X : array-like of shape (n_samples, n_features)</span>
-<span class="sd">            Covariate matrix.</span>
-
-<span class="sd">        Returns</span>
-<span class="sd">        -------</span>
-<span class="sd">        ndarray of shape (n_samples,)</span>
-<span class="sd">            Estimated treatment effect for each sample.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
-        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">m1</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="n">X</span><span class="p">)</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">m0</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="n">X</span><span class="p">)</span></div>
+        <span class="n">x_arr</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">float</span><span class="p">,</span> <span class="n">order</span><span class="o">=</span><span class="s2">&quot;F&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">learner</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="n">x_arr</span><span class="o">.</span><span class="n">ravel</span><span class="p">(),</span> <span class="n">x_arr</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">x_arr</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span></div>
 </div>
 
 
@@ -323,137 +316,50 @@
 <div class="viewcode-block" id="XLearner">
 <a class="viewcode-back" href="../../api.html#perpetual.meta_learners.XLearner">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">XLearner</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;X-Learner for HTE estimation (typically better for imbalanced treatment groups).</span>
-
-<span class="sd">    Stage 1: Estimate T-Learner (M0, M1).</span>
-<span class="sd">    Stage 2: Impute separate treatment effects from Stage 1::</span>
-
-<span class="sd">        D1 = Y[W=1] - M0(X[W=1])</span>
-<span class="sd">        D0 = M1(X[W=0]) - Y[W=0]</span>
-
-<span class="sd">    Stage 3: Fit models for imputed effects::</span>
-
-<span class="sd">        tau1(X) ~ D1</span>
-<span class="sd">        tau0(X) ~ D0</span>
-
-<span class="sd">    Stage 4: Combine using propensity score g(X)::</span>
-
-<span class="sd">        CATE(X) = g(X) * tau0(X) + (1 - g(X)) * tau1(X)</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;X-Learner for HTE estimation (typically better for imbalanced treatment groups).&quot;&quot;&quot;</span>
 
 <div class="viewcode-block" id="XLearner.__init__">
 <a class="viewcode-back" href="../../api.html#perpetual.meta_learners.XLearner.__init__">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">budget</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.5</span><span class="p">,</span>
-        <span class="n">propensity_model</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">PerpetualBooster</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">propensity_budget</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
     <span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Create an X-Learner.</span>
-
-<span class="sd">        Parameters</span>
-<span class="sd">        ----------</span>
-<span class="sd">        budget : float, default=0.5</span>
-<span class="sd">            Fitting budget forwarded to each `PerpetualBooster`.</span>
-<span class="sd">        propensity_model : PerpetualBooster, optional</span>
-<span class="sd">            Pre-configured booster for propensity estimation.  If ``None``, a</span>
-<span class="sd">            default ``LogLoss`` booster is created.</span>
-<span class="sd">        **kwargs</span>
-<span class="sd">            Additional keyword arguments forwarded to `PerpetualBooster`.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">budget</span> <span class="o">=</span> <span class="n">budget</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_kwargs</span> <span class="o">=</span> <span class="n">kwargs</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">m0</span> <span class="o">=</span> <span class="n">PerpetualBooster</span><span class="p">(</span><span class="n">budget</span><span class="o">=</span><span class="n">budget</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">m1</span> <span class="o">=</span> <span class="n">PerpetualBooster</span><span class="p">(</span><span class="n">budget</span><span class="o">=</span><span class="n">budget</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">tau0</span> <span class="o">=</span> <span class="n">PerpetualBooster</span><span class="p">(</span><span class="n">budget</span><span class="o">=</span><span class="n">budget</span><span class="p">,</span> <span class="n">objective</span><span class="o">=</span><span class="s2">&quot;SquaredLoss&quot;</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">tau1</span> <span class="o">=</span> <span class="n">PerpetualBooster</span><span class="p">(</span><span class="n">budget</span><span class="o">=</span><span class="n">budget</span><span class="p">,</span> <span class="n">objective</span><span class="o">=</span><span class="s2">&quot;SquaredLoss&quot;</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
-
-        <span class="k">if</span> <span class="n">propensity_model</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">g</span> <span class="o">=</span> <span class="n">PerpetualBooster</span><span class="p">(</span><span class="n">budget</span><span class="o">=</span><span class="n">budget</span><span class="p">,</span> <span class="n">objective</span><span class="o">=</span><span class="s2">&quot;LogLoss&quot;</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
-        <span class="k">else</span><span class="p">:</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">g</span> <span class="o">=</span> <span class="n">propensity_model</span>
-
-        <span class="bp">self</span><span class="o">.</span><span class="n">feature_importances_</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span></div>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_params</span> <span class="o">=</span> <span class="n">_prepare_params</span><span class="p">(</span><span class="n">budget</span><span class="p">,</span> <span class="n">kwargs</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_params</span><span class="p">[</span><span class="s2">&quot;propensity_budget&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">propensity_budget</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">learner</span> <span class="o">=</span> <span class="n">RustXLearner</span><span class="p">(</span><span class="o">**</span><span class="bp">self</span><span class="o">.</span><span class="n">_params</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_n_features</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span></div>
 
 
 <div class="viewcode-block" id="XLearner.fit">
 <a class="viewcode-back" href="../../api.html#perpetual.meta_learners.XLearner.fit">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">fit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">X</span><span class="p">,</span> <span class="n">w</span><span class="p">,</span> <span class="n">y</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Self</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Fit all stages of the X-Learner.</span>
-
-<span class="sd">        Parameters</span>
-<span class="sd">        ----------</span>
-<span class="sd">        X : array-like of shape (n_samples, n_features)</span>
-<span class="sd">            Covariate matrix.</span>
-<span class="sd">        w : array-like of shape (n_samples,)</span>
-<span class="sd">            Binary treatment indicator (0 or 1).</span>
-<span class="sd">        y : array-like of shape (n_samples,)</span>
-<span class="sd">            Observed outcome.</span>
-
-<span class="sd">        Returns</span>
-<span class="sd">        -------</span>
-<span class="sd">        self</span>
-<span class="sd">            Fitted estimator.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
-        <span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pd</span>
-
-        <span class="n">w_arr</span> <span class="o">=</span> <span class="n">_validate_binary_treatment</span><span class="p">(</span><span class="n">w</span><span class="p">)</span>
-        <span class="c1"># If X is not a DataFrame, convert to DataFrame with default column names</span>
-        <span class="k">if</span> <span class="ow">not</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="s2">&quot;columns&quot;</span><span class="p">):</span>
-            <span class="n">X</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span>
-                <span class="n">X</span><span class="p">,</span> <span class="n">columns</span><span class="o">=</span><span class="p">[</span><span class="sa">f</span><span class="s2">&quot;f</span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2">&quot;</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">X</span><span class="p">)</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">])]</span>
-            <span class="p">)</span>
-        <span class="n">mask_0</span> <span class="o">=</span> <span class="n">w_arr</span> <span class="o">==</span> <span class="mi">0</span>
-        <span class="n">mask_1</span> <span class="o">=</span> <span class="n">w_arr</span> <span class="o">==</span> <span class="mi">1</span>
-        <span class="n">X_0</span> <span class="o">=</span> <span class="n">X</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">mask_0</span><span class="p">]</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
-        <span class="n">X_1</span> <span class="o">=</span> <span class="n">X</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">mask_1</span><span class="p">]</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
-        <span class="n">y_0</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">y</span><span class="p">)[</span><span class="n">mask_0</span><span class="p">]</span>
-        <span class="n">y_1</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">y</span><span class="p">)[</span><span class="n">mask_1</span><span class="p">]</span>
-        <span class="c1"># Stage 1</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">m0</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">X_0</span><span class="p">,</span> <span class="n">y_0</span><span class="p">)</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">m1</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">X_1</span><span class="p">,</span> <span class="n">y_1</span><span class="p">)</span>
-        <span class="c1"># Stage 2</span>
-        <span class="n">pred_m0_on_1</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">m0</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="n">X_1</span><span class="p">)</span>
-        <span class="n">pred_m1_on_0</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">m1</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="n">X_0</span><span class="p">)</span>
-        <span class="n">d1</span> <span class="o">=</span> <span class="n">y_1</span> <span class="o">-</span> <span class="n">pred_m0_on_1</span>
-        <span class="n">d0</span> <span class="o">=</span> <span class="n">pred_m1_on_0</span> <span class="o">-</span> <span class="n">y_0</span>
-        <span class="c1"># Stage 3</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">tau1</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">X_1</span><span class="p">,</span> <span class="n">d1</span><span class="p">)</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">tau0</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">X_0</span><span class="p">,</span> <span class="n">d0</span><span class="p">)</span>
-        <span class="c1"># Propensity</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">g</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">w_arr</span><span class="p">)</span>
-        <span class="c1"># Average feature importances from the two effect models.</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">feature_importances_</span> <span class="o">=</span> <span class="p">(</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">tau0</span><span class="o">.</span><span class="n">feature_importances_</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">tau1</span><span class="o">.</span><span class="n">feature_importances_</span>
-        <span class="p">)</span> <span class="o">/</span> <span class="mf">2.0</span>
+        <span class="n">x_arr</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">float</span><span class="p">,</span> <span class="n">order</span><span class="o">=</span><span class="s2">&quot;F&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_n_features</span> <span class="o">=</span> <span class="n">x_arr</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">learner</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span>
+            <span class="n">x_arr</span><span class="o">.</span><span class="n">ravel</span><span class="p">(),</span>
+            <span class="n">x_arr</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span>
+            <span class="n">x_arr</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span>
+            <span class="n">_validate_binary_treatment</span><span class="p">(</span><span class="n">w</span><span class="p">),</span>
+            <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">y</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">float</span><span class="p">),</span>
+        <span class="p">)</span>
         <span class="k">return</span> <span class="bp">self</span></div>
 
+
+    <span class="nd">@property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">feature_importances_</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Aggregated feature importance from the second-stage effect models (tau0, tau1).&quot;&quot;&quot;</span>
+        <span class="n">importances_map</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">learner</span><span class="o">.</span><span class="n">calculate_feature_importance</span><span class="p">(</span><span class="s2">&quot;Gain&quot;</span><span class="p">,</span> <span class="kc">True</span><span class="p">)</span>
+        <span class="n">n</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_n_features</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_n_features</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="mi">0</span>
+        <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="n">importances_map</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">)</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n</span><span class="p">)])</span>
 
 <div class="viewcode-block" id="XLearner.predict">
 <a class="viewcode-back" href="../../api.html#perpetual.meta_learners.XLearner.predict">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">predict</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">X</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Estimate the CATE by combining ``tau0`` and ``tau1`` via propensity.</span>
-
-<span class="sd">        Parameters</span>
-<span class="sd">        ----------</span>
-<span class="sd">        X : array-like of shape (n_samples, n_features)</span>
-<span class="sd">            Covariate matrix.</span>
-
-<span class="sd">        Returns</span>
-<span class="sd">        -------</span>
-<span class="sd">        ndarray of shape (n_samples,)</span>
-<span class="sd">            Estimated treatment effect for each sample.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
-        <span class="c1"># Propensity score as P(W=1|X).</span>
-        <span class="c1"># Use predict (raw log-odds) and apply sigmoid for robustness,</span>
-        <span class="c1"># since predict_proba may not be available for every objective.</span>
-        <span class="n">log_odds</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">g</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="n">X</span><span class="p">)</span>
-        <span class="n">p_score</span> <span class="o">=</span> <span class="mf">1.0</span> <span class="o">/</span> <span class="p">(</span><span class="mf">1.0</span> <span class="o">+</span> <span class="n">np</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="o">-</span><span class="n">log_odds</span><span class="p">))</span>
-
-        <span class="n">tau0_pred</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">tau0</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="n">X</span><span class="p">)</span>
-        <span class="n">tau1_pred</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">tau1</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="n">X</span><span class="p">)</span>
-
-        <span class="k">return</span> <span class="n">p_score</span> <span class="o">*</span> <span class="n">tau0_pred</span> <span class="o">+</span> <span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="n">p_score</span><span class="p">)</span> <span class="o">*</span> <span class="n">tau1_pred</span></div>
+        <span class="n">x_arr</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">float</span><span class="p">,</span> <span class="n">order</span><span class="o">=</span><span class="s2">&quot;F&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">learner</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="n">x_arr</span><span class="o">.</span><span class="n">ravel</span><span class="p">(),</span> <span class="n">x_arr</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">x_arr</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span></div>
 </div>
 
 
@@ -466,43 +372,7 @@
 <div class="viewcode-block" id="DRLearner">
 <a class="viewcode-back" href="../../api.html#perpetual.meta_learners.DRLearner">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">DRLearner</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Doubly Robust (DR) Learner for heterogeneous treatment effect estimation.</span>
-
-<span class="sd">    The DR-Learner constructs an *augmented IPW* (AIPW) pseudo-outcome</span>
-<span class="sd">    and regresses it on covariates to estimate the CATE directly.</span>
-
-<span class="sd">    AIPW Pseudo-outcome</span>
-<span class="sd">    --------------------</span>
-<span class="sd">    For each sample *i*:</span>
-
-<span class="sd">    .. math::</span>
-
-<span class="sd">        \\Gamma_i = \\hat{\\mu}_1(X_i) - \\hat{\\mu}_0(X_i)</span>
-<span class="sd">            + \\frac{W_i (Y_i - \\hat{\\mu}_1(X_i))}{\\hat{p}(X_i)}</span>
-<span class="sd">            - \\frac{(1-W_i)(Y_i - \\hat{\\mu}_0(X_i))}{1-\\hat{p}(X_i)}</span>
-
-<span class="sd">    The DR-Learner is &quot;doubly robust&quot; because the resulting CATE estimate</span>
-<span class="sd">    is consistent as long as *either* the outcome models or the propensity</span>
-<span class="sd">    model is correctly specified.</span>
-
-<span class="sd">    Stages</span>
-<span class="sd">    ------</span>
-<span class="sd">    1. Fit outcome models per arm: ``mu0(X)`` and ``mu1(X)``.</span>
-<span class="sd">    2. Fit propensity model: ``p(X) = P(W=1|X)``.</span>
-<span class="sd">    3. Compute AIPW pseudo-outcomes.</span>
-<span class="sd">    4. Fit a final regression of pseudo-outcomes on covariates.</span>
-
-<span class="sd">    Parameters</span>
-<span class="sd">    ----------</span>
-<span class="sd">    budget : float, default=0.5</span>
-<span class="sd">        Fitting budget forwarded to each internal `PerpetualBooster`.</span>
-<span class="sd">    propensity_budget : float, optional</span>
-<span class="sd">        Separate budget for the propensity model (defaults to ``budget``).</span>
-<span class="sd">    clip : float, default=0.01</span>
-<span class="sd">        Propensity scores are clipped to ``[clip, 1-clip]`` for stability.</span>
-<span class="sd">    **kwargs</span>
-<span class="sd">        Additional keyword arguments forwarded to `PerpetualBooster`.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Doubly Robust (DR) Learner for heterogeneous treatment effect estimation.&quot;&quot;&quot;</span>
 
 <div class="viewcode-block" id="DRLearner.__init__">
 <a class="viewcode-back" href="../../api.html#perpetual.meta_learners.DRLearner.__init__">[docs]</a>
@@ -510,94 +380,43 @@
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">budget</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.5</span><span class="p">,</span>
         <span class="n">propensity_budget</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-        <span class="n">clip</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.01</span><span class="p">,</span>
+        <span class="n">clip</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.01</span><span class="p">,</span>  <span class="c1"># Note: clip is currently handled inside Rust fit logic for stable IPW</span>
         <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
     <span class="p">):</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">budget</span> <span class="o">=</span> <span class="n">budget</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">propensity_budget</span> <span class="o">=</span> <span class="n">propensity_budget</span> <span class="ow">or</span> <span class="n">budget</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">clip</span> <span class="o">=</span> <span class="n">clip</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_kwargs</span> <span class="o">=</span> <span class="n">kwargs</span>
-
-        <span class="bp">self</span><span class="o">.</span><span class="n">mu0</span> <span class="o">=</span> <span class="n">PerpetualBooster</span><span class="p">(</span><span class="n">budget</span><span class="o">=</span><span class="n">budget</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">mu1</span> <span class="o">=</span> <span class="n">PerpetualBooster</span><span class="p">(</span><span class="n">budget</span><span class="o">=</span><span class="n">budget</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">propensity</span> <span class="o">=</span> <span class="n">PerpetualBooster</span><span class="p">(</span>
-            <span class="n">budget</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">propensity_budget</span><span class="p">,</span> <span class="n">objective</span><span class="o">=</span><span class="s2">&quot;LogLoss&quot;</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span>
-        <span class="p">)</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">effect</span> <span class="o">=</span> <span class="n">PerpetualBooster</span><span class="p">(</span><span class="n">budget</span><span class="o">=</span><span class="n">budget</span><span class="p">,</span> <span class="n">objective</span><span class="o">=</span><span class="s2">&quot;SquaredLoss&quot;</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">feature_importances_</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span></div>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_params</span> <span class="o">=</span> <span class="n">_prepare_params</span><span class="p">(</span><span class="n">budget</span><span class="p">,</span> <span class="n">kwargs</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_params</span><span class="p">[</span><span class="s2">&quot;propensity_budget&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">propensity_budget</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">learner</span> <span class="o">=</span> <span class="n">RustDRLearner</span><span class="p">(</span><span class="o">**</span><span class="bp">self</span><span class="o">.</span><span class="n">_params</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_n_features</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span></div>
 
 
 <div class="viewcode-block" id="DRLearner.fit">
 <a class="viewcode-back" href="../../api.html#perpetual.meta_learners.DRLearner.fit">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">fit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">X</span><span class="p">,</span> <span class="n">w</span><span class="p">,</span> <span class="n">y</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Self</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Fit the DR-Learner.</span>
-
-<span class="sd">        Parameters</span>
-<span class="sd">        ----------</span>
-<span class="sd">        X : array-like of shape (n_samples, n_features)</span>
-<span class="sd">            Covariate matrix.</span>
-<span class="sd">        w : array-like of shape (n_samples,)</span>
-<span class="sd">            Binary treatment indicator (0 or 1).</span>
-<span class="sd">        y : array-like of shape (n_samples,)</span>
-<span class="sd">            Observed outcome.</span>
-
-<span class="sd">        Returns</span>
-<span class="sd">        -------</span>
-<span class="sd">        self</span>
-<span class="sd">            Fitted estimator.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
-        <span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pd</span>
-
-        <span class="n">w_arr</span> <span class="o">=</span> <span class="n">_validate_binary_treatment</span><span class="p">(</span><span class="n">w</span><span class="p">)</span>
-        <span class="c1"># If X is not a DataFrame, convert to DataFrame with default column names</span>
-        <span class="k">if</span> <span class="ow">not</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="s2">&quot;columns&quot;</span><span class="p">):</span>
-            <span class="n">X</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span>
-                <span class="n">X</span><span class="p">,</span> <span class="n">columns</span><span class="o">=</span><span class="p">[</span><span class="sa">f</span><span class="s2">&quot;f</span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2">&quot;</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">X</span><span class="p">)</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">])]</span>
-            <span class="p">)</span>
-        <span class="n">mask_0</span> <span class="o">=</span> <span class="n">w_arr</span> <span class="o">==</span> <span class="mi">0</span>
-        <span class="n">mask_1</span> <span class="o">=</span> <span class="n">w_arr</span> <span class="o">==</span> <span class="mi">1</span>
-        <span class="n">X_0</span> <span class="o">=</span> <span class="n">X</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">mask_0</span><span class="p">]</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
-        <span class="n">X_1</span> <span class="o">=</span> <span class="n">X</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">mask_1</span><span class="p">]</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
-        <span class="n">y_0</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">y</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">float</span><span class="p">)[</span><span class="n">mask_0</span><span class="p">]</span>
-        <span class="n">y_1</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">y</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">float</span><span class="p">)[</span><span class="n">mask_1</span><span class="p">]</span>
-        <span class="c1"># Stage 1: Outcome models per arm.</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">mu0</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">X_0</span><span class="p">,</span> <span class="n">y_0</span><span class="p">)</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">mu1</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">X_1</span><span class="p">,</span> <span class="n">y_1</span><span class="p">)</span>
-        <span class="n">mu0_hat</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">mu0</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="n">X</span><span class="p">)</span>
-        <span class="n">mu1_hat</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">mu1</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="n">X</span><span class="p">)</span>
-        <span class="c1"># Stage 2: Propensity model.</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">propensity</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">w_arr</span><span class="p">)</span>
-        <span class="n">log_odds</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">propensity</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="n">X</span><span class="p">)</span>
-        <span class="n">p_hat</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">clip</span><span class="p">(</span><span class="mf">1.0</span> <span class="o">/</span> <span class="p">(</span><span class="mf">1.0</span> <span class="o">+</span> <span class="n">np</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="o">-</span><span class="n">log_odds</span><span class="p">)),</span> <span class="bp">self</span><span class="o">.</span><span class="n">clip</span><span class="p">,</span> <span class="mf">1.0</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">clip</span><span class="p">)</span>
-        <span class="c1"># Stage 3: AIPW pseudo-outcomes.</span>
-        <span class="n">gamma</span> <span class="o">=</span> <span class="p">(</span>
-            <span class="n">mu1_hat</span>
-            <span class="o">-</span> <span class="n">mu0_hat</span>
-            <span class="o">+</span> <span class="n">w_arr</span> <span class="o">*</span> <span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">y</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">float</span><span class="p">)</span> <span class="o">-</span> <span class="n">mu1_hat</span><span class="p">)</span> <span class="o">/</span> <span class="n">p_hat</span>
-            <span class="o">-</span> <span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="n">w_arr</span><span class="p">)</span> <span class="o">*</span> <span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">y</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">float</span><span class="p">)</span> <span class="o">-</span> <span class="n">mu0_hat</span><span class="p">)</span> <span class="o">/</span> <span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="n">p_hat</span><span class="p">)</span>
+        <span class="n">x_arr</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">float</span><span class="p">,</span> <span class="n">order</span><span class="o">=</span><span class="s2">&quot;F&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_n_features</span> <span class="o">=</span> <span class="n">x_arr</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">learner</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span>
+            <span class="n">x_arr</span><span class="o">.</span><span class="n">ravel</span><span class="p">(),</span>
+            <span class="n">x_arr</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span>
+            <span class="n">x_arr</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span>
+            <span class="n">_validate_binary_treatment</span><span class="p">(</span><span class="n">w</span><span class="p">),</span>
+            <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">y</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">float</span><span class="p">),</span>
         <span class="p">)</span>
-        <span class="c1"># Stage 4: Final effect model.</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">effect</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">gamma</span><span class="p">)</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">feature_importances_</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">effect</span><span class="o">.</span><span class="n">feature_importances_</span>
         <span class="k">return</span> <span class="bp">self</span></div>
 
+
+    <span class="nd">@property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">feature_importances_</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Feature importance from the outcome model fitted on pseudo-outcomes.&quot;&quot;&quot;</span>
+        <span class="n">importances_map</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">learner</span><span class="o">.</span><span class="n">calculate_feature_importance</span><span class="p">(</span><span class="s2">&quot;Gain&quot;</span><span class="p">,</span> <span class="kc">True</span><span class="p">)</span>
+        <span class="n">n</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_n_features</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_n_features</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="mi">0</span>
+        <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="n">importances_map</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">)</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n</span><span class="p">)])</span>
 
 <div class="viewcode-block" id="DRLearner.predict">
 <a class="viewcode-back" href="../../api.html#perpetual.meta_learners.DRLearner.predict">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">predict</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">X</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Predict CATE.</span>
-
-<span class="sd">        Parameters</span>
-<span class="sd">        ----------</span>
-<span class="sd">        X : array-like of shape (n_samples, n_features)</span>
-<span class="sd">            Covariate matrix.</span>
-
-<span class="sd">        Returns</span>
-<span class="sd">        -------</span>
-<span class="sd">        ndarray of shape (n_samples,)</span>
-<span class="sd">            Estimated treatment effect for each sample.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
-        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">effect</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="n">X</span><span class="p">)</span></div>
+        <span class="n">x_arr</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">float</span><span class="p">,</span> <span class="n">order</span><span class="o">=</span><span class="s2">&quot;F&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">learner</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="n">x_arr</span><span class="o">.</span><span class="n">ravel</span><span class="p">(),</span> <span class="n">x_arr</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">x_arr</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span></div>
 </div>
 
 </pre></div>

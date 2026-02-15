@@ -9,10 +9,10 @@ Unobserved confounding violates the consistency of standard estimators (like Ord
 Boosted Instrumental Variables
 ------------------------------
 
-The :class:`iv.BraidedBooster` implements a **2-Stage Least Squares (2SLS)** approach using Gradient Boosting. This allows for capturing complex non-linear relationships in both the first stage (treatment assignment) and the second stage (outcome estimation).
+The :class:`iv.BraidedBooster` implements a **Control Function** approach using Gradient Boosting. This method avoids the biased "Forbidden Regression" by explicitly modeling the first-stage residuals to account for endogeneity.
 
-1. **Stage 1**: Model the treatment :math:`W` as a function of covariates :math:`X` and instruments :math:`Z`: :math:`\hat{W} = f(X, Z)`.
-2. **Stage 2**: Model the outcome :math:`Y` as a function of covariates :math:`X` and the predicted treatment from the first stage :math:`\hat{W}`: :math:`\hat{Y} = g(X, \hat{W})`.
+1. **Stage 1 (Treatment Model)**: Model the treatment :math:`W` as a function of covariates :math:`X` and instruments :math:`Z`: :math:`\hat{W} = f(X, Z)`. Then compute residuals :math:`V = W - \hat{W}`.
+2. **Stage 2 (Outcome Model)**: Model the outcome :math:`Y` as a function of covariates :math:`X`, predicted treatment :math:`\hat{W}`, and the residuals :math:`V`: :math:`\hat{Y} = g(X, \hat{W}, V)`.
 
 Example:
 
