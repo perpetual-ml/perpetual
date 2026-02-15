@@ -21,7 +21,7 @@
     <script src="_static/js/theme.js"></script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
-    <link rel="next" title="Tutorials" href="tutorials/index.html" />
+    <link rel="next" title="Causal ML" href="causal_ml/index.html" />
     <link rel="prev" title="API Reference" href="api.html" /> 
 </head>
 
@@ -51,15 +51,23 @@
 <li class="toctree-l1"><a class="reference internal" href="api.html">API Reference</a></li>
 <li class="toctree-l1 current"><a class="current reference internal" href="#">Calibration and Uncertainty Quantification</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="#the-fundamental-advantage-post-hoc-calibration">The Fundamental Advantage: Post-Hoc Calibration</a></li>
-<li class="toctree-l2"><a class="reference internal" href="#probability-calibration-classification">Probability Calibration (Classification)</a></li>
-<li class="toctree-l2"><a class="reference internal" href="#uncertainty-quantification-regression">Uncertainty Quantification (Regression)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#probability-calibration-classification">Probability Calibration (Classification)</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#available-methods">Available Methods</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#example">Example</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#uncertainty-quantification-regression">Uncertainty Quantification (Regression)</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#native-calibration-methods">Native Calibration Methods</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#id1">Example</a></li>
+</ul>
+</li>
 <li class="toctree-l2"><a class="reference internal" href="#why-perpetual-is-better">Why Perpetual is Better</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#tutorials">Tutorials</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#next-steps">Next Steps</a></li>
 </ul>
 </li>
-<li class="toctree-l1"><a class="reference internal" href="tutorials/index.html">Tutorials</a></li>
 <li class="toctree-l1"><a class="reference internal" href="causal_ml/index.html">Causal ML</a></li>
+<li class="toctree-l1"><a class="reference internal" href="tutorials/index.html">Tutorials</a></li>
 <li class="toctree-l1"><a class="reference internal" href="architecture.html">Architecture</a></li>
 <li class="toctree-l1"><a class="reference internal" href="parameters_tuning.html">Parameters Tuning</a></li>
 <li class="toctree-l1"><a class="reference internal" href="faq.html">Frequently Asked Questions</a></li>
@@ -104,13 +112,16 @@
 <h2>Probability Calibration (Classification)<a class="headerlink" href="#probability-calibration-classification" title="Link to this heading"></a></h2>
 <p>In classification, calibration ensures that the output probabilities reflect true frequencies. A well-calibrated model that predicts a 90% probability of a “fraudulent” transaction should indeed be correct 90% of the time.</p>
 <p>Perpetual utilizes the <strong>Pool Adjacent Violators Algorithm (PAVA)</strong> for <strong>Isotonic Regression</strong> natively in Rust.</p>
-<p>### Available Methods</p>
+<section id="available-methods">
+<h3>Available Methods<a class="headerlink" href="#available-methods" title="Link to this heading"></a></h3>
 <p>Perpetual allows you to drive the Isotonic calibration using different internal uncertainty scores:</p>
 <ol class="arabic simple">
 <li><p><strong>Conformal (Default)</strong>: Uses raw probabilities to fit the Isotonic curve. This is the standard approach to probability calibration.</p></li>
 <li><p><strong>WeightVariance / GRP / MinMax</strong>: These methods use method-specific uncertainty scores (calculated from node statistics) to drive the Isotonic calibration. By weighting probabilities by the model’s confidence in specific regions of the feature space, Perpetual can achieve even lower <strong>Expected Calibration Error (ECE)</strong>.</p></li>
 </ol>
-<p>### Example</p>
+</section>
+<section id="example">
+<h3>Example<a class="headerlink" href="#example" title="Link to this heading"></a></h3>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">perpetual</span><span class="w"> </span><span class="kn">import</span> <span class="n">PerpetualBooster</span>
 
 <span class="c1"># 1. Train once</span>
@@ -125,16 +136,20 @@
 </pre></div>
 </div>
 </section>
+</section>
 <section id="uncertainty-quantification-regression">
 <h2>Uncertainty Quantification (Regression)<a class="headerlink" href="#uncertainty-quantification-regression" title="Link to this heading"></a></h2>
 <p>For regression, Perpetual provides rigorous <strong>Prediction Intervals</strong>. Instead of a point estimate, you receive a range <code class="docutils literal notranslate"><span class="pre">[lower,</span> <span class="pre">upper]</span></code> that is guaranteed to contain the true value with a specific probability (e.g., 90%).</p>
-<p>### Native Calibration Methods</p>
+<section id="native-calibration-methods">
+<h3>Native Calibration Methods<a class="headerlink" href="#native-calibration-methods" title="Link to this heading"></a></h3>
 <ul class="simple">
 <li><p><strong>Conformal</strong>: Implements a method similar to Split Conformal Prediction or CQR. It ensures conservative coverage on any unseen data distributed similarly to the calibration set.</p></li>
 <li><p><strong>MinMax</strong>: A proprietary method that uses the range of target values observed in the leaves of the ensemble to drive local uncertainty.</p></li>
 <li><p><strong>GRP (Generalized Residual Percentiles)</strong>: Uses log-odds percentiles and statistical spreads within trees to generate extremely efficient and narrow intervals that still respect the coverage guarantees.</p></li>
 </ul>
-<p>### Example</p>
+</section>
+<section id="id1">
+<h3>Example<a class="headerlink" href="#id1" title="Link to this heading"></a></h3>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Define desired coverage (alpha=0.1 means 90% confidence)</span>
 <span class="n">model</span><span class="o">.</span><span class="n">calibrate</span><span class="p">(</span><span class="n">X_cal</span><span class="p">,</span> <span class="n">y_cal</span><span class="p">,</span> <span class="n">alpha</span><span class="o">=</span><span class="mf">0.1</span><span class="p">,</span> <span class="n">method</span><span class="o">=</span><span class="s2">&quot;GRP&quot;</span><span class="p">)</span>
 
@@ -142,6 +157,7 @@
 <span class="n">intervals</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="n">X_test</span><span class="p">,</span> <span class="n">interval</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 </pre></div>
 </div>
+</section>
 </section>
 <section id="why-perpetual-is-better">
 <h2>Why Perpetual is Better<a class="headerlink" href="#why-perpetual-is-better" title="Link to this heading"></a></h2>
@@ -171,7 +187,7 @@
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
         <a href="api.html" class="btn btn-neutral float-left" title="API Reference" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
-        <a href="tutorials/index.html" class="btn btn-neutral float-right" title="Tutorials" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="causal_ml/index.html" class="btn btn-neutral float-right" title="Causal ML" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 
   <hr/>

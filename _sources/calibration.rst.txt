@@ -20,14 +20,16 @@ In classification, calibration ensures that the output probabilities reflect tru
 
 Perpetual utilizes the **Pool Adjacent Violators Algorithm (PAVA)** for **Isotonic Regression** natively in Rust.
 
-### Available Methods
+Available Methods
+~~~~~~~~~~~~~~~~~
 
 Perpetual allows you to drive the Isotonic calibration using different internal uncertainty scores:
 
 1. **Conformal (Default)**: Uses raw probabilities to fit the Isotonic curve. This is the standard approach to probability calibration.
 2. **WeightVariance / GRP / MinMax**: These methods use method-specific uncertainty scores (calculated from node statistics) to drive the Isotonic calibration. By weighting probabilities by the model's confidence in specific regions of the feature space, Perpetual can achieve even lower **Expected Calibration Error (ECE)**.
 
-### Example
+Example
+~~~~~~~
 
 .. code-block:: python
 
@@ -48,13 +50,15 @@ Uncertainty Quantification (Regression)
 
 For regression, Perpetual provides rigorous **Prediction Intervals**. Instead of a point estimate, you receive a range ``[lower, upper]`` that is guaranteed to contain the true value with a specific probability (e.g., 90%).
 
-### Native Calibration Methods
+Native Calibration Methods
+~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 * **Conformal**: Implements a method similar to Split Conformal Prediction or CQR. It ensures conservative coverage on any unseen data distributed similarly to the calibration set.
 * **MinMax**: A proprietary method that uses the range of target values observed in the leaves of the ensemble to drive local uncertainty.
 * **GRP (Generalized Residual Percentiles)**: Uses log-odds percentiles and statistical spreads within trees to generate extremely efficient and narrow intervals that still respect the coverage guarantees.
 
-### Example
+Example
+~~~~~~~
 
 .. code-block:: python
 
