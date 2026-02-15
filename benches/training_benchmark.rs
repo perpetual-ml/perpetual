@@ -1,14 +1,14 @@
 use criterion::{Criterion, criterion_group, criterion_main};
 use perpetual::PerpetualBooster;
 use perpetual::data::Matrix;
-use perpetual::objective_functions::Objective;
+use perpetual::objective::Objective;
 use std::fs;
 use std::hint::black_box;
 use std::time::Duration;
 
 // Baseline results:
-// cal_housing: 5.66s -> 1.83s
-// cover_types: 9.07s -> 3.98s
+// cal_housing: 5.66s -> 1.83s -> 1.37s
+// cover_types: 9.07s -> 3.98s -> 3.33s
 
 pub fn training_benchmark_cal_housing(c: &mut Criterion) {
     let file_content =
