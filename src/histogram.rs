@@ -778,7 +778,7 @@ mod tests {
     use crate::histogram::{
         FeatureHistogram, FeatureHistogramOwned, NodeHistogram, NodeHistogramOwned, update_histogram,
     };
-    use crate::objective_functions::objective::{Objective, ObjectiveFunction};
+    use crate::objective::{Objective, ObjectiveFunction};
     use approx::assert_relative_eq;
     use std::collections::HashSet;
     use std::fs;

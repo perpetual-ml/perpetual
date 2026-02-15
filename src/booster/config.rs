@@ -4,7 +4,7 @@
 //! including contribution methods, importance methods, and missing-value strategies.
 use crate::constraints::ConstraintMap;
 use crate::errors::PerpetualError;
-use crate::objective_functions::objective::Objective;
+use crate::objective::Objective;
 use serde::{Deserialize, Deserializer, Serialize, de::DeserializeOwned};
 use std::collections::HashSet;
 use std::fs;

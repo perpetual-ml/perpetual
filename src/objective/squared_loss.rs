@@ -1,5 +1,5 @@
 //! Squared Loss function for regression.
-use crate::{metrics::evaluation::Metric, objective_functions::objective::ObjectiveFunction};
+use crate::{metrics::evaluation::Metric, objective::ObjectiveFunction};
 use serde::{Deserialize, Serialize};
 
 #[derive(Default, Debug, Deserialize, Serialize, Clone)]

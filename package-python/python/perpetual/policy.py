@@ -30,7 +30,7 @@ from perpetual.perpetual import PolicyObjective
 
 
 class PolicyLearner:
-    """Policy learner via Inverse Propensity Weighting.
+    r"""Policy learner via Inverse Propensity Weighting.
 
     Learns a treatment-assignment policy :math:`\\pi(X)` that maximizes
     expected reward using the Athey & Wager (2021) policy-learning
@@ -97,9 +97,10 @@ class PolicyLearner:
         w,
         y,
         propensity: Optional[np.ndarray] = None,
-        mu_hat: Optional[np.ndarray] = None,
+        mu_hat_1: Optional[np.ndarray] = None,
+        mu_hat_0: Optional[np.ndarray] = None,
     ) -> Self:
-        """Fit the policy learner.
+        r"""Fit the policy learner.
 
         Parameters
         ----------
@@ -112,10 +113,12 @@ class PolicyLearner:
         propensity : array-like of shape (n_samples,), optional
             Estimated :math:`P(W=1|X)`.  If ``None``, a propensity model is
             fitted internally.
-        mu_hat : array-like of shape (n_samples,), optional
-            Predicted baseline outcome :math:`\\hat{\\mu}(X)`.  Required when
-            ``mode="aipw"``.  If ``None`` and ``mode="aipw"``, an outcome
-            model is fitted internally.
+        mu_hat_1 : array-like of shape (n_samples,), optional
+            Predicted outcome under treatment :math:`\hat{\mu}_1(X)`.
+            Required when ``mode="aipw"``.
+        mu_hat_0 : array-like of shape (n_samples,), optional
+            Predicted outcome under control :math:`\hat{\mu}_0(X)`.
+            Required when ``mode="aipw"``.
 
         Returns
         -------
@@ -137,24 +140,38 @@ class PolicyLearner:
             log_odds = prop_model.predict(X_arr)
             p_hat = 1.0 / (1.0 + np.exp(-log_odds))
 
-        # Baseline outcome model for AIPW
-        mu = None
+        # Baseline outcome models for AIPW
+        m1 = None
+        m0 = None
         if self.mode == "aipw":
-            if mu_hat is not None:
-                mu = np.asarray(mu_hat, dtype=float)
+            if mu_hat_1 is not None and mu_hat_0 is not None:
+                m1 = np.asarray(mu_hat_1, dtype=float)
+                m0 = np.asarray(mu_hat_0, dtype=float)
             else:
-                mu_model = PerpetualBooster(
+                # Fit separate outcome models for treatment and control
+                m1_model = PerpetualBooster(
                     budget=self.budget, objective="SquaredLoss", **self._kwargs
                 )
-                mu_model.fit(X_arr, y_arr)
-                mu = mu_model.predict(X_arr)
+                m0_model = PerpetualBooster(
+                    budget=self.budget, objective="SquaredLoss", **self._kwargs
+                )
+                mask1 = w_arr == 1
+                mask0 = w_arr == 0
+                if mask1.any():
+                    m1_model.fit(X_arr[mask1], y_arr[mask1])
+                if mask0.any():
+                    m0_model.fit(X_arr[mask0], y_arr[mask0])
+
+                m1 = m1_model.predict(X_arr)
+                m0 = m0_model.predict(X_arr)
 
         # Policy model via Rust PolicyObjective
         objective = PolicyObjective(
             treatment=w_arr.astype("uint8"),
             propensity=p_hat,
             mode=self.mode,
-            mu_hat=mu,
+            mu_hat_1=m1,
+            mu_hat_0=m0,
         )
 
         self._policy_model = PerpetualBooster(

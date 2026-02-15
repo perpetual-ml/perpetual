@@ -3,7 +3,7 @@
 //! Wraps user-supplied Python callables (loss, gradient, initial_value) into
 //! a Rust [`ObjectiveFunction`] implementation for use with the booster.
 use numpy::PyArray;
-use perpetual_rs::objective_functions::ObjectiveFunction;
+use perpetual_rs::objective::ObjectiveFunction;
 use pyo3::prelude::*;
 
 /// A user-defined objective backed by Python callables.

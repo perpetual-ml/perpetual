@@ -3,7 +3,7 @@ use crate::utils::{int_map_to_constraint_map, to_value_error};
 use numpy::{IntoPyArray, PyArray1, PyReadonlyArray1};
 use perpetual_rs::causal::iv::IVBooster as CrateIVBooster;
 use perpetual_rs::data::Matrix;
-use perpetual_rs::objective_functions::Objective;
+use perpetual_rs::objective::Objective;
 use pyo3::IntoPyObjectExt;
 use pyo3::prelude::*;
 use pyo3::types::IntoPyDict;

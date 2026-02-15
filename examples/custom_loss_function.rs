@@ -15,7 +15,7 @@ use std::fs::File;
 use std::io::BufReader;
 use std::sync::Arc;
 
-use perpetual::objective_functions::Objective;
+use perpetual::objective::Objective;
 use perpetual::{Matrix, PerpetualBooster};
 
 //--------------------------------------------------
@@ -24,7 +24,7 @@ use perpetual::{Matrix, PerpetualBooster};
 #[derive(Clone)]
 struct CustomSquaredLoss;
 
-impl perpetual::objective_functions::ObjectiveFunction for CustomSquaredLoss {
+impl perpetual::objective::ObjectiveFunction for CustomSquaredLoss {
     fn loss(&self, y: &[f64], yhat: &[f64], sample_weight: Option<&[f64]>, _group: Option<&[u64]>) -> Vec<f32> {
         y.iter()
             .zip(yhat)

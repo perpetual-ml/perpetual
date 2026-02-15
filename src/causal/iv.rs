@@ -7,7 +7,7 @@ use crate::booster::core::PerpetualBooster;
 use crate::constraints::ConstraintMap;
 use crate::data::Matrix;
 use crate::errors::PerpetualError;
-use crate::objective_functions::objective::Objective;
+use crate::objective::Objective;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 
@@ -153,54 +153,41 @@ impl IVBooster {
         })
     }
 
-    /// Fit the IV Model.
+    /// Fit the IV Model (Control Function Approach).
     ///
-    /// # Arguments
-    /// * `X` - Covariates (Controls).
-    /// * `Z` - Instruments.
-    /// * `y` - Partial Outcome.
-    /// * `w` - Treatment received.
+    /// 1. Stage 1: Estimate $\hat{W} = E[W|X, Z]$.
+    /// 2. Compute residuals $V = W - \hat{W}$.
+    /// 3. Stage 2: Estimate $Y = E[Y | X, \hat{W}, V]$.
+    ///    - $V$ acts as a control for endogeneity.
     pub fn fit(&mut self, x: &Matrix<f64>, z: &Matrix<f64>, y: &[f64], w: &[f64]) -> Result<(), PerpetualError> {
         // --- Stage 1: Treatment Model ---
         // Predict W using X and Z.
-        // We need to concatenate X and Z features.
-        // For simplicity/performance in this initial version, we assume the user
-        // passes a combined matrix for Stage 1 or we construct it.
-        // Let's assume for now we construct a lightweight combined view or new matrix.
-        // TODO: Optimize this concatenation (maybe use ColumnarMatrix).
-
-        // Construct Stage 1 Features: [X, Z]
-        // This is expensive if we copy.
-        // For now, let's assume the user handles feature engineering and passes `stage1_features` directly?
-        // Or strictly strictly implement 2SLS logic here.
-
-        // Let's implement the concatenation logic for correctness first, optimization later.
         let rows = x.rows;
         let x_cols = x.cols;
         let z_cols = z.cols;
-        let total_cols = x_cols + z_cols;
-        // Efficient Column-Major concatenation
-        // Assumes input matrices are standard contiguous column-major (which they are by Matrix definition)
+        let total_cols_s1 = x_cols + z_cols;
+
         let mut stage1_data = Vec::with_capacity(x.data.len() + z.data.len());
         stage1_data.extend_from_slice(x.data);
         stage1_data.extend_from_slice(z.data);
 
-        let matrix_stage1 = Matrix::new(&stage1_data, rows, total_cols);
+        let matrix_stage1 = Matrix::new(&stage1_data, rows, total_cols_s1);
 
-        // Fit Stage 1
         self.treatment_model.fit(&matrix_stage1, w, None, None)?;
 
-        // Predict W_hat
+        // Predict W_hat and compute residuals V
         let w_hat = self.treatment_model.predict(&matrix_stage1, true);
+        let v_res: Vec<f64> = w.iter().zip(w_hat.iter()).map(|(wi, what)| wi - what).collect();
 
-        // --- Stage 2: Outcome Model ---
-        // Predict Y using X and W_hat.
-        // Stage 2 Features: [X, W_hat]
-        let mut stage2_data = Vec::with_capacity(x.data.len() + w_hat.len());
+        // --- Stage 2: Outcome Model (Control Function) ---
+        // Predict Y using X, W_hat, and V.
+        // Stage 2 Features: [X, W_hat, V]
+        let mut stage2_data = Vec::with_capacity(x.data.len() + w_hat.len() + v_res.len());
         stage2_data.extend_from_slice(x.data);
         stage2_data.extend_from_slice(&w_hat);
+        stage2_data.extend_from_slice(&v_res);
 
-        let matrix_stage2 = Matrix::new(&stage2_data, rows, x_cols + 1);
+        let matrix_stage2 = Matrix::new(&stage2_data, rows, x_cols + 2); // X + W_hat + V
 
         // Fit Stage 2
         self.outcome_model.fit(&matrix_stage2, y, None, None)?;
@@ -208,36 +195,42 @@ impl IVBooster {
         Ok(())
     }
 
-    /// Predict Outcome given X (and potentially new Z, though usually we want E[Y|do(W)]).
-    /// For IV, "prediction" is tricky. Usually we want the structural function f(X, W).
+    /// Predict Outcome given X and a Counterfactual Treatment W.
+    ///
+    /// Note: This implementation assumes the "Control Function" term $V$ is zero
+    /// for counterfactual prediction (effectively estimating E[Y|do(W)] assuming
+    /// the shift in W is exogenous or we are intervening).
     ///
     /// * `X` - Covariates
-    /// * `w_counterfactual` - Treatment value to simulate (e.g., 1.0 or 0.0)
+    /// * `w_counterfactual` - Treatment value to simulate.
     pub fn predict(&self, x: &Matrix<f64>, w_counterfactual: &[f64]) -> Vec<f64> {
         let rows = x.rows;
         let x_cols = x.cols;
 
-        // Construct Stage 2 Features with counterfactual W
-        // Stage 2 Features with counterfactual: [X, W_cf]
-        let mut stage2_data = Vec::with_capacity(x.data.len() + rows);
-        stage2_data.extend_from_slice(x.data);
-
-        // Handle W_counterfactual (broadcast if scalar, else extend)
-        if w_counterfactual.len() == 1 {
-            let val = w_counterfactual[0];
-            stage2_data.resize(stage2_data.len() + rows, val);
-        } else {
-            if w_counterfactual.len() != rows {
-                // If this happens, we might panic or should handle error, but signature doesn't allow error.
-                // Assuming caller provides correct length as per doc logic implies match.
-                // Fallback to safe iteration/extend if needed, or just extend.
-                stage2_data.extend_from_slice(w_counterfactual);
-            } else {
-                stage2_data.extend_from_slice(w_counterfactual);
-            }
+        // Verify dimensions
+        if w_counterfactual.len() != 1 && w_counterfactual.len() != rows {
+            panic!("w_counterfactual must satisfy len == 1 or len == x.rows");
         }
 
-        let matrix_stage2 = Matrix::new(&stage2_data, rows, x_cols + 1);
+        // Feature Construction: [X, W_cf, V=0]
+        // We set V=0 because we are estimating the structural expectation E[Y|X, do(W)].
+        // The control function term beta*V captures the bias from endogeneity in the observed
+        // data. By setting V=0, we "remove" this bias term for prediction.
+
+        let mut stage2_data = Vec::with_capacity(x.data.len() + rows * 2);
+        stage2_data.extend_from_slice(x.data);
+
+        // W_counterfactual column
+        if w_counterfactual.len() == 1 {
+            stage2_data.resize(stage2_data.len() + rows, w_counterfactual[0]);
+        } else {
+            stage2_data.extend_from_slice(w_counterfactual);
+        }
+
+        // V column (Zeros)
+        stage2_data.resize(stage2_data.len() + rows, 0.0);
+
+        let matrix_stage2 = Matrix::new(&stage2_data, rows, x_cols + 2);
 
         // Predict using Outcome Model
         self.outcome_model.predict(&matrix_stage2, true)

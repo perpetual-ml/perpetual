@@ -11,12 +11,13 @@ pub struct PyPolicyObjective {
 #[pymethods]
 impl PyPolicyObjective {
     #[new]
-    #[pyo3(signature=(treatment, propensity, mode, mu_hat))]
+    #[pyo3(signature=(treatment, propensity, mode, mu_hat_1=None, mu_hat_0=None))]
     pub fn new(
         treatment: PyReadonlyArray1<u8>,
         propensity: PyReadonlyArray1<f64>,
         mode: &str,
-        mu_hat: Option<PyReadonlyArray1<f64>>,
+        mu_hat_1: Option<PyReadonlyArray1<f64>>,
+        mu_hat_0: Option<PyReadonlyArray1<f64>>,
     ) -> PyResult<Self> {
         let treatment_vec = treatment.as_slice()?.to_vec();
         let propensity_vec = propensity.as_slice()?.to_vec();
@@ -24,11 +25,18 @@ impl PyPolicyObjective {
         let policy_mode = match mode {
             "ipw" => PolicyMode::IPW,
             "aipw" => {
-                let mu = mu_hat
-                    .ok_or_else(|| pyo3::exceptions::PyValueError::new_err("mu_hat required for AIPW mode"))?
+                let mu1 = mu_hat_1
+                    .ok_or_else(|| pyo3::exceptions::PyValueError::new_err("mu_hat_1 required for AIPW mode"))?
                     .as_slice()?
                     .to_vec();
-                PolicyMode::AIPW { mu_hat: mu }
+                let mu0 = mu_hat_0
+                    .ok_or_else(|| pyo3::exceptions::PyValueError::new_err("mu_hat_0 required for AIPW mode"))?
+                    .as_slice()?
+                    .to_vec();
+                PolicyMode::AIPW {
+                    mu_hat_1: mu1,
+                    mu_hat_0: mu0,
+                }
             }
             _ => {
                 return Err(pyo3::exceptions::PyValueError::new_err(format!(

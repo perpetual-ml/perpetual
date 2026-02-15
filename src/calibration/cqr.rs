@@ -2,7 +2,7 @@
 //!
 //! Calibrates upper and lower quantile models on held-out data to produce
 //! prediction intervals with marginal coverage of at least `1 - alpha`.
-use crate::objective_functions::objective::Objective;
+use crate::objective::Objective;
 use crate::{ColumnarMatrix, Matrix, PerpetualBooster, errors::PerpetualError, utils::percentiles};
 use std::collections::HashMap;
 
@@ -138,7 +138,7 @@ mod tests {
 
     use crate::Matrix;
     use crate::PerpetualBooster;
-    use crate::objective_functions::objective::Objective;
+    use crate::objective::Objective;
     use std::error::Error;
     use std::fs::File;
     use std::io::BufReader;

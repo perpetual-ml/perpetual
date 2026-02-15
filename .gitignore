@@ -56,3 +56,4 @@ package-r/src/rust/core/
 *.whl
 *.pyd
 *.pyd.old
+*.pyd.*

@@ -1,8 +1,8 @@
 //! Tree Prediction Methods
 //!
 //! Prediction and feature-contribution logic executed on individual trees.
-use super::tree::Tree;
 use crate::data::ColumnarMatrix;
+use crate::tree::Tree;
 use crate::{Matrix, utils::odds};
 use rayon::prelude::*;
 use std::collections::{HashMap, HashSet};

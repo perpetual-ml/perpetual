@@ -2,7 +2,7 @@
 //!
 //! Implementation of the TreeSHAP algorithm for explaining model predictions
 //! by calculating feature contributions.
-use crate::{decision_tree::tree::Tree, node::Node};
+use crate::{node::Node, tree::core::Tree};
 
 #[derive(Debug, Clone, Copy)]
 struct PathElement {

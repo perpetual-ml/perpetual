@@ -21,7 +21,6 @@ pub use log_loss::LogLoss;
 pub use quantile_loss::QuantileLoss;
 pub use squared_loss::SquaredLoss;
 
-pub mod objective;
-
-pub use objective::Objective;
-pub use objective::ObjectiveFunction;
+pub mod core;
+pub use core::Objective;
+pub use core::ObjectiveFunction;

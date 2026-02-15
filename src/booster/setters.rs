@@ -2,7 +2,7 @@
 //!
 //! Builder-style setters for configuring [`PerpetualBooster`] parameters.
 use crate::booster::config::{CalibrationMethod, MissingNodeTreatment};
-use crate::objective_functions::objective::Objective;
+use crate::objective::Objective;
 use crate::{PerpetualBooster, constraints::ConstraintMap};
 use std::collections::HashSet;
 

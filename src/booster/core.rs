@@ -11,12 +11,12 @@ use crate::constants::{
 };
 use crate::constraints::ConstraintMap;
 use crate::data::{ColumnarMatrix, Matrix};
-use crate::decision_tree::tree::{Tree, TreeStopper};
 use crate::errors::PerpetualError;
 use crate::histogram::{HistogramArena, NodeHistogram, update_cuts};
-use crate::objective_functions::objective::{Objective, ObjectiveFunction};
+use crate::objective::{Objective, ObjectiveFunction};
 use crate::splitter::{MissingBranchSplitter, MissingImputerSplitter, SplitInfo, SplitInfoSlice, Splitter};
-use core::{f32, f64};
+use crate::tree::core::{Tree, TreeStopper};
+
 use log::{info, warn};
 use rand::SeedableRng;
 use rand::rngs::StdRng;
@@ -58,6 +58,9 @@ pub struct PerpetualBooster {
     /// Maps alpha string to a vector of parameters (e.g., [lower_thresh, upper_thresh]).
     #[serde(default)]
     pub cal_params: HashMap<String, Vec<f64>>,
+    /// Isotonic calibration model for probability calibration (classification only).
+    #[serde(default)]
+    pub isotonic_calibrator: Option<crate::calibration::isotonic::IsotonicCalibrator>,
     /// Arbitrary metadata key-value pairs associated with the model.
     #[serde(default)]
     pub metadata: HashMap<String, String>,
@@ -72,6 +75,7 @@ impl Default for PerpetualBooster {
             trees: Vec::new(),
             cal_models: HashMap::new(),
             cal_params: HashMap::new(),
+            isotonic_calibrator: None,
             metadata: HashMap::new(),
         }
     }
@@ -187,6 +191,7 @@ impl PerpetualBooster {
             trees: Vec::new(),
             cal_models: HashMap::new(),
             cal_params: HashMap::new(),
+            isotonic_calibrator: None,
             metadata: HashMap::new(),
         };
 
@@ -994,7 +999,7 @@ mod perpetual_booster_test {
 
     use crate::booster::config::*;
     use crate::metrics::ranking::{GainScheme, ndcg_at_k_metric};
-    use crate::objective_functions::objective::{Objective, ObjectiveFunction};
+    use crate::objective::{Objective, ObjectiveFunction};
     use crate::utils::between;
     use crate::{Matrix, PerpetualBooster};
     use approx::assert_relative_eq;
@@ -1166,7 +1171,7 @@ mod perpetual_booster_test {
         let data_vec: Vec<f64> = file.lines().map(|x| x.parse::<f64>().unwrap_or(f64::NAN)).collect();
         let data = Matrix::new(&data_vec, y.len(), n_columns);
 
-        let probabilities = booster.predict_proba(&data, true);
+        let probabilities = booster.predict_proba(&data, true, false);
 
         let accuracy = probabilities
             .iter()

@@ -9,7 +9,7 @@
 //! * **AIPW** (Augmented IPW / Doubly Robust) – Reduces variance by
 //!   incorporating a baseline outcome model $\hat{\mu}(X)$.
 use crate::metrics::evaluation::Metric;
-use crate::objective_functions::objective::ObjectiveFunction;
+use crate::objective::ObjectiveFunction;
 use serde::{Deserialize, Serialize};
 
 /// Minimum propensity clip for numerical safety.
@@ -22,8 +22,10 @@ pub enum PolicyMode {
     IPW,
     /// Augmented / Doubly Robust IPW with baseline outcome predictions.
     AIPW {
-        /// Predicted baseline outcome $\hat{\mu}(X)$ for each sample.
-        mu_hat: Vec<f64>,
+        /// Predicted baseline outcome $\hat{\mu}_1(X)$ for treated.
+        mu_hat_1: Vec<f64>,
+        /// Predicted baseline outcome $\hat{\mu}_0(X)$ for control.
+        mu_hat_0: Vec<f64>,
     },
 }
 
@@ -66,12 +68,13 @@ impl PolicyObjective {
     ///
     /// * `treatment` - Binary treatment assignments.
     /// * `propensity` - Estimated $P(W=1|X)$ for each sample.
-    /// * `mu_hat` - Predicted baseline outcome $\hat{\mu}(X)$ for variance reduction.
-    pub fn new_aipw(treatment: Vec<u8>, propensity: Vec<f64>, mu_hat: Vec<f64>) -> Self {
+    /// * `mu_hat_1` - Predicted baseline outcome $\hat{\mu}_1(X)$ for treated.
+    /// * `mu_hat_0` - Predicted baseline outcome $\hat{\mu}_0(X)$ for control.
+    pub fn new_aipw(treatment: Vec<u8>, propensity: Vec<f64>, mu_hat_1: Vec<f64>, mu_hat_0: Vec<f64>) -> Self {
         Self {
             treatment,
             propensity,
-            mode: PolicyMode::AIPW { mu_hat },
+            mode: PolicyMode::AIPW { mu_hat_1, mu_hat_0 },
         }
     }
 
@@ -79,11 +82,9 @@ impl PolicyObjective {
     ///
     /// $$\Gamma_i^{IPW} = \frac{Y_i W_i}{p_i} - \frac{Y_i (1-W_i)}{1-p_i}$$
     ///
-    /// $$\Gamma_i^{AIPW} = \hat{\mu}_1 - \hat{\mu}_0
+    /// $$\Gamma_i^{AIPW} = (\hat{\mu}_1 - \hat{\mu}_0)
     ///     + \frac{W_i (Y_i - \hat{\mu}_1)}{p_i}
     ///     - \frac{(1-W_i)(Y_i - \hat{\mu}_0)}{1-p_i}$$
-    ///
-    /// (Simplified AIPW uses the same $\hat{\mu}$ for both arms.)
     fn pseudo_outcome(&self, y: &[f64]) -> Vec<f64> {
         let n = y.len();
         let mut gamma = Vec::with_capacity(n);
@@ -98,11 +99,16 @@ impl PolicyObjective {
                     // Gamma = Y*W/p - Y*(1-W)/(1-p)
                     yi * w / p - yi * (1.0 - w) / (1.0 - p)
                 }
-                PolicyMode::AIPW { mu_hat } => {
-                    // Simplified: use mu_hat as E[Y|X] for both arms
-                    let mu = mu_hat[i];
-                    // AIPW score
-                    w * (yi - mu) / p - (1.0 - w) * (yi - mu) / (1.0 - p)
+                PolicyMode::AIPW { mu_hat_1, mu_hat_0 } => {
+                    let m1 = mu_hat_1[i];
+                    let m0 = mu_hat_0[i];
+
+                    // AIPW score = (m1 - m0) + W(Y-m1)/p - (1-W)(Y-m0)/(1-p)
+                    let term1 = m1 - m0;
+                    let term2 = w * (yi - m1) / p;
+                    let term3 = (1.0 - w) * (yi - m0) / (1.0 - p);
+
+                    term1 + term2 - term3
                 }
             };
             gamma.push(g);

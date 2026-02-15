@@ -3,12 +3,11 @@
 //! Prediction, probability, contribution, and feature importance methods for the booster.
 
 use crate::MultiOutputBooster;
-use crate::booster::config::ContributionsMethod;
+
+use crate::booster::config::{CalibrationMethod, ContributionsMethod};
 use crate::data::ColumnarMatrix;
-use crate::objective_functions::objective::Objective;
-use crate::{
-    Matrix, PerpetualBooster, decision_tree::tree::Tree, shapley::predict_contributions_row_shapley, utils::odds,
-};
+use crate::objective::Objective;
+use crate::{Matrix, PerpetualBooster, shapley::predict_contributions_row_shapley, tree::core::Tree, utils::odds};
 use rayon::prelude::*;
 use std::collections::{HashMap, HashSet};
 
@@ -63,26 +62,44 @@ impl PerpetualBooster {
     ///
     /// * `data` - The feature matrix.
     /// * `parallel` - Predict in parallel.
-    pub fn predict_proba(&self, data: &Matrix<f64>, parallel: bool) -> Vec<f64> {
+    pub fn predict_proba(&self, data: &Matrix<f64>, parallel: bool, calibrated: bool) -> Vec<f64> {
         let preds = self.predict(data, parallel);
-        if parallel {
+        let mut proba: Vec<f64> = if parallel {
             preds.par_iter().map(|p| 1.0 / (1.0 + (-p).exp())).collect()
         } else {
             preds.iter().map(|p| 1.0 / (1.0 + (-p).exp())).collect()
+        };
+
+        if let Some(calibrator) = self.isotonic_calibrator.as_ref().filter(|_| calibrated) {
+            let scores = match self.cfg.calibration_method {
+                CalibrationMethod::Conformal => proba.clone(),
+                _ => self.get_calibration_scores(data, parallel),
+            };
+            proba = calibrator.transform(&scores);
         }
+        proba
     }
 
     /// Generate class probabilities for columnar data (zero-copy).
     ///
     /// * `data` - The columnar feature matrix.
     /// * `parallel` - Predict in parallel.
-    pub fn predict_proba_columnar(&self, data: &ColumnarMatrix<f64>, parallel: bool) -> Vec<f64> {
+    pub fn predict_proba_columnar(&self, data: &ColumnarMatrix<f64>, parallel: bool, calibrated: bool) -> Vec<f64> {
         let preds = self.predict_columnar(data, parallel);
-        if parallel {
+        let mut proba: Vec<f64> = if parallel {
             preds.par_iter().map(|p| 1.0 / (1.0 + (-p).exp())).collect()
         } else {
             preds.iter().map(|p| 1.0 / (1.0 + (-p).exp())).collect()
+        };
+
+        if let Some(calibrator) = self.isotonic_calibrator.as_ref().filter(|_| calibrated) {
+            let scores = match self.cfg.calibration_method {
+                CalibrationMethod::Conformal => proba.clone(),
+                _ => self.get_calibration_scores_columnar(data, parallel),
+            };
+            proba = calibrator.transform(&scores);
         }
+        proba
     }
 
     /// Calculate Feature Contributions (SHAP-like values).

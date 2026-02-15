@@ -6,8 +6,7 @@ use crate::data::Matrix;
 use crate::grower::Grower;
 use crate::histogram::{NodeHistogram, update_histogram};
 use crate::node::{Node, NodeType, SplittableNode};
-use crate::objective_functions::Objective;
-use crate::objective_functions::objective::ObjectiveFunction;
+use crate::objective::{Objective, ObjectiveFunction};
 use crate::partial_dependence::tree_partial_dependence;
 use crate::splitter::{SplitInfoSlice, Splitter};
 use crate::utils::{fast_f64_sum, gain, gain_const_hess, weight, weight_const_hess};
@@ -550,7 +549,7 @@ mod tests {
     use crate::binning::bin_matrix;
     use crate::constraints::{Constraint, ConstraintMap};
     use crate::histogram::NodeHistogramOwned;
-    use crate::objective_functions::objective::{Objective, ObjectiveFunction};
+    use crate::objective::{Objective, ObjectiveFunction};
     use crate::splitter::{MissingImputerSplitter, SplitInfo};
     use crate::utils::precision_round;
 
@@ -558,9 +557,9 @@ mod tests {
     use std::fs;
 
     use crate::Matrix;
-    use crate::decision_tree::tree::Tree;
     use crate::histogram::NodeHistogram;
     use crate::splitter::SplitInfoSlice;
+    use crate::tree::Tree;
     use std::collections::HashSet;
 
     #[test]

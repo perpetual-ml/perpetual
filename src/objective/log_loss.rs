@@ -1,5 +1,5 @@
 //! Log Loss (negative log-likelihood) for binary classification.
-use crate::objective_functions::ObjectiveFunction;
+use crate::objective::ObjectiveFunction;
 use crate::{metrics::evaluation::Metric, utils::fast_sum};
 use serde::{Deserialize, Serialize};
 

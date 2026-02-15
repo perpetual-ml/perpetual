@@ -1,10 +1,10 @@
-use perpetual_rs::booster::config::{
-    BoosterConfig, BoosterIO, ContributionsMethod, ImportanceMethod, MissingNodeTreatment,
-};
-use perpetual_rs::objective_functions::Objective;
 use perpetual_rs::Matrix;
 use perpetual_rs::MultiOutputBooster;
 use perpetual_rs::PerpetualBooster as CratePerpetualBooster;
+use perpetual_rs::booster::config::{
+    BoosterConfig, BoosterIO, CalibrationMethod, ContributionsMethod, ImportanceMethod, MissingNodeTreatment,
+};
+use perpetual_rs::objective::Objective;
 use std::ffi::{CStr, CString};
 use std::os::raw::{c_char, c_double, c_int, c_void};
 use std::slice;
@@ -131,35 +131,19 @@ unsafe fn get_str(sexp: SEXP) -> String {
 
 // Helpers for Options
 unsafe fn opt_f64(sexp: SEXP) -> Option<f64> {
-    if is_nil(sexp) {
-        None
-    } else {
-        Some(get_f64(sexp))
-    }
+    if is_nil(sexp) { None } else { Some(get_f64(sexp)) }
 }
 
 unsafe fn opt_i32(sexp: SEXP) -> Option<i32> {
-    if is_nil(sexp) {
-        None
-    } else {
-        Some(get_int(sexp))
-    }
+    if is_nil(sexp) { None } else { Some(get_int(sexp)) }
 }
 
 unsafe fn opt_bool(sexp: SEXP) -> Option<bool> {
-    if is_nil(sexp) {
-        None
-    } else {
-        Some(get_bool(sexp))
-    }
+    if is_nil(sexp) { None } else { Some(get_bool(sexp)) }
 }
 
 unsafe fn opt_str(sexp: SEXP) -> Option<String> {
-    if is_nil(sexp) {
-        None
-    } else {
-        Some(get_str(sexp))
-    }
+    if is_nil(sexp) { None } else { Some(get_str(sexp)) }
 }
 
 // --- Logic ---
@@ -337,6 +321,8 @@ pub unsafe extern "C" fn PerpetualBooster_fit(ptr: SEXP, flat_data: SEXP, rows: 
                 booster.config.iteration_limit,
                 booster.config.memory_limit,
                 booster.config.stopping_rounds,
+                booster.config.save_node_stats,
+                booster.config.calibration_method.clone(),
             )
             .or_r_error("Failed to create MultiOutputBooster");
 
@@ -379,6 +365,7 @@ pub unsafe extern "C" fn PerpetualBooster_fit(ptr: SEXP, flat_data: SEXP, rows: 
                 booster.config.iteration_limit,
                 booster.config.memory_limit,
                 booster.config.stopping_rounds,
+                booster.config.calibration_method.clone(),
             )
             .or_r_error("Failed to create PerpetualBooster");
 
@@ -439,7 +426,7 @@ pub unsafe extern "C" fn PerpetualBooster_predict_proba(ptr: SEXP, flat_data: SE
         let matrix = Matrix::new(&_data_vec, rows_val, cols_val);
 
         let preds = match &booster.internal {
-            Some(InternalBooster::Single(b)) => b.predict_proba(&matrix, true),
+            Some(InternalBooster::Single(b)) => b.predict_proba(&matrix, true, false),
             Some(InternalBooster::Multi(b)) => b.predict_proba(&matrix, true),
             None => r_error("Booster not fitted"),
         };
@@ -644,11 +631,8 @@ pub unsafe extern "C" fn PerpetualBooster_calibrate(
                 let _y_cal_vec = y_cal_slice.to_vec();
                 let _alpha_vec = alpha_slice.to_vec();
                 b.calibrate(
-                    &matrix,
-                    &y_slice.to_vec(),
-                    None,
-                    None,
-                    (matrix_cal, &_y_cal_vec, &_alpha_vec),
+                    booster.config.calibration_method.clone(),
+                    (&matrix_cal, &_y_cal_vec, &_alpha_vec),
                 )
                 .or_r_error("Failed to calibrate");
             }
@@ -699,17 +683,17 @@ pub unsafe extern "C" fn PerpetualBooster_predict_intervals(
 
                 Rf_setAttrib(r_list, R_NamesSymbol, names_vec);
                 Rf_unprotect(2); // names_vec and r_list (wait, r_list must be protected until return if referenced, but here we return it)
-                                 // Actually Rf_unprotect pops items from stack.
-                                 // Stack: [r_list, names_vec] (top)
-                                 // Rf_unprotect(2) pops both.
-                                 // But we need to return r_list.
-                                 // If we unprotect, is it safe? Yes if we don't allocate more.
-                                 // BUT usually we return a protected value or it's implicitly part of result logic?
-                                 // In R extensions: "If you want to return a protected object, you should unprotect it first but better make sure it's safe."
-                                 // Typically: protect result -> do work -> unprotect(n) -> return result.
-                                 // If result is on stack, unprotecting it makes it vulnerable to GC if we allocate?
-                                 // No, we are returning immediately. And R function result is protected by caller.
-                                 // Rf_unprotect will happen at end
+                // Actually Rf_unprotect pops items from stack.
+                // Stack: [r_list, names_vec] (top)
+                // Rf_unprotect(2) pops both.
+                // But we need to return r_list.
+                // If we unprotect, is it safe? Yes if we don't allocate more.
+                // BUT usually we return a protected value or it's implicitly part of result logic?
+                // In R extensions: "If you want to return a protected object, you should unprotect it first but better make sure it's safe."
+                // Typically: protect result -> do work -> unprotect(n) -> return result.
+                // If result is on stack, unprotecting it makes it vulnerable to GC if we allocate?
+                // No, we are returning immediately. And R function result is protected by caller.
+                // Rf_unprotect will happen at end
                 r_list
             }
             _ => r_error("Prediction intervals not supported"),

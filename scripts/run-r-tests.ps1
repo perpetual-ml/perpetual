@@ -30,22 +30,52 @@ if (-not (Get-Command "Rscript" -ErrorAction SilentlyContinue)) {
 
 $RscriptExe = Join-Path $global:RBinDir "Rscript.exe"
 $Rexe = Join-Path $global:RBinDir "R.exe"
+$env:PERPETUAL_ROOT = $projectRoot.Replace('\', '/')
 
 Write-Host "Setting up R dependencies..." -ForegroundColor Cyan
 & $RscriptExe scripts/setup_r_deps.R
+Write-Host "Vendoring Rust dependencies and syncing core..." -ForegroundColor Cyan
+python scripts/vendor_r.py
+if ($LASTEXITCODE -ne 0) {
+    Write-Error "Vendor script failed with exit code $LASTEXITCODE"
+    exit $LASTEXITCODE
+}
+
+# Remove potential stale Cargo.lock in package-r/src/rust to allow fresh resolution matching vendored deps
+$RustDir = Join-Path $projectRoot "package-r\src\rust"
+$StaleLock = Join-Path $RustDir "Cargo.lock"
+if (Test-Path $StaleLock) {
+    Write-Host "Removing stale $StaleLock..."
+    Remove-Item -Path $StaleLock -Force
+}
 
 Write-Host "Building and installing perpetual package..." -ForegroundColor Cyan
 $RLibUnix = $RLib.Replace('\', '/')
 
-$installArgs = @("CMD", "INSTALL", "package-r", "--library=$RLibUnix")
-$process = Start-Process -FilePath $Rexe -ArgumentList $installArgs -Wait -NoNewWindow -PassThru
-
-if ($process.ExitCode -ne 0) {
-    Write-Error "R CMD INSTALL failed with exit code $($process.ExitCode)"
-    exit $process.ExitCode
+$LockDir = Join-Path $RLib "00LOCK-perpetual"
+if (Test-Path $LockDir) {
+    Write-Host "Removing stale lock directory..." -ForegroundColor Yellow
+    Remove-Item -Path $LockDir -Recurse -Force
+}
+$LockDir2 = Join-Path $RLib "00LOCK-package-r"
+if (Test-Path $LockDir2) {
+    Write-Host "Removing stale lock directory (package-r)..." -ForegroundColor Yellow
+    Remove-Item -Path $LockDir2 -Recurse -Force
 }
 
-Write-Host "Running R tests..." -ForegroundColor Cyan
+Write-Host "Building and installing perpetual package..." -ForegroundColor Cyan
+$RLibUnix = $RLib.Replace('\', '/')
+
+# Run R CMD INSTALL directly to the console
+& $Rexe CMD INSTALL package-r --library="$RLibUnix"
+
+if ($LASTEXITCODE -ne 0) {
+    Write-Error "R CMD INSTALL failed with exit code $LASTEXITCODE"
+    exit $LASTEXITCODE
+} else {
+    Write-Host "Installation successful." -ForegroundColor Green
+}
+
 Write-Host "Running R tests..." -ForegroundColor Cyan
 & $RscriptExe -e ".libPaths('$RLibUnix'); library(testthat); library(perpetual); test_dir('package-r/tests/testthat')"
 

@@ -1,4 +1,4 @@
-"""Double / Debiased Machine Learning (DML) estimator.
+r"""Double / Debiased Machine Learning (DML) estimator.
 
 Implements the Chernozhukov et al. (2018) partial-linear model for
 heterogeneous treatment effect estimation using cross-fitting and
@@ -81,7 +81,7 @@ def _dml_initial_value(y_residual, w_residual):
 
 
 class DMLEstimator:
-    """Double Machine Learning (DML) estimator for heterogeneous treatment effects.
+    r"""Double Machine Learning (DML) estimator for heterogeneous treatment effects.
 
     Uses three gradient boosting stages with K-fold cross-fitting to learn
     :math:`\\theta(X)` — the Conditional Average Treatment Effect (CATE).

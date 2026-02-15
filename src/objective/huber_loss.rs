@@ -1,6 +1,6 @@
 //! Huber Loss function for robust regression.
 
-use crate::{objective_functions::objective::ObjectiveFunction, utils::weighted_median};
+use crate::{objective::ObjectiveFunction, utils::weighted_median};
 use serde::{Deserialize, Serialize};
 
 /// Huber Loss — quadratic near zero, linear beyond `delta`.

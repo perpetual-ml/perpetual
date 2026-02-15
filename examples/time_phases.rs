@@ -1,5 +1,5 @@
 /// Quick timing of cal_housing fit to understand baseline.
-use perpetual::{Matrix, PerpetualBooster, objective_functions::Objective};
+use perpetual::{Matrix, PerpetualBooster, objective::Objective};
 use std::time::Instant;
 
 fn main() {

@@ -2,8 +2,9 @@
 //!
 //! Implements the ListNet loss function which uses softmax-based
 //! cross-entropy between ground-truth and predicted relevance distributions.
+use crate::metrics::evaluation::Metric;
 use crate::metrics::ranking::GainScheme;
-use crate::{metrics::evaluation::Metric, objective_functions::objective::ObjectiveFunction};
+use crate::objective::ObjectiveFunction;
 use serde::{Deserialize, Serialize};
 
 #[derive(Default, Debug, Deserialize, Serialize, Clone)]

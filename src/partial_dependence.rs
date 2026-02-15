@@ -1,7 +1,7 @@
 //! Partial Dependence
 //!
 //! Utilities for calculating partial dependence of features in a decision tree model.
-use crate::{decision_tree::tree::Tree, utils::is_missing};
+use crate::{tree::core::Tree, utils::is_missing};
 
 fn get_node_cover(tree: &Tree, node_idx: usize) -> f32 {
     tree.nodes[&node_idx].hessian_sum
@@ -73,10 +73,10 @@ mod tests {
     use crate::binning::bin_matrix;
     use crate::constraints::ConstraintMap;
     use crate::data::Matrix;
-    use crate::decision_tree::tree::Tree;
     use crate::histogram::{NodeHistogram, NodeHistogramOwned};
-    use crate::objective_functions::objective::{Objective, ObjectiveFunction};
+    use crate::objective::{Objective, ObjectiveFunction};
     use crate::splitter::{MissingImputerSplitter, SplitInfo, SplitInfoSlice};
+    use crate::tree::Tree;
     use std::fs;
 
     #[test]

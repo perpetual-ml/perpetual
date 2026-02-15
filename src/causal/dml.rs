@@ -32,7 +32,7 @@
 //! which handles it automatically.
 
 use crate::metrics::evaluation::Metric;
-use crate::objective_functions::objective::ObjectiveFunction;
+use crate::objective::ObjectiveFunction;
 use serde::{Deserialize, Serialize};
 
 /// Minimum hessian floor for numerical stability.

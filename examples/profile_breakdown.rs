@@ -1,7 +1,7 @@
 /// Profile the time breakdown of PerpetualBooster::fit.
 use perpetual::{
     Matrix, PerpetualBooster,
-    objective_functions::{Objective, ObjectiveFunction},
+    objective::{Objective, ObjectiveFunction},
 };
 use std::time::Instant;
 

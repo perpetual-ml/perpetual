@@ -1,7 +1,7 @@
 //! Adaptive Huber Loss function — automatically adjusts `delta` from the
 //! residual distribution.
 
-use crate::{objective_functions::objective::ObjectiveFunction, utils::weighted_median};
+use crate::{objective::ObjectiveFunction, utils::weighted_median};
 use serde::{Deserialize, Serialize};
 
 /// Adaptive Huber Loss — delta is derived from the `quantile` of the

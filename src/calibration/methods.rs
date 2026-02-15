@@ -1,10 +1,91 @@
 use crate::booster::config::CalibrationMethod;
 use crate::errors::PerpetualError;
+use crate::objective::Objective;
 use crate::utils::percentiles;
 use crate::{ColumnarMatrix, Matrix, PerpetualBooster};
 use std::collections::HashMap;
 
 impl PerpetualBooster {
+    /// Calculate calibration scores for the given data based on the configured calibration method.
+    /// These scores are used as input to the Isotonic Calibrator.
+    pub fn get_calibration_scores(&self, data: &Matrix<f64>, parallel: bool) -> Vec<f64> {
+        match self.cfg.calibration_method {
+            CalibrationMethod::Conformal => self.predict_proba(data, parallel, false),
+            CalibrationMethod::WeightVariance => {
+                let fold_weights = self.predict_fold_weights(data, parallel);
+                fold_weights
+                    .iter()
+                    .map(|row| self.compute_score_weight_variance(row))
+                    .collect()
+            }
+            CalibrationMethod::MinMax => {
+                let fold_weights = self.predict_fold_weights(data, parallel);
+                fold_weights.iter().map(|row| self.compute_score_min_max(row)).collect()
+            }
+            CalibrationMethod::GRP => {
+                let fold_weights = self.predict_fold_weights(data, parallel);
+                let stat_q = [0.0, 0.25, 0.5, 0.75, 1.0];
+                fold_weights
+                    .iter()
+                    .map(|row| self.compute_score_grp(row, &stat_q))
+                    .collect()
+            }
+        }
+    }
+
+    pub fn get_calibration_scores_columnar(&self, data: &ColumnarMatrix<f64>, parallel: bool) -> Vec<f64> {
+        match self.cfg.calibration_method {
+            CalibrationMethod::Conformal => self.predict_proba_columnar(data, parallel, false),
+            CalibrationMethod::WeightVariance => {
+                let fold_weights = self.predict_fold_weights_columnar(data, parallel);
+                fold_weights
+                    .iter()
+                    .map(|row| self.compute_score_weight_variance(row))
+                    .collect()
+            }
+            CalibrationMethod::MinMax => {
+                let fold_weights = self.predict_fold_weights_columnar(data, parallel);
+                fold_weights.iter().map(|row| self.compute_score_min_max(row)).collect()
+            }
+            CalibrationMethod::GRP => {
+                let fold_weights = self.predict_fold_weights_columnar(data, parallel);
+                let stat_q = [0.0, 0.25, 0.5, 0.75, 1.0];
+                fold_weights
+                    .iter()
+                    .map(|row| self.compute_score_grp(row, &stat_q))
+                    .collect()
+            }
+        }
+    }
+
+    fn compute_score_weight_variance(&self, log_odds: &[f64; 5]) -> f64 {
+        let fold_probs: Vec<f64> = log_odds.iter().map(|&z| 1.0 / (1.0 + (-z).exp())).collect();
+        let mean_p = fold_probs.iter().sum::<f64>() / 5.0;
+        let std_p = (fold_probs.iter().map(|&p| (p - mean_p).powi(2)).sum::<f64>() / 5.0).sqrt();
+        let sigma = std_p.max(1e-6);
+        mean_p / sigma
+    }
+
+    fn compute_score_min_max(&self, log_odds: &[f64; 5]) -> f64 {
+        let fold_probs: Vec<f64> = log_odds.iter().map(|&z| 1.0 / (1.0 + (-z).exp())).collect();
+        let min_p = fold_probs.iter().copied().fold(f64::INFINITY, f64::min);
+        let max_p = fold_probs.iter().copied().fold(f64::NEG_INFINITY, f64::max);
+        let diff = (max_p - min_p).max(1e-6);
+        let mean_p = fold_probs.iter().sum::<f64>() / 5.0;
+        mean_p / diff
+    }
+
+    fn compute_score_grp(&self, log_odds: &[f64; 5], stat_q: &[f64; 5]) -> f64 {
+        let mut fold_probs: Vec<f64> = log_odds.iter().map(|&z| 1.0 / (1.0 + (-z).exp())).collect();
+        fold_probs.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+        let fold_probs_arr: [f64; 5] = fold_probs.clone().try_into().unwrap();
+        let p_low = self.grp_interp(0.0, &fold_probs_arr, stat_q);
+        let p_high = self.grp_interp(1.0, &fold_probs_arr, stat_q);
+        let spread = (p_high - p_low).max(1e-6);
+        let mean_p = fold_probs.iter().sum::<f64>() / 5.0;
+        mean_p / spread
+    }
+
     /// Internal method to predict fold weights for each sample.
     /// Returns a vector of [f64; 5] for each sample, where each element is the sum
     /// of the corresponding fold weight across all trees, plus the base score.
@@ -72,12 +153,15 @@ impl PerpetualBooster {
         method: CalibrationMethod,
         data_cal: (&Matrix<f64>, &[f64], &[f64]),
     ) -> Result<(), PerpetualError> {
-        if !self.cfg.save_node_stats {
+        if !self.cfg.save_node_stats && !matches!(method, CalibrationMethod::Conformal) {
             return Err(PerpetualError::InvalidParameter(
                 "save_node_stats".to_string(),
                 "true".to_string(),
                 "false".to_string(),
             ));
+        }
+        if matches!(self.cfg.objective, Objective::LogLoss) {
+            return self.calibrate_classification(method, data_cal);
         }
         self.cfg.calibration_method = method;
         match method {
@@ -99,12 +183,15 @@ impl PerpetualBooster {
         method: CalibrationMethod,
         data_cal: (&ColumnarMatrix<f64>, &[f64], &[f64]),
     ) -> Result<(), PerpetualError> {
-        if !self.cfg.save_node_stats {
+        if !self.cfg.save_node_stats && !matches!(method, CalibrationMethod::Conformal) {
             return Err(PerpetualError::InvalidParameter(
                 "save_node_stats".to_string(),
                 "true".to_string(),
                 "false".to_string(),
             ));
+        }
+        if matches!(self.cfg.objective, Objective::LogLoss) {
+            return self.calibrate_classification_columnar(method, data_cal);
         }
         self.cfg.calibration_method = method;
         match method {
@@ -505,7 +592,7 @@ impl PerpetualBooster {
         intervals
     }
 
-    fn grp_interp(&self, p: f64, vals: &[f64; 5], stat_q: &[f64; 5]) -> f64 {
+    pub(crate) fn grp_interp(&self, p: f64, vals: &[f64; 5], stat_q: &[f64; 5]) -> f64 {
         if p <= 0.0 {
             let slope = (vals[1] - vals[0]) / (stat_q[1] - stat_q[0]);
             vals[0] + slope * p

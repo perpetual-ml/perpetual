@@ -9,7 +9,7 @@ use crate::booster::config::MissingNodeTreatment;
 use crate::booster::config::*;
 use crate::constraints::ConstraintMap;
 use crate::errors::PerpetualError;
-use crate::objective_functions::objective::Objective;
+use crate::objective::Objective;
 use crate::{ColumnarMatrix, Matrix, PerpetualBooster};
 
 /// Multi-Output Gradient Boosting Machine.
@@ -646,7 +646,7 @@ impl BoosterIO for MultiOutputBooster {
 mod multi_output_booster_test {
 
     use crate::Matrix;
-    use crate::objective_functions::objective::Objective;
+    use crate::objective::Objective;
     use crate::{MultiOutputBooster, utils::between};
     use std::error::Error;
     use std::fs::File;

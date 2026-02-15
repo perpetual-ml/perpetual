@@ -6,17 +6,39 @@ PKG_CFLAGS = -I./rust/target/$(TARGET)/release
 all: rust-target
 
 rust-target:
-	@echo "Building Rust library for Windows..."
+	@echo "DEBUG: Starting rust-target"
+	@echo "DEBUG: Current directory: $$(pwd)"
+	@echo "DEBUG: PERPETUAL_ROOT: '$(PERPETUAL_ROOT)'"
+	@if [ ! -d "rust" ]; then \
+		echo "DEBUG: rust directory missing in build dir."; \
+		if [ -n "$(PERPETUAL_ROOT)" ]; then \
+			echo "DEBUG: Attempting to copy from $(PERPETUAL_ROOT)/package-r/src/rust..."; \
+			ls -ld "$(PERPETUAL_ROOT)/package-r/src/rust" || echo "DEBUG: Source directory not found!"; \
+			cp -r "$(PERPETUAL_ROOT)/package-r/src/rust" . || echo "DEBUG: Copy failed!"; \
+			ls -ld rust || echo "DEBUG: rust directory still missing after copy!"; \
+		else \
+			echo "DEBUG: PERPETUAL_ROOT is not set. Cannot recover."; \
+		fi \
+	else \
+		echo "DEBUG: rust directory exists."; \
+	fi
+	@echo "DEBUG: checking rust directory permissions and type"
+	ls -ld rust
+	ls -F
 	@echo "Attempting to add $(TARGET) target..."
 	-rustup target add $(TARGET)
-	@if rustup target list --installed 2>/dev/null | grep -q "$(TARGET)" && \
-		cd rust && cargo build --release --lib --manifest-path Cargo.toml --target $(TARGET) --verbose --config 'source.crates-io.replace-with="vendored-sources"' --config 'source.vendored-sources.directory="../../inst/v"' > cargo_build.log 2>&1; then \
-		echo "Target $(TARGET) build successful."; \
+	@if rustup target list --installed 2>/dev/null | grep -q "$(TARGET)"; then \
+		echo "DEBUG: Target $(TARGET) found. Entering rust directory..."; \
+		ls -ld rust; \
+		if [ -d "rust" ]; then echo "DEBUG: rust is a dir"; else echo "DEBUG: rust is NOT a dir"; fi; \
+		cd ./rust && cargo build --release --lib --manifest-path Cargo.toml --target $(TARGET) --verbose --config 'source.crates-io.replace-with="vendored-sources"' --config 'source.vendored-sources.directory="../../inst/v"'; \
 	else \
-		echo "Target $(TARGET) build failed. Detailed log:"; \
+		echo "Target $(TARGET) build failed or missing. Detailed log:"; \
 		cat rust/cargo_build.log || true; \
 		echo "Falling back to default host target..."; \
-		cd rust && cargo build --release --lib --manifest-path Cargo.toml --verbose --config 'source.crates-io.replace-with="vendored-sources"' --config 'source.vendored-sources.directory="../../inst/v"' >> cargo_build.log 2>&1; \
+		echo "DEBUG: Current dir in else: $$(pwd)"; \
+		ls -F; \
+		cd ./rust && cargo build --release --lib --manifest-path Cargo.toml --verbose --config 'source.crates-io.replace-with="vendored-sources"' --config 'source.vendored-sources.directory="../../inst/v"'; \
 	fi
 	@if [ ! -f rust/target/$(TARGET)/release/libperpetual_r.a ] && [ ! -f rust/target/release/libperpetual_r.a ] && [ ! -f rust/target/release/perpetual_r.lib ]; then \
 		echo "ERROR: Detailed build log follow:"; \

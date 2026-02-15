@@ -6,6 +6,7 @@ mod booster;
 mod custom_objective;
 mod fairness;
 mod iv;
+mod metalearners;
 mod multi_output;
 mod policy;
 mod uplift;
@@ -13,6 +14,7 @@ mod utils;
 
 use crate::booster::PerpetualBooster;
 use crate::iv::IVBooster;
+use crate::metalearners::{DRLearner, SLearner, TLearner, XLearner};
 use crate::multi_output::MultiOutputBooster;
 use crate::uplift::UpliftBooster;
 use crate::utils::percentiles;
@@ -32,6 +34,11 @@ fn perpetual(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<IVBooster>()?;
     m.add_class::<crate::fairness::PyFairnessObjective>()?;
     m.add_class::<crate::policy::PyPolicyObjective>()?;
+
+    m.add_class::<SLearner>()?;
+    m.add_class::<TLearner>()?;
+    m.add_class::<XLearner>()?;
+    m.add_class::<DRLearner>()?;
 
     Ok(())
 }

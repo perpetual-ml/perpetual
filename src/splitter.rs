@@ -7,11 +7,11 @@ use crate::booster::config::MissingNodeTreatment;
 use crate::constants::GENERALIZATION_THRESHOLD;
 use crate::constraints::{Constraint, ConstraintMap};
 use crate::data::{FloatData, Matrix};
-use crate::decision_tree::tree::Tree;
 use crate::histogram::{
     FeatureHistogram, NodeHistogram, update_histogram_and_subtract, update_two_histograms_and_subtract,
 };
 use crate::node::{NodeType, SplittableNode};
+use crate::tree::Tree;
 use crate::utils::{
     bound_to_parent, constrained_weight, constrained_weight_const_hess, cull_gain, gain_given_weight,
     gain_given_weight_const_hess, pivot_on_split, pivot_on_split_const_hess, pivot_on_split_exclude_missing,
@@ -3034,10 +3034,11 @@ mod tests {
     use super::*;
     use crate::binning::bin_matrix;
     use crate::data::Matrix;
-    use crate::decision_tree::tree::create_root_node;
     use crate::histogram::{NodeHistogramOwned, update_histogram};
     use crate::node::SplittableNode;
-    use crate::objective_functions::objective::{Objective, ObjectiveFunction};
+    use crate::tree::core::create_root_node;
+
+    use crate::objective::{Objective, ObjectiveFunction};
     use crate::utils::weight;
     use crate::utils::{between, gain};
     // use polars::prelude::*; // Removed

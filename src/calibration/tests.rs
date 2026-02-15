@@ -1,5 +1,5 @@
 use crate::errors::PerpetualError;
-use crate::objective_functions::objective::Objective;
+use crate::objective::Objective;
 use crate::{CalibrationMethod, Matrix, PerpetualBooster};
 use csv;
 use std::fs::File;

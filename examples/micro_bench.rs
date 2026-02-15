@@ -1,5 +1,5 @@
 /// Micro-benchmarks of individual operations to identify bottlenecks
-use perpetual::{Matrix, objective_functions::Objective};
+use perpetual::{Matrix, objective::Objective};
 use std::hint::black_box;
 use std::time::Instant;
 

@@ -25,7 +25,7 @@
 //!
 //! ```rust
 //! use perpetual::PerpetualBooster;
-//! use perpetual::objective_functions::Objective;
+//! use perpetual::objective::Objective;
 //! use perpetual::Matrix;
 //! use perpetual::booster::config::MissingNodeTreatment;
 //! use std::collections::{HashSet, HashMap};
@@ -91,15 +91,15 @@ pub mod causal;
 pub mod constants;
 pub mod constraints;
 pub mod data;
-pub mod decision_tree;
 pub mod errors;
 pub mod grower;
 pub mod histogram;
 pub mod metrics;
-pub mod objective_functions;
+pub mod objective;
 pub mod prune;
 pub mod sampler;
 pub mod splitter;
+pub mod tree;
 pub mod utils;
 
 // Individual classes, and functions

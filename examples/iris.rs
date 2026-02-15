@@ -9,7 +9,7 @@
 //! cargo run --release --example iris
 //! ```
 
-use perpetual::objective_functions::Objective;
+use perpetual::objective::Objective;
 use perpetual::{Matrix, PerpetualBooster};
 use std::error::Error;
 
@@ -89,8 +89,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     // ------------------------------------------------------------------
     // 4. Evaluate
     // ------------------------------------------------------------------
-    let proba_train = model.predict_proba(&matrix_train, true);
-    let proba_test = model.predict_proba(&matrix_test, true);
+    let proba_train = model.predict_proba(&matrix_train, true, false);
+    let proba_test = model.predict_proba(&matrix_test, true, false);
 
     println!("Train accuracy: {:.2}%", accuracy(y_train, &proba_train, 0.5) * 100.0);
     println!("Test  accuracy: {:.2}%", accuracy(y_test, &proba_test, 0.5) * 100.0);

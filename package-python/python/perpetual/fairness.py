@@ -1,4 +1,4 @@
-"""Fairness-aware gradient boosting classifier.
+r"""Fairness-aware gradient boosting classifier.
 
 Provides ``FairClassifier``, a wrapper around ``PerpetualBooster`` that adds
 an in-processing fairness regularization penalty to the log-loss gradient.
@@ -46,7 +46,7 @@ def stable_sigmoid(x):
 
 
 class FairClassifier:
-    """Fairness-aware gradient boosting classifier.
+    r"""Fairness-aware gradient boosting classifier.
 
     Wraps a ``PerpetualBooster`` with an in-processing fairness penalty that
     regularizes the log-loss gradient to reduce dependence of predictions on

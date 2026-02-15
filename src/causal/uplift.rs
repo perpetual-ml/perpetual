@@ -8,7 +8,7 @@ use crate::causal::objective::RLearnerObjective;
 use crate::constraints::ConstraintMap;
 use crate::data::Matrix;
 use crate::errors::PerpetualError;
-use crate::objective_functions::objective::Objective;
+use crate::objective::Objective;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 

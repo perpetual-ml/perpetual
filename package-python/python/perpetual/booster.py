@@ -564,13 +564,15 @@ class PerpetualBooster:
             )
             y_cal_, _ = convert_input_array(y_cal, self.objective)
 
+            alpha_arr = np.atleast_1d(np.array(alpha, dtype=np.float64))
+
             self.booster.calibrate(
                 method=method,
                 flat_data_cal=flat_data_cal,
                 rows_cal=rows_cal,
                 cols_cal=cols_cal,
                 y_cal=y_cal_,
-                alpha=np.atleast_1d(np.array(alpha, dtype=np.float64)),
+                alpha=alpha_arr,
             )
 
         return self
@@ -725,6 +727,43 @@ class PerpetualBooster:
             parallel=parallel,
         )
 
+    def predict_sets(self, X, parallel: Union[bool, None] = None) -> dict:
+        """
+        Predict sets with the fitted booster on new data.
+
+        Parameters
+        ----------
+        X : array-like of shape (n_samples, n_features)
+            New data for prediction.
+        parallel : bool, optional
+            Whether to run prediction in parallel. If None, uses class default.
+
+        Returns
+        -------
+        sets : dict
+            A dictionary containing prediction sets for the specified alpha levels.
+            Each set is a list of labels (e.g., [1.0], [0.0], or [0.0, 1.0]).
+        """
+        is_polars = type_df(X) == "polars_df"
+        if is_polars:
+            features_, columns, masks, rows, cols = transform_input_frame_columnar(
+                X, self.cat_mapping
+            )
+            self._validate_features(features_)
+            return self.booster.predict_sets_columnar(
+                columns=columns, masks=masks, rows=rows, parallel=parallel
+            )
+
+        features_, flat_data, rows, cols = transform_input_frame(X, self.cat_mapping)
+        self._validate_features(features_)
+
+        return self.booster.predict_sets(
+            flat_data=flat_data,
+            rows=rows,
+            cols=cols,
+            parallel=parallel,
+        )
+
     def predict(self, X, parallel: Union[bool, None] = None) -> np.ndarray:
         """
         Predict with the fitted booster on new data.
@@ -764,12 +803,20 @@ class PerpetualBooster:
             if is_polars:
                 return np.rint(
                     self.booster.predict_proba_columnar(
-                        columns=columns, masks=masks, rows=rows, parallel=parallel
+                        columns=columns,
+                        masks=masks,
+                        rows=rows,
+                        parallel=parallel,
+                        calibrated=False,
                     )
                 ).astype(int)
             return np.rint(
                 self.booster.predict_proba(
-                    flat_data=flat_data, rows=rows, cols=cols, parallel=parallel
+                    flat_data=flat_data,
+                    rows=rows,
+                    cols=cols,
+                    parallel=parallel,
+                    calibrated=False,
                 )
             ).astype(int)
         else:
@@ -785,7 +832,9 @@ class PerpetualBooster:
             indices = np.argmax(preds_matrix, axis=1)
             return np.array([self.classes_[i] for i in indices])
 
-    def predict_proba(self, X, parallel: Union[bool, None] = None) -> np.ndarray:
+    def predict_proba(
+        self, X, parallel: Union[bool, None] = None, calibrated: bool = False
+    ) -> np.ndarray:
         """
         Predict class probabilities with the fitted booster on new data.
 
@@ -797,6 +846,8 @@ class PerpetualBooster:
             Input features.
         parallel : bool, optional
             Whether to run prediction in parallel.
+        calibrated : bool, default=False
+            Whether to return calibrated probabilities (requires calibration).
 
         Returns
         -------
@@ -817,21 +868,37 @@ class PerpetualBooster:
         if len(self.classes_) > 2:
             if is_polars:
                 probabilities = self.booster.predict_proba_columnar(
-                    columns=columns, masks=masks, rows=rows, parallel=parallel
+                    columns=columns,
+                    masks=masks,
+                    rows=rows,
+                    parallel=parallel,
+                    calibrated=calibrated,
                 )
             else:
                 probabilities = self.booster.predict_proba(
-                    flat_data=flat_data, rows=rows, cols=cols, parallel=parallel
+                    flat_data=flat_data,
+                    rows=rows,
+                    cols=cols,
+                    parallel=parallel,
+                    calibrated=calibrated,
                 )
             return probabilities.reshape((-1, len(self.classes_)), order="C")
         elif len(self.classes_) == 2:
             if is_polars:
                 probabilities = self.booster.predict_proba_columnar(
-                    columns=columns, masks=masks, rows=rows, parallel=parallel
+                    columns=columns,
+                    masks=masks,
+                    rows=rows,
+                    parallel=parallel,
+                    calibrated=calibrated,
                 )
             else:
                 probabilities = self.booster.predict_proba(
-                    flat_data=flat_data, rows=rows, cols=cols, parallel=parallel
+                    flat_data=flat_data,
+                    rows=rows,
+                    cols=cols,
+                    parallel=parallel,
+                    calibrated=calibrated,
                 )
             return np.concatenate(
                 [(1.0 - probabilities).reshape(-1, 1), probabilities.reshape(-1, 1)],
@@ -2086,3 +2153,111 @@ class PerpetualBooster:
         )
         model_def.ir_version = 6
         onnx.save(model_def, path)
+
+
+def compute_calibration_curve(
+    y_true: Any,
+    y_prob: Any,
+    n_bins: int = 10,
+    strategy: str = "uniform",
+) -> Tuple[np.ndarray, np.ndarray]:
+    """
+    Compute true and predicted probabilities for a calibration curve.
+
+    Parameters
+    ----------
+    y_true : array-like of shape (n_samples,)
+        True targets.
+    y_prob : array-like of shape (n_samples,)
+        Probabilities of the positive class.
+    n_bins : int, default=10
+        Number of bins to discretize the [0, 1] interval.
+    strategy : {"uniform", "quantile"}, default="uniform"
+        Strategy used to define the widths of the bins.
+        uniform: The bins have identical widths.
+        quantile: The bins have the same number of samples.
+
+    Returns
+    -------
+    prob_true : ndarray of shape (n_bins,) or smaller
+        The proportion of samples whose class is the positive class, in each bin.
+    prob_pred : ndarray of shape (n_bins,) or smaller
+        The mean predicted probability in each bin.
+    """
+    y_true = np.asarray(y_true)
+    y_prob = np.asarray(y_prob)
+
+    if strategy == "uniform":
+        bins = np.linspace(0.0, 1.0, n_bins + 1)
+    elif strategy == "quantile":
+        bins = np.percentile(y_prob, np.linspace(0, 100, n_bins + 1))
+    else:
+        raise ValueError(
+            "Invalid strategy: strategies can be specified as uniform or quantile"
+        )
+
+    binids = np.searchsorted(bins[1:-1], y_prob)
+
+    bin_sums = np.bincount(binids, weights=y_prob, minlength=len(bins))
+    bin_true = np.bincount(binids, weights=y_true, minlength=len(bins))
+    bin_total = np.bincount(binids, minlength=len(bins))
+
+    nonzero = bin_total != 0
+    prob_true = bin_true[nonzero] / bin_total[nonzero]
+    prob_pred = bin_sums[nonzero] / bin_total[nonzero]
+
+    return prob_true, prob_pred
+
+
+def expected_calibration_error(
+    y_true: Any,
+    y_prob: Any,
+    n_bins: int = 10,
+    strategy: str = "uniform",
+) -> float:
+    """
+    Compute Expected Calibration Error (ECE).
+
+    Parameters
+    ----------
+    y_true : array-like of shape (n_samples,)
+        True targets.
+    y_prob : array-like of shape (n_samples,)
+        Probabilities of the positive class.
+    n_bins : int, default=10
+        Number of bins.
+    strategy : {"uniform", "quantile"}, default="uniform"
+        Strategy used to define the widths of the bins.
+
+    Returns
+    -------
+    ece : float
+        The expected calibration error.
+    """
+    y_true = np.asarray(y_true)
+    y_prob = np.asarray(y_prob)
+
+    if strategy == "uniform":
+        bins = np.linspace(0.0, 1.0, n_bins + 1)
+    elif strategy == "quantile":
+        bins = np.percentile(y_prob, np.linspace(0, 100, n_bins + 1))
+    else:
+        raise ValueError(
+            "Invalid strategy: strategies can be specified as uniform or quantile"
+        )
+
+    binids = np.searchsorted(bins[1:-1], y_prob)
+
+    bin_total = np.bincount(binids, minlength=len(bins))
+
+    nonzero = bin_total != 0
+
+    bin_true_sums = np.bincount(binids, weights=y_true, minlength=len(bins))
+    bin_prob_sums = np.bincount(binids, weights=y_prob, minlength=len(bins))
+
+    # Avoid division by zero
+    prob_true = bin_true_sums[nonzero] / bin_total[nonzero]
+    prob_pred = bin_prob_sums[nonzero] / bin_total[nonzero]
+
+    ece = np.sum(np.abs(prob_true - prob_pred) * (bin_total[nonzero] / len(y_true)))
+    return ece

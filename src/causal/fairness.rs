@@ -7,7 +7,7 @@
 //! * **Equalized Odds** — penalizes correlation between $\hat{Y}$ and $S$
 //!   *conditionally* within each class of the true label $Y$.
 use crate::metrics::evaluation::Metric;
-use crate::objective_functions::objective::ObjectiveFunction;
+use crate::objective::ObjectiveFunction;
 use serde::{Deserialize, Serialize};
 
 /// Which fairness criterion to enforce.

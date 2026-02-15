@@ -737,7 +737,7 @@ def test_calibration():
         X_train_full, y_train_full, random_state=42, test_size=0.25
     )
 
-    model = PerpetualBooster(objective="SquaredLoss")
+    model = PerpetualBooster(objective="SquaredLoss", save_node_stats=True)
     model.fit(X_train, y_train)
 
     alpha = [0.2]

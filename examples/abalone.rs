@@ -12,7 +12,7 @@
 //! ```
 
 use perpetual::booster::config::BoosterIO;
-use perpetual::objective_functions::Objective;
+use perpetual::objective::Objective;
 use perpetual::{Matrix, PerpetualBooster};
 use std::error::Error;
 

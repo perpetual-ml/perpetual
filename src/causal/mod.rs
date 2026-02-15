@@ -6,6 +6,7 @@
 pub mod dml;
 pub mod fairness;
 pub mod iv;
+pub mod metalearners;
 pub mod objective;
 pub mod policy;
 pub mod uplift;

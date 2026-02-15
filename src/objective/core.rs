@@ -1,6 +1,6 @@
 use crate::{
     metrics::evaluation::Metric,
-    objective_functions::{AdaptiveHuberLoss, HuberLoss, ListNetLoss, LogLoss, QuantileLoss, SquaredLoss},
+    objective::{AdaptiveHuberLoss, HuberLoss, ListNetLoss, LogLoss, QuantileLoss, SquaredLoss},
 };
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
@@ -288,7 +288,7 @@ impl ObjectiveFunction for Objective {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::objective_functions::objective::Objective;
+    use crate::objective::Objective;
 
     // Common data used across tests
     static Y: &[f64] = &[0.0, 0.0, 0.0, 1.0, 1.0, 1.0];

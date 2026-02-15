@@ -11,7 +11,7 @@ use perpetual_rs::booster::config::{CalibrationMethod, MissingNodeTreatment};
 use perpetual_rs::booster::multi_output::MultiOutputBooster as CrateMultiOutputBooster;
 use perpetual_rs::constraints::Constraint;
 use perpetual_rs::data::{ColumnarMatrix, Matrix};
-use perpetual_rs::objective_functions::Objective;
+use perpetual_rs::objective::Objective;
 use pyo3::IntoPyObjectExt;
 use pyo3::exceptions::{PyKeyError, PyValueError};
 use pyo3::prelude::*;
@@ -703,7 +703,9 @@ impl MultiOutputBooster {
         rows: usize,
         cols: usize,
         parallel: Option<bool>,
+        calibrated: Option<bool>,
     ) -> PyResult<Bound<'py, PyArray1<f64>>> {
+        let _ = calibrated;
         let flat_data = flat_data.as_slice()?;
         let data = Matrix::new(flat_data, rows, cols);
         let parallel = parallel.unwrap_or(true);
@@ -717,7 +719,9 @@ impl MultiOutputBooster {
         masks: Option<Vec<Option<PyReadonlyArray1<u8>>>>,
         rows: usize,
         parallel: Option<bool>,
+        calibrated: Option<bool>,
     ) -> PyResult<Bound<'py, PyArray1<f64>>> {
+        let _ = calibrated;
         let col_slices: Vec<&[f64]> = columns
             .iter()
             .map(|col| col.as_slice())

@@ -6,7 +6,7 @@ mod causal_tests {
     use crate::causal::policy::PolicyObjective;
     use crate::causal::uplift::UpliftBooster;
     use crate::data::Matrix;
-    use crate::objective_functions::objective::{Objective, ObjectiveFunction};
+    use crate::objective::{Objective, ObjectiveFunction};
 
     // -----------------------------------------------------------------------
     // UpliftBooster
@@ -187,9 +187,11 @@ mod causal_tests {
     fn test_policy_objective_aipw() {
         let treatment = vec![1, 0, 1, 0];
         let propensity = vec![0.5, 0.5, 0.5, 0.5];
-        let mu_hat = vec![5.0, 5.0, 5.0, 5.0]; // baseline prediction
+        // Now split baselines
+        let mu_hat_1 = vec![5.0, 5.0, 5.0, 5.0];
+        let mu_hat_0 = vec![4.0, 4.0, 4.0, 4.0]; // diff = 1.0
 
-        let obj = PolicyObjective::new_aipw(treatment, propensity, mu_hat);
+        let obj = PolicyObjective::new_aipw(treatment, propensity, mu_hat_1, mu_hat_0);
 
         let y = vec![10.0, 2.0, 8.0, 3.0];
         let yhat = vec![0.0; 4];
@@ -200,6 +202,188 @@ mod causal_tests {
 
         let loss = obj.loss(&y, &yhat, None, None);
         assert_eq!(loss.len(), 4);
+    }
+
+    // -----------------------------------------------------------------------
+    // Meta-Learners
+    // -----------------------------------------------------------------------
+
+    use crate::causal::metalearners::{DRLearner, SLearner, TLearner, XLearner};
+
+    #[test]
+    fn test_s_learner_basic() {
+        // Synthetic data Y = X + 5*W
+        let n = 100;
+        let mut x_data = Vec::with_capacity(n);
+        let mut w = Vec::with_capacity(n);
+        let mut y = Vec::with_capacity(n);
+        for i in 0..n {
+            let x_val = i as f64 / n as f64;
+            let w_val = if i % 2 == 0 { 0.0 } else { 1.0 };
+            x_data.push(x_val);
+            w.push(w_val);
+            y.push(x_val + 5.0 * w_val);
+        }
+        let matrix = Matrix::new(&x_data, n, 1);
+
+        let mut learner = SLearner::new(
+            1.0,
+            255,
+            None,
+            None,
+            None,
+            false,
+            f64::NAN,
+            true,
+            true,
+            Default::default(),
+            crate::booster::config::MissingNodeTreatment::AssignToParent,
+            0,
+            42,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        )
+        .unwrap();
+
+        learner.fit(&matrix, &w, &y).expect("Fit failed");
+
+        let cate = learner.predict(&matrix);
+        let avg_effect: f64 = cate.iter().sum::<f64>() / cate.len() as f64;
+        assert!(
+            avg_effect > 4.0,
+            "S-Learner should capture strong effect, got {avg_effect}"
+        );
+    }
+
+    #[test]
+    fn test_t_learner_basic() {
+        // T-Learner fits separate models.
+        let x_data = vec![1.0, 2.0, 3.0, 4.0, 1.0, 2.0, 3.0, 4.0];
+        let w = vec![0.0, 1.0, 0.0, 1.0, 0.0, 1.0, 0.0, 1.0];
+        let y = vec![1.0, 4.0, 3.0, 6.0, 1.0, 4.0, 3.0, 6.0]; // Effect = 2.0
+        let matrix = Matrix::new(&x_data, 8, 1);
+
+        let mut learner = TLearner::new(
+            2.0,
+            255,
+            None,
+            None,
+            None,
+            false,
+            f64::NAN,
+            true,
+            true,
+            Default::default(),
+            crate::booster::config::MissingNodeTreatment::AssignToParent,
+            0,
+            42,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        )
+        .unwrap();
+
+        learner.fit(&matrix, &w, &y).expect("Fit failed");
+
+        let cate = learner.predict(&matrix);
+        let avg_effect: f64 = cate.iter().sum::<f64>() / cate.len() as f64;
+        assert!(
+            avg_effect > 1.0,
+            "T-Learner should capture effect ~2.0, got {avg_effect}"
+        );
+    }
+
+    #[test]
+    fn test_x_learner_basic() {
+        let x_data = vec![1.0, 2.0, 3.0, 4.0, 1.0, 2.0, 3.0, 4.0];
+        let w = vec![0.0, 1.0, 0.0, 1.0, 0.0, 1.0, 0.0, 1.0];
+        let y = vec![1.0, 4.0, 3.0, 6.0, 1.0, 4.0, 3.0, 6.0]; // Effect = 2.0
+        let matrix = Matrix::new(&x_data, 8, 1);
+
+        let mut learner = XLearner::new(
+            2.0,
+            None,
+            255,
+            None,
+            None,
+            None,
+            false,
+            f64::NAN,
+            true,
+            true,
+            Default::default(),
+            crate::booster::config::MissingNodeTreatment::AssignToParent,
+            0,
+            42,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        )
+        .unwrap();
+
+        learner.fit(&matrix, &w, &y).expect("Fit failed");
+
+        let cate = learner.predict(&matrix);
+        let avg_effect: f64 = cate.iter().sum::<f64>() / cate.len() as f64;
+        assert!(
+            avg_effect > 1.0,
+            "X-Learner should capture effect ~2.0, got {avg_effect}"
+        );
+    }
+
+    #[test]
+    fn test_dr_learner_basic() {
+        let x_data = vec![1.0, 2.0, 3.0, 4.0, 1.0, 2.0, 3.0, 4.0];
+        let w = vec![0.0, 1.0, 0.0, 1.0, 0.0, 1.0, 0.0, 1.0];
+        let y = vec![1.0, 4.0, 3.0, 6.0, 1.0, 4.0, 3.0, 6.0]; // Effect = 2.0
+        let matrix = Matrix::new(&x_data, 8, 1);
+
+        let mut learner = DRLearner::new(
+            2.0,
+            None,
+            255,
+            None,
+            None,
+            None,
+            false,
+            f64::NAN,
+            true,
+            true,
+            Default::default(),
+            crate::booster::config::MissingNodeTreatment::AssignToParent,
+            0,
+            42,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        )
+        .unwrap();
+
+        learner.fit(&matrix, &w, &y).expect("Fit failed");
+
+        let cate = learner.predict(&matrix);
+        let avg_effect: f64 = cate.iter().sum::<f64>() / cate.len() as f64;
+        assert!(
+            avg_effect > 1.0,
+            "DR-Learner should capture effect ~2.0, got {avg_effect}"
+        );
     }
 
     // -----------------------------------------------------------------------

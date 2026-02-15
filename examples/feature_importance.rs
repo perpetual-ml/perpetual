@@ -10,7 +10,7 @@
 //! ```
 
 use perpetual::booster::config::{ContributionsMethod, ImportanceMethod};
-use perpetual::objective_functions::Objective;
+use perpetual::objective::Objective;
 use perpetual::{Matrix, PerpetualBooster};
 use std::error::Error;
 use std::fs::File;

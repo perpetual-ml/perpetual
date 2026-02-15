@@ -1,5 +1,5 @@
 /// Detailed profiling: measure histogram build time vs other overhead
-use perpetual::{Matrix, PerpetualBooster, objective_functions::Objective};
+use perpetual::{Matrix, PerpetualBooster, objective::Objective};
 use std::time::Instant;
 
 fn main() {

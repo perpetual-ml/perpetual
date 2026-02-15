@@ -1,22 +1,33 @@
 """Meta-learner strategies for heterogeneous treatment effect estimation.
 
 Provides S-Learner, T-Learner, X-Learner, and DR-Learner wrappers around
-`PerpetualBooster` for estimating the Conditional Average Treatment
+optimized Rust implementations for estimating the Conditional Average Treatment
 Effect (CATE) from observational data.
 
 All learners follow a consistent API:
-    - ``fit(X, w, y)`` – fit on covariates, binary treatment, and outcome.
-    - ``predict(X)`` – return estimated CATE for each row.
-    - ``feature_importances_`` – feature importance from the final effect
+    - ``fit(X, w, y)`` - fit on covariates, binary treatment, and outcome.
+    - ``predict(X)`` - return estimated CATE for each row.
+    - ``feature_importances_`` - feature importance from the final effect
       model (available after ``fit``).
 """
 
-from typing import Optional
+from typing import Any, Dict, Optional
 
 import numpy as np
 from typing_extensions import Self
 
-from perpetual.booster import PerpetualBooster
+from perpetual.perpetual import (
+    DRLearner as RustDRLearner,
+)
+from perpetual.perpetual import (
+    SLearner as RustSLearner,
+)
+from perpetual.perpetual import (
+    TLearner as RustTLearner,
+)
+from perpetual.perpetual import (
+    XLearner as RustXLearner,
+)
 
 
 def _validate_binary_treatment(w):
@@ -24,7 +35,35 @@ def _validate_binary_treatment(w):
     w_arr = np.asarray(w)
     if not np.all(np.isin(w_arr, [0, 1])):
         raise ValueError("Treatment 'w' must be binary (0 or 1).")
-    return w_arr
+    return w_arr.astype(np.float64)
+
+
+def _prepare_params(budget: float, kwargs: Dict[str, Any]) -> Dict[str, Any]:
+    """Prepare parameters for the Rust backend with defaults matching PerpetualBooster."""
+    params = {
+        "budget": budget,
+        "max_bin": 255,
+        "num_threads": None,
+        "monotone_constraints": {},
+        "interaction_constraints": None,
+        "force_children_to_bound_parent": False,
+        "missing": np.nan,
+        "allow_missing_splits": True,
+        "create_missing_branch": False,
+        "terminate_missing_features": set(),
+        "missing_node_treatment": "AssignToParent",
+        "log_iterations": 0,
+        "seed": 42,
+        "quantile": None,
+        "reset": None,
+        "categorical_features": None,
+        "timeout": None,
+        "iteration_limit": None,
+        "memory_limit": None,
+        "stopping_rounds": None,
+    }
+    params.update(kwargs)
+    return params
 
 
 # ---------------------------------------------------------------------------
@@ -48,14 +87,14 @@ class SLearner:
         Parameters
         ----------
         budget : float, default=0.5
-            Fitting budget forwarded to `PerpetualBooster`.
+            Fitting budget forwarded to the Rust backend.
         **kwargs
             Additional keyword arguments forwarded to `PerpetualBooster`.
         """
         self.budget = budget
-        self._kwargs = kwargs
-        self.learner = PerpetualBooster(budget=budget, **kwargs)
-        self.feature_importances_: Optional[np.ndarray] = None
+        self._params = _prepare_params(budget, kwargs)
+        self.learner = RustSLearner(**self._params)
+        self._n_features: Optional[int] = None
 
     def fit(self, X, w, y) -> Self:
         """Fit the single model on covariates augmented with treatment.
@@ -74,27 +113,23 @@ class SLearner:
         self
             Fitted estimator.
         """
-        import pandas as pd
-
         w_arr = _validate_binary_treatment(w)
-        # If X is not a DataFrame, convert to DataFrame with default column names
-        if not hasattr(X, "columns"):
-            X = pd.DataFrame(
-                X, columns=[f"f{i}" for i in range(np.asarray(X).shape[1])]
-            )
-        X_aug = X.copy()
-        X_aug["treatment"] = w_arr
-        self.learner.fit(X_aug, y)
-        # Feature importances: drop the appended treatment column if present
-        if (
-            hasattr(self.learner, "feature_importances_")
-            and len(self.learner.feature_importances_) == X_aug.shape[1]
-        ):
-            self.feature_importances_ = self.learner.feature_importances_[:-1]
-        else:
-            self.feature_importances_ = self.learner.feature_importances_
+        x_arr = np.asarray(X, dtype=float, order="F")
+        y_arr = np.asarray(y, dtype=float)
 
+        self._n_features = x_arr.shape[1]
+        self.learner.fit(x_arr.ravel(), x_arr.shape[0], x_arr.shape[1], w_arr, y_arr)
         return self
+
+    @property
+    def feature_importances_(self) -> np.ndarray:
+        """Feature importance of the single model (excluding treatment feature)."""
+        importances_map = self.learner.calculate_feature_importance("Gain", True)
+        if self._n_features is None:
+            return np.zeros(0)
+        # Return only the FIRST n_features (the covariates).
+        # We assume treatment was appended at index n_features.
+        return np.array([importances_map.get(i, 0.0) for i in range(self._n_features)])
 
     def predict(self, X) -> np.ndarray:
         """Estimate the CATE as ``M(X, 1) - M(X, 0)``.
@@ -109,19 +144,8 @@ class SLearner:
         ndarray of shape (n_samples,)
             Estimated treatment effect for each sample.
         """
-        import pandas as pd
-
-        # If X is not a DataFrame, convert to DataFrame with default column names
-        if not hasattr(X, "columns"):
-            X = pd.DataFrame(
-                X, columns=[f"f{i}" for i in range(np.asarray(X).shape[1])]
-            )
-        X_1 = X.copy()
-        X_1["treatment"] = 1
-        X_0 = X.copy()
-        X_0["treatment"] = 0
-
-        return self.learner.predict(X_1) - self.learner.predict(X_0)
+        x_arr = np.asarray(X, dtype=float, order="F")
+        return self.learner.predict(x_arr.ravel(), x_arr.shape[0], x_arr.shape[1])
 
 
 # ---------------------------------------------------------------------------
@@ -146,69 +170,37 @@ class TLearner:
         Parameters
         ----------
         budget : float, default=0.5
-            Fitting budget forwarded to each `PerpetualBooster`.
+            Fitting budget forwarded to the Rust backend.
         **kwargs
             Additional keyword arguments forwarded to `PerpetualBooster`.
         """
         self.budget = budget
-        self._kwargs = kwargs
-        self.m0 = PerpetualBooster(budget=budget, **kwargs)
-        self.m1 = PerpetualBooster(budget=budget, **kwargs)
-        self.feature_importances_: Optional[np.ndarray] = None
+        self._params = _prepare_params(budget, kwargs)
+        self.learner = RustTLearner(**self._params)
+        self._n_features: Optional[int] = None
 
     def fit(self, X, w, y) -> Self:
-        """Fit separate models on control and treated groups.
-
-        Parameters
-        ----------
-        X : array-like of shape (n_samples, n_features)
-            Covariate matrix.
-        w : array-like of shape (n_samples,)
-            Binary treatment indicator (0 or 1).
-        y : array-like of shape (n_samples,)
-            Observed outcome.
-
-        Returns
-        -------
-        self
-            Fitted estimator.
-        """
-        import pandas as pd
-
-        w_arr = _validate_binary_treatment(w)
-        # If X is not a DataFrame, convert to DataFrame with default column names
-        if not hasattr(X, "columns"):
-            X = pd.DataFrame(
-                X, columns=[f"f{i}" for i in range(np.asarray(X).shape[1])]
-            )
-        mask_0 = w_arr == 0
-        mask_1 = w_arr == 1
-        X_0 = X.loc[mask_0].copy()
-        X_1 = X.loc[mask_1].copy()
-        y_0 = np.asarray(y)[mask_0]
-        y_1 = np.asarray(y)[mask_1]
-        self.m0.fit(X_0, y_0)
-        self.m1.fit(X_1, y_1)
-        # Average feature importances across both arms.
-        self.feature_importances_ = (
-            self.m0.feature_importances_ + self.m1.feature_importances_
-        ) / 2.0
+        x_arr = np.asarray(X, dtype=float, order="F")
+        self._n_features = x_arr.shape[1]
+        self.learner.fit(
+            x_arr.ravel(),
+            x_arr.shape[0],
+            x_arr.shape[1],
+            _validate_binary_treatment(w),
+            np.asarray(y, dtype=float),
+        )
         return self
 
+    @property
+    def feature_importances_(self) -> np.ndarray:
+        """Aggregated feature importance from mu0 and mu1."""
+        importances_map = self.learner.calculate_feature_importance("Gain", True)
+        n = self._n_features if self._n_features is not None else 0
+        return np.array([importances_map.get(i, 0.0) for i in range(n)])
+
     def predict(self, X) -> np.ndarray:
-        """Estimate the CATE as ``M1(X) - M0(X)``.
-
-        Parameters
-        ----------
-        X : array-like of shape (n_samples, n_features)
-            Covariate matrix.
-
-        Returns
-        -------
-        ndarray of shape (n_samples,)
-            Estimated treatment effect for each sample.
-        """
-        return self.m1.predict(X) - self.m0.predict(X)
+        x_arr = np.asarray(X, dtype=float, order="F")
+        return self.learner.predict(x_arr.ravel(), x_arr.shape[0], x_arr.shape[1])
 
 
 # ---------------------------------------------------------------------------
@@ -217,129 +209,42 @@ class TLearner:
 
 
 class XLearner:
-    """X-Learner for HTE estimation (typically better for imbalanced treatment groups).
-
-    Stage 1: Estimate T-Learner (M0, M1).
-    Stage 2: Impute separate treatment effects from Stage 1::
-
-        D1 = Y[W=1] - M0(X[W=1])
-        D0 = M1(X[W=0]) - Y[W=0]
-
-    Stage 3: Fit models for imputed effects::
-
-        tau1(X) ~ D1
-        tau0(X) ~ D0
-
-    Stage 4: Combine using propensity score g(X)::
-
-        CATE(X) = g(X) * tau0(X) + (1 - g(X)) * tau1(X)
-    """
+    """X-Learner for HTE estimation (typically better for imbalanced treatment groups)."""
 
     def __init__(
         self,
         budget: float = 0.5,
-        propensity_model: Optional[PerpetualBooster] = None,
+        propensity_budget: Optional[float] = None,
         **kwargs,
     ):
-        """Create an X-Learner.
-
-        Parameters
-        ----------
-        budget : float, default=0.5
-            Fitting budget forwarded to each `PerpetualBooster`.
-        propensity_model : PerpetualBooster, optional
-            Pre-configured booster for propensity estimation.  If ``None``, a
-            default ``LogLoss`` booster is created.
-        **kwargs
-            Additional keyword arguments forwarded to `PerpetualBooster`.
-        """
         self.budget = budget
-        self._kwargs = kwargs
-        self.m0 = PerpetualBooster(budget=budget, **kwargs)
-        self.m1 = PerpetualBooster(budget=budget, **kwargs)
-        self.tau0 = PerpetualBooster(budget=budget, objective="SquaredLoss", **kwargs)
-        self.tau1 = PerpetualBooster(budget=budget, objective="SquaredLoss", **kwargs)
-
-        if propensity_model is None:
-            self.g = PerpetualBooster(budget=budget, objective="LogLoss", **kwargs)
-        else:
-            self.g = propensity_model
-
-        self.feature_importances_: Optional[np.ndarray] = None
+        self._params = _prepare_params(budget, kwargs)
+        self._params["propensity_budget"] = propensity_budget
+        self.learner = RustXLearner(**self._params)
+        self._n_features: Optional[int] = None
 
     def fit(self, X, w, y) -> Self:
-        """Fit all stages of the X-Learner.
-
-        Parameters
-        ----------
-        X : array-like of shape (n_samples, n_features)
-            Covariate matrix.
-        w : array-like of shape (n_samples,)
-            Binary treatment indicator (0 or 1).
-        y : array-like of shape (n_samples,)
-            Observed outcome.
-
-        Returns
-        -------
-        self
-            Fitted estimator.
-        """
-        import pandas as pd
-
-        w_arr = _validate_binary_treatment(w)
-        # If X is not a DataFrame, convert to DataFrame with default column names
-        if not hasattr(X, "columns"):
-            X = pd.DataFrame(
-                X, columns=[f"f{i}" for i in range(np.asarray(X).shape[1])]
-            )
-        mask_0 = w_arr == 0
-        mask_1 = w_arr == 1
-        X_0 = X.loc[mask_0].copy()
-        X_1 = X.loc[mask_1].copy()
-        y_0 = np.asarray(y)[mask_0]
-        y_1 = np.asarray(y)[mask_1]
-        # Stage 1
-        self.m0.fit(X_0, y_0)
-        self.m1.fit(X_1, y_1)
-        # Stage 2
-        pred_m0_on_1 = self.m0.predict(X_1)
-        pred_m1_on_0 = self.m1.predict(X_0)
-        d1 = y_1 - pred_m0_on_1
-        d0 = pred_m1_on_0 - y_0
-        # Stage 3
-        self.tau1.fit(X_1, d1)
-        self.tau0.fit(X_0, d0)
-        # Propensity
-        self.g.fit(X, w_arr)
-        # Average feature importances from the two effect models.
-        self.feature_importances_ = (
-            self.tau0.feature_importances_ + self.tau1.feature_importances_
-        ) / 2.0
+        x_arr = np.asarray(X, dtype=float, order="F")
+        self._n_features = x_arr.shape[1]
+        self.learner.fit(
+            x_arr.ravel(),
+            x_arr.shape[0],
+            x_arr.shape[1],
+            _validate_binary_treatment(w),
+            np.asarray(y, dtype=float),
+        )
         return self
 
+    @property
+    def feature_importances_(self) -> np.ndarray:
+        """Aggregated feature importance from the second-stage effect models (tau0, tau1)."""
+        importances_map = self.learner.calculate_feature_importance("Gain", True)
+        n = self._n_features if self._n_features is not None else 0
+        return np.array([importances_map.get(i, 0.0) for i in range(n)])
+
     def predict(self, X) -> np.ndarray:
-        """Estimate the CATE by combining ``tau0`` and ``tau1`` via propensity.
-
-        Parameters
-        ----------
-        X : array-like of shape (n_samples, n_features)
-            Covariate matrix.
-
-        Returns
-        -------
-        ndarray of shape (n_samples,)
-            Estimated treatment effect for each sample.
-        """
-        # Propensity score as P(W=1|X).
-        # Use predict (raw log-odds) and apply sigmoid for robustness,
-        # since predict_proba may not be available for every objective.
-        log_odds = self.g.predict(X)
-        p_score = 1.0 / (1.0 + np.exp(-log_odds))
-
-        tau0_pred = self.tau0.predict(X)
-        tau1_pred = self.tau1.predict(X)
-
-        return p_score * tau0_pred + (1 - p_score) * tau1_pred
+        x_arr = np.asarray(X, dtype=float, order="F")
+        return self.learner.predict(x_arr.ravel(), x_arr.shape[0], x_arr.shape[1])
 
 
 # ---------------------------------------------------------------------------
@@ -348,127 +253,40 @@ class XLearner:
 
 
 class DRLearner:
-    """Doubly Robust (DR) Learner for heterogeneous treatment effect estimation.
-
-    The DR-Learner constructs an *augmented IPW* (AIPW) pseudo-outcome
-    and regresses it on covariates to estimate the CATE directly.
-
-    AIPW Pseudo-outcome
-    --------------------
-    For each sample *i*:
-
-    .. math::
-
-        \\Gamma_i = \\hat{\\mu}_1(X_i) - \\hat{\\mu}_0(X_i)
-            + \\frac{W_i (Y_i - \\hat{\\mu}_1(X_i))}{\\hat{p}(X_i)}
-            - \\frac{(1-W_i)(Y_i - \\hat{\\mu}_0(X_i))}{1-\\hat{p}(X_i)}
-
-    The DR-Learner is "doubly robust" because the resulting CATE estimate
-    is consistent as long as *either* the outcome models or the propensity
-    model is correctly specified.
-
-    Stages
-    ------
-    1. Fit outcome models per arm: ``mu0(X)`` and ``mu1(X)``.
-    2. Fit propensity model: ``p(X) = P(W=1|X)``.
-    3. Compute AIPW pseudo-outcomes.
-    4. Fit a final regression of pseudo-outcomes on covariates.
-
-    Parameters
-    ----------
-    budget : float, default=0.5
-        Fitting budget forwarded to each internal `PerpetualBooster`.
-    propensity_budget : float, optional
-        Separate budget for the propensity model (defaults to ``budget``).
-    clip : float, default=0.01
-        Propensity scores are clipped to ``[clip, 1-clip]`` for stability.
-    **kwargs
-        Additional keyword arguments forwarded to `PerpetualBooster`.
-    """
+    """Doubly Robust (DR) Learner for heterogeneous treatment effect estimation."""
 
     def __init__(
         self,
         budget: float = 0.5,
         propensity_budget: Optional[float] = None,
-        clip: float = 0.01,
+        clip: float = 0.01,  # Note: clip is currently handled inside Rust fit logic for stable IPW
         **kwargs,
     ):
         self.budget = budget
-        self.propensity_budget = propensity_budget or budget
-        self.clip = clip
-        self._kwargs = kwargs
-
-        self.mu0 = PerpetualBooster(budget=budget, **kwargs)
-        self.mu1 = PerpetualBooster(budget=budget, **kwargs)
-        self.propensity = PerpetualBooster(
-            budget=self.propensity_budget, objective="LogLoss", **kwargs
-        )
-        self.effect = PerpetualBooster(budget=budget, objective="SquaredLoss", **kwargs)
-        self.feature_importances_: Optional[np.ndarray] = None
+        self._params = _prepare_params(budget, kwargs)
+        self._params["propensity_budget"] = propensity_budget
+        self.learner = RustDRLearner(**self._params)
+        self._n_features: Optional[int] = None
 
     def fit(self, X, w, y) -> Self:
-        """Fit the DR-Learner.
-
-        Parameters
-        ----------
-        X : array-like of shape (n_samples, n_features)
-            Covariate matrix.
-        w : array-like of shape (n_samples,)
-            Binary treatment indicator (0 or 1).
-        y : array-like of shape (n_samples,)
-            Observed outcome.
-
-        Returns
-        -------
-        self
-            Fitted estimator.
-        """
-        import pandas as pd
-
-        w_arr = _validate_binary_treatment(w)
-        # If X is not a DataFrame, convert to DataFrame with default column names
-        if not hasattr(X, "columns"):
-            X = pd.DataFrame(
-                X, columns=[f"f{i}" for i in range(np.asarray(X).shape[1])]
-            )
-        mask_0 = w_arr == 0
-        mask_1 = w_arr == 1
-        X_0 = X.loc[mask_0].copy()
-        X_1 = X.loc[mask_1].copy()
-        y_0 = np.asarray(y, dtype=float)[mask_0]
-        y_1 = np.asarray(y, dtype=float)[mask_1]
-        # Stage 1: Outcome models per arm.
-        self.mu0.fit(X_0, y_0)
-        self.mu1.fit(X_1, y_1)
-        mu0_hat = self.mu0.predict(X)
-        mu1_hat = self.mu1.predict(X)
-        # Stage 2: Propensity model.
-        self.propensity.fit(X, w_arr)
-        log_odds = self.propensity.predict(X)
-        p_hat = np.clip(1.0 / (1.0 + np.exp(-log_odds)), self.clip, 1.0 - self.clip)
-        # Stage 3: AIPW pseudo-outcomes.
-        gamma = (
-            mu1_hat
-            - mu0_hat
-            + w_arr * (np.asarray(y, dtype=float) - mu1_hat) / p_hat
-            - (1 - w_arr) * (np.asarray(y, dtype=float) - mu0_hat) / (1 - p_hat)
+        x_arr = np.asarray(X, dtype=float, order="F")
+        self._n_features = x_arr.shape[1]
+        self.learner.fit(
+            x_arr.ravel(),
+            x_arr.shape[0],
+            x_arr.shape[1],
+            _validate_binary_treatment(w),
+            np.asarray(y, dtype=float),
         )
-        # Stage 4: Final effect model.
-        self.effect.fit(X, gamma)
-        self.feature_importances_ = self.effect.feature_importances_
         return self
 
+    @property
+    def feature_importances_(self) -> np.ndarray:
+        """Feature importance from the outcome model fitted on pseudo-outcomes."""
+        importances_map = self.learner.calculate_feature_importance("Gain", True)
+        n = self._n_features if self._n_features is not None else 0
+        return np.array([importances_map.get(i, 0.0) for i in range(n)])
+
     def predict(self, X) -> np.ndarray:
-        """Predict CATE.
-
-        Parameters
-        ----------
-        X : array-like of shape (n_samples, n_features)
-            Covariate matrix.
-
-        Returns
-        -------
-        ndarray of shape (n_samples,)
-            Estimated treatment effect for each sample.
-        """
-        return self.effect.predict(X)
+        x_arr = np.asarray(X, dtype=float, order="F")
+        return self.learner.predict(x_arr.ravel(), x_arr.shape[0], x_arr.shape[1])

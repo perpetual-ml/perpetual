@@ -20,7 +20,7 @@
 
 // cargo flamegraph --example cover_types
 
-use perpetual::{Matrix, PerpetualBooster, objective_functions::Objective};
+use perpetual::{Matrix, PerpetualBooster, objective::Objective};
 use std::env;
 use std::error::Error;
 use std::fs::File;

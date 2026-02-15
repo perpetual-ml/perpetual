@@ -1,6 +1,6 @@
 /// Instrument the tree.fit loop with timing.
 /// Adds thread-local timing accumulators to measure split_node phase breakdown.
-use perpetual::{Matrix, PerpetualBooster, objective_functions::Objective};
+use perpetual::{Matrix, PerpetualBooster, objective::Objective};
 use std::time::Instant;
 
 fn main() {

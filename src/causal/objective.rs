@@ -3,7 +3,7 @@
 //! Custom objective function for the effect model in the R-Learner
 //! meta-algorithm. Minimizes the R-Loss for CATE estimation.
 use crate::metrics::evaluation::Metric;
-use crate::objective_functions::objective::ObjectiveFunction;
+use crate::objective::ObjectiveFunction;
 use serde::{Deserialize, Serialize};
 
 /// Minimum propensity clip to avoid division-by-zero or extreme weights.

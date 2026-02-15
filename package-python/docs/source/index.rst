@@ -28,6 +28,7 @@ Key Features
    installation
    quickstart
    api
+   calibration
    tutorials/index
    Causal ML <causal_ml/index>
    architecture

@@ -16,7 +16,11 @@ Provides:
 
 from __future__ import annotations
 
-from perpetual.booster import PerpetualBooster
+from perpetual.booster import (
+    PerpetualBooster,
+    compute_calibration_curve,
+    expected_calibration_error,
+)
 from perpetual.causal_metrics import (
     auuc,
     cumulative_gain_curve,
@@ -34,6 +38,8 @@ from perpetual.uplift import UpliftBooster
 
 __all__ = [
     "PerpetualBooster",
+    "compute_calibration_curve",
+    "expected_calibration_error",
     "PerpetualClassifier",
     "PerpetualRegressor",
     "PerpetualRanker",
