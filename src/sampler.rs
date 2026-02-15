@@ -2,8 +2,8 @@
 //!
 //! Strategies for sampling data before fitting new trees, allowing for stochastic
 //! gradient boosting and better regularization.
-use rand::rngs::StdRng;
 use rand::RngExt;
+use rand::rngs::StdRng;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize)]

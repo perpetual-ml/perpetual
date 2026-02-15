@@ -20,7 +20,7 @@
 
 // cargo flamegraph --example cover_types
 
-use perpetual::{objective_functions::Objective, Matrix, PerpetualBooster};
+use perpetual::{Matrix, PerpetualBooster, objective_functions::Objective};
 use std::env;
 use std::error::Error;
 use std::fs::File;
@@ -44,7 +44,7 @@ pub fn multiclass_log_loss(y_true: &[f64], y_pred: &[Vec<f64>]) -> f64 {
         let probabilities = y_p_exp.iter().map(|e| e / y_p_exp_sum).collect::<Vec<f64>>();
         let cls_idx = (y_true[i] - 1.0) as usize;
         let p = f64::max(eps, f64::min(1.0 - eps, probabilities[cls_idx]));
-        losses[i] = -1.0 * p.ln();
+        losses[i] = -p.ln();
     }
     losses.iter().sum::<f64>() / losses.len() as f64
 }
@@ -147,7 +147,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         let trees = model.get_prediction_trees();
         println!("n_rounds: {:?}", trees.len());
 
-        let n_leaves: usize = trees.iter().map(|t| (t.nodes.len() + 1) / 2).sum();
+        let n_leaves: usize = trees.iter().map(|t| t.nodes.len().div_ceil(2)).sum();
         println!("n_leaves: {:?}", n_leaves);
 
         let y_pred_train = model.predict(&matrix_train, true);

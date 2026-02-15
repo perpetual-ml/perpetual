@@ -131,11 +131,7 @@ impl ObjectiveFunction for DMLObjective {
             .map(|(yr, wr)| yr * wr)
             .sum();
         let den: f64 = self.w_residual.iter().map(|wr| wr * wr).sum();
-        if den.abs() < HESSIAN_FLOOR {
-            0.0
-        } else {
-            num / den
-        }
+        if den.abs() < HESSIAN_FLOOR { 0.0 } else { num / den }
     }
 
     fn default_metric(&self) -> Metric {

@@ -2,14 +2,14 @@
 //!
 //! Split-finding logic for decision tree nodes, including support for
 //! missing-value imputation, ternary branches, and monotone constraints.
-use crate::bin::{sort_cat_bins_by_stat, Bin};
+use crate::bin::{Bin, sort_cat_bins_by_stat};
 use crate::booster::config::MissingNodeTreatment;
 use crate::constants::GENERALIZATION_THRESHOLD;
 use crate::constraints::{Constraint, ConstraintMap};
 use crate::data::{FloatData, Matrix};
 use crate::decision_tree::tree::Tree;
 use crate::histogram::{
-    update_histogram_and_subtract, update_two_histograms_and_subtract, FeatureHistogram, NodeHistogram,
+    FeatureHistogram, NodeHistogram, update_histogram_and_subtract, update_two_histograms_and_subtract,
 };
 use crate::node::{NodeType, SplittableNode};
 use crate::utils::{
@@ -75,8 +75,7 @@ impl<'a> SplitInfoSlice<'a> {
     /// Calling this function is **safe** if and only if `i` is a valid index for the internal data.
     #[allow(clippy::mut_from_ref)]
     pub unsafe fn get_mut(&self, i: usize) -> &mut SplitInfo {
-        let split_info = self.data[i].get().as_mut().unwrap();
-        split_info
+        unsafe { self.data[i].get().as_mut().unwrap() }
     }
     /// # Safety
     ///
@@ -87,19 +86,19 @@ impl<'a> SplitInfoSlice<'a> {
     /// The returned `&mut SplitInfo` is a mutable reference to an element within the internal
     /// data. The caller must not move, drop, or invalidate this reference.
     pub unsafe fn best_split_info(&mut self) -> &mut SplitInfo {
-        let split_info = self
-            .data
-            .iter()
-            .max_by(|s1, s2| {
-                let g1 = s1.get().as_ref().unwrap().split_gain;
-                let g2 = s2.get().as_ref().unwrap().split_gain;
-                g1.partial_cmp(&g2).expect("Tried to compare a NaN")
-            })
-            .unwrap()
-            .get()
-            .as_mut()
-            .unwrap();
-        split_info
+        unsafe {
+            self.data
+                .iter()
+                .max_by(|s1, s2| {
+                    let g1 = s1.get().as_ref().unwrap().split_gain;
+                    let g2 = s2.get().as_ref().unwrap().split_gain;
+                    g1.partial_cmp(&g2).expect("Tried to compare a NaN")
+                })
+                .unwrap()
+                .get()
+                .as_mut()
+                .unwrap()
+        }
     }
 }
 
@@ -205,14 +204,12 @@ pub trait Splitter {
             pool.scope(|s| {
                 for (feat_idx, feature) in col_index.iter().enumerate() {
                     // Check interaction constraints - skip disallowed features
-                    if let Some(allowed) = allowed_features {
-                        if !allowed.contains(feature) {
-                            unsafe {
-                                let split_info = split_info_slice.get_mut(feat_idx);
-                                split_info.split_gain = -1.0;
-                            }
-                            continue;
+                    if allowed_features.is_some_and(|allowed| !allowed.contains(feature)) {
+                        unsafe {
+                            let split_info = split_info_slice.get_mut(feat_idx);
+                            split_info.split_gain = -1.0;
                         }
+                        continue;
                     }
 
                     let fi = feat_idx;
@@ -238,14 +235,12 @@ pub trait Splitter {
         } else {
             for (feat_idx, feature) in col_index.iter().enumerate() {
                 // Check interaction constraints - skip disallowed features
-                if let Some(allowed) = allowed_features {
-                    if !allowed.contains(feature) {
-                        unsafe {
-                            let split_info = split_info_slice.get_mut(feat_idx);
-                            split_info.split_gain = -1.0;
-                        }
-                        continue;
+                if allowed_features.is_some_and(|allowed| !allowed.contains(feature)) {
+                    unsafe {
+                        let split_info = split_info_slice.get_mut(feat_idx);
+                        split_info.split_gain = -1.0;
                     }
+                    continue;
                 }
                 best_feature_split(
                     node,
@@ -404,10 +399,8 @@ impl MissingBranchSplitter {
         }
         // Only update the missing node if it's a leaf, otherwise we will auto-update
         // them via the recursion called earlier.
-        if missing_leaf {
-            if let Some(m) = tree.nodes.get_mut(&missing) {
-                m.weight_value = update as f32;
-            }
+        if let Some(m) = tree.nodes.get_mut(&missing).filter(|_| missing_leaf) {
+            m.weight_value = update as f32;
         }
 
         update
@@ -1069,11 +1062,11 @@ fn best_feature_split_const_hess(
                 let parent_score = -0.5 * node.gain_value / node.stats.as_ref().unwrap().count as f32;
                 let delta_score_train = parent_score - train_score;
                 let delta_score_valid = parent_score - valid_score;
-                let gen = delta_score_train / delta_score_valid;
-                if gen < GENERALIZATION_THRESHOLD && node.num != 0 {
+                let gen_val = delta_score_train / delta_score_valid;
+                if gen_val < GENERALIZATION_THRESHOLD && node.num != 0 {
                     continue;
                 }
-                generalization = Some(gen);
+                generalization = Some(gen_val);
             } else {
                 continue;
             }
@@ -1242,11 +1235,11 @@ fn best_feature_split_const_hess(
             let parent_score = -0.5 * node.gain_value / node.stats.as_ref().unwrap().count as f32;
             let delta_score_train = parent_score - train_score;
             let delta_score_valid = parent_score - valid_score;
-            let gen = delta_score_train / delta_score_valid;
-            if gen < GENERALIZATION_THRESHOLD && node.num != 0 {
+            let gen_val = delta_score_train / delta_score_valid;
+            if gen_val < GENERALIZATION_THRESHOLD && node.num != 0 {
                 continue;
             }
-            let generalization = Some(gen);
+            let generalization = Some(gen_val);
 
             // Compute split gain from summed valid stats (no evaluate call needed)
             let tl_grad: f32 = left_gradient_valid.iter().sum();
@@ -1423,11 +1416,11 @@ fn best_feature_split_const_hess(
             let parent_score = -0.5 * node.gain_value / node.stats.as_ref().unwrap().count as f32;
             let delta_score_train = parent_score - train_score;
             let delta_score_valid = parent_score - valid_score;
-            let gen = delta_score_train / delta_score_valid;
-            if gen < GENERALIZATION_THRESHOLD && node.num != 0 {
+            let gen_val = delta_score_train / delta_score_valid;
+            if gen_val < GENERALIZATION_THRESHOLD && node.num != 0 {
                 continue;
             }
-            let generalization = Some(gen);
+            let generalization = Some(gen_val);
 
             let tl_grad: f32 = left_gradient_valid.iter().sum();
             let tl_count: usize = left_counts_valid.iter().sum();
@@ -1605,11 +1598,11 @@ fn best_feature_split_const_hess(
                 let parent_score = -0.5 * node.gain_value / node.stats.as_ref().unwrap().count as f32;
                 let delta_score_train = parent_score - train_score;
                 let delta_score_valid = parent_score - valid_score;
-                let gen = delta_score_train / delta_score_valid;
-                if gen < GENERALIZATION_THRESHOLD && node.num != 0 {
+                let gen_val = delta_score_train / delta_score_valid;
+                if gen_val < GENERALIZATION_THRESHOLD && node.num != 0 {
                     continue;
                 }
-                generalization = Some(gen);
+                generalization = Some(gen_val);
             } else {
                 continue;
             }
@@ -1923,11 +1916,11 @@ fn best_feature_split_var_hess(
                 let parent_score = -0.5 * node.gain_value / node.stats.as_ref().unwrap().count as f32;
                 let delta_score_train = parent_score - train_score;
                 let delta_score_valid = parent_score - valid_score;
-                let gen = delta_score_train / delta_score_valid;
-                if gen < GENERALIZATION_THRESHOLD && node.num != 0 {
+                let gen_val = delta_score_train / delta_score_valid;
+                if gen_val < GENERALIZATION_THRESHOLD && node.num != 0 {
                     continue;
                 }
-                generalization = Some(gen);
+                generalization = Some(gen_val);
             } else {
                 continue;
             }
@@ -2107,11 +2100,11 @@ fn best_feature_split_var_hess(
             let parent_score = -0.5 * node.gain_value / node.stats.as_ref().unwrap().count as f32;
             let delta_score_train = parent_score - train_score;
             let delta_score_valid = parent_score - valid_score;
-            let gen = delta_score_train / delta_score_valid;
-            if gen < GENERALIZATION_THRESHOLD && node.num != 0 {
+            let gen_val = delta_score_train / delta_score_valid;
+            if gen_val < GENERALIZATION_THRESHOLD && node.num != 0 {
                 continue;
             }
-            let generalization = Some(gen);
+            let generalization = Some(gen_val);
 
             // Compute split gain from summed valid stats
             let tl_grad: f32 = left_gradient_valid.iter().sum();
@@ -2304,11 +2297,11 @@ fn best_feature_split_var_hess(
             let parent_score = -0.5 * node.gain_value / node.stats.as_ref().unwrap().count as f32;
             let delta_score_train = parent_score - train_score;
             let delta_score_valid = parent_score - valid_score;
-            let gen = delta_score_train / delta_score_valid;
-            if gen < GENERALIZATION_THRESHOLD && node.num != 0 {
+            let gen_val = delta_score_train / delta_score_valid;
+            if gen_val < GENERALIZATION_THRESHOLD && node.num != 0 {
                 continue;
             }
-            let generalization = Some(gen);
+            let generalization = Some(gen_val);
 
             let tl_grad: f32 = left_gradient_valid.iter().sum();
             let tl_hess: f32 = left_hessian_valid.iter().sum();
@@ -2499,11 +2492,11 @@ fn best_feature_split_var_hess(
                 let parent_score = -0.5 * node.gain_value / node.stats.as_ref().unwrap().count as f32;
                 let delta_score_train = parent_score - train_score;
                 let delta_score_valid = parent_score - valid_score;
-                let gen = delta_score_train / delta_score_valid;
-                if gen < GENERALIZATION_THRESHOLD && node.num != 0 {
+                let gen_val = delta_score_train / delta_score_valid;
+                if gen_val < GENERALIZATION_THRESHOLD && node.num != 0 {
                     continue;
                 }
-                generalization = Some(gen);
+                generalization = Some(gen_val);
             } else {
                 continue;
             }
@@ -3042,7 +3035,7 @@ mod tests {
     use crate::binning::bin_matrix;
     use crate::data::Matrix;
     use crate::decision_tree::tree::create_root_node;
-    use crate::histogram::{update_histogram, NodeHistogramOwned};
+    use crate::histogram::{NodeHistogramOwned, update_histogram};
     use crate::node::SplittableNode;
     use crate::objective_functions::objective::{Objective, ObjectiveFunction};
     use crate::utils::weight;
@@ -3094,14 +3087,11 @@ mod tests {
             .map(|_| NodeHistogramOwned::empty_from_cuts(&b.cuts, &col_index, is_const_hess, true))
             .collect();
 
-        let mut hist_tree: Vec<NodeHistogram> = hist_tree_owned
-            .iter_mut()
-            .map(|node_hist| NodeHistogram::from_owned(node_hist))
-            .collect();
+        let hist_tree: Vec<NodeHistogram> = hist_tree_owned.iter_mut().map(NodeHistogram::from_owned).collect();
 
         for i in 0..n_nodes_alloc {
             update_histogram(
-                unsafe { &mut hist_tree.get_unchecked(i) },
+                unsafe { hist_tree.get_unchecked(i) },
                 0,
                 index.len(),
                 &bdata,
@@ -3120,7 +3110,7 @@ mod tests {
             root_gain,
             gradient_sum,
             hessian_sum,
-            grad.len() as usize,
+            grad.len(),
             0,
             0,
             grad.len(),
@@ -3134,10 +3124,10 @@ mod tests {
         let mut split_info_vec: Vec<SplitInfo> = (0..col_index.len()).map(|_| SplitInfo::default()).collect();
         let mut split_info_slice = SplitInfoSlice::new(&mut split_info_vec);
         splitter.best_split(
-            &mut n,
+            &n,
             &col_index,
             false,
-            &mut hist_tree,
+            &hist_tree,
             &pool,
             None,
             &mut split_info_slice,
@@ -3146,7 +3136,7 @@ mod tests {
         let s = unsafe { split_info_slice.best_split_info() };
         println!("{:?}", s);
 
-        n.update_children(2, 1, 2, &s);
+        n.update_children(2, 1, 2, s);
 
         assert_eq!(0, s.split_feature);
         assert_eq!(s.split_value, 3.0);
@@ -3240,14 +3230,11 @@ mod tests {
             .map(|_| NodeHistogramOwned::empty_from_cuts(&b.cuts, &col_index, is_const_hess, true))
             .collect();
 
-        let mut hist_tree: Vec<NodeHistogram> = hist_tree_owned
-            .iter_mut()
-            .map(|node_hist| NodeHistogram::from_owned(node_hist))
-            .collect();
+        let hist_tree: Vec<NodeHistogram> = hist_tree_owned.iter_mut().map(NodeHistogram::from_owned).collect();
 
         for i in 0..n_nodes_alloc {
             update_histogram(
-                unsafe { &mut hist_tree.get_unchecked(i) },
+                unsafe { hist_tree.get_unchecked(i) },
                 0,
                 index.len(),
                 &bdata,
@@ -3265,10 +3252,10 @@ mod tests {
         let mut split_info_vec: Vec<SplitInfo> = (0..col_index.len()).map(|_| SplitInfo::default()).collect();
         let mut split_info_slice = SplitInfoSlice::new(&mut split_info_vec);
         splitter.best_split(
-            &mut n,
+            &n,
             &col_index,
             is_const_hess,
-            &mut hist_tree,
+            &hist_tree,
             &pool,
             None,
             &mut split_info_slice,
@@ -3277,7 +3264,7 @@ mod tests {
         let s = unsafe { split_info_slice.best_split_info() };
         println!("{:?}", s);
 
-        n.update_children(2, 1, 2, &s);
+        n.update_children(2, 1, 2, s);
 
         assert_eq!(0, s.split_feature);
         assert!(between(4.8, 5.1, s.split_value as f32));
@@ -3299,7 +3286,7 @@ mod tests {
             fs::read_to_string("resources/titanic_train_flat.csv").expect("Something went wrong reading the file");
         let data_vec: Vec<f64> = file.lines().map(|x| x.parse::<f64>().unwrap_or(f64::NAN)).collect();
         let data_vec_truncated = &data_vec[0..(n_cols * n_rows)];
-        let data = Matrix::new(&data_vec_truncated, n_rows, n_cols);
+        let data = Matrix::new(data_vec_truncated, n_rows, n_cols);
 
         let file = fs::read_to_string("resources/titanic_train_y.csv").expect("Something went wrong reading the file");
         let y: Vec<f64> = file.lines().map(|x| x.parse::<f64>().unwrap()).collect();
@@ -3331,14 +3318,11 @@ mod tests {
             .map(|_| NodeHistogramOwned::empty_from_cuts(&b.cuts, &col_index, is_const_hess, true))
             .collect();
 
-        let mut hist_tree: Vec<NodeHistogram> = hist_tree_owned
-            .iter_mut()
-            .map(|node_hist| NodeHistogram::from_owned(node_hist))
-            .collect();
+        let hist_tree: Vec<NodeHistogram> = hist_tree_owned.iter_mut().map(NodeHistogram::from_owned).collect();
 
         for i in 0..10 {
             update_histogram(
-                unsafe { &mut hist_tree.get_unchecked(i) },
+                unsafe { hist_tree.get_unchecked(i) },
                 0,
                 index.len(),
                 &bdata,
@@ -3357,7 +3341,7 @@ mod tests {
             root_gain,
             gradient_sum,
             hessian_sum,
-            grad.len() as usize,
+            grad.len(),
             0,
             0,
             grad.len(),
@@ -3372,10 +3356,10 @@ mod tests {
         let mut split_info_slice = SplitInfoSlice::new(&mut split_info_vec);
 
         splitter.best_split(
-            &mut n,
+            &n,
             &col_index,
             is_const_hess,
-            &mut hist_tree,
+            &hist_tree,
             &pool,
             Some(&cat_index),
             &mut split_info_slice,
@@ -3383,7 +3367,7 @@ mod tests {
         );
         let s = unsafe { split_info_slice.best_split_info() };
 
-        n.update_children(1, 1, 2, &s);
+        n.update_children(1, 1, 2, s);
 
         println!("split info:");
         println!("{:?}", s);
@@ -3435,14 +3419,11 @@ mod tests {
             .map(|_| NodeHistogramOwned::empty_from_cuts(&b.cuts, &col_index, is_const_hess, true))
             .collect();
 
-        let mut hist_tree: Vec<NodeHistogram> = hist_tree_owned
-            .iter_mut()
-            .map(|node_hist| NodeHistogram::from_owned(node_hist))
-            .collect();
+        let hist_tree: Vec<NodeHistogram> = hist_tree_owned.iter_mut().map(NodeHistogram::from_owned).collect();
 
         for i in 0..10 {
             update_histogram(
-                unsafe { &mut hist_tree.get_unchecked(i) },
+                unsafe { hist_tree.get_unchecked(i) },
                 0,
                 index.len(),
                 &bdata,
@@ -3460,10 +3441,10 @@ mod tests {
         let mut split_info_vec: Vec<SplitInfo> = (0..col_index.len()).map(|_| SplitInfo::default()).collect();
         let mut split_info_slice = SplitInfoSlice::new(&mut split_info_vec);
         splitter.best_split(
-            &mut n,
+            &n,
             &col_index,
             is_const_hess,
-            &mut hist_tree,
+            &hist_tree,
             &pool,
             Some(&cat_index),
             &mut split_info_slice,
@@ -3472,12 +3453,12 @@ mod tests {
 
         println!("split_info_slice:");
         for s_data in split_info_slice.data.iter() {
-            println!("{:?}", unsafe { &s_data.get().as_ref().unwrap() });
+            println!("{:?}", unsafe { s_data.get().as_ref().unwrap() });
         }
 
         let s = unsafe { split_info_slice.best_split_info() };
 
-        n.update_children(1, 1, 2, &s);
+        n.update_children(1, 1, 2, s);
 
         println!("split info:");
         println!("{:?}", s);

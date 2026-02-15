@@ -3,6 +3,7 @@
 import inspect
 import json
 import warnings
+from enum import Enum
 from types import FunctionType
 from typing import Any, Dict, Iterable, List, Optional, Set, Tuple, Union, cast
 
@@ -27,6 +28,15 @@ from perpetual.utils import (
     transform_input_frame_columnar,
     type_df,
 )
+
+
+class CalibrationMethod(str, Enum):
+    """Calibration methods for prediction intervals."""
+
+    Conformal = "Conformal"
+    MinMax = "MinMax"
+    GRP = "GRP"
+    WeightVariance = "WeightVariance"
 
 
 class PerpetualBooster:
@@ -80,12 +90,16 @@ class PerpetualBooster:
         max_bin: int = 256,
         max_cat: int = 1000,
         interaction_constraints: Optional[List[List[int]]] = None,
+        save_node_stats: bool = False,
     ):
         """
         Gradient Boosting Machine with Perpetual Learning.
 
         A self-generalizing gradient boosting machine that doesn't need hyperparameter optimization.
-        It automatically finds the best configuration based on the provided budget.
+        It automatically finds the best configuration based on the provided budget. The budget
+        acts as a complexity control: a higher budget allows for more trees and potentially
+        better fit, while a lower budget ensures faster training and better generalization
+        for simpler datasets.
 
         Parameters
         ----------
@@ -153,6 +167,8 @@ class PerpetualBooster:
             Maximum unique categories before a feature is treated as numerical.
         interaction_constraints : list of list of int, optional
             Interaction constraints.
+        save_node_stats : bool, default=False
+            Whether to save node statistics (gradients, hessians) for analysis.
 
         Attributes
         ----------
@@ -235,6 +251,7 @@ class PerpetualBooster:
         self.max_bin = max_bin
         self.max_cat = max_cat
         self.interaction_constraints = interaction_constraints
+        self.save_node_stats = save_node_stats
 
         booster = CratePerpetualBooster(
             objective=self.objective if not isinstance(self.objective, tuple) else None,
@@ -260,6 +277,7 @@ class PerpetualBooster:
             loss=self.loss,
             grad=self.grad,
             init=self.init,
+            save_node_stats=self.save_node_stats,
         )
         self.booster = cast(BoosterType, booster)
         self.classes_ = np.array([])
@@ -380,6 +398,7 @@ class PerpetualBooster:
                 loss=self.loss,
                 grad=self.grad,
                 init=self.init,
+                save_node_stats=self.save_node_stats,
             )
             self.booster = cast(BoosterType, booster)
         else:
@@ -410,6 +429,7 @@ class PerpetualBooster:
                 loss=self.loss,
                 grad=self.grad,
                 init=self.init,
+                save_node_stats=self.save_node_stats,
             )
             self.booster = cast(MultiOutputBoosterType, booster)
 
@@ -496,19 +516,83 @@ class PerpetualBooster:
         return self
 
     def calibrate(
-        self, X_train, y_train, X_cal, y_cal, alpha, sample_weight=None, group=None
+        self,
+        X_cal: Any,
+        y_cal: Any,
+        alpha: Union[float, Iterable[float]],
+        method: Optional[str] = None,
     ) -> Self:
         """
-        Calibrate the gradient booster for prediction intervals.
-
-        Uses the provided training and calibration sets to compute scaling factors
-        for intervals.
+        Calibrate the gradient booster for prediction intervals using a selected method.
 
         Parameters
         ----------
-        X_train : array-like
-            Data used to train the base model.
-        y_train : array-like
+        X_cal : array-like
+            Independent calibration dataset.
+        y_cal : array-like
+            Targets for calibration data.
+        alpha : float or array-like
+            Significance level(s) for the intervals (1 - coverage).
+        method : str, optional
+            Calibration method to use. Options are "MinMax",
+            "GRP", "WeightVariance". If None, defaults to "WeightVariance".
+
+        Returns
+        -------
+        self : object
+            Returns self.
+        """
+
+        is_polars = type_df(X_cal) == "polars_df"
+        if is_polars:
+            features_cal, cols_cal, masks_cal, rows_cal, _ = (
+                transform_input_frame_columnar(X_cal, self.cat_mapping)
+            )
+            y_cal_, _ = convert_input_array(y_cal, self.objective)
+
+            self.booster.calibrate_columnar(
+                method=method,
+                columns_cal=cols_cal,
+                masks_cal=masks_cal,
+                rows_cal=rows_cal,
+                y_cal=y_cal_,
+                alpha=np.atleast_1d(np.array(alpha, dtype=np.float64)),
+            )
+        else:
+            _, flat_data_cal, rows_cal, cols_cal = transform_input_frame(
+                X_cal, self.cat_mapping
+            )
+            y_cal_, _ = convert_input_array(y_cal, self.objective)
+
+            self.booster.calibrate(
+                method=method,
+                flat_data_cal=flat_data_cal,
+                rows_cal=rows_cal,
+                cols_cal=cols_cal,
+                y_cal=y_cal_,
+                alpha=np.atleast_1d(np.array(alpha, dtype=np.float64)),
+            )
+
+        return self
+
+    def calibrate_conformal(
+        self,
+        X: Any,
+        y: Any,
+        X_cal: Any,
+        y_cal: Any,
+        alpha: Union[float, Iterable[float]],
+        sample_weight: Optional[Any] = None,
+        group: Optional[Any] = None,
+    ) -> Self:
+        """
+        Calibrate the gradient booster using Conformal Prediction (CQR).
+
+        Parameters
+        ----------
+        X : array-like
+            Independent training dataset.
+        y : array-like
             Targets for training data.
         X_cal : array-like
             Independent calibration dataset.
@@ -517,9 +601,9 @@ class PerpetualBooster:
         alpha : float or array-like
             Significance level(s) for the intervals (1 - coverage).
         sample_weight : array-like, optional
-            Sample weights.
+            Weights for training data.
         group : array-like, optional
-            Group labels.
+            Group IDs for training data.
 
         Returns
         -------
@@ -527,66 +611,72 @@ class PerpetualBooster:
             Returns self.
         """
 
-        is_polars = type_df(X_train) == "polars_df"
+        is_polars = type_df(X_cal) == "polars_df"
         if is_polars:
-            features_train, cols_train, masks_train, rows_train, _ = (
-                transform_input_frame_columnar(X_train, self.cat_mapping)
+            features, cols, masks, rows, _ = transform_input_frame_columnar(
+                X, self.cat_mapping
             )
-            self._validate_features(features_train)
-            features_cal, cols_cal, masks_cal, rows_cal, _ = (
-                transform_input_frame_columnar(X_cal, self.cat_mapping)
-            )
-            # Use columnar calibration
-            y_train_, _ = convert_input_array(y_train, self.objective)
-            y_cal_, _ = convert_input_array(y_cal, self.objective)
+            y_, _ = convert_input_array(y, self.objective)
+
             if sample_weight is None:
                 sample_weight_ = None
             else:
                 sample_weight_, _ = convert_input_array(sample_weight, self.objective)
 
-            self.booster.calibrate_columnar(
-                columns=cols_train,
-                masks=masks_train,
-                rows=rows_train,
-                y=y_train_,
+            if group is None:
+                group_ = None
+            else:
+                group_, _ = convert_input_array(group, self.objective, is_int=True)
+
+            features_cal, cols_cal, masks_cal, rows_cal, _ = (
+                transform_input_frame_columnar(X_cal, self.cat_mapping)
+            )
+            y_cal_, _ = convert_input_array(y_cal, self.objective)
+
+            self.booster.calibrate_conformal_columnar(
+                columns=cols,
+                masks=masks,
+                rows=rows,
+                y=y_,
+                sample_weight=sample_weight_,
+                group=group_,
                 columns_cal=cols_cal,
                 masks_cal=masks_cal,
                 rows_cal=rows_cal,
                 y_cal=y_cal_,
-                alpha=np.array(alpha),
-                sample_weight=sample_weight_,  # type: ignore
-                group=group,
+                alpha=np.atleast_1d(np.array(alpha, dtype=np.float64)),
             )
         else:
-            _, flat_data_train, rows_train, cols_train = transform_input_frame(
-                X_train, self.cat_mapping
-            )
-
-            y_train_, _ = convert_input_array(y_train, self.objective)
-
-            _, flat_data_cal, rows_cal, cols_cal = transform_input_frame(
-                X_cal, self.cat_mapping
-            )
-
-            y_cal_, _ = convert_input_array(y_cal, self.objective)
+            _, flat_data, rows, cols = transform_input_frame(X, self.cat_mapping)
+            y_, _ = convert_input_array(y, self.objective)
 
             if sample_weight is None:
                 sample_weight_ = None
             else:
                 sample_weight_, _ = convert_input_array(sample_weight, self.objective)
 
-            self.booster.calibrate(
-                flat_data=flat_data_train,
-                rows=rows_train,
-                cols=cols_train,
-                y=y_train_,
+            if group is None:
+                group_ = None
+            else:
+                group_, _ = convert_input_array(group, self.objective, is_int=True)
+
+            _, flat_data_cal, rows_cal, cols_cal = transform_input_frame(
+                X_cal, self.cat_mapping
+            )
+            y_cal_, _ = convert_input_array(y_cal, self.objective)
+
+            self.booster.calibrate_conformal(
+                flat_data=flat_data,
+                rows=rows,
+                cols=cols,
+                y=y_,
+                sample_weight=sample_weight_,
+                group=group_,
                 flat_data_cal=flat_data_cal,
                 rows_cal=rows_cal,
                 cols_cal=cols_cal,
                 y_cal=y_cal_,
-                alpha=np.array(alpha),
-                sample_weight=sample_weight_,  # type: ignore
-                group=group,
+                alpha=np.atleast_1d(np.array(alpha, dtype=np.float64)),
             )
 
         return self
@@ -1090,9 +1180,18 @@ class PerpetualBooster:
             The loaded booster object.
         """
         try:
-            booster = CratePerpetualBooster.load_booster(str(path))
-        except ValueError:
-            booster = CrateMultiOutputBooster.load_booster(str(path))
+            with open(path) as f:
+                dump = json.load(f)
+            if "boosters" in dump or "n_boosters" in dump:
+                booster = CrateMultiOutputBooster.load_booster(str(path))
+            else:
+                booster = CratePerpetualBooster.load_booster(str(path))
+        except (ValueError, KeyError, json.JSONDecodeError):
+            # Fallback for older models or unexpected formats
+            try:
+                booster = CratePerpetualBooster.load_booster(str(path))
+            except ValueError:
+                booster = CrateMultiOutputBooster.load_booster(str(path))
 
         params = booster.get_params()
         with warnings.catch_warnings():
@@ -1322,6 +1421,13 @@ class PerpetualBooster:
             for t in booster_trees:
                 nodes = []
                 for node in t["nodes"].values():
+                    # Flatten stats if present
+                    if "stats" in node and node["stats"] is not None:
+                        stats = node["stats"]
+                        for key in ["depth", "count", "generalization", "weights"]:
+                            if key in stats:
+                                node[key] = stats[key]
+
                     if not node["is_leaf"]:
                         node["split_feature"] = feature_map[node["split_feature"]]
                     else:

@@ -2,7 +2,7 @@
 //!
 //! Implements a two-stage least-squares (2SLS) approach using gradient boosting
 //! to estimate causal effects in the presence of endogeneity.
-use crate::booster::config::MissingNodeTreatment;
+use crate::booster::config::{CalibrationMethod, MissingNodeTreatment};
 use crate::booster::core::PerpetualBooster;
 use crate::constraints::ConstraintMap;
 use crate::data::Matrix;
@@ -115,6 +115,7 @@ impl IVBooster {
             iteration_limit,
             memory_limit,
             stopping_rounds,
+            CalibrationMethod::default(),
         )?;
 
         // Initialize Stage 2 Booster
@@ -141,6 +142,7 @@ impl IVBooster {
             iteration_limit,
             memory_limit,
             stopping_rounds,
+            CalibrationMethod::default(),
         )?;
 
         Ok(IVBooster {

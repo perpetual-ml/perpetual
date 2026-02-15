@@ -1,6 +1,6 @@
 Set-Location package-python
-python -m ruff check --fix .
-python -m ruff format .
-maturin develop --release
-pytest tests/test_sklearn.py::test_sklearn_compat_ranking -s
+uv run python -m ruff check --fix .
+uv run python -m ruff format .
+uv run maturin develop --release
+uv run pytest tests/test_booster.py::test_calibration -s
 Set-Location ..

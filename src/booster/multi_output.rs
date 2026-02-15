@@ -25,7 +25,8 @@ pub struct MultiOutputBooster {
     /// The individual [`PerpetualBooster`] instances.
     pub boosters: Vec<PerpetualBooster>,
     /// Arbitrary metadata key-value pairs.
-    metadata: HashMap<String, String>,
+    #[serde(default)]
+    pub metadata: HashMap<String, String>,
 }
 
 impl Default for MultiOutputBooster {
@@ -83,6 +84,7 @@ impl MultiOutputBooster {
     /// * `iteration_limit` - optional limit for the number of boosting rounds.
     /// * `memory_limit` - optional limit for memory allocation.
     /// * `stopping_rounds` - optional limit for auto stopping rounds.
+    /// * `save_node_stats` - whether to save node statistics during training.
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         n_boosters: usize,
@@ -107,6 +109,8 @@ impl MultiOutputBooster {
         iteration_limit: Option<usize>,
         memory_limit: Option<f32>,
         stopping_rounds: Option<usize>,
+        save_node_stats: bool,
+        calibration_method: CalibrationMethod,
     ) -> Result<Self, PerpetualError> {
         // Build the common configuration object.
         let cfg = BoosterConfig {
@@ -131,7 +135,8 @@ impl MultiOutputBooster {
             iteration_limit,
             memory_limit,
             stopping_rounds,
-            save_node_stats: false,
+            save_node_stats,
+            calibration_method,
         };
 
         // Base booster template that child boosters will clone.
@@ -199,6 +204,108 @@ impl MultiOutputBooster {
     ) -> Result<(), PerpetualError> {
         for i in 0..self.n_boosters {
             let _ = self.boosters[i].prune(data, y.get_col(i), sample_weight, group);
+        }
+        Ok(())
+    }
+
+    /// Calibrate the boosters using a selected non-conformal method.
+    ///
+    /// # Arguments
+    ///
+    /// * `method` - The calibration method to use (MinMax, GRP, or WeightVariance).
+    /// * `data_cal` - A tuple of (features, targets, alphas) representing the dedicated calibration set.
+    pub fn calibrate(
+        &mut self,
+        method: CalibrationMethod,
+        data_cal: (&Matrix<f64>, &Matrix<f64>, &[f64]),
+    ) -> Result<(), PerpetualError> {
+        if !self.cfg.save_node_stats {
+            return Err(PerpetualError::InvalidParameter(
+                "save_node_stats".to_string(),
+                "true".to_string(),
+                "false".to_string(),
+            ));
+        }
+        self.cfg.calibration_method = method;
+        let (x_cal, ys_cal, alpha) = data_cal;
+        for i in 0..self.n_boosters {
+            let y_cal_col = ys_cal.get_col(i);
+            self.boosters[i].calibrate(method, (x_cal, y_cal_col, alpha))?;
+        }
+        Ok(())
+    }
+
+    /// Calibrate the boosters using Conformal Prediction (CQR).
+    pub fn calibrate_conformal(
+        &mut self,
+        data: &Matrix<f64>,
+        y: &Matrix<f64>,
+        sample_weight: Option<&[f64]>,
+        group: Option<&[u64]>,
+        data_cal: (&Matrix<f64>, &Matrix<f64>, &[f64]),
+    ) -> Result<(), PerpetualError> {
+        self.cfg.calibration_method = CalibrationMethod::Conformal;
+        let (x_cal, ys_cal, alpha) = data_cal;
+        for i in 0..self.n_boosters {
+            let y_cal_col = ys_cal.get_col(i);
+            self.boosters[i].calibrate_conformal(
+                data,
+                y.get_col(i),
+                sample_weight,
+                group,
+                (x_cal, y_cal_col, alpha),
+            )?;
+        }
+        Ok(())
+    }
+
+    /// Calibrate the boosters on columnar data using a selected non-conformal method.
+    ///
+    /// # Arguments
+    ///
+    /// * `method` - The calibration method to use (MinMax, GRP, or WeightVariance).
+    /// * `data_cal` - Dedicated calibration set (features, targets, alphas).
+    pub fn calibrate_columnar(
+        &mut self,
+        method: CalibrationMethod,
+        data_cal: (&ColumnarMatrix<f64>, &Matrix<f64>, &[f64]),
+    ) -> Result<(), PerpetualError> {
+        if !self.cfg.save_node_stats {
+            return Err(PerpetualError::InvalidParameter(
+                "save_node_stats".to_string(),
+                "true".to_string(),
+                "false".to_string(),
+            ));
+        }
+        self.cfg.calibration_method = method;
+        let (x_cal, ys_cal, alpha) = data_cal;
+        for i in 0..self.n_boosters {
+            let y_cal_col = ys_cal.get_col(i);
+            self.boosters[i].calibrate_columnar(method, (x_cal, y_cal_col, alpha))?;
+        }
+        Ok(())
+    }
+
+    /// Calibrate the boosters on columnar data using Conformal Prediction (CQR).
+    pub fn calibrate_conformal_columnar(
+        &mut self,
+        data: &ColumnarMatrix<f64>,
+        y: &Matrix<f64>,
+        sample_weight: Option<&[f64]>,
+        group: Option<&[u64]>,
+        data_cal: (&ColumnarMatrix<f64>, &Matrix<f64>, &[f64]),
+    ) -> Result<(), PerpetualError> {
+        self.cfg.calibration_method = CalibrationMethod::Conformal;
+        let (x_cal, ys_cal, alpha) = data_cal;
+        for i in 0..self.n_boosters {
+            let y_cal_col = ys_cal.get_col(i);
+            self.boosters[i].calibrate_conformal_columnar(
+                data,
+                y.get_col(i),
+                sample_weight,
+                group,
+                (x_cal, y_cal_col, alpha),
+            )?;
         }
         Ok(())
     }
@@ -457,6 +564,30 @@ impl MultiOutputBooster {
         self
     }
 
+    /// Set whether to save node stats on the booster.
+    /// * `save_node_stats` - Whether to save node statistics during training.
+    pub fn set_save_node_stats(mut self, save_node_stats: bool) -> Self {
+        self.cfg.save_node_stats = save_node_stats;
+        self.boosters = self
+            .boosters
+            .iter()
+            .map(|b| b.clone().set_save_node_stats(save_node_stats))
+            .collect();
+        self
+    }
+
+    /// Set the calibration_method on the booster.
+    /// * `calibration_method` - The calibration method of the booster.
+    pub fn set_calibration_method(mut self, calibration_method: CalibrationMethod) -> Self {
+        self.cfg.calibration_method = calibration_method;
+        self.boosters = self
+            .boosters
+            .iter()
+            .map(|b| b.clone().set_calibration_method(calibration_method))
+            .collect();
+        self
+    }
+
     /// Insert metadata
     /// * `key` - String value for the metadata key.
     /// * `value` - value to assign to the metadata key.
@@ -514,9 +645,9 @@ impl BoosterIO for MultiOutputBooster {
 #[cfg(test)]
 mod multi_output_booster_test {
 
-    use crate::objective_functions::objective::Objective;
     use crate::Matrix;
-    use crate::{utils::between, MultiOutputBooster};
+    use crate::objective_functions::objective::Objective;
+    use crate::{MultiOutputBooster, utils::between};
     use std::error::Error;
     use std::fs::File;
     use std::io::BufReader;

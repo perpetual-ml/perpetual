@@ -109,10 +109,7 @@ mod tests {
             .map(|_| NodeHistogramOwned::empty_from_cuts(&b.cuts, &col_index, is_const_hess, true))
             .collect();
 
-        let mut hist_tree: Vec<NodeHistogram> = hist_tree_owned
-            .iter_mut()
-            .map(|node_hist| NodeHistogram::from_owned(node_hist))
-            .collect();
+        let mut hist_tree: Vec<NodeHistogram> = hist_tree_owned.iter_mut().map(NodeHistogram::from_owned).collect();
 
         let pool = rayon::ThreadPoolBuilder::new().num_threads(2).build().unwrap();
 

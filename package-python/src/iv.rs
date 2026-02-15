@@ -4,10 +4,10 @@ use numpy::{IntoPyArray, PyArray1, PyReadonlyArray1};
 use perpetual_rs::causal::iv::IVBooster as CrateIVBooster;
 use perpetual_rs::data::Matrix;
 use perpetual_rs::objective_functions::Objective;
+use pyo3::IntoPyObjectExt;
 use pyo3::prelude::*;
 use pyo3::types::IntoPyDict;
 use pyo3::types::PyType;
-use pyo3::IntoPyObjectExt;
 use std::collections::{HashMap, HashSet};
 
 /// Python-facing Instrumental Variable (BoostIV) estimator.

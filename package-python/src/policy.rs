@@ -34,7 +34,7 @@ impl PyPolicyObjective {
                 return Err(pyo3::exceptions::PyValueError::new_err(format!(
                     "Unknown mode: {}",
                     mode
-                )))
+                )));
             }
         };
 

@@ -1,9 +1,9 @@
 //! Setter Methods
 //!
 //! Builder-style setters for configuring [`PerpetualBooster`] parameters.
-use crate::booster::config::MissingNodeTreatment;
+use crate::booster::config::{CalibrationMethod, MissingNodeTreatment};
 use crate::objective_functions::objective::Objective;
-use crate::{constraints::ConstraintMap, PerpetualBooster};
+use crate::{PerpetualBooster, constraints::ConstraintMap};
 use std::collections::HashSet;
 
 impl PerpetualBooster {
@@ -176,6 +176,13 @@ impl PerpetualBooster {
     /// * `save_node_stats` - Whether to save node statistics during training.
     pub fn set_save_node_stats(mut self, save_node_stats: bool) -> Self {
         self.cfg.save_node_stats = save_node_stats;
+        self
+    }
+
+    /// Set the calibration_method on the booster.
+    /// * `calibration_method` - The calibration method of the booster.
+    pub fn set_calibration_method(mut self, calibration_method: CalibrationMethod) -> Self {
+        self.cfg.calibration_method = calibration_method;
         self
     }
 }

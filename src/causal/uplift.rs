@@ -2,7 +2,7 @@
 //!
 //! Estimates the Conditional Average Treatment Effect (CATE) using the
 //! R-Learner meta-algorithm backed by gradient boosting.
-use crate::booster::config::MissingNodeTreatment;
+use crate::booster::config::{CalibrationMethod, MissingNodeTreatment};
 use crate::booster::core::PerpetualBooster;
 use crate::causal::objective::RLearnerObjective;
 use crate::constraints::ConstraintMap;
@@ -108,6 +108,7 @@ impl UpliftBooster {
                 iteration_limit,
                 memory_limit,
                 stopping_rounds,
+                CalibrationMethod::default(),
             )
         };
 

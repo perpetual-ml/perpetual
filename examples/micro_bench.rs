@@ -1,5 +1,5 @@
 /// Micro-benchmarks of individual operations to identify bottlenecks
-use perpetual::{objective_functions::Objective, Matrix};
+use perpetual::{Matrix, objective_functions::Objective};
 use std::hint::black_box;
 use std::time::Instant;
 
@@ -93,8 +93,8 @@ fn main() {
         }
         black_box(&idx);
         // Reset
-        for i in 0..n_pivot {
-            idx[i] = i;
+        for (i, item) in idx.iter_mut().enumerate() {
+            *item = i;
         }
     }
     let pivot_us = t.elapsed().as_micros() as f64 / n_reps as f64;

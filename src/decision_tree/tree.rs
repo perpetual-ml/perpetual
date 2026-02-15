@@ -4,10 +4,10 @@
 //! for growing, fitting, and evaluating it.
 use crate::data::Matrix;
 use crate::grower::Grower;
-use crate::histogram::{update_histogram, NodeHistogram};
+use crate::histogram::{NodeHistogram, update_histogram};
 use crate::node::{Node, NodeType, SplittableNode};
-use crate::objective_functions::objective::ObjectiveFunction;
 use crate::objective_functions::Objective;
+use crate::objective_functions::objective::ObjectiveFunction;
 use crate::partial_dependence::tree_partial_dependence;
 use crate::splitter::{SplitInfoSlice, Splitter};
 use crate::utils::{fast_f64_sum, gain, gain_const_hess, weight, weight_const_hess};
@@ -194,11 +194,9 @@ impl Tree {
                 break;
             }
 
-            if let Some(tld) = target_loss_decrement {
-                if loss_decr_avg > tld {
-                    self.stopper = TreeStopper::StepSize;
-                    break;
-                }
+            if target_loss_decrement.is_some_and(|tld| loss_decr_avg > tld) {
+                self.stopper = TreeStopper::StepSize;
+                break;
             }
             // We know there is a value here, because of how the
             // while loop is setup.
@@ -559,10 +557,10 @@ mod tests {
     use std::error::Error;
     use std::fs;
 
+    use crate::Matrix;
     use crate::decision_tree::tree::Tree;
     use crate::histogram::NodeHistogram;
     use crate::splitter::SplitInfoSlice;
-    use crate::Matrix;
     use std::collections::HashSet;
 
     #[test]
@@ -594,10 +592,7 @@ mod tests {
             .map(|_| NodeHistogramOwned::empty_from_cuts(&b.cuts, &col_index, is_const_hess, true))
             .collect();
 
-        let mut hist_tree: Vec<NodeHistogram> = hist_tree_owned
-            .iter_mut()
-            .map(|node_hist| NodeHistogram::from_owned(node_hist))
-            .collect();
+        let mut hist_tree: Vec<NodeHistogram> = hist_tree_owned.iter_mut().map(NodeHistogram::from_owned).collect();
 
         let pool = rayon::ThreadPoolBuilder::new().num_threads(2).build().unwrap();
 
@@ -696,10 +691,7 @@ mod tests {
             .map(|_| NodeHistogramOwned::empty_from_cuts(&b.cuts, &col_index, is_const_hess, true))
             .collect();
 
-        let mut hist_tree: Vec<NodeHistogram> = hist_tree_owned
-            .iter_mut()
-            .map(|node_hist| NodeHistogram::from_owned(node_hist))
-            .collect();
+        let mut hist_tree: Vec<NodeHistogram> = hist_tree_owned.iter_mut().map(NodeHistogram::from_owned).collect();
 
         let pool = rayon::ThreadPoolBuilder::new().num_threads(2).build().unwrap();
 
@@ -792,10 +784,7 @@ mod tests {
             .map(|_| NodeHistogramOwned::empty_from_cuts(&b.cuts, &col_index, is_const_hess, true))
             .collect();
 
-        let mut hist_tree: Vec<NodeHistogram> = hist_tree_owned
-            .iter_mut()
-            .map(|node_hist| NodeHistogram::from_owned(node_hist))
-            .collect();
+        let mut hist_tree: Vec<NodeHistogram> = hist_tree_owned.iter_mut().map(NodeHistogram::from_owned).collect();
 
         let pool = rayon::ThreadPoolBuilder::new().num_threads(2).build().unwrap();
 
@@ -898,10 +887,7 @@ mod tests {
             .map(|_| NodeHistogramOwned::empty_from_cuts(&b.cuts, &col_index, is_const_hess, true))
             .collect();
 
-        let mut hist_tree: Vec<NodeHistogram> = hist_tree_owned
-            .iter_mut()
-            .map(|node_hist| NodeHistogram::from_owned(node_hist))
-            .collect();
+        let mut hist_tree: Vec<NodeHistogram> = hist_tree_owned.iter_mut().map(NodeHistogram::from_owned).collect();
 
         let pool = rayon::ThreadPoolBuilder::new().num_threads(2).build().unwrap();
 

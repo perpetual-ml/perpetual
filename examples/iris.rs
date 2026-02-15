@@ -20,7 +20,7 @@ fn accuracy(y_true: &[f64], y_prob: &[f64], threshold: f64) -> f64 {
     let correct = y_true
         .iter()
         .zip(y_prob)
-        .filter(|(&t, &p)| (p >= threshold) as u8 as f64 == t)
+        .filter(|&(&t, &p)| (p >= threshold) as u8 as f64 == t)
         .count();
     correct as f64 / y_true.len() as f64
 }

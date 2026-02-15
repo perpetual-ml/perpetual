@@ -67,6 +67,7 @@
 //!     None,       // iteration_limit
 //!     None,       // memory_limit
 //!     None,       // stopping_rounds
+//!     perpetual::booster::config::CalibrationMethod::MinMax,
 //! ).expect("Failed to initialize booster");
 //!
 //! // 3. Fit the Model
@@ -85,8 +86,8 @@ mod shapley;
 pub mod bin;
 pub mod binning;
 pub mod booster;
+pub mod calibration;
 pub mod causal;
-pub mod conformal;
 pub mod constants;
 pub mod constraints;
 pub mod data;
@@ -102,6 +103,7 @@ pub mod splitter;
 pub mod utils;
 
 // Individual classes, and functions
+pub use booster::config::{CalibrationMethod, ContributionsMethod};
 pub use booster::core::PerpetualBooster;
 pub use booster::multi_output::MultiOutputBooster;
 pub use data::{ColumnarMatrix, Matrix};

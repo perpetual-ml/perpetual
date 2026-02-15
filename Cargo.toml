@@ -6,8 +6,8 @@ members = [
 
 [package]
 name = "perpetual"
-version = "1.5.0"
-edition = "2021"
+version = "1.6.0"
+edition = "2024"
 authors = ["Mutlu Simsek <msimsek@perpetual-ml.com>", "Serkan Korkmaz <serkor1@duck.com>", "Pieter Pel <pelpieter@gmail.com>"]
 homepage = "https://perpetual-ml.com"
 description = "A self-generalizing gradient boosting machine that doesn't need hyperparameter optimization"

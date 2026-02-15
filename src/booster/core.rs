@@ -13,14 +13,14 @@ use crate::constraints::ConstraintMap;
 use crate::data::{ColumnarMatrix, Matrix};
 use crate::decision_tree::tree::{Tree, TreeStopper};
 use crate::errors::PerpetualError;
-use crate::histogram::{update_cuts, HistogramArena, NodeHistogram};
+use crate::histogram::{HistogramArena, NodeHistogram, update_cuts};
 use crate::objective_functions::objective::{Objective, ObjectiveFunction};
 use crate::splitter::{MissingBranchSplitter, MissingImputerSplitter, SplitInfo, SplitInfoSlice, Splitter};
 use core::{f32, f64};
 use log::{info, warn};
+use rand::SeedableRng;
 use rand::rngs::StdRng;
 use rand::seq::IndexedRandom;
-use rand::SeedableRng;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
@@ -52,8 +52,14 @@ pub struct PerpetualBooster {
     pub trees: Vec<Tree>,
     /// Calibration models used for conformal prediction / prediction intervals.
     /// Stores tuples of (Booster, threshold) for different calibration levels.
+    #[serde(default)]
     pub cal_models: HashMap<String, [(PerpetualBooster, f64); 2]>,
+    /// Calibration parameters for native methods (M1, M2, M3).
+    /// Maps alpha string to a vector of parameters (e.g., [lower_thresh, upper_thresh]).
+    #[serde(default)]
+    pub cal_params: HashMap<String, Vec<f64>>,
     /// Arbitrary metadata key-value pairs associated with the model.
+    #[serde(default)]
     pub metadata: HashMap<String, String>,
 }
 
@@ -65,6 +71,7 @@ impl Default for PerpetualBooster {
             eta: f32::NAN,
             trees: Vec::new(),
             cal_models: HashMap::new(),
+            cal_params: HashMap::new(),
             metadata: HashMap::new(),
         }
     }
@@ -145,6 +152,7 @@ impl PerpetualBooster {
         iteration_limit: Option<usize>,
         memory_limit: Option<f32>,
         stopping_rounds: Option<usize>,
+        calibration_method: CalibrationMethod,
     ) -> Result<Self, PerpetualError> {
         let cfg = BoosterConfig {
             objective,
@@ -169,6 +177,7 @@ impl PerpetualBooster {
             memory_limit,
             stopping_rounds,
             save_node_stats: false,
+            calibration_method,
         };
 
         let booster = PerpetualBooster {
@@ -177,6 +186,7 @@ impl PerpetualBooster {
             eta: f32::NAN,
             trees: Vec::new(),
             cal_models: HashMap::new(),
+            cal_params: HashMap::new(),
             metadata: HashMap::new(),
         };
 
@@ -523,15 +533,17 @@ impl PerpetualBooster {
                 break;
             }
 
-            if let Some(t) = self.cfg.timeout {
-                if start.elapsed().as_secs_f32() > t {
-                    warn!("Reached timeout before auto stopping. Try to decrease the budget or increase the timeout for the best performance.");
-                    break;
-                }
+            if self.cfg.timeout.is_some_and(|t| start.elapsed().as_secs_f32() > t) {
+                warn!(
+                    "Reached timeout before auto stopping. Try to decrease the budget or increase the timeout for the best performance."
+                );
+                break;
             }
 
             if i == self.cfg.iteration_limit.unwrap_or(ITER_LIMIT) - 1 {
-                warn!("Reached iteration limit before auto stopping. Try to decrease the budget or increase the iteration limit for the best performance.");
+                warn!(
+                    "Reached iteration limit before auto stopping. Try to decrease the budget or increase the iteration limit for the best performance."
+                );
             }
         }
 
@@ -754,15 +766,17 @@ impl PerpetualBooster {
                 break;
             }
 
-            if let Some(t) = self.cfg.timeout {
-                if start.elapsed().as_secs_f32() > t {
-                    warn!("Reached timeout before auto stopping. Try to decrease the budget or increase the timeout for the best performance.");
-                    break;
-                }
+            if self.cfg.timeout.is_some_and(|t| start.elapsed().as_secs_f32() > t) {
+                warn!(
+                    "Reached timeout before auto stopping. Try to decrease the budget or increase the timeout for the best performance."
+                );
+                break;
             }
 
             if i == self.cfg.iteration_limit.unwrap_or(ITER_LIMIT) - 1 {
-                warn!("Reached iteration limit before auto stopping. Try to decrease the budget or increase the iteration limit for the best performance.");
+                warn!(
+                    "Reached iteration limit before auto stopping. Try to decrease the budget or increase the iteration limit for the best performance."
+                );
             }
         }
 
@@ -892,12 +906,10 @@ impl PerpetualBooster {
 }
 
 pub(crate) fn fix_legacy_value(value: &mut serde_json::Value) {
-    if let serde_json::Value::Object(map) = value {
-        if map.contains_key("nodes") {
-            if let Some(nodes) = map.get_mut("nodes").and_then(|n| n.as_object_mut()) {
-                for node in nodes.values_mut() {
-                    fix_legacy_node(node);
-                }
+    if let Some(map) = value.as_object_mut() {
+        if let Some(nodes) = map.get_mut("nodes").and_then(|n| n.as_object_mut()) {
+            for node in nodes.values_mut() {
+                fix_legacy_node(node);
             }
         }
         for v in map.values_mut() {
@@ -912,56 +924,56 @@ pub(crate) fn fix_legacy_value(value: &mut serde_json::Value) {
 
 pub(crate) fn fix_legacy_node(node: &mut serde_json::Value) {
     if let Some(node_obj) = node.as_object_mut() {
-        if let Some(left_cats_val) = node_obj.get("left_cats") {
-            if let Some(left_cats_arr) = left_cats_val.as_array() {
-                if left_cats_arr.len() != 8192 && (!left_cats_arr.is_empty() || node_obj.contains_key("right_cats")) {
-                    let left_cats_indices: Vec<u16> = left_cats_arr
-                        .iter()
-                        .filter_map(|v| v.as_u64().map(|n| n as u16))
-                        .collect();
-                    let right_cats_indices: Vec<u16> = node_obj
-                        .get("right_cats")
-                        .and_then(|v| v.as_array())
-                        .map(|arr| arr.iter().filter_map(|v| v.as_u64().map(|n| n as u16)).collect())
-                        .unwrap_or_default();
+        if let Some(left_cats_arr) = node_obj
+            .get("left_cats")
+            .and_then(|v| v.as_array())
+            .filter(|arr| arr.len() != 8192 && (!arr.is_empty() || node_obj.contains_key("right_cats")))
+        {
+            let left_cats_indices: Vec<u16> = left_cats_arr
+                .iter()
+                .filter_map(|v| v.as_u64().map(|n| n as u16))
+                .collect();
+            let right_cats_indices: Vec<u16> = node_obj
+                .get("right_cats")
+                .and_then(|v| v.as_array())
+                .map(|arr| arr.iter().filter_map(|v| v.as_u64().map(|n| n as u16)).collect())
+                .unwrap_or_default();
 
-                    if !left_cats_indices.is_empty() || !right_cats_indices.is_empty() {
-                        let missing_node = node_obj.get("missing_node").and_then(|v| v.as_u64()).unwrap_or(0) as usize;
-                        let left_child = node_obj.get("left_child").and_then(|v| v.as_u64()).unwrap_or(0) as usize;
+            if !left_cats_indices.is_empty() || !right_cats_indices.is_empty() {
+                let missing_node = node_obj.get("missing_node").and_then(|v| v.as_u64()).unwrap_or(0) as usize;
+                let left_child = node_obj.get("left_child").and_then(|v| v.as_u64()).unwrap_or(0) as usize;
 
-                        let mut bitset = vec![0u8; 8192];
-                        if missing_node == left_child {
-                            bitset.fill(255);
-                            for &cat in &right_cats_indices {
-                                let byte_idx = (cat >> 3) as usize;
-                                let bit_idx = (cat & 7) as u8;
-                                if byte_idx < 8192 {
-                                    bitset[byte_idx] &= !(1 << bit_idx);
-                                }
-                            }
-                        } else {
-                            for &cat in &left_cats_indices {
-                                let byte_idx = (cat >> 3) as usize;
-                                let bit_idx = (cat & 7) as u8;
-                                if byte_idx < 8192 {
-                                    bitset[byte_idx] |= 1 << bit_idx;
-                                }
-                            }
+                let mut bitset = vec![0u8; 8192];
+                if missing_node == left_child {
+                    bitset.fill(255);
+                    for &cat in &right_cats_indices {
+                        let byte_idx = (cat >> 3) as usize;
+                        let bit_idx = (cat & 7) as u8;
+                        if byte_idx < 8192 {
+                            bitset[byte_idx] &= !(1 << bit_idx);
                         }
-                        node_obj.insert(
-                            "left_cats".to_string(),
-                            serde_json::Value::Array(
-                                bitset
-                                    .into_iter()
-                                    .map(|b| serde_json::Value::Number(b.into()))
-                                    .collect(),
-                            ),
-                        );
-                    } else {
-                        // It's a numerical split, ensure left_cats is null for the current library
-                        node_obj.insert("left_cats".to_string(), serde_json::Value::Null);
+                    }
+                } else {
+                    for &cat in &left_cats_indices {
+                        let byte_idx = (cat >> 3) as usize;
+                        let bit_idx = (cat & 7) as u8;
+                        if byte_idx < 8192 {
+                            bitset[byte_idx] |= 1 << bit_idx;
+                        }
                     }
                 }
+                node_obj.insert(
+                    "left_cats".to_string(),
+                    serde_json::Value::Array(
+                        bitset
+                            .into_iter()
+                            .map(|b| serde_json::Value::Number(b.into()))
+                            .collect(),
+                    ),
+                );
+            } else {
+                // It's a numerical split, ensure left_cats is null for the current library
+                node_obj.insert("left_cats".to_string(), serde_json::Value::Null);
             }
         }
         node_obj.remove("right_cats");
@@ -981,7 +993,7 @@ impl BoosterIO for PerpetualBooster {
 mod perpetual_booster_test {
 
     use crate::booster::config::*;
-    use crate::metrics::ranking::{ndcg_at_k_metric, GainScheme};
+    use crate::metrics::ranking::{GainScheme, ndcg_at_k_metric};
     use crate::objective_functions::objective::{Objective, ObjectiveFunction};
     use crate::utils::between;
     use crate::{Matrix, PerpetualBooster};
@@ -1200,8 +1212,8 @@ mod perpetual_booster_test {
         let trees2 = model2.get_prediction_trees();
         assert_eq!(trees1.len(), trees2.len());
 
-        let n_leaves1: usize = trees1.iter().map(|t| (t.nodes.len() + 1) / 2).sum();
-        let n_leaves2: usize = trees2.iter().map(|t| (t.nodes.len() + 1) / 2).sum();
+        let n_leaves1: usize = trees1.iter().map(|t| t.nodes.len().div_ceil(2)).sum();
+        let n_leaves2: usize = trees2.iter().map(|t| t.nodes.len().div_ceil(2)).sum();
         assert_eq!(n_leaves1, n_leaves2);
 
         println!("{}", trees1.last().unwrap());
@@ -1256,16 +1268,7 @@ mod perpetual_booster_test {
 
         let split_features_test = vec![6, 6, 6, 1, 6, 1, 6, 9, 1, 6];
         let split_gains_test = vec![
-            31.172100067138672,
-            25.249399185180664,
-            20.45199966430664,
-            17.50349998474121,
-            16.566099166870117,
-            14.345199584960938,
-            13.418600082397461,
-            12.505200386047363,
-            12.23270034790039,
-            10.869000434875488,
+            31.172_1, 25.249_4, 20.452, 17.503_5, 16.566_1, 14.345_2, 13.418_6, 12.505_2, 12.232_7, 10.869,
         ];
         for (i, tree) in booster.get_prediction_trees().iter().enumerate() {
             let nodes = &tree.nodes;
@@ -1499,8 +1502,8 @@ mod perpetual_booster_test {
                 let val_str = &record[idx];
                 let val = if val_str.is_empty() {
                     0.0 // Default for missing in numeric columns logic?
-                        // Original polars logic used check for numeric and unwrap_or(0.0) or (0).
-                        // I'll assume 0.0 for now for simplicity as per original logic snippet hint.
+                // Original polars logic used check for numeric and unwrap_or(0.0) or (0).
+                // I'll assume 0.0 for now for simplicity as per original logic snippet hint.
                 } else {
                     val_str.parse::<f64>().unwrap_or(0.0)
                 };

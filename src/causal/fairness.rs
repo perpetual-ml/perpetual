@@ -70,18 +70,10 @@ struct GroupStats {
 
 impl GroupStats {
     fn mean(&self) -> f64 {
-        if self.count < 1.0 {
-            0.0
-        } else {
-            self.sum / self.count
-        }
+        if self.count < 1.0 { 0.0 } else { self.sum / self.count }
     }
     fn safe_count(&self) -> f64 {
-        if self.count < 1.0 {
-            1.0
-        } else {
-            self.count
-        }
+        if self.count < 1.0 { 1.0 } else { self.count }
     }
 }
 

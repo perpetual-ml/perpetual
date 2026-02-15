@@ -3,16 +3,19 @@
 //! Calibrates upper and lower quantile models on held-out data to produce
 //! prediction intervals with marginal coverage of at least `1 - alpha`.
 use crate::objective_functions::objective::Objective;
-use crate::{errors::PerpetualError, utils::percentiles, ColumnarMatrix, Matrix, PerpetualBooster};
+use crate::{ColumnarMatrix, Matrix, PerpetualBooster, errors::PerpetualError, utils::percentiles};
 use std::collections::HashMap;
 
 /// Calibration data: `(features, targets, alpha_values)`.
-pub type CalData<'a> = (Matrix<'a, f64>, &'a [f64], &'a [f64]);
+pub type CalData<'a> = (&'a Matrix<'a, f64>, &'a [f64], &'a [f64]);
+
+/// Calibration data for columnar matrices: `(features, targets, alpha_values)`.
+pub type CalDataColumnar<'a> = (&'a ColumnarMatrix<'a, f64>, &'a [f64], &'a [f64]);
 
 impl PerpetualBooster {
     /// Calibrate models to get prediction intervals
     /// * `alpha` - Alpha list to train calibration models for
-    pub fn calibrate(
+    pub fn calibrate_conformal(
         &mut self,
         data: &Matrix<f64>,
         y: &[f64],
@@ -20,6 +23,7 @@ impl PerpetualBooster {
         group: Option<&[u64]>,
         data_cal: CalData,
     ) -> Result<(), PerpetualError> {
+        self.cfg.calibration_method = crate::booster::config::CalibrationMethod::Conformal;
         let (x_cal, y_cal, alpha) = data_cal;
 
         for alpha_ in alpha {
@@ -36,13 +40,13 @@ impl PerpetualBooster {
 
             model_upper.fit(data, y, sample_weight, group)?;
 
-            let y_cal_pred_lower = model_lower.predict(&x_cal, true);
-            let y_cal_pred_upper = model_upper.predict(&x_cal, true);
+            let y_cal_pred_lower = model_lower.predict(x_cal, true);
+            let y_cal_pred_upper = model_upper.predict(x_cal, true);
             let mut scores: Vec<f64> = Vec::with_capacity(y_cal.len());
             for i in 0..y_cal.len() {
                 scores.push(f64::max(y_cal_pred_lower[i] - y_cal[i], y_cal[i] - y_cal_pred_upper[i]));
             }
-            let perc = (1.0 - *alpha_) * (1.0 + 1.0 * (1.0 / (scores.len() as f64)));
+            let perc = ((1.0 - *alpha_) * (1.0 + 1.0 / (scores.len() as f64))).min(1.0);
             let score = percentiles(&scores, &vec![1.0; scores.len()], &[perc])[0];
             self.cal_models
                 .insert(alpha_.to_string(), [(model_lower, -score), (model_upper, score)]);
@@ -51,14 +55,15 @@ impl PerpetualBooster {
     }
 
     /// Calibrate models to get prediction intervals using columnar data
-    pub fn calibrate_columnar(
+    pub fn calibrate_conformal_columnar(
         &mut self,
         data: &ColumnarMatrix<f64>,
         y: &[f64],
         sample_weight: Option<&[f64]>,
         group: Option<&[u64]>,
-        data_cal: (&ColumnarMatrix<f64>, &[f64], &[f64]),
+        data_cal: CalDataColumnar,
     ) -> Result<(), PerpetualError> {
+        self.cfg.calibration_method = crate::booster::config::CalibrationMethod::Conformal;
         let (x_cal, y_cal, alpha) = data_cal;
 
         for alpha_ in alpha {
@@ -81,7 +86,7 @@ impl PerpetualBooster {
             for i in 0..y_cal.len() {
                 scores.push(f64::max(y_cal_pred_lower[i] - y_cal[i], y_cal[i] - y_cal_pred_upper[i]));
             }
-            let perc = (1.0 - *alpha_) * (1.0 + 1.0 * (1.0 / (scores.len() as f64)));
+            let perc = ((1.0 - *alpha_) * (1.0 + 1.0 / (scores.len() as f64))).min(1.0);
             let score = percentiles(&scores, &vec![1.0; scores.len()], &[perc])[0];
             self.cal_models
                 .insert(alpha_.to_string(), [(model_lower, -score), (model_upper, score)]);
@@ -89,46 +94,39 @@ impl PerpetualBooster {
         Ok(())
     }
 
-    pub fn predict_intervals(&self, data: &Matrix<f64>, parallel: bool) -> HashMap<String, Vec<Vec<f64>>> {
+    pub fn predict_intervals_conformal(&self, data: &Matrix<f64>, parallel: bool) -> HashMap<String, Vec<Vec<f64>>> {
         let mut intervals = HashMap::new();
         for (alpha, value) in &self.cal_models {
             let (model_lower, score_lower) = &value[0];
             let (model_upper, score_upper) = &value[1];
-            let lower_preds = model_lower
-                .predict(data, parallel)
-                .iter()
-                .map(|p| p + score_lower)
-                .collect();
-            let upper_preds = model_upper
-                .predict(data, parallel)
-                .iter()
-                .map(|p| p + score_upper)
-                .collect();
-            intervals.insert(alpha.to_string(), vec![lower_preds, upper_preds]);
+            let lower_preds = model_lower.predict(data, parallel);
+            let upper_preds = model_upper.predict(data, parallel);
+            let mut sample_intervals = Vec::with_capacity(data.rows);
+            for i in 0..data.rows {
+                sample_intervals.push(vec![lower_preds[i] + score_lower, upper_preds[i] + score_upper]);
+            }
+            intervals.insert(alpha.to_string(), sample_intervals);
         }
         intervals
     }
 
-    pub fn predict_intervals_columnar(
+    pub fn predict_intervals_conformal_columnar(
         &self,
         data: &ColumnarMatrix<f64>,
         parallel: bool,
     ) -> HashMap<String, Vec<Vec<f64>>> {
         let mut intervals = HashMap::new();
+        let n_samples = data.index.len();
         for (alpha, value) in &self.cal_models {
             let (model_lower, score_lower) = &value[0];
             let (model_upper, score_upper) = &value[1];
-            let lower_preds = model_lower
-                .predict_columnar(data, parallel)
-                .iter()
-                .map(|p| p + score_lower)
-                .collect();
-            let upper_preds = model_upper
-                .predict_columnar(data, parallel)
-                .iter()
-                .map(|p| p + score_upper)
-                .collect();
-            intervals.insert(alpha.to_string(), vec![lower_preds, upper_preds]);
+            let lower_preds = model_lower.predict_columnar(data, parallel);
+            let upper_preds = model_upper.predict_columnar(data, parallel);
+            let mut sample_intervals = Vec::with_capacity(n_samples);
+            for i in 0..n_samples {
+                sample_intervals.push(vec![lower_preds[i] + score_lower, upper_preds[i] + score_upper]);
+            }
+            intervals.insert(alpha.to_string(), sample_intervals);
         }
         intervals
     }
@@ -138,9 +136,9 @@ impl PerpetualBooster {
 #[cfg(test)]
 mod tests {
 
-    use crate::objective_functions::objective::Objective;
     use crate::Matrix;
     use crate::PerpetualBooster;
+    use crate::objective_functions::objective::Objective;
     use std::error::Error;
     use std::fs::File;
     use std::io::BufReader;
@@ -241,9 +239,9 @@ mod tests {
         model.fit(&matrix_train, &y_train_sub, None, None)?;
 
         let alpha = vec![0.2];
-        let data_cal = (matrix_test, y_test_sub.as_slice(), alpha.as_slice());
+        let data_cal = (&matrix_test, y_test_sub.as_slice(), alpha.as_slice());
 
-        model.calibrate(&matrix_train, &y_train_sub, None, None, data_cal)?;
+        model.calibrate_conformal(&matrix_train, &y_train_sub, None, None, data_cal)?;
 
         let matrix_test_eval = Matrix::new(&data_test_sub, y_test_sub.len(), 8);
         let _intervals = model.predict_intervals(&matrix_test_eval, true);

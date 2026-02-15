@@ -22,7 +22,7 @@ impl PyFairnessObjective {
                 return Err(pyo3::exceptions::PyValueError::new_err(format!(
                     "Unknown fairness type: {}. Expected 'demographic_parity' or 'equalized_odds'.",
                     fairness_type
-                )))
+                )));
             }
         };
 

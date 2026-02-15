@@ -1,6 +1,6 @@
+use perpetual::PerpetualBooster;
 use perpetual::data::Matrix;
 use perpetual::objective_functions::Objective;
-use perpetual::PerpetualBooster;
 use std::fs;
 
 fn main() {

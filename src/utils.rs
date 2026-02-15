@@ -310,6 +310,9 @@ pub fn percentiles<T>(v: &[T], sample_weight: &[T], percentiles: &[T]) -> Vec<T>
 where
     T: FloatData<T>,
 {
+    if v.is_empty() {
+        return vec![T::ZERO; percentiles.len()];
+    }
     let mut idx: Vec<usize> = (0..v.len()).collect();
     idx.sort_unstable_by(|a, b| v[*a].partial_cmp(&v[*b]).unwrap());
 
@@ -318,7 +321,7 @@ where
     let mut current_pct = *pcts.pop_front().expect("No percentiles were provided");
 
     // Prepare a vector to put the percentiles in...
-    let mut p = Vec::new();
+    let mut p = Vec::with_capacity(percentiles.len());
     let mut cuml_pct = T::ZERO;
     let mut current_value = v[idx[0]];
     let total_values = fast_sum(sample_weight);
@@ -338,11 +341,18 @@ where
                     None => return p,
                 }
             }
-        } else if current_pct == T::ONE {
-            if let Some(i_) = idx.last() {
-                p.push(v[*i_]);
-                break;
+        } else if let Some(i_) = idx.last().filter(|_| current_pct == T::ONE) {
+            p.push(v[*i_]);
+            match pcts.pop_front() {
+                Some(p_) => current_pct = *p_,
+                None => return p,
             }
+        }
+    }
+    // If there are still percentiles left, pad with the last value.
+    if let Some(&last_val) = v.iter().last() {
+        while p.len() < percentiles.len() {
+            p.push(last_val);
         }
     }
     p
@@ -750,10 +760,10 @@ pub fn precision_round(n: f64, precision: i32) -> f64 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use rand::rngs::StdRng;
-    use rand::seq::IndexedRandom;
     use rand::RngExt;
     use rand::SeedableRng;
+    use rand::rngs::StdRng;
+    use rand::seq::IndexedRandom;
     #[test]
     fn test_round() {
         assert_eq!(0.3, precision_round(0.3333, 1));
@@ -852,11 +862,7 @@ mod tests {
         let f = vec![15, 10, 10, 11, 3, 18, 9, 3, 5, 2, 6, 13, 19, 14];
         idx.sort_by_key(|i| {
             if f[*i] == 0 {
-                if missing_right {
-                    u16::MAX
-                } else {
-                    u16::MIN
-                }
+                if missing_right { u16::MAX } else { u16::MIN }
             } else {
                 f[*i]
             }
@@ -1044,7 +1050,7 @@ mod tests {
             }
             // Check none are less than...
             for i in split_i.1..(idx.len()) {
-                assert!(!(f[idx[i]] < split_value));
+                assert!((f[idx[i]] >= split_value));
             }
             // Check none other are missing...
             for i in split_i.0..(idx.len()) {

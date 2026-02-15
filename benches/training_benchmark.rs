@@ -1,7 +1,7 @@
-use criterion::{criterion_group, criterion_main, Criterion};
+use criterion::{Criterion, criterion_group, criterion_main};
+use perpetual::PerpetualBooster;
 use perpetual::data::Matrix;
 use perpetual::objective_functions::Objective;
-use perpetual::PerpetualBooster;
 use std::fs;
 use std::hint::black_box;
 use std::time::Duration;

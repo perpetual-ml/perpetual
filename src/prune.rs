@@ -2,9 +2,9 @@
 //!
 //! This module implements tree pruning strategies to remove branches that do not
 //! contribute significantly to the model's generalization capabilities.
-use crate::objective_functions::objective::ObjectiveFunction;
 use crate::objective_functions::Objective;
-use crate::{decision_tree::tree::Tree, errors::PerpetualError, Matrix, PerpetualBooster};
+use crate::objective_functions::objective::ObjectiveFunction;
+use crate::{Matrix, PerpetualBooster, decision_tree::tree::Tree, errors::PerpetualError};
 use std::collections::HashMap;
 
 impl PerpetualBooster {

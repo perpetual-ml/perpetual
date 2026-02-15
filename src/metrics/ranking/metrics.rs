@@ -120,11 +120,7 @@ fn compute_group_ndcg(
     let idcg = compute_group_dcg(&ideal_relevance, k, &ideal_weights, scheme);
 
     // Return NDCG
-    if idcg > 0.0 {
-        dcg / idcg
-    } else {
-        0.0
-    }
+    if idcg > 0.0 { dcg / idcg } else { 0.0 }
 }
 
 pub fn ndcg_at_k_metric(

@@ -255,17 +255,15 @@ impl<'a, T> ColumnarMatrix<'a, T> {
 
     /// Check if a value at (row, col) is valid (not null).
     pub fn is_valid(&self, row: usize, col: usize) -> bool {
-        if let Some(ref masks) = self.masks {
-            if let Some(mask) = masks[col] {
-                // Arrow/Polars validity bitmap: bit set (1) means valid, unset (0) means null.
-                let byte_idx = row / 8;
-                let bit_idx = row % 8;
-                if byte_idx < mask.len() {
-                    return (mask[byte_idx] >> bit_idx) & 1 != 0;
-                }
-                // Should not happen if mask length is correct, but safe fallback
-                return false;
+        if let Some(mask) = self.masks.as_ref().and_then(|m| m[col]) {
+            // Arrow/Polars validity bitmap: bit set (1) means valid, unset (0) means null.
+            let byte_idx = row / 8;
+            let bit_idx = row % 8;
+            if byte_idx < mask.len() {
+                return (mask[byte_idx] >> bit_idx) & 1 != 0;
             }
+            // Should not happen if mask length is correct, but safe fallback
+            return false;
         }
         true
     }

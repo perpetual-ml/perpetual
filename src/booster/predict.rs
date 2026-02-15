@@ -2,12 +2,12 @@
 //!
 //! Prediction, probability, contribution, and feature importance methods for the booster.
 
+use crate::MultiOutputBooster;
 use crate::booster::config::ContributionsMethod;
 use crate::data::ColumnarMatrix;
 use crate::objective_functions::objective::Objective;
-use crate::MultiOutputBooster;
 use crate::{
-    decision_tree::tree::Tree, shapley::predict_contributions_row_shapley, utils::odds, Matrix, PerpetualBooster,
+    Matrix, PerpetualBooster, decision_tree::tree::Tree, shapley::predict_contributions_row_shapley, utils::odds,
 };
 use rayon::prelude::*;
 use std::collections::{HashMap, HashSet};
@@ -520,5 +520,38 @@ impl MultiOutputBooster {
             .iter()
             .flat_map(|b| b.predict_contributions_columnar(data, method, parallel))
             .collect::<Vec<f64>>()
+    }
+
+    pub fn predict_intervals(&self, data: &Matrix<f64>, parallel: bool) -> HashMap<String, Vec<Vec<f64>>> {
+        let mut results: HashMap<String, Vec<Vec<f64>>> = HashMap::new();
+        for booster in &self.boosters {
+            let booster_intervals = booster.predict_intervals(data, parallel);
+            for (alpha, intervals) in booster_intervals {
+                let entry = results.entry(alpha).or_insert_with(|| vec![Vec::new(); data.rows]);
+                for (i, sample_interval) in intervals.into_iter().enumerate() {
+                    entry[i].extend(sample_interval);
+                }
+            }
+        }
+        results
+    }
+
+    pub fn predict_intervals_columnar(
+        &self,
+        data: &ColumnarMatrix<f64>,
+        parallel: bool,
+    ) -> HashMap<String, Vec<Vec<f64>>> {
+        let mut results: HashMap<String, Vec<Vec<f64>>> = HashMap::new();
+        let n_samples = data.index.len();
+        for booster in &self.boosters {
+            let booster_intervals = booster.predict_intervals_columnar(data, parallel);
+            for (alpha, intervals) in booster_intervals {
+                let entry = results.entry(alpha).or_insert_with(|| vec![Vec::new(); n_samples]);
+                for (i, sample_interval) in intervals.into_iter().enumerate() {
+                    entry[i].extend(sample_interval);
+                }
+            }
+        }
+        results
     }
 }

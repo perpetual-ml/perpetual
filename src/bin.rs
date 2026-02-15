@@ -48,14 +48,16 @@ impl Bin {
     /// # Safety
     /// Updates a `Bin` by subtracting the values of another `Bin` from a parent `Bin`.
     pub unsafe fn from_parent_child(root_bin: *mut Bin, child_bin: *mut Bin, update_bin: *mut Bin) {
-        let rb = root_bin.as_ref().unwrap_unchecked();
-        let cb = child_bin.as_ref().unwrap_unchecked();
-        let ub = update_bin.as_mut().unwrap_unchecked();
-        // Fused loop: update g_folded, h_folded, counts in a single pass per fold
-        for j in 0..5 {
-            *ub.g_folded.get_unchecked_mut(j) = rb.g_folded.get_unchecked(j) - cb.g_folded.get_unchecked(j);
-            *ub.h_folded.get_unchecked_mut(j) = rb.h_folded.get_unchecked(j) - cb.h_folded.get_unchecked(j);
-            *ub.counts.get_unchecked_mut(j) = rb.counts.get_unchecked(j) - cb.counts.get_unchecked(j);
+        unsafe {
+            let rb = root_bin.as_ref().unwrap_unchecked();
+            let cb = child_bin.as_ref().unwrap_unchecked();
+            let ub = update_bin.as_mut().unwrap_unchecked();
+            // Fused loop: update g_folded, h_folded, counts in a single pass per fold
+            for j in 0..5 {
+                *ub.g_folded.get_unchecked_mut(j) = rb.g_folded.get_unchecked(j) - cb.g_folded.get_unchecked(j);
+                *ub.h_folded.get_unchecked_mut(j) = rb.h_folded.get_unchecked(j) - cb.h_folded.get_unchecked(j);
+                *ub.counts.get_unchecked_mut(j) = rb.counts.get_unchecked(j) - cb.counts.get_unchecked(j);
+            }
         }
     }
 
@@ -86,17 +88,19 @@ impl Bin {
         second_bin: *mut Bin,
         update_bin: *mut Bin,
     ) {
-        let rb = root_bin.as_ref().unwrap_unchecked();
-        let fb = first_bin.as_ref().unwrap_unchecked();
-        let sb = second_bin.as_ref().unwrap_unchecked();
-        let ub = update_bin.as_mut().unwrap_unchecked();
-        for j in 0..5 {
-            *ub.g_folded.get_unchecked_mut(j) =
-                rb.g_folded.get_unchecked(j) - fb.g_folded.get_unchecked(j) - sb.g_folded.get_unchecked(j);
-            *ub.h_folded.get_unchecked_mut(j) =
-                rb.h_folded.get_unchecked(j) - fb.h_folded.get_unchecked(j) - sb.h_folded.get_unchecked(j);
-            *ub.counts.get_unchecked_mut(j) =
-                rb.counts.get_unchecked(j) - fb.counts.get_unchecked(j) - sb.counts.get_unchecked(j);
+        unsafe {
+            let rb = root_bin.as_ref().unwrap_unchecked();
+            let fb = first_bin.as_ref().unwrap_unchecked();
+            let sb = second_bin.as_ref().unwrap_unchecked();
+            let ub = update_bin.as_mut().unwrap_unchecked();
+            for j in 0..5 {
+                *ub.g_folded.get_unchecked_mut(j) =
+                    rb.g_folded.get_unchecked(j) - fb.g_folded.get_unchecked(j) - sb.g_folded.get_unchecked(j);
+                *ub.h_folded.get_unchecked_mut(j) =
+                    rb.h_folded.get_unchecked(j) - fb.h_folded.get_unchecked(j) - sb.h_folded.get_unchecked(j);
+                *ub.counts.get_unchecked_mut(j) =
+                    rb.counts.get_unchecked(j) - fb.counts.get_unchecked(j) - sb.counts.get_unchecked(j);
+            }
         }
     }
 }

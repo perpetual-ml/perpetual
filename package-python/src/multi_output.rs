@@ -5,18 +5,18 @@ use crate::policy::PyPolicyObjective;
 use crate::utils::int_map_to_constraint_map;
 use crate::utils::to_value_error;
 use numpy::IntoPyArray;
-use numpy::{PyArray1, PyReadonlyArray1};
+use numpy::{PyArray1, PyArray2, PyReadonlyArray1};
 use perpetual_rs::booster::config::BoosterIO;
-use perpetual_rs::booster::config::MissingNodeTreatment;
+use perpetual_rs::booster::config::{CalibrationMethod, MissingNodeTreatment};
 use perpetual_rs::booster::multi_output::MultiOutputBooster as CrateMultiOutputBooster;
 use perpetual_rs::constraints::Constraint;
 use perpetual_rs::data::{ColumnarMatrix, Matrix};
 use perpetual_rs::objective_functions::Objective;
+use pyo3::IntoPyObjectExt;
 use pyo3::exceptions::{PyKeyError, PyValueError};
 use pyo3::prelude::*;
-use pyo3::types::IntoPyDict;
 use pyo3::types::PyType;
-use pyo3::IntoPyObjectExt;
+use pyo3::types::{IntoPyDict, PyDict};
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
@@ -55,6 +55,7 @@ impl MultiOutputBooster {
         loss,
         grad,
         init,
+        save_node_stats=None,
     ))]
     pub fn new<'py>(
         n_boosters: usize,
@@ -81,6 +82,7 @@ impl MultiOutputBooster {
         loss: Option<Bound<'py, PyAny>>,
         grad: Option<Bound<'py, PyAny>>,
         init: Option<Bound<'py, PyAny>>,
+        save_node_stats: Option<bool>,
     ) -> PyResult<Self> {
         let objective_ = match objective {
             Some(obj) => {
@@ -134,7 +136,8 @@ impl MultiOutputBooster {
             .set_timeout(timeout)
             .set_iteration_limit(iteration_limit)
             .set_memory_limit(memory_limit)
-            .set_stopping_rounds(stopping_rounds);
+            .set_stopping_rounds(stopping_rounds)
+            .set_save_node_stats(save_node_stats.unwrap_or(false));
 
         Ok(MultiOutputBooster { booster })
     }
@@ -245,6 +248,11 @@ impl MultiOutputBooster {
     #[setter]
     fn set_stopping_rounds(&mut self, value: Option<usize>) -> PyResult<()> {
         self.booster = self.booster.clone().set_stopping_rounds(value);
+        Ok(())
+    }
+    #[setter]
+    fn set_save_node_stats(&mut self, value: bool) -> PyResult<()> {
+        self.booster = self.booster.clone().set_save_node_stats(value);
         Ok(())
     }
 
@@ -402,6 +410,246 @@ impl MultiOutputBooster {
         Ok(())
     }
 
+    /// Calibrate the boosters using a selected non-conformal method.
+    ///
+    /// # Arguments
+    ///
+    /// * `method` - The calibration method to use (e.g., "MinMax", "GRP", "WeightVariance").
+    /// * `flat_data_cal` - Features for the calibration set (flattened).
+    /// * `rows_cal` - Number of calibration samples.
+    /// * `cols_cal` - Number of features.
+    /// * `y_cal` - Calibration targets (flattened).
+    /// * `alpha` - Confidence levels (e.g., [0.1, 0.05]).
+    #[pyo3(signature=(method, flat_data_cal, rows_cal, cols_cal, y_cal, alpha))]
+    pub fn calibrate(
+        &mut self,
+        method: Option<&str>,
+        flat_data_cal: PyReadonlyArray1<f64>,
+        rows_cal: usize,
+        cols_cal: usize,
+        y_cal: PyReadonlyArray1<f64>,
+        alpha: PyReadonlyArray1<f64>,
+    ) -> PyResult<()> {
+        let flat_data_cal = flat_data_cal.as_slice()?;
+        let data_cal = Matrix::new(flat_data_cal, rows_cal, cols_cal);
+        let y_cal = y_cal.as_slice()?;
+        let ys_cal = Matrix::new(y_cal, rows_cal, self.booster.n_boosters);
+
+        let alpha_slice = alpha.as_slice()?;
+
+        let method_ = match method {
+            Some(s) => to_value_error(serde_plain::from_str(s))?,
+            None => CalibrationMethod::default(),
+        };
+
+        to_value_error(self.booster.calibrate(method_, (&data_cal, &ys_cal, alpha_slice)))?;
+
+        Ok(())
+    }
+
+    /// Calibrate the boosters using Split Conformal Prediction (CQR).
+    ///
+    /// # Arguments
+    ///
+    /// * `flat_data_cal` - Feature matrix for the calibration set (flattened).
+    /// * `rows_cal` - Number of samples in the calibration set.
+    /// * `cols_cal` - Number of features.
+    /// * `y_cal` - Calibration targets (flattened).
+    /// * `alpha` - Confidence levels (e.g., [0.1, 0.05]).
+    /// Calibrate the boosters using Conformal Prediction (CQR).
+    ///
+    /// # Arguments
+    ///
+    /// * `flat_data` - Feature matrix for the training set (flattened).
+    /// * `rows` - Number of samples in the training set.
+    /// * `cols` - Number of features.
+    /// * `y` - Training targets.
+    /// * `sample_weight` - Optional training sample weights.
+    /// * `group` - Optional training group IDs.
+    /// * `flat_data_cal` - Feature matrix for the calibration set (flattened).
+    /// * `rows_cal` - Number of samples in the calibration set.
+    /// * `cols_cal` - Number of features.
+    /// * `y_cal` - Calibration targets (flattened).
+    /// * `alpha` - Confidence levels.
+    #[pyo3(signature=(flat_data, rows, cols, y, sample_weight, group, flat_data_cal, rows_cal, cols_cal, y_cal, alpha))]
+    pub fn calibrate_conformal(
+        &mut self,
+        flat_data: PyReadonlyArray1<f64>,
+        rows: usize,
+        cols: usize,
+        y: PyReadonlyArray1<f64>,
+        sample_weight: Option<PyReadonlyArray1<f64>>,
+        group: Option<PyReadonlyArray1<u64>>,
+        flat_data_cal: PyReadonlyArray1<f64>,
+        rows_cal: usize,
+        cols_cal: usize,
+        y_cal: PyReadonlyArray1<f64>,
+        alpha: PyReadonlyArray1<f64>,
+    ) -> PyResult<()> {
+        let flat_data = flat_data.as_slice()?;
+        let data = Matrix::new(flat_data, rows, cols);
+        let y_slice = y.as_slice()?;
+        let ys = Matrix::new(y_slice, rows, self.booster.n_boosters);
+        let sw = match &sample_weight {
+            Some(w) => Some(w.as_slice()?),
+            None => None,
+        };
+        let g = match &group {
+            Some(gr) => Some(gr.as_slice()?),
+            None => None,
+        };
+
+        let flat_data_cal = flat_data_cal.as_slice()?;
+        let data_cal = Matrix::new(flat_data_cal, rows_cal, cols_cal);
+        let y_cal_slice = y_cal.as_slice()?;
+        let ys_cal = Matrix::new(y_cal_slice, rows_cal, self.booster.n_boosters);
+
+        let alpha_slice = alpha.as_slice()?;
+
+        to_value_error(
+            self.booster
+                .calibrate_conformal(&data, &ys, sw, g, (&data_cal, &ys_cal, alpha_slice)),
+        )?;
+
+        Ok(())
+    }
+
+    /// Calibrate the boosters on columnar data using a selected non-conformal method.
+    ///
+    /// # Arguments
+    ///
+    /// * `method` - The calibration method to use.
+    /// * `columns_cal` - Feature columns (Zero-Copy).
+    /// * `masks_cal` - Optional masks.
+    /// * `rows_cal` - Number of samples.
+    /// * `y_cal` - Calibration targets.
+    /// * `alpha` - Confidence levels.
+    #[pyo3(signature=(method, columns_cal, masks_cal, rows_cal, y_cal, alpha))]
+    pub fn calibrate_columnar(
+        &mut self,
+        method: Option<&str>,
+        columns_cal: Vec<PyReadonlyArray1<f64>>,
+        masks_cal: Option<Vec<Option<PyReadonlyArray1<u8>>>>,
+        rows_cal: usize,
+        y_cal: PyReadonlyArray1<f64>,
+        alpha: PyReadonlyArray1<f64>,
+    ) -> PyResult<()> {
+        let col_slices_cal: Vec<&[f64]> = columns_cal
+            .iter()
+            .map(|col| col.as_slice())
+            .collect::<Result<Vec<_>, _>>()?;
+
+        let mut mask_slices_cal: Option<Vec<Option<&[u8]>>> = None;
+        if let Some(ref m) = masks_cal {
+            let mut v = Vec::with_capacity(m.len());
+            for mask in m {
+                if let Some(arr) = mask {
+                    v.push(Some(arr.as_slice()?));
+                } else {
+                    v.push(None);
+                }
+            }
+            mask_slices_cal = Some(v);
+        }
+        let data_cal = ColumnarMatrix::new(col_slices_cal, mask_slices_cal, rows_cal);
+
+        let y_cal = y_cal.as_slice()?;
+        let ys_cal = Matrix::new(y_cal, rows_cal, self.booster.n_boosters);
+        let alpha = alpha.as_slice()?;
+
+        let method_ = match method {
+            Some(s) => to_value_error(serde_plain::from_str(s))?,
+            None => CalibrationMethod::default(),
+        };
+
+        to_value_error(self.booster.calibrate_columnar(method_, (&data_cal, &ys_cal, alpha)))?;
+
+        Ok(())
+    }
+
+    /// Calibrate the boosters on columnar data using Split Conformal Prediction (CQR).
+    ///
+    /// # Arguments
+    ///
+    /// * `columns_cal` - Feature columns (Zero-Copy).
+    /// * `masks_cal` - Optional masks.
+    /// * `rows_cal` - Number of samples.
+    /// * `y_cal` - Calibration targets.
+    /// * `alpha` - Confidence levels.
+    #[pyo3(signature=(columns, masks, rows, y, sample_weight, group, columns_cal, masks_cal, rows_cal, y_cal, alpha))]
+    pub fn calibrate_conformal_columnar(
+        &mut self,
+        columns: Vec<PyReadonlyArray1<f64>>,
+        masks: Option<Vec<Option<PyReadonlyArray1<u8>>>>,
+        rows: usize,
+        y: PyReadonlyArray1<f64>,
+        sample_weight: Option<PyReadonlyArray1<f64>>,
+        group: Option<PyReadonlyArray1<u64>>,
+        columns_cal: Vec<PyReadonlyArray1<f64>>,
+        masks_cal: Option<Vec<Option<PyReadonlyArray1<u8>>>>,
+        rows_cal: usize,
+        y_cal: PyReadonlyArray1<f64>,
+        alpha: PyReadonlyArray1<f64>,
+    ) -> PyResult<()> {
+        let col_slices: Vec<&[f64]> = columns
+            .iter()
+            .map(|col| col.as_slice())
+            .collect::<Result<Vec<_>, _>>()?;
+        let mut mask_slices: Option<Vec<Option<&[u8]>>> = None;
+        if let Some(ref m) = masks {
+            let mut v = Vec::with_capacity(m.len());
+            for mask in m {
+                if let Some(arr) = mask {
+                    v.push(Some(arr.as_slice()?));
+                } else {
+                    v.push(None);
+                }
+            }
+            mask_slices = Some(v);
+        }
+        let data = ColumnarMatrix::new(col_slices, mask_slices, rows);
+        let y_slice = y.as_slice()?;
+        let ys = Matrix::new(y_slice, rows, self.booster.n_boosters);
+        let sw = match &sample_weight {
+            Some(w) => Some(w.as_slice()?),
+            None => None,
+        };
+        let g = match &group {
+            Some(gr) => Some(gr.as_slice()?),
+            None => None,
+        };
+
+        let col_slices_cal: Vec<&[f64]> = columns_cal
+            .iter()
+            .map(|col| col.as_slice())
+            .collect::<Result<Vec<_>, _>>()?;
+
+        let mut mask_slices_cal: Option<Vec<Option<&[u8]>>> = None;
+        if let Some(ref m) = masks_cal {
+            let mut v = Vec::with_capacity(m.len());
+            for mask in m {
+                if let Some(arr) = mask {
+                    v.push(Some(arr.as_slice()?));
+                } else {
+                    v.push(None);
+                }
+            }
+            mask_slices_cal = Some(v);
+        }
+        let data_cal = ColumnarMatrix::new(col_slices_cal, mask_slices_cal, rows_cal);
+
+        let y_cal = y_cal.as_slice()?;
+        let ys_cal = Matrix::new(y_cal, rows_cal, self.booster.n_boosters);
+        let alpha = alpha.as_slice()?;
+
+        to_value_error(
+            self.booster
+                .calibrate_conformal_columnar(&data, &ys, sw, g, (&data_cal, &ys_cal, alpha)),
+        )?;
+
+        Ok(())
+    }
+
     pub fn predict<'py>(
         &self,
         py: Python<'py>,
@@ -462,7 +710,6 @@ impl MultiOutputBooster {
         Ok(self.booster.predict_proba(&data, parallel).into_pyarray(py))
     }
 
-    /// Predict probabilities using columnar data (zero-copy from Polars).
     pub fn predict_proba_columnar<'py>(
         &self,
         py: Python<'py>,
@@ -492,6 +739,69 @@ impl MultiOutputBooster {
         let data = ColumnarMatrix::new(col_slices, mask_slices, rows);
         let parallel = parallel.unwrap_or(true);
         Ok(self.booster.predict_proba_columnar(&data, parallel).into_pyarray(py))
+    }
+
+    pub fn predict_intervals<'py>(
+        &self,
+        py: Python<'py>,
+        flat_data: PyReadonlyArray1<f64>,
+        rows: usize,
+        cols: usize,
+        parallel: Option<bool>,
+    ) -> PyResult<Bound<'py, PyDict>> {
+        let flat_data = flat_data.as_slice()?;
+        let data = Matrix::new(flat_data, rows, cols);
+        let parallel = parallel.unwrap_or(true);
+
+        let predictions: HashMap<String, Vec<Vec<f64>>> = self.booster.predict_intervals(&data, parallel);
+
+        let py_dict = PyDict::new(py);
+        for (key, value) in predictions.iter() {
+            let py_array = PyArray2::from_vec2(py, value)?;
+            py_dict.set_item(key, py_array)?;
+        }
+
+        Ok(py_dict)
+    }
+
+    /// Predict intervals using columnar data (zero-copy from Polars).
+    pub fn predict_intervals_columnar<'py>(
+        &self,
+        py: Python<'py>,
+        columns: Vec<PyReadonlyArray1<f64>>,
+        masks: Option<Vec<Option<PyReadonlyArray1<u8>>>>,
+        rows: usize,
+        parallel: Option<bool>,
+    ) -> PyResult<Bound<'py, PyDict>> {
+        let col_slices: Vec<&[f64]> = columns
+            .iter()
+            .map(|col| col.as_slice())
+            .collect::<Result<Vec<_>, _>>()?;
+
+        let mut mask_slices: Option<Vec<Option<&[u8]>>> = None;
+        if let Some(ref m) = masks {
+            let mut v = Vec::with_capacity(m.len());
+            for mask in m {
+                if let Some(arr) = mask {
+                    v.push(Some(arr.as_slice()?));
+                } else {
+                    v.push(None);
+                }
+            }
+            mask_slices = Some(v);
+        }
+        let data = ColumnarMatrix::new(col_slices, mask_slices, rows);
+        let parallel = parallel.unwrap_or(true);
+
+        let predictions: HashMap<String, Vec<Vec<f64>>> = self.booster.predict_intervals_columnar(&data, parallel);
+
+        let py_dict = PyDict::new(py);
+        for (key, value) in predictions.iter() {
+            let py_array = PyArray2::from_vec2(py, value)?;
+            py_dict.set_item(key, py_array)?;
+        }
+
+        Ok(py_dict)
     }
 
     pub fn predict_nodes<'py>(

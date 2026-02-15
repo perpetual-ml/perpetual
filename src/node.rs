@@ -96,11 +96,9 @@ impl Node {
         self.parent_node = split_node.parent_node;
         self.left_cats = split_node.left_cats;
         // If we are keeping stats, update them from the split_node stats.
-        if let Some(stats) = &mut self.stats {
-            if let Some(sn_stats) = split_node.stats {
-                stats.generalization = sn_stats.generalization;
-                stats.weights = sn_stats.weights.map(|x| x * eta);
-            }
+        if let (Some(stats), Some(sn_stats)) = (&mut self.stats, split_node.stats) {
+            stats.generalization = sn_stats.generalization;
+            stats.weights = sn_stats.weights.map(|x| x * eta);
         }
     }
     /// Get the path that should be traveled down, given a value.

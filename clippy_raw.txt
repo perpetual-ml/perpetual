@@ -1,0 +1,27 @@
+﻿cargo :     Checking perpetual v1.6.0 (C:\work\perpetual\rust_pr
+oject\forust-main-perp-oss)
+At line:1 char:1
++ cargo clippy --all-targets --all-features -- -D warnings 2>&1 
+| Out-F ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (    Checking pe... 
+   -main-perp-oss):String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+error: very complex type used. Consider factoring parts into `ty
+pe` definitions
+  --> src\calibration\tests.rs:13:6
+   |
+13 | ) -> (Vec<f64>, Vec<f64>, Vec<f64>, Vec<f64>, Vec<f64>, Vec
+<f64>) {
+   |      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^
+   |
+   = help: for further information visit https://rust-lang.githu
+b.io/rust-clippy/master/index.html#type_complexity
+   = note: `-D clippy::type-complexity` implied by `-D warnings`
+   = help: to override `-D warnings` add `#[allow(clippy::type_c
+omplexity)]`
+
+error: could not compile `perpetual` (lib test) due to 1 previou
+s error

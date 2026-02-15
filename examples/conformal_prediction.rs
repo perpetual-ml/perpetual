@@ -102,11 +102,11 @@ fn main() -> Result<(), Box<dyn Error>> {
         model.get_prediction_trees().len()
     );
 
-    // ------------------------------------------------------------------
     // 3. Calibrate with conformal quantile regression
     // ------------------------------------------------------------------
-    let cal_data = (matrix_cal, y_cal, quantiles.as_slice());
-    model.calibrate(&matrix_fit, y_fit, None, None, cal_data)?;
+    let quantiles_slice = quantiles.as_slice();
+    let cal_data = (&matrix_cal, y_cal, quantiles_slice);
+    model.calibrate_conformal(&matrix_fit, y_fit, None, None, cal_data)?;
     println!("Calibrated conformal model on {n_cal} held-out samples.");
 
     // ------------------------------------------------------------------

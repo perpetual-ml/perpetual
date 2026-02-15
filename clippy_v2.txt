@@ -1,0 +1,358 @@
+﻿cargo :     Checking perpetual v1.6.0 (C:\work\perpetual\rust_pr
+oject\forust-main-perp-oss)
+At line:1 char:1
++ cargo clippy -- -D warnings 2>&1 | Out-File -FilePath clippy_v
+2.txt - ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (    Checking pe... 
+   -main-perp-oss):String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+error: this `if` statement can be collapsed
+   --> src\node.rs:99:9
+    |
+ 99 | /         if let Some(stats) = &mut self.stats {
+100 | |             if let Some(sn_stats) = split_node.stats {
+101 | |                 stats.generalization = sn_stats.generali
+zation;
+102 | |                 stats.weights = sn_stats.weights.map(|x|
+ x * eta);
+103 | |             }
+104 | |         }
+    | |_________^
+    |
+    = help: for further information visit https://rust-lang.gith
+ub.io/rust-clippy/master/index.html#collapsible_if
+    = note: `-D clippy::collapsible-if` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::colla
+psible_if)]`
+help: collapse nested if block
+    |
+ 99 ~         if let Some(stats) = &mut self.stats
+100 ~             && let Some(sn_stats) = split_node.stats {
+101 |                 stats.generalization = sn_stats.generaliza
+tion;
+102 |                 stats.weights = sn_stats.weights.map(|x| x
+ * eta);
+103 ~             }
+    |
+
+error: this `if` statement can be collapsed
+   --> src\booster\core.rs:536:13
+    |
+536 | / ...   if let Some(t) = self.cfg.timeout {
+537 | | ...       if start.elapsed().as_secs_f32() > t {
+538 | | ...           warn!(
+539 | | ...               "Reached timeout before auto stopping.
+ Try to decrease the budget or increase the timeout for the best
+ performa...
+...   |
+543 | | ...   }
+    | |_______^
+    |
+    = help: for further information visit https://rust-lang.gith
+ub.io/rust-clippy/master/index.html#collapsible_if
+help: collapse nested if block
+    |
+536 ~             if let Some(t) = self.cfg.timeout
+537 ~                 && start.elapsed().as_secs_f32() > t {
+538 |                     warn!(
+...
+541 |                     break;
+542 ~                 }
+    |
+
+error: this `if` statement can be collapsed
+   --> src\booster\core.rs:771:13
+    |
+771 | / ...   if let Some(t) = self.cfg.timeout {
+772 | | ...       if start.elapsed().as_secs_f32() > t {
+773 | | ...           warn!(
+774 | | ...               "Reached timeout before auto stopping.
+ Try to decrease the budget or increase the timeout for the best
+ performa...
+...   |
+778 | | ...   }
+    | |_______^
+    |
+    = help: for further information visit https://rust-lang.gith
+ub.io/rust-clippy/master/index.html#collapsible_if
+help: collapse nested if block
+    |
+771 ~             if let Some(t) = self.cfg.timeout
+772 ~                 && start.elapsed().as_secs_f32() > t {
+773 |                     warn!(
+...
+776 |                     break;
+777 ~                 }
+    |
+
+error: this `if` statement can be collapsed
+   --> src\booster\core.rs:914:9
+    |
+914 | /         if map.contains_key("nodes") {
+915 | |             if let Some(nodes) = map.get_mut("nodes").an
+d_then(|n| n.as_object_mut()) {
+916 | |                 for node in nodes.values_mut() {
+917 | |                     fix_legacy_node(node);
+...   |
+920 | |         }
+    | |_________^
+    |
+    = help: for further information visit https://rust-lang.gith
+ub.io/rust-clippy/master/index.html#collapsible_if
+help: collapse nested if block
+    |
+914 ~         if map.contains_key("nodes")
+915 ~             && let Some(nodes) = map.get_mut("nodes").and_
+then(|n| n.as_object_mut()) {
+916 |                 for node in nodes.values_mut() {
+917 |                     fix_legacy_node(node);
+918 |                 }
+919 ~             }
+    |
+
+error: this `if` statement can be collapsed
+   --> src\booster\core.rs:933:9
+    |
+933 | /         if let Some(left_cats_val) = node_obj.get("left_
+cats") {
+934 | |             if let Some(left_cats_arr) = left_cats_val.a
+s_array() {
+935 | |                 if left_cats_arr.len() != 8192 && (!left
+_cats_arr.is_empty() || node_obj.contains_key("right_cats")) {
+936 | |                     let left_cats_indices: Vec<u16> = le
+ft_cats_arr
+...   |
+984 | |         }
+    | |_________^
+    |
+    = help: for further information visit https://rust-lang.gith
+ub.io/rust-clippy/master/index.html#collapsible_if
+help: collapse nested if block
+    |
+933 ~         if let Some(left_cats_val) = node_obj.get("left_ca
+ts")
+934 ~             && let Some(left_cats_arr) = left_cats_val.as_
+array() {
+935 |                 if left_cats_arr.len() != 8192 && (!left_c
+ats_arr.is_empty() || node_obj.contains_key("right_cats")) {
+...
+982 |                 }
+983 ~             }
+    |
+
+error: this `if` statement can be collapsed
+   --> src\booster\core.rs:934:13
+    |
+934 | /             if let Some(left_cats_arr) = left_cats_val.a
+s_array() {
+935 | |                 if left_cats_arr.len() != 8192 && (!left
+_cats_arr.is_empty() || node_obj.contains_key("right_cats")) {
+936 | |                     let left_cats_indices: Vec<u16> = le
+ft_cats_arr
+937 | |                         .iter()
+...   |
+983 | |             }
+    | |_____________^
+    |
+    = help: for further information visit https://rust-lang.gith
+ub.io/rust-clippy/master/index.html#collapsible_if
+help: collapse nested if block
+    |
+934 ~             if let Some(left_cats_arr) = left_cats_val.as_
+array()
+935 ~                 && left_cats_arr.len() != 8192 && (!left_c
+ats_arr.is_empty() || node_obj.contains_key("right_cats")) {
+936 |                     let left_cats_indices: Vec<u16> = left
+_cats_arr
+...
+981 |                     }
+982 ~                 }
+    |
+
+error: this `if` statement can be collapsed
+   --> src\data.rs:258:9
+    |
+258 | /         if let Some(ref masks) = self.masks {
+259 | |             if let Some(mask) = masks[col] {
+260 | |                 // Arrow/Polars validity bitmap: bit set
+ (1) means valid, unset (0) means null.
+261 | |                 let byte_idx = row / 8;
+...   |
+269 | |         }
+    | |_________^
+    |
+    = help: for further information visit https://rust-lang.gith
+ub.io/rust-clippy/master/index.html#collapsible_if
+help: collapse nested if block
+    |
+258 ~         if let Some(ref masks) = self.masks
+259 ~             && let Some(mask) = masks[col] {
+260 |                 // Arrow/Polars validity bitmap: bit set (
+1) means valid, unset (0) means null.
+...
+267 |                 return false;
+268 ~             }
+    |
+
+error: this `map_or` can be simplified
+   --> src\decision_tree\tree.rs:197:16
+    |
+197 |             if target_loss_decrement.map_or(false, |tld| l
+oss_decr_avg > tld) {
+    |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.gith
+ub.io/rust-clippy/master/index.html#unnecessary_map_or
+    = note: `-D clippy::unnecessary-map-or` implied by `-D warni
+ngs`
+    = help: to override `-D warnings` add `#[allow(clippy::unnec
+essary_map_or)]`
+help: use `is_some_and` instead
+    |
+197 -             if target_loss_decrement.map_or(false, |tld| l
+oss_decr_avg > tld) {
+197 +             if target_loss_decrement.is_some_and(|tld| los
+s_decr_avg > tld) {
+    |
+
+error: this `map_or` can be simplified
+   --> src\objective_functions\listnet_loss.rs:106:12
+    |
+106 |           if group.map_or(false, |group_sizes| {
+    |  ____________^
+107 | |             group_sizes.iter().sum::<u64>() != y.len() a
+s u64
+108 | |         }) {
+    | |__________^
+    |
+    = help: for further information visit https://rust-lang.gith
+ub.io/rust-clippy/master/index.html#unnecessary_map_or
+help: use `is_some_and` instead
+    |
+106 -         if group.map_or(false, |group_sizes| {
+106 +         if group.is_some_and(|group_sizes| {
+    |
+
+error: this `map_or` can be simplified
+   --> src\objective_functions\listnet_loss.rs:166:12
+    |
+166 |           if group.map_or(false, |group_sizes| {
+    |  ____________^
+167 | |             group_sizes.iter().sum::<u64>() != y.len() a
+s u64
+168 | |         }) {
+    | |__________^
+    |
+    = help: for further information visit https://rust-lang.gith
+ub.io/rust-clippy/master/index.html#unnecessary_map_or
+help: use `is_some_and` instead
+    |
+166 -         if group.map_or(false, |group_sizes| {
+166 +         if group.is_some_and(|group_sizes| {
+    |
+
+error: this `map_or` can be simplified
+   --> src\objective_functions\listnet_loss.rs:238:12
+    |
+238 |           if group.map_or(false, |group_sizes| {
+    |  ____________^
+239 | |             group_sizes.iter().sum::<u64>() != y.len() a
+s u64
+240 | |         }) {
+    | |__________^
+    |
+    = help: for further information visit https://rust-lang.gith
+ub.io/rust-clippy/master/index.html#unnecessary_map_or
+help: use `is_some_and` instead
+    |
+238 -         if group.map_or(false, |group_sizes| {
+238 +         if group.is_some_and(|group_sizes| {
+    |
+
+error: this `map_or` can be simplified
+   --> src\splitter.rs:209:24
+    |
+209 |                     if allowed_features.map_or(false, |all
+owed| !allowed.contains(feature)) {
+    |                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.gith
+ub.io/rust-clippy/master/index.html#unnecessary_map_or
+help: use `is_some_and` instead
+    |
+209 -                     if allowed_features.map_or(false, |all
+owed| !allowed.contains(feature)) {
+209 +                     if allowed_features.is_some_and(|allow
+ed| !allowed.contains(feature)) {
+    |
+
+error: this `map_or` can be simplified
+   --> src\splitter.rs:240:20
+    |
+240 |                 if allowed_features.map_or(false, |allowed
+| !allowed.contains(feature)) {
+    |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.gith
+ub.io/rust-clippy/master/index.html#unnecessary_map_or
+help: use `is_some_and` instead
+    |
+240 -                 if allowed_features.map_or(false, |allowed
+| !allowed.contains(feature)) {
+240 +                 if allowed_features.is_some_and(|allowed| 
+!allowed.contains(feature)) {
+    |
+
+error: this `if` statement can be collapsed
+   --> src\splitter.rs:404:9
+    |
+404 | /         if missing_leaf {
+405 | |             if let Some(m) = tree.nodes.get_mut(&missing
+) {
+406 | |                 m.weight_value = update as f32;
+407 | |             }
+408 | |         }
+    | |_________^
+    |
+    = help: for further information visit https://rust-lang.gith
+ub.io/rust-clippy/master/index.html#collapsible_if
+help: collapse nested if block
+    |
+404 ~         if missing_leaf
+405 ~             && let Some(m) = tree.nodes.get_mut(&missing) 
+{
+406 |                 m.weight_value = update as f32;
+407 ~             }
+    |
+
+error: this `if` statement can be collapsed
+   --> src\utils.rs:344:16
+    |
+344 |           } else if current_pct == T::ONE {
+    |  ________________^
+345 | |             if let Some(i_) = idx.last() {
+346 | |                 p.push(v[*i_]);
+347 | |                 match pcts.pop_front() {
+...   |
+352 | |         }
+    | |_________^
+    |
+    = help: for further information visit https://rust-lang.gith
+ub.io/rust-clippy/master/index.html#collapsible_if
+help: collapse nested if block
+    |
+344 ~         } else if current_pct == T::ONE
+345 ~             && let Some(i_) = idx.last() {
+346 |                 p.push(v[*i_]);
+...
+350 |                 }
+351 ~             }
+    |
+
+error: could not compile `perpetual` (lib) due to 15 previous er
+rors

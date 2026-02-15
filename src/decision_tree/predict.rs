@@ -3,7 +3,7 @@
 //! Prediction and feature-contribution logic executed on individual trees.
 use super::tree::Tree;
 use crate::data::ColumnarMatrix;
-use crate::{utils::odds, Matrix};
+use crate::{Matrix, utils::odds};
 use rayon::prelude::*;
 use std::collections::{HashMap, HashSet};
 
@@ -274,6 +274,32 @@ impl Tree {
         }
     }
 
+    fn predict_weights_row(&self, data: &Matrix<f64>, row: usize, missing: &f64) -> [f32; 5] {
+        let mut node_idx = 0;
+        loop {
+            let node = &self.nodes.get(&node_idx).unwrap();
+            if node.is_leaf {
+                return node.stats.as_ref().map_or([node.weight_value; 5], |s| s.weights);
+            } else {
+                node_idx = node.get_child_idx(data.get(row, node.split_feature), missing);
+            }
+        }
+    }
+
+    pub fn predict_weights(&self, data: &Matrix<f64>, parallel: bool, missing: &f64) -> Vec<[f32; 5]> {
+        if parallel {
+            data.index
+                .par_iter()
+                .map(|i| self.predict_weights_row(data, *i, missing))
+                .collect()
+        } else {
+            data.index
+                .iter()
+                .map(|i| self.predict_weights_row(data, *i, missing))
+                .collect()
+        }
+    }
+
     fn predict_nodes_row(&self, data: &Matrix<f64>, row: usize, missing: &f64) -> HashSet<usize> {
         let mut node_idx = 0;
         let mut v = HashSet::new();
@@ -352,6 +378,37 @@ impl Tree {
             self.predict_parallel_columnar(data, missing)
         } else {
             self.predict_single_threaded_columnar(data, missing)
+        }
+    }
+
+    fn predict_weights_row_columnar(&self, data: &ColumnarMatrix<f64>, row: usize, missing: &f64) -> [f32; 5] {
+        let mut node_idx = 0;
+        loop {
+            let node = &self.nodes.get(&node_idx).unwrap();
+            if node.is_leaf {
+                return node.stats.as_ref().map_or([node.weight_value; 5], |s| s.weights);
+            } else {
+                let val = if data.is_valid(row, node.split_feature) {
+                    data.get(row, node.split_feature)
+                } else {
+                    missing
+                };
+                node_idx = node.get_child_idx(val, missing);
+            }
+        }
+    }
+
+    pub fn predict_weights_columnar(&self, data: &ColumnarMatrix<f64>, parallel: bool, missing: &f64) -> Vec<[f32; 5]> {
+        if parallel {
+            data.index
+                .par_iter()
+                .map(|i| self.predict_weights_row_columnar(data, *i, missing))
+                .collect()
+        } else {
+            data.index
+                .iter()
+                .map(|i| self.predict_weights_row_columnar(data, *i, missing))
+                .collect()
         }
     }
 

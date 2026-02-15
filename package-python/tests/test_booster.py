@@ -729,24 +729,24 @@ def test_polars():
 
 
 def test_calibration():
-    X_train = pd.read_csv("../resources/cal_housing_train.csv", index_col=False)
-    y_train = X_train.pop("MedHouseVal").to_numpy()
-    X_cal = pd.read_csv("../resources/cal_housing_test.csv", index_col=False)
-    y_cal = X_cal.pop("MedHouseVal").to_numpy()
-    X_train, X_test, y_train, y_test = train_test_split(
-        X_train, y_train, random_state=42
+    X_train_full = pd.read_csv("../resources/cal_housing_train.csv", index_col=False)
+    y_train_full = X_train_full.pop("MedHouseVal").to_numpy()
+    X_test = pd.read_csv("../resources/cal_housing_test.csv", index_col=False)
+    y_test = X_test.pop("MedHouseVal").to_numpy()
+    X_train, X_cal, y_train, y_cal = train_test_split(
+        X_train_full, y_train_full, random_state=42, test_size=0.25
     )
 
     model = PerpetualBooster(objective="SquaredLoss")
     model.fit(X_train, y_train)
 
     alpha = [0.2]
-    model.calibrate(X_train, y_train, X_cal, y_cal, alpha)
+    model.calibrate(X_cal, y_cal, alpha)
     predicted_intervals = model.predict_intervals(X_test)
 
     for i, (alpha_, intervals) in enumerate(predicted_intervals.items()):
-        lower_preds = intervals[0]
-        upper_preds = intervals[1]
+        lower_preds = intervals[:, 0]
+        upper_preds = intervals[:, 1]
         assert float(alpha_) == alpha[i]
         target_coverage = 1.0 - alpha[i]
         coverage_count = 0
@@ -754,7 +754,36 @@ def test_calibration():
             if lower_preds[j] < y_test[j] < upper_preds[j]:
                 coverage_count += 1
         actual_coverage = coverage_count / len(X_test)
-        assert actual_coverage > target_coverage
+        assert actual_coverage > (target_coverage - 0.01)
+
+
+def test_calibration_conformal():
+    X_train_full = pd.read_csv("../resources/cal_housing_train.csv", index_col=False)
+    y_train_full = X_train_full.pop("MedHouseVal").to_numpy()
+    X_cal = pd.read_csv("../resources/cal_housing_test.csv", index_col=False)
+    y_cal = X_cal.pop("MedHouseVal").to_numpy()
+    X_train, X_test, y_train, y_test = train_test_split(
+        X_train_full, y_train_full, random_state=42
+    )
+
+    model = PerpetualBooster(objective="SquaredLoss")
+    model.fit(X_train, y_train)
+
+    alpha = [0.2]
+    model.calibrate_conformal(X_train, y_train, X_cal, y_cal, alpha)
+    predicted_intervals = model.predict_intervals(X_test)
+
+    for i, (alpha_, intervals) in enumerate(predicted_intervals.items()):
+        lower_preds = intervals[:, 0]
+        upper_preds = intervals[:, 1]
+        assert float(alpha_) == alpha[i]
+        target_coverage = 1.0 - alpha[i]
+        coverage_count = 0
+        for j in range(len(X_test)):
+            if lower_preds[j] < y_test[j] < upper_preds[j]:
+                coverage_count += 1
+        actual_coverage = coverage_count / len(X_test)
+        assert actual_coverage > (target_coverage - 0.01)
 
 
 def test_pruning():

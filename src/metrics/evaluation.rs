@@ -240,10 +240,10 @@ mod tests {
         let group = vec![4];
 
         let ndcg = ndcg_at_k_metric(&y, &yhat, &weights, &group, None, &GainScheme::Burges);
-        assert!(ndcg < 1.0 && ndcg >= 0.0);
+        assert!((0.0..1.0).contains(&ndcg));
 
         let ndcg = ndcg_at_k_metric(&y, &yhat, &weights, &group, None, &GainScheme::Jarvelin);
-        assert!(ndcg < 1.0 && ndcg >= 0.0);
+        assert!((0.0..1.0).contains(&ndcg));
     }
 
     #[test]
@@ -272,10 +272,10 @@ mod tests {
         let group = vec![2, 3];
 
         let ndcg = ndcg_at_k_metric(&y, &yhat, &weights, &group, None, &GainScheme::Burges);
-        assert!(ndcg >= 0.0 && ndcg <= 1.0);
+        assert!((0.0..=1.0).contains(&ndcg));
 
         let ndcg = ndcg_at_k_metric(&y, &yhat, &weights, &group, None, &GainScheme::Jarvelin);
-        assert!(ndcg >= 0.0 && ndcg <= 1.0);
+        assert!((0.0..=1.0).contains(&ndcg));
     }
 
     #[test]

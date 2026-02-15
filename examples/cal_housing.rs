@@ -9,7 +9,7 @@
 
 // cargo flamegraph --example cal_housing
 
-use perpetual::{objective_functions::Objective, Matrix, PerpetualBooster};
+use perpetual::{Matrix, PerpetualBooster, objective_functions::Objective};
 use std::env;
 use std::error::Error;
 use std::fs::File;
@@ -106,7 +106,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let trees = model.get_prediction_trees();
     println!("n_rounds: {:?}", trees.len());
 
-    let n_leaves: usize = trees.iter().map(|t| (t.nodes.len() + 1) / 2).sum();
+    let n_leaves: usize = trees.iter().map(|t| t.nodes.len().div_ceil(2)).sum();
     println!("n_leaves: {:?}", n_leaves);
 
     let y_pred = model.predict(&matrix_train, true);

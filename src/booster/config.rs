@@ -5,7 +5,7 @@
 use crate::constraints::ConstraintMap;
 use crate::errors::PerpetualError;
 use crate::objective_functions::objective::Objective;
-use serde::{de::DeserializeOwned, Deserialize, Deserializer, Serialize};
+use serde::{Deserialize, Deserializer, Serialize, de::DeserializeOwned};
 use std::collections::HashSet;
 use std::fs;
 use std::path::Path;
@@ -55,6 +55,20 @@ pub enum MissingNodeTreatment {
     AverageLeafWeight,
     /// Simple weighted average of immediate left and right children.
     AverageNodeWeight,
+}
+
+/// Methods for prediction interval calibration.
+#[derive(Serialize, Deserialize, Clone, Copy, PartialEq, Debug, Default)]
+pub enum CalibrationMethod {
+    /// Method 1: Min-Max interval from fold weights.
+    MinMax,
+    /// Method 2: Global Relative Position interpolation.
+    GRP,
+    /// Method 3: Weight Variance (Standard Deviation of fold weights).
+    #[default]
+    WeightVariance,
+    /// Conformal Prediction (CQR).
+    Conformal,
 }
 
 fn default_budget() -> f32 {
@@ -168,6 +182,9 @@ pub struct BoosterConfig {
     /// Save node statistics for debugging.
     #[serde(default)]
     pub save_node_stats: bool,
+    /// Calibration method used for prediction intervals.
+    #[serde(default)]
+    pub calibration_method: CalibrationMethod,
 }
 
 // Default booster base configuration
@@ -196,6 +213,7 @@ impl Default for BoosterConfig {
             memory_limit: None,
             stopping_rounds: None,
             save_node_stats: false,
+            calibration_method: CalibrationMethod::WeightVariance,
         }
     }
 }

@@ -1,5 +1,5 @@
 /// Detailed profiling: measure histogram build time vs other overhead
-use perpetual::{objective_functions::Objective, Matrix, PerpetualBooster};
+use perpetual::{Matrix, PerpetualBooster, objective_functions::Objective};
 use std::time::Instant;
 
 fn main() {
@@ -51,7 +51,12 @@ fn main() {
 
         eprintln!(
             "run={} trees={} total_nodes={} total_leaves={} max_depth={} avg_depth={:.1} total_time={:.3}s avg_tree={:.2}ms avg_node={:.1}μs",
-            run, trees, total_nodes, total_leaves, max_depth, avg_depth,
+            run,
+            trees,
+            total_nodes,
+            total_leaves,
+            max_depth,
+            avg_depth,
             total.as_secs_f64(),
             total.as_secs_f64() * 1000.0 / trees as f64,
             total.as_secs_f64() * 1e6 / total_nodes as f64,

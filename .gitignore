@@ -51,3 +51,8 @@ package-r/src/rust/core/
 
 # Python cache
 .ruff_cache/
+
+# Python wheel
+*.whl
+*.pyd
+*.pyd.old

@@ -5,19 +5,18 @@ use crate::policy::PyPolicyObjective;
 use crate::utils::int_map_to_constraint_map;
 use crate::utils::to_value_error;
 use numpy::{IntoPyArray, PyArray1, PyArray2, PyReadonlyArray1};
+use perpetual_rs::PerpetualBooster as CratePerpetualBooster;
 use perpetual_rs::booster::config::BoosterIO;
-use perpetual_rs::booster::config::MissingNodeTreatment;
-use perpetual_rs::conformal::cqr::CalData;
+use perpetual_rs::booster::config::{CalibrationMethod, MissingNodeTreatment};
 use perpetual_rs::constraints::Constraint;
 use perpetual_rs::data::{ColumnarMatrix, Matrix};
 use perpetual_rs::objective_functions::Objective;
-use perpetual_rs::PerpetualBooster as CratePerpetualBooster;
+use pyo3::IntoPyObjectExt;
 use pyo3::exceptions::{PyKeyError, PyValueError};
 use pyo3::prelude::*;
 use pyo3::types::IntoPyDict;
 use pyo3::types::PyDict;
 use pyo3::types::PyType;
-use pyo3::IntoPyObjectExt;
 use pyo3::{Bound, Python};
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
@@ -31,31 +30,31 @@ pub struct PerpetualBooster {
 #[pymethods]
 impl PerpetualBooster {
     #[new]
-    #[allow(clippy::too_many_arguments)]
-    #[pyo3(signature=(
-        objective,
-        budget,
-        max_bin,
-        num_threads,
-        monotone_constraints,
-        interaction_constraints,
-        force_children_to_bound_parent,
-        missing,
-        allow_missing_splits,
-        create_missing_branch,
-        terminate_missing_features,
-        missing_node_treatment,
-        log_iterations,
-        quantile,
-        reset,
-        categorical_features,
-        timeout,
-        iteration_limit,
-        memory_limit,
-        stopping_rounds,
-        loss,
-        grad,
-        init,
+    #[pyo3(signature = (
+        objective=None,
+        budget=0.5,
+        max_bin=256,
+        num_threads=None,
+        monotone_constraints=HashMap::new(),
+        interaction_constraints=None,
+        force_children_to_bound_parent=false,
+        missing=f64::NAN,
+        allow_missing_splits=true,
+        create_missing_branch=false,
+        terminate_missing_features=HashSet::new(),
+        missing_node_treatment="None",
+        log_iterations=0,
+        quantile=None,
+        reset=None,
+        categorical_features=None,
+        timeout=None,
+        iteration_limit=None,
+        memory_limit=None,
+        stopping_rounds=None,
+        loss=None,
+        grad=None,
+        init=None,
+        save_node_stats=None,
     ))]
     pub fn new<'py>(
         objective: Option<Bound<'py, PyAny>>,
@@ -81,6 +80,7 @@ impl PerpetualBooster {
         loss: Option<Bound<'py, PyAny>>,
         grad: Option<Bound<'py, PyAny>>,
         init: Option<Bound<'py, PyAny>>,
+        save_node_stats: Option<bool>,
     ) -> PyResult<Self> {
         let objective_ = match objective {
             Some(obj) => {
@@ -133,7 +133,8 @@ impl PerpetualBooster {
             .set_timeout(timeout)
             .set_iteration_limit(iteration_limit)
             .set_memory_limit(memory_limit)
-            .set_stopping_rounds(stopping_rounds);
+            .set_stopping_rounds(stopping_rounds)
+            .set_save_node_stats(save_node_stats.unwrap_or(false));
 
         to_value_error(booster.validate_parameters())?;
 
@@ -249,6 +250,11 @@ impl PerpetualBooster {
     #[setter]
     fn set_stopping_rounds(&mut self, value: Option<usize>) -> PyResult<()> {
         self.booster.cfg.stopping_rounds = value;
+        Ok(())
+    }
+    #[setter]
+    fn set_save_node_stats(&mut self, value: bool) -> PyResult<()> {
+        self.booster.cfg.save_node_stats = value;
         Ok(())
     }
 
@@ -387,45 +393,36 @@ impl PerpetualBooster {
         Ok(())
     }
 
+    /// Calibrate the booster using a selected non-conformal method.
+    ///
+    /// # Arguments
+    ///
+    /// * `method` - The calibration method to use (e.g., "MinMax", "GRP", "WeightVariance").
+    /// * `flat_data_cal` - Feature matrix for the calibration set (flattened).
+    /// * `rows_cal` - Number of samples in the calibration set.
+    /// * `cols_cal` - Number of features.
+    /// * `y_cal` - Calibration targets.
+    /// * `alpha` - Confidence levels (e.g., [0.1, 0.05]).
+    #[pyo3(signature=(method, flat_data_cal, rows_cal, cols_cal, y_cal, alpha))]
     pub fn calibrate(
         &mut self,
-        flat_data: PyReadonlyArray1<f64>,
-        rows: usize,
-        cols: usize,
-        y: PyReadonlyArray1<f64>,
+        method: Option<&str>,
         flat_data_cal: PyReadonlyArray1<f64>,
         rows_cal: usize,
         cols_cal: usize,
         y_cal: PyReadonlyArray1<f64>,
         alpha: PyReadonlyArray1<f64>,
-        sample_weight: Option<PyReadonlyArray1<f64>>,
-        group: Option<PyReadonlyArray1<u64>>,
     ) -> PyResult<()> {
-        let flat_data = flat_data.as_slice()?;
-        let data = Matrix::new(flat_data, rows, cols);
-        let y = y.as_slice()?;
-        let sample_weight_ = match sample_weight.as_ref() {
-            Some(sw) => {
-                let sw_slice = sw.as_slice()?;
-                Some(sw_slice)
-            }
-            None => None,
-        };
-        let group_ = match group.as_ref() {
-            Some(gr) => {
-                let gr_slice = gr.as_slice()?;
-                Some(gr_slice)
-            }
-            None => None,
-        };
-
         let flat_data_cal = flat_data_cal.as_slice()?;
         let data_cal = Matrix::new(flat_data_cal, rows_cal, cols_cal);
         let y_cal = y_cal.as_slice()?;
 
-        let cal_data: CalData = (data_cal, y_cal, alpha.as_slice()?);
+        let method_ = match method {
+            Some(s) => to_value_error(serde_plain::from_str(s))?,
+            None => CalibrationMethod::default(),
+        };
 
-        match self.booster.calibrate(&data, y, sample_weight_, group_, cal_data) {
+        match self.booster.calibrate(method_, (&data_cal, y_cal, alpha.as_slice()?)) {
             Ok(m) => Ok(m),
             Err(e) => Err(PyValueError::new_err(e.to_string())),
         }?;
@@ -433,39 +430,83 @@ impl PerpetualBooster {
         Ok(())
     }
 
+    /// Calibrate the booster using Conformal Prediction (CQR).
+    ///
+    /// # Arguments
+    ///
+    /// * `flat_data` - Feature matrix for the training set (flattened).
+    /// * `rows` - Number of samples in the training set.
+    /// * `cols` - Number of features.
+    /// * `y` - Training targets.
+    /// * `sample_weight` - Optional training sample weights.
+    /// * `group` - Optional training group IDs.
+    /// * `flat_data_cal` - Feature matrix for the calibration set (flattened).
+    /// * `rows_cal` - Number of samples in the calibration set.
+    /// * `cols_cal` - Number of features.
+    /// * `y_cal` - Calibration targets.
+    /// * `alpha` - Confidence levels.
+    #[pyo3(signature=(flat_data, rows, cols, y, sample_weight, group, flat_data_cal, rows_cal, cols_cal, y_cal, alpha))]
+    pub fn calibrate_conformal(
+        &mut self,
+        flat_data: PyReadonlyArray1<f64>,
+        rows: usize,
+        cols: usize,
+        y: PyReadonlyArray1<f64>,
+        sample_weight: Option<PyReadonlyArray1<f64>>,
+        group: Option<PyReadonlyArray1<u64>>,
+        flat_data_cal: PyReadonlyArray1<f64>,
+        rows_cal: usize,
+        cols_cal: usize,
+        y_cal: PyReadonlyArray1<f64>,
+        alpha: PyReadonlyArray1<f64>,
+    ) -> PyResult<()> {
+        let flat_data = flat_data.as_slice()?;
+        let data = Matrix::new(flat_data, rows, cols);
+        let y = y.as_slice()?;
+        let sw = match &sample_weight {
+            Some(w) => Some(w.as_slice()?),
+            None => None,
+        };
+        let g = match &group {
+            Some(gr) => Some(gr.as_slice()?),
+            None => None,
+        };
+
+        let flat_data_cal = flat_data_cal.as_slice()?;
+        let data_cal = Matrix::new(flat_data_cal, rows_cal, cols_cal);
+        let y_cal = y_cal.as_slice()?;
+
+        match self
+            .booster
+            .calibrate_conformal(&data, y, sw, g, (&data_cal, y_cal, alpha.as_slice()?))
+        {
+            Ok(m) => Ok(m),
+            Err(e) => Err(PyValueError::new_err(e.to_string())),
+        }?;
+
+        Ok(())
+    }
+
+    /// Calibrate the booster on columnar data using a selected non-conformal method.
+    ///
+    /// # Arguments
+    ///
+    /// * `method` - The calibration method to use.
+    /// * `columns_cal` - Feature columns (Zero-Copy).
+    /// * `masks_cal` - Optional masks for missing values.
+    /// * `rows_cal` - Number of samples.
+    /// * `y_cal` - Calibration targets.
+    /// * `alpha` - Confidence levels.
+    #[pyo3(signature=(method, columns_cal, masks_cal, rows_cal, y_cal, alpha))]
     pub fn calibrate_columnar(
         &mut self,
-        columns: Vec<PyReadonlyArray1<f64>>,
-        masks: Option<Vec<Option<PyReadonlyArray1<u8>>>>,
-        rows: usize,
-        y: PyReadonlyArray1<f64>,
+        method: Option<&str>,
         columns_cal: Vec<PyReadonlyArray1<f64>>,
         masks_cal: Option<Vec<Option<PyReadonlyArray1<u8>>>>,
         rows_cal: usize,
         y_cal: PyReadonlyArray1<f64>,
         alpha: PyReadonlyArray1<f64>,
-        sample_weight: Option<PyReadonlyArray1<f64>>,
-        group: Option<PyReadonlyArray1<u64>>,
     ) -> PyResult<()> {
-        let col_slices: Vec<&[f64]> = columns
-            .iter()
-            .map(|col| col.as_slice())
-            .collect::<Result<Vec<_>, _>>()?;
-
-        let mut mask_slices: Option<Vec<Option<&[u8]>>> = None;
-        if let Some(ref m) = masks {
-            let mut v = Vec::with_capacity(m.len());
-            for mask in m {
-                if let Some(arr) = mask {
-                    v.push(Some(arr.as_slice()?));
-                } else {
-                    v.push(None);
-                }
-            }
-            mask_slices = Some(v);
-        }
-        let data = ColumnarMatrix::new(col_slices, mask_slices, rows);
-
         let col_slices_cal: Vec<&[f64]> = columns_cal
             .iter()
             .map(|col| col.as_slice())
@@ -485,22 +526,98 @@ impl PerpetualBooster {
         }
         let data_cal = ColumnarMatrix::new(col_slices_cal, mask_slices_cal, rows_cal);
 
-        let y = y.as_slice()?;
         let y_cal = y_cal.as_slice()?;
         let alpha = alpha.as_slice()?;
 
-        let sample_weight_ = match sample_weight.as_ref() {
-            Some(sw) => Some(sw.as_slice()?),
+        let method_ = match method {
+            Some(s) => to_value_error(serde_plain::from_str(s))?,
+            None => CalibrationMethod::default(),
+        };
+
+        match self.booster.calibrate_columnar(method_, (&data_cal, y_cal, alpha)) {
+            Ok(_) => Ok(()),
+            Err(e) => Err(PyValueError::new_err(e.to_string())),
+        }
+    }
+    /// Calibrate the booster on columnar data using Conformal Prediction (CQR).
+    ///
+    /// # Arguments
+    ///
+    /// * `columns` - Feature columns for the training set (Zero-Copy).
+    /// * `masks` - Optional masks for training.
+    /// * `rows` - Number of training samples.
+    /// * `y` - Training targets.
+    /// * `sample_weight` - Optional training sample weights.
+    /// * `group` - Optional training group IDs.
+    /// * `columns_cal` - Feature columns for the calibration set (Zero-Copy).
+    /// * `masks_cal` - Optional masks for calibration.
+    /// * `rows_cal` - Number of calibration samples.
+    /// * `y_cal` - Calibration targets.
+    /// * `alpha` - Confidence levels.
+    #[pyo3(signature=(columns, masks, rows, y, sample_weight, group, columns_cal, masks_cal, rows_cal, y_cal, alpha))]
+    pub fn calibrate_conformal_columnar(
+        &mut self,
+        columns: Vec<PyReadonlyArray1<f64>>,
+        masks: Option<Vec<Option<PyReadonlyArray1<u8>>>>,
+        rows: usize,
+        y: PyReadonlyArray1<f64>,
+        sample_weight: Option<PyReadonlyArray1<f64>>,
+        group: Option<PyReadonlyArray1<u64>>,
+        columns_cal: Vec<PyReadonlyArray1<f64>>,
+        masks_cal: Option<Vec<Option<PyReadonlyArray1<u8>>>>,
+        rows_cal: usize,
+        y_cal: PyReadonlyArray1<f64>,
+        alpha: PyReadonlyArray1<f64>,
+    ) -> PyResult<()> {
+        let col_slices: Vec<&[f64]> = columns
+            .iter()
+            .map(|col| col.as_slice())
+            .collect::<Result<Vec<_>, _>>()?;
+        let mut mask_slices: Option<Vec<Option<&[u8]>>> = None;
+        if let Some(ref m) = masks {
+            let mut v = Vec::with_capacity(m.len());
+            for mask in m {
+                if let Some(arr) = mask {
+                    v.push(Some(arr.as_slice()?));
+                } else {
+                    v.push(None);
+                }
+            }
+            mask_slices = Some(v);
+        }
+        let data = ColumnarMatrix::new(col_slices, mask_slices, rows);
+        let y = y.as_slice()?;
+        let sw = match &sample_weight {
+            Some(w) => Some(w.as_slice()?),
             None => None,
         };
-        let group_ = match group.as_ref() {
+        let g = match &group {
             Some(gr) => Some(gr.as_slice()?),
             None => None,
         };
 
+        let col_slices_cal: Vec<&[f64]> = columns_cal
+            .iter()
+            .map(|col| col.as_slice())
+            .collect::<Result<Vec<_>, _>>()?;
+        let mut mask_slices_cal: Option<Vec<Option<&[u8]>>> = None;
+        if let Some(ref m) = masks_cal {
+            let mut v = Vec::with_capacity(m.len());
+            for mask in m {
+                if let Some(arr) = mask {
+                    v.push(Some(arr.as_slice()?));
+                } else {
+                    v.push(None);
+                }
+            }
+            mask_slices_cal = Some(v);
+        }
+        let data_cal = ColumnarMatrix::new(col_slices_cal, mask_slices_cal, rows_cal);
+        let y_cal = y_cal.as_slice()?;
+
         match self
             .booster
-            .calibrate_columnar(&data, y, sample_weight_, group_, (&data_cal, y_cal, alpha))
+            .calibrate_conformal_columnar(&data, y, sw, g, (&data_cal, y_cal, alpha.as_slice()?))
         {
             Ok(_) => Ok(()),
             Err(e) => Err(PyValueError::new_err(e.to_string())),

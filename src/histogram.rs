@@ -2,10 +2,10 @@
 //!
 //! Efficient histogram calculations for finding optimal splits.
 //! Histograms store aggregated gradient and hessian statistics for each bin.
+use crate::Matrix;
 use crate::bin::Bin;
 use crate::data::{FloatData, JaggedMatrix};
-use crate::Matrix;
-use rayon::{prelude::*, ThreadPool};
+use rayon::{ThreadPool, prelude::*};
 use std::cell::UnsafeCell;
 
 /// Owned Feature Histogram.
@@ -89,176 +89,178 @@ impl<'a> FeatureHistogram<'a> {
     /// 5. The internal `self.data` structure must not be modified externally while this function is running.
     /// 6. Each element in `self.data` must contain a valid `Some` value that can be mutated.
     pub unsafe fn update(&self, feature: &[u16], sorted_grad: &[f32], sorted_hess: Option<&[f32]>, index: &[usize]) {
-        let n_bins = self.data.len();
-        let n = index.len();
+        unsafe {
+            let n_bins = self.data.len();
+            let n = index.len();
 
-        // For very small nodes, accumulate directly into Bin structs.
-        // The overhead of zeroing a 6 KB+ stack array dominates for < ~64 samples.
-        if n < 64 {
+            // For very small nodes, accumulate directly into Bin structs.
+            // The overhead of zeroing a 6 KB+ stack array dominates for < ~64 samples.
+            if n < 64 {
+                match sorted_hess {
+                    Some(sorted_hess) => {
+                        self.data.iter().for_each(|b| {
+                            let bin = b.get().as_mut().unwrap_unchecked();
+                            bin.g_folded = [f32::ZERO; 5];
+                            bin.h_folded = [f32::ZERO; 5];
+                            bin.counts = [0; 5];
+                        });
+                        for k in 0..n {
+                            let i = *index.get_unchecked(k);
+                            let b = self.data.get_unchecked(*feature.get_unchecked(i) as usize).get();
+                            let bin = b.as_mut().unwrap_unchecked();
+                            let fold = i % 5;
+                            *bin.g_folded.get_unchecked_mut(fold) += *sorted_grad.get_unchecked(i);
+                            *bin.h_folded.get_unchecked_mut(fold) += *sorted_hess.get_unchecked(i);
+                            *bin.counts.get_unchecked_mut(fold) += 1;
+                        }
+                    }
+                    None => {
+                        self.data.iter().for_each(|b| {
+                            let bin = b.get().as_mut().unwrap_unchecked();
+                            bin.g_folded = [f32::ZERO; 5];
+                            bin.counts = [0; 5];
+                            bin.h_folded = [f32::ZERO; 5];
+                        });
+                        for k in 0..n {
+                            let i = *index.get_unchecked(k);
+                            let b = self.data.get_unchecked(*feature.get_unchecked(i) as usize).get();
+                            let bin = b.as_mut().unwrap_unchecked();
+                            let fold = i % 5;
+                            *bin.g_folded.get_unchecked_mut(fold) += *sorted_grad.get_unchecked(i);
+                            *bin.counts.get_unchecked_mut(fold) += 1;
+                        }
+                    }
+                }
+                return;
+            }
+
+            // ── Flat-buffer histogram accumulation ──
+            //
+            // Instead of accumulating directly into 72-byte Bin structs (which causes
+            // cache-line thrashing on random scatter writes), we accumulate into compact
+            // flat arrays laid out as [bin0_fold0..bin0_fold4, bin1_fold0..].
+            //
+            // For 256 bins: grad = 256×5×4 = 5 KB, counts = 256×5×4 = 5 KB → 10 KB total,
+            // fitting entirely in L1 cache. This eliminates the dominant cache-miss cost
+            // of the histogram building phase.
+            //
+            // Stack-allocated with a compile-time max to avoid heap allocations.
+            const MAX_FLAT: usize = 300 * 5; // supports up to 300 bins
+            debug_assert!(n_bins * 5 <= MAX_FLAT, "n_bins {} exceeds flat buffer capacity", n_bins);
+            let flat_len = n_bins * 5;
+
+            // Use MaybeUninit to avoid zeroing the full MAX_FLAT array.
+            // Only zero the flat_len portion we actually use via write_bytes.
+            let mut flat_grad_storage: std::mem::MaybeUninit<[f32; MAX_FLAT]> = std::mem::MaybeUninit::uninit();
+            let mut flat_counts_storage: std::mem::MaybeUninit<[u32; MAX_FLAT]> = std::mem::MaybeUninit::uninit();
+            let gp = flat_grad_storage.as_mut_ptr() as *mut f32;
+            let cp = flat_counts_storage.as_mut_ptr() as *mut u32;
+            core::ptr::write_bytes(gp, 0, flat_len);
+            core::ptr::write_bytes(cp, 0, flat_len);
+            let flat_grad = core::slice::from_raw_parts_mut(gp, flat_len);
+            let flat_counts = core::slice::from_raw_parts_mut(cp, flat_len);
+
             match sorted_hess {
                 Some(sorted_hess) => {
-                    self.data.iter().for_each(|b| {
-                        let bin = b.get().as_mut().unwrap_unchecked();
-                        bin.g_folded = [f32::ZERO; 5];
-                        bin.h_folded = [f32::ZERO; 5];
-                        bin.counts = [0; 5];
-                    });
-                    for k in 0..n {
-                        let i = *index.get_unchecked(k);
-                        let b = self.data.get_unchecked(*feature.get_unchecked(i) as usize).get();
-                        let bin = b.as_mut().unwrap_unchecked();
-                        let fold = i % 5;
-                        *bin.g_folded.get_unchecked_mut(fold) += *sorted_grad.get_unchecked(i);
-                        *bin.h_folded.get_unchecked_mut(fold) += *sorted_hess.get_unchecked(i);
-                        *bin.counts.get_unchecked_mut(fold) += 1;
+                    let mut flat_hess_storage: std::mem::MaybeUninit<[f32; MAX_FLAT]> = std::mem::MaybeUninit::uninit();
+                    let hp = flat_hess_storage.as_mut_ptr() as *mut f32;
+                    core::ptr::write_bytes(hp, 0, flat_len);
+                    let flat_hess = core::slice::from_raw_parts_mut(hp, flat_len);
+
+                    // Prefetch source data to hide memory latency on reads
+                    #[cfg(target_arch = "x86_64")]
+                    {
+                        use core::arch::x86_64::{_MM_HINT_T0, _MM_HINT_T1, _mm_prefetch};
+                        const PF_FAR: usize = 16;
+                        const PF_NEAR: usize = 4;
+                        let n = index.len();
+                        for k in 0..n {
+                            if k + PF_FAR < n {
+                                let far = *index.get_unchecked(k + PF_FAR);
+                                _mm_prefetch(feature.as_ptr().add(far) as *const i8, _MM_HINT_T1);
+                                _mm_prefetch(sorted_grad.as_ptr().add(far) as *const i8, _MM_HINT_T1);
+                                _mm_prefetch(sorted_hess.as_ptr().add(far) as *const i8, _MM_HINT_T1);
+                            }
+                            if k + PF_NEAR < n {
+                                let near = *index.get_unchecked(k + PF_NEAR);
+                                _mm_prefetch(feature.as_ptr().add(near) as *const i8, _MM_HINT_T0);
+                                _mm_prefetch(sorted_grad.as_ptr().add(near) as *const i8, _MM_HINT_T0);
+                                _mm_prefetch(sorted_hess.as_ptr().add(near) as *const i8, _MM_HINT_T0);
+                            }
+                            let i = *index.get_unchecked(k);
+                            let bin_idx = *feature.get_unchecked(i) as usize;
+                            let slot = bin_idx * 5 + (i % 5);
+                            *flat_grad.get_unchecked_mut(slot) += *sorted_grad.get_unchecked(i);
+                            *flat_hess.get_unchecked_mut(slot) += *sorted_hess.get_unchecked(i);
+                            *flat_counts.get_unchecked_mut(slot) += 1;
+                        }
+                    }
+                    #[cfg(not(target_arch = "x86_64"))]
+                    {
+                        for k in 0..index.len() {
+                            let i = *index.get_unchecked(k);
+                            let bin_idx = *feature.get_unchecked(i) as usize;
+                            let slot = bin_idx * 5 + (i % 5);
+                            *flat_grad.get_unchecked_mut(slot) += *sorted_grad.get_unchecked(i);
+                            *flat_hess.get_unchecked_mut(slot) += *sorted_hess.get_unchecked(i);
+                            *flat_counts.get_unchecked_mut(slot) += 1;
+                        }
+                    }
+
+                    // Scatter from flat buffers → Bin structs (sequential, cache-friendly)
+                    for b_idx in 0..n_bins {
+                        let bin = self.data.get_unchecked(b_idx).get().as_mut().unwrap_unchecked();
+                        let base = b_idx * 5;
+                        bin.g_folded.copy_from_slice(flat_grad.get_unchecked(base..base + 5));
+                        bin.h_folded.copy_from_slice(flat_hess.get_unchecked(base..base + 5));
+                        bin.counts.copy_from_slice(flat_counts.get_unchecked(base..base + 5));
                     }
                 }
                 None => {
-                    self.data.iter().for_each(|b| {
-                        let bin = b.get().as_mut().unwrap_unchecked();
-                        bin.g_folded = [f32::ZERO; 5];
-                        bin.counts = [0; 5];
+                    // const_hess path — no hessian
+                    #[cfg(target_arch = "x86_64")]
+                    {
+                        use core::arch::x86_64::{_MM_HINT_T0, _MM_HINT_T1, _mm_prefetch};
+                        const PF_FAR: usize = 16;
+                        const PF_NEAR: usize = 4;
+                        let n = index.len();
+                        for k in 0..n {
+                            if k + PF_FAR < n {
+                                let far = *index.get_unchecked(k + PF_FAR);
+                                _mm_prefetch(feature.as_ptr().add(far) as *const i8, _MM_HINT_T1);
+                                _mm_prefetch(sorted_grad.as_ptr().add(far) as *const i8, _MM_HINT_T1);
+                            }
+                            if k + PF_NEAR < n {
+                                let near = *index.get_unchecked(k + PF_NEAR);
+                                _mm_prefetch(feature.as_ptr().add(near) as *const i8, _MM_HINT_T0);
+                                _mm_prefetch(sorted_grad.as_ptr().add(near) as *const i8, _MM_HINT_T0);
+                            }
+                            let i = *index.get_unchecked(k);
+                            let bin_idx = *feature.get_unchecked(i) as usize;
+                            let slot = bin_idx * 5 + (i % 5);
+                            *flat_grad.get_unchecked_mut(slot) += *sorted_grad.get_unchecked(i);
+                            *flat_counts.get_unchecked_mut(slot) += 1;
+                        }
+                    }
+                    #[cfg(not(target_arch = "x86_64"))]
+                    {
+                        for k in 0..index.len() {
+                            let i = *index.get_unchecked(k);
+                            let bin_idx = *feature.get_unchecked(i) as usize;
+                            let slot = bin_idx * 5 + (i % 5);
+                            *flat_grad.get_unchecked_mut(slot) += *sorted_grad.get_unchecked(i);
+                            *flat_counts.get_unchecked_mut(slot) += 1;
+                        }
+                    }
+
+                    // Scatter from flat buffers → Bin structs
+                    for b_idx in 0..n_bins {
+                        let bin = self.data.get_unchecked(b_idx).get().as_mut().unwrap_unchecked();
+                        let base = b_idx * 5;
+                        bin.g_folded.copy_from_slice(flat_grad.get_unchecked(base..base + 5));
+                        bin.counts.copy_from_slice(flat_counts.get_unchecked(base..base + 5));
                         bin.h_folded = [f32::ZERO; 5];
-                    });
-                    for k in 0..n {
-                        let i = *index.get_unchecked(k);
-                        let b = self.data.get_unchecked(*feature.get_unchecked(i) as usize).get();
-                        let bin = b.as_mut().unwrap_unchecked();
-                        let fold = i % 5;
-                        *bin.g_folded.get_unchecked_mut(fold) += *sorted_grad.get_unchecked(i);
-                        *bin.counts.get_unchecked_mut(fold) += 1;
                     }
-                }
-            }
-            return;
-        }
-
-        // ── Flat-buffer histogram accumulation ──
-        //
-        // Instead of accumulating directly into 72-byte Bin structs (which causes
-        // cache-line thrashing on random scatter writes), we accumulate into compact
-        // flat arrays laid out as [bin0_fold0..bin0_fold4, bin1_fold0..].
-        //
-        // For 256 bins: grad = 256×5×4 = 5 KB, counts = 256×5×4 = 5 KB → 10 KB total,
-        // fitting entirely in L1 cache. This eliminates the dominant cache-miss cost
-        // of the histogram building phase.
-        //
-        // Stack-allocated with a compile-time max to avoid heap allocations.
-        const MAX_FLAT: usize = 300 * 5; // supports up to 300 bins
-        debug_assert!(n_bins * 5 <= MAX_FLAT, "n_bins {} exceeds flat buffer capacity", n_bins);
-        let flat_len = n_bins * 5;
-
-        // Use MaybeUninit to avoid zeroing the full MAX_FLAT array.
-        // Only zero the flat_len portion we actually use via write_bytes.
-        let mut flat_grad_storage: std::mem::MaybeUninit<[f32; MAX_FLAT]> = std::mem::MaybeUninit::uninit();
-        let mut flat_counts_storage: std::mem::MaybeUninit<[u32; MAX_FLAT]> = std::mem::MaybeUninit::uninit();
-        let gp = flat_grad_storage.as_mut_ptr() as *mut f32;
-        let cp = flat_counts_storage.as_mut_ptr() as *mut u32;
-        core::ptr::write_bytes(gp, 0, flat_len);
-        core::ptr::write_bytes(cp, 0, flat_len);
-        let flat_grad = core::slice::from_raw_parts_mut(gp, flat_len);
-        let flat_counts = core::slice::from_raw_parts_mut(cp, flat_len);
-
-        match sorted_hess {
-            Some(sorted_hess) => {
-                let mut flat_hess_storage: std::mem::MaybeUninit<[f32; MAX_FLAT]> = std::mem::MaybeUninit::uninit();
-                let hp = flat_hess_storage.as_mut_ptr() as *mut f32;
-                core::ptr::write_bytes(hp, 0, flat_len);
-                let flat_hess = core::slice::from_raw_parts_mut(hp, flat_len);
-
-                // Prefetch source data to hide memory latency on reads
-                #[cfg(target_arch = "x86_64")]
-                {
-                    use core::arch::x86_64::{_mm_prefetch, _MM_HINT_T0, _MM_HINT_T1};
-                    const PF_FAR: usize = 16;
-                    const PF_NEAR: usize = 4;
-                    let n = index.len();
-                    for k in 0..n {
-                        if k + PF_FAR < n {
-                            let far = *index.get_unchecked(k + PF_FAR);
-                            _mm_prefetch(feature.as_ptr().add(far) as *const i8, _MM_HINT_T1);
-                            _mm_prefetch(sorted_grad.as_ptr().add(far) as *const i8, _MM_HINT_T1);
-                            _mm_prefetch(sorted_hess.as_ptr().add(far) as *const i8, _MM_HINT_T1);
-                        }
-                        if k + PF_NEAR < n {
-                            let near = *index.get_unchecked(k + PF_NEAR);
-                            _mm_prefetch(feature.as_ptr().add(near) as *const i8, _MM_HINT_T0);
-                            _mm_prefetch(sorted_grad.as_ptr().add(near) as *const i8, _MM_HINT_T0);
-                            _mm_prefetch(sorted_hess.as_ptr().add(near) as *const i8, _MM_HINT_T0);
-                        }
-                        let i = *index.get_unchecked(k);
-                        let bin_idx = *feature.get_unchecked(i) as usize;
-                        let slot = bin_idx * 5 + (i % 5);
-                        *flat_grad.get_unchecked_mut(slot) += *sorted_grad.get_unchecked(i);
-                        *flat_hess.get_unchecked_mut(slot) += *sorted_hess.get_unchecked(i);
-                        *flat_counts.get_unchecked_mut(slot) += 1;
-                    }
-                }
-                #[cfg(not(target_arch = "x86_64"))]
-                {
-                    for k in 0..index.len() {
-                        let i = *index.get_unchecked(k);
-                        let bin_idx = *feature.get_unchecked(i) as usize;
-                        let slot = bin_idx * 5 + (i % 5);
-                        *flat_grad.get_unchecked_mut(slot) += *sorted_grad.get_unchecked(i);
-                        *flat_hess.get_unchecked_mut(slot) += *sorted_hess.get_unchecked(i);
-                        *flat_counts.get_unchecked_mut(slot) += 1;
-                    }
-                }
-
-                // Scatter from flat buffers → Bin structs (sequential, cache-friendly)
-                for b_idx in 0..n_bins {
-                    let bin = self.data.get_unchecked(b_idx).get().as_mut().unwrap_unchecked();
-                    let base = b_idx * 5;
-                    bin.g_folded.copy_from_slice(flat_grad.get_unchecked(base..base + 5));
-                    bin.h_folded.copy_from_slice(flat_hess.get_unchecked(base..base + 5));
-                    bin.counts.copy_from_slice(flat_counts.get_unchecked(base..base + 5));
-                }
-            }
-            None => {
-                // const_hess path — no hessian
-                #[cfg(target_arch = "x86_64")]
-                {
-                    use core::arch::x86_64::{_mm_prefetch, _MM_HINT_T0, _MM_HINT_T1};
-                    const PF_FAR: usize = 16;
-                    const PF_NEAR: usize = 4;
-                    let n = index.len();
-                    for k in 0..n {
-                        if k + PF_FAR < n {
-                            let far = *index.get_unchecked(k + PF_FAR);
-                            _mm_prefetch(feature.as_ptr().add(far) as *const i8, _MM_HINT_T1);
-                            _mm_prefetch(sorted_grad.as_ptr().add(far) as *const i8, _MM_HINT_T1);
-                        }
-                        if k + PF_NEAR < n {
-                            let near = *index.get_unchecked(k + PF_NEAR);
-                            _mm_prefetch(feature.as_ptr().add(near) as *const i8, _MM_HINT_T0);
-                            _mm_prefetch(sorted_grad.as_ptr().add(near) as *const i8, _MM_HINT_T0);
-                        }
-                        let i = *index.get_unchecked(k);
-                        let bin_idx = *feature.get_unchecked(i) as usize;
-                        let slot = bin_idx * 5 + (i % 5);
-                        *flat_grad.get_unchecked_mut(slot) += *sorted_grad.get_unchecked(i);
-                        *flat_counts.get_unchecked_mut(slot) += 1;
-                    }
-                }
-                #[cfg(not(target_arch = "x86_64"))]
-                {
-                    for k in 0..index.len() {
-                        let i = *index.get_unchecked(k);
-                        let bin_idx = *feature.get_unchecked(i) as usize;
-                        let slot = bin_idx * 5 + (i % 5);
-                        *flat_grad.get_unchecked_mut(slot) += *sorted_grad.get_unchecked(i);
-                        *flat_counts.get_unchecked_mut(slot) += 1;
-                    }
-                }
-
-                // Scatter from flat buffers → Bin structs
-                for b_idx in 0..n_bins {
-                    let bin = self.data.get_unchecked(b_idx).get().as_mut().unwrap_unchecked();
-                    let base = b_idx * 5;
-                    bin.g_folded.copy_from_slice(flat_grad.get_unchecked(base..base + 5));
-                    bin.counts.copy_from_slice(flat_counts.get_unchecked(base..base + 5));
-                    bin.h_folded = [f32::ZERO; 5];
                 }
             }
         }
@@ -274,15 +276,17 @@ impl<'a> FeatureHistogram<'a> {
     /// Calling this function with an unsorted slice or an incorrect length
     /// could lead to incorrect binning logic and potential data corruption.
     pub unsafe fn update_cuts(&self, cuts: &[f64]) {
-        let cuts_mod = &cuts[..(cuts.len() - 1)];
-        self.data.iter().enumerate().for_each(|(i, b)| {
-            let bin = b.get().as_mut().unwrap();
-            if i == 0 {
-                bin.cut_value = f64::NAN;
-            } else {
-                bin.cut_value = *cuts_mod.get(i - 1).unwrap_or(&f64::NAN);
-            }
-        });
+        unsafe {
+            let cuts_mod = &cuts[..(cuts.len() - 1)];
+            self.data.iter().enumerate().for_each(|(i, b)| {
+                let bin = b.get().as_mut().unwrap();
+                if i == 0 {
+                    bin.cut_value = f64::NAN;
+                } else {
+                    bin.cut_value = *cuts_mod.get(i - 1).unwrap_or(&f64::NAN);
+                }
+            });
+        }
     }
 }
 
@@ -769,12 +773,12 @@ pub fn update_two_histograms_and_subtract(
 
 #[cfg(test)]
 mod tests {
+    use crate::Matrix;
     use crate::binning::bin_matrix;
     use crate::histogram::{
-        update_histogram, FeatureHistogram, FeatureHistogramOwned, NodeHistogram, NodeHistogramOwned,
+        FeatureHistogram, FeatureHistogramOwned, NodeHistogram, NodeHistogramOwned, update_histogram,
     };
     use crate::objective_functions::objective::{Objective, ObjectiveFunction};
-    use crate::Matrix;
     use approx::assert_relative_eq;
     use std::collections::HashSet;
     use std::fs;
@@ -799,9 +803,9 @@ mod tests {
         let (g, h) = objective_function.gradient(&y, &yhat, None, None);
 
         let col = 0;
-        let mut hist_feat_owned = FeatureHistogramOwned::empty_from_cuts(&b.cuts.get_col(col), false);
+        let mut hist_feat_owned = FeatureHistogramOwned::empty_from_cuts(b.cuts.get_col(col), false);
         let hist_feat = FeatureHistogram::new(&mut hist_feat_owned.data);
-        unsafe { hist_feat.update(&bdata.get_col(col), &g, h.as_deref(), &bdata.index) };
+        unsafe { hist_feat.update(bdata.get_col(col), &g, h.as_deref(), &bdata.index) };
 
         let mut f = bdata.get_col(col).to_owned();
 
@@ -865,7 +869,7 @@ mod tests {
                 .data
                 .get_mut(col)
                 .unwrap()
-                .update(&bdata.get_col(col), &g, h.as_deref(), &bdata.index)
+                .update(bdata.get_col(col), &g, h.as_deref(), &bdata.index)
         };
 
         let mut f = bdata.get_col(col).to_owned();
@@ -920,14 +924,14 @@ mod tests {
 
         let col_index: Vec<usize> = (0..data.cols).collect();
         let mut hist_init_owned = NodeHistogramOwned::empty_from_cuts(&b.cuts, &col_index, false, false);
-        let mut hist_init = NodeHistogram::from_owned(&mut hist_init_owned);
+        let hist_init = NodeHistogram::from_owned(&mut hist_init_owned);
 
         let col = 0;
 
         let pool = rayon::ThreadPoolBuilder::new().num_threads(2).build().unwrap();
 
         update_histogram(
-            &mut hist_init,
+            &hist_init,
             0,
             bdata.index.len(),
             &bdata,
@@ -979,10 +983,10 @@ mod tests {
         let col_index: Vec<usize> = (0..data.cols).collect();
 
         let mut hist_init_owned1 = NodeHistogramOwned::empty_from_cuts(&b.cuts, &col_index, false, false);
-        let mut hist_init1 = NodeHistogram::from_owned(&mut hist_init_owned1);
+        let hist_init1 = NodeHistogram::from_owned(&mut hist_init_owned1);
 
         let mut hist_init_owned2 = NodeHistogramOwned::empty_from_cuts(&b.cuts, &col_index, false, false);
-        let mut hist_init2 = NodeHistogram::from_owned(&mut hist_init_owned2);
+        let hist_init2 = NodeHistogram::from_owned(&mut hist_init_owned2);
 
         let col = 1;
 
@@ -990,7 +994,7 @@ mod tests {
         let pool2 = rayon::ThreadPoolBuilder::new().num_threads(2).build().unwrap();
 
         update_histogram(
-            &mut hist_init1,
+            &hist_init1,
             0,
             bdata.index.len(),
             &bdata,
@@ -1002,7 +1006,7 @@ mod tests {
             false,
         );
         update_histogram(
-            &mut hist_init2,
+            &hist_init2,
             0,
             bdata.index.len(),
             &bdata,

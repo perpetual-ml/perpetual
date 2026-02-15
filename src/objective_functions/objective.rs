@@ -382,7 +382,7 @@ mod test {
     static YHAT1_RANK: &[f64] = &[1.0, 2.0, 3.0, 1.0, 2.0, 3.0];
     static YHAT2_RANK: &[f64] = &[3.0, 2.0, 1.0, 3.0, 2.0, 1.0];
     static YHAT3_RANK: &[f64] = &[4.0, 5.0, 6.0, 4.0, 5.0, 6.0]; // NOTE: should be the
-                                                                 // same as YHAT1_RANK
+    // same as YHAT1_RANK
     static GROUP: &[u64] = &[3, 3];
 
     fn sum_loss_rank(obj: &Objective, yhat: &[f64]) -> f32 {
