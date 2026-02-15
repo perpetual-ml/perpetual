@@ -29,8 +29,8 @@ Key Features
    quickstart
    api
    calibration
-   tutorials/index
    Causal ML <causal_ml/index>
+   tutorials/index
    architecture
    parameters_tuning
    faq
