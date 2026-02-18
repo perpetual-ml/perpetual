@@ -164,65 +164,92 @@ def vendor_dependencies(project_root):
 
 
 def prune_windows_crate(vendor_dir):
+    """Prune unneeded parts of the 'windows' crate.
+
+    The keep-lists are derived from sysinfo's Cargo.toml [features] section.
+    sysinfo default features = [component, disk, network, system, user], each
+    of which activates specific windows/* Cargo features.
+    """
     windows_dir = os.path.join(vendor_dir, "windows")
     if not os.path.exists(windows_dir):
         return
 
-    print("Aggressively pruning 'windows' crate...")
-    # Keep only necessary namespaces for sysinfo:
-    # Win32::Foundation, Win32::System, Win32::Storage, Win32::NetworkManagement, core
+    print("Pruning 'windows' crate (keeping sysinfo-required namespaces)...")
     win_src = os.path.join(windows_dir, "src", "Windows")
     if not os.path.exists(win_src):
         return
 
-    to_keep = ["Win32", "Foundation", "System", "Storage", "Networking", "core"]
-    for d in os.listdir(win_src):
-        if d not in to_keep and os.path.isdir(os.path.join(win_src, d)):
-            print(f"Pruning unused namespace: {d}")
-            force_rmtree(os.path.join(win_src, d))
+    # --- Top-level: only Win32 and Wdk are used by sysinfo ---
+    # (Foundation at top-level is Windows::Foundation, a WinRT namespace - NOT needed)
+    to_keep_top = {"Win32", "Wdk", "mod.rs"}
+    for entry in os.listdir(win_src):
+        path = os.path.join(win_src, entry)
+        if entry not in to_keep_top and os.path.isdir(path):
+            print(f"  Pruning top-level: {entry}")
+            force_rmtree(path)
 
-    # Keep only necessary Win32 sub-namespaces:
+    # --- Win32 sub-namespaces needed by sysinfo ---
+    # component: Security, System (Com, Ole, Rpc, Variant, Wmi)
+    # disk:      Foundation, Storage (FileSystem), Security, System (IO, Ioctl, SystemServices, WindowsProgramming)
+    # network:   Foundation, NetworkManagement (IpHelper, Ndis), Networking (WinSock)
+    # system:    Foundation, Security (Authorization), System (many sub-dirs), UI (Shell)
+    # user:      Foundation, NetworkManagement (NetManagement), Security (Authentication, Authorization)
     win32_src = os.path.join(win_src, "Win32")
     if os.path.exists(win32_src):
-        to_keep_win32 = [
+        to_keep_win32 = {
             "Foundation",
+            "Security",
             "System",
             "Storage",
             "NetworkManagement",
             "Networking",
-        ]
-        for d in os.listdir(win32_src):
-            if d not in to_keep_win32 and os.path.isdir(os.path.join(win32_src, d)):
-                print(f"Pruning unused Win32 namespace: {d}")
-                force_rmtree(os.path.join(win32_src, d))
+            "UI",
+        }
+        for entry in os.listdir(win32_src):
+            path = os.path.join(win32_src, entry)
+            if entry not in to_keep_win32 and os.path.isdir(path):
+                print(f"  Pruning Win32/{entry}")
+                force_rmtree(path)
 
-    # Further prune Win32/System:
+    # --- Win32/System sub-namespaces ---
     win32_sys = os.path.join(win32_src, "System")
     if os.path.exists(win32_sys):
-        to_keep_sys = [
+        to_keep_sys = {
+            "Com",
             "Diagnostics",
-            "ProcessStatus",
-            "Registry",
-            "SystemInformation",
-            "Threading",
             "IO",
             "Ioctl",
+            "Kernel",
+            "Memory",
+            "Ole",
+            "Performance",
+            "Power",
+            "ProcessStatus",
+            "Registry",
+            "RemoteDesktop",
+            "Rpc",
+            "SystemInformation",
             "SystemServices",
+            "Threading",
+            "Variant",
             "WindowsProgramming",
-        ]
-        for d in os.listdir(win32_sys):
-            if d not in to_keep_sys and os.path.isdir(os.path.join(win32_sys, d)):
-                print(f"Pruning unused Win32/System namespace: {d}")
-                force_rmtree(os.path.join(win32_sys, d))
+            "Wmi",
+        }
+        for entry in os.listdir(win32_sys):
+            path = os.path.join(win32_sys, entry)
+            if entry not in to_keep_sys and os.path.isdir(path):
+                print(f"  Pruning Win32/System/{entry}")
+                force_rmtree(path)
 
-    # Prune Win32/System/Diagnostics except ToolHelp:
+    # --- Win32/System/Diagnostics: keep ToolHelp + Debug ---
     win32_diag = os.path.join(win32_sys, "Diagnostics")
     if os.path.exists(win32_diag):
-        to_keep_diag = ["ToolHelp"]
-        for d in os.listdir(win32_diag):
-            if d not in to_keep_diag and os.path.isdir(os.path.join(win32_diag, d)):
-                print(f"Pruning unused Win32/System/Diagnostics namespace: {d}")
-                force_rmtree(os.path.join(win32_diag, d))
+        to_keep_diag = {"ToolHelp", "Debug"}
+        for entry in os.listdir(win32_diag):
+            path = os.path.join(win32_diag, entry)
+            if entry not in to_keep_diag and os.path.isdir(path):
+                print(f"  Pruning Win32/System/Diagnostics/{entry}")
+                force_rmtree(path)
 
 
 def prune_vendor(vendor_dir):
