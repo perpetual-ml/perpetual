@@ -3,7 +3,7 @@
 #include <R_ext/Rdynload.h>
 
 // Declare the Rust functions
-extern SEXP PerpetualBooster_new(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
+extern SEXP PerpetualBooster_new(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP PerpetualBooster_fit(SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP PerpetualBooster_predict(SEXP, SEXP, SEXP, SEXP);
 extern SEXP PerpetualBooster_predict_proba(SEXP, SEXP, SEXP, SEXP);
@@ -13,7 +13,7 @@ extern SEXP PerpetualBooster_json_dump(SEXP);
 extern SEXP PerpetualBooster_number_of_trees(SEXP);
 extern SEXP PerpetualBooster_base_score(SEXP);
 extern SEXP PerpetualBooster_predict_contributions(SEXP, SEXP, SEXP, SEXP, SEXP);
-extern SEXP PerpetualBooster_calibrate(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
+extern SEXP PerpetualBooster_calibrate(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP PerpetualBooster_predict_intervals(SEXP, SEXP, SEXP, SEXP);
 extern SEXP PerpetualBooster_calculate_feature_importance(SEXP, SEXP, SEXP);
 extern SEXP PerpetualBooster_get_classes(SEXP);
@@ -21,7 +21,7 @@ extern SEXP PerpetualBooster_get_objective(SEXP);
 extern SEXP test_binding();
 
 static const R_CallMethodDef CallEntries[] = {
-    {"PerpetualBooster_new", (DL_FUNC) &PerpetualBooster_new, 16},
+    {"PerpetualBooster_new", (DL_FUNC) &PerpetualBooster_new, 18},
     {"PerpetualBooster_fit", (DL_FUNC) &PerpetualBooster_fit, 5},
     {"PerpetualBooster_predict", (DL_FUNC) &PerpetualBooster_predict, 4},
     {"PerpetualBooster_predict_proba", (DL_FUNC) &PerpetualBooster_predict_proba, 4},
@@ -31,7 +31,7 @@ static const R_CallMethodDef CallEntries[] = {
     {"PerpetualBooster_number_of_trees", (DL_FUNC) &PerpetualBooster_number_of_trees, 1},
     {"PerpetualBooster_base_score", (DL_FUNC) &PerpetualBooster_base_score, 1},
     {"PerpetualBooster_predict_contributions", (DL_FUNC) &PerpetualBooster_predict_contributions, 5},
-    {"PerpetualBooster_calibrate", (DL_FUNC) &PerpetualBooster_calibrate, 10},
+    {"PerpetualBooster_calibrate", (DL_FUNC) &PerpetualBooster_calibrate, 11},
     {"PerpetualBooster_predict_intervals", (DL_FUNC) &PerpetualBooster_predict_intervals, 4},
     {"PerpetualBooster_calculate_feature_importance", (DL_FUNC) &PerpetualBooster_calculate_feature_importance, 3},
     {"PerpetualBooster_get_classes", (DL_FUNC) &PerpetualBooster_get_classes, 1},

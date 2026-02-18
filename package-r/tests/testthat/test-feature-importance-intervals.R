@@ -34,7 +34,7 @@ test_that("perpetual_calibrate and predict intervals work", {
   X_reg <- as.matrix(iris[, 2:4])
   storage.mode(X_reg) <- "double"
   
-  model_reg <- perpetual(X_reg, y_reg, objective = "SquaredLoss", budget = 0.5)
+  model_reg <- perpetual(X_reg, y_reg, objective = "SquaredLoss", budget = 0.5, save_node_stats = TRUE)
   
   # Split for calibration
   set.seed(123)

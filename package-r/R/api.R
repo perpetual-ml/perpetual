@@ -22,6 +22,8 @@
 #' @param timeout Numeric.
 #' @param memory_limit Numeric.
 #' @param seed Integer seed for reproducibility.
+#' @param calibration_method String specifying the calibration method for prediction intervals. Options: "WeightVariance", "MinMax", "GRP", "Conformal".
+#' @param save_node_stats Boolean. Whether to save node statistics (required for some calibration methods and importance types).
 #' @param ... Additional arguments.
 #'
 #' @return A \code{PerpetualBooster} object.
@@ -32,7 +34,8 @@ perpetual <- function(x, y, objective = "LogLoss", budget = NULL,
                       allow_missing_splits = NULL, create_missing_branch = NULL,
                       missing_node_treatment = NULL, log_iterations = NULL,
                       quantile = NULL, reset = NULL, timeout = NULL,
-                      memory_limit = NULL, seed = NULL, ...) {
+                      memory_limit = NULL, seed = NULL, calibration_method = NULL, 
+                      save_node_stats = NULL, ...) {
   if (is.data.frame(x)) {
     x <- as.matrix(x)
   }
@@ -51,6 +54,7 @@ perpetual <- function(x, y, objective = "LogLoss", budget = NULL,
   if (!is.null(num_threads)) num_threads <- as.integer(num_threads)
   if (!is.null(log_iterations)) log_iterations <- as.integer(log_iterations)
   if (!is.null(seed)) seed <- as.integer(seed)
+  if (!is.null(save_node_stats)) save_node_stats <- as.logical(save_node_stats)
   
   # Detect classes for classification objectives
   classes <- sort(unique(y[!is.na(y)]))
@@ -72,6 +76,8 @@ perpetual <- function(x, y, objective = "LogLoss", budget = NULL,
         memory_limit,
         stopping_rounds,
         seed,
+        calibration_method,
+        save_node_stats,
         PACKAGE = "perpetual"
   )
   
@@ -233,9 +239,10 @@ perpetual_load <- function(path) {
 #' @param x_cal Calibration features.
 #' @param y_cal Calibration targets.
 #' @param alpha Calibration parameter.
+#' @param method String specifying the calibration method to use. If NULL, uses the method configured in the model.
 #'
 #' @export
-perpetual_calibrate <- function(model, x, y, x_cal, y_cal, alpha) {
+perpetual_calibrate <- function(model, x, y, x_cal, y_cal, alpha, method = NULL) {
   if (is.data.frame(x)) x <- as.matrix(x)
   if (is.data.frame(x_cal)) x_cal <- as.matrix(x_cal)
   storage.mode(x) <- "double"
@@ -244,7 +251,7 @@ perpetual_calibrate <- function(model, x, y, x_cal, y_cal, alpha) {
   .Call("PerpetualBooster_calibrate", model$.ptr, 
         as.vector(x), as.integer(nrow(x)), as.integer(ncol(x)), as.numeric(y),
         as.vector(x_cal), as.integer(nrow(x_cal)), as.integer(ncol(x_cal)), as.numeric(y_cal),
-        as.numeric(alpha), PACKAGE = "perpetual")
+        as.numeric(alpha), method, PACKAGE = "perpetual")
   invisible(model)
 }
 

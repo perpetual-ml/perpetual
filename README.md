@@ -14,6 +14,12 @@
 <a href="https://perpetual-ml.r-universe.dev/perpetual" target="_blank"><img src="https://img.shields.io/badge/dynamic/json?url=https://perpetual-ml.r-universe.dev/api/packages/perpetual&query=$.Version&label=r-universe&logo=R&logoColor=white&color=brightgreen" alt="R-Universe status"></a>
 <a href="https://discord.gg/AyUK7rr6wy" target="_blank"><img src="https://img.shields.io/badge/join-discord-blue?logo=discord" alt="Static Badge"></a>
 <a href="https://pypi.org/project/perpetual" target="_blank"><img src="https://img.shields.io/pypi/dm/perpetual?logo=pypi" alt="PyPI - Downloads"></a>
+<a href="https://github.com/pre-commit/pre-commit" target="_blank"><img src="https://img.shields.io/badge/pre--commit-enabled-brightgreen?logo=pre-commit&logoColor=white" alt="pre-commit"></a>
+<a href="https://github.com/astral-sh/ruff" target="_blank"><img src="https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json" alt="Ruff"></a>
+<a href="https://github.com/perpetual-ml/perpetual/actions/workflows/CI.yml" target="_blank"><img src="https://img.shields.io/badge/python_coverage-90%25%2B-brightgreen" alt="Python Coverage"></a>
+<a href="https://github.com/perpetual-ml/perpetual/actions/workflows/CI.yml" target="_blank"><img src="https://img.shields.io/badge/rust_coverage-90%25%2B-brightgreen" alt="Rust Coverage"></a>
+<a href="https://github.com/perpetual-ml/perpetual/actions/workflows/CI.yml" target="_blank"><img src="https://img.shields.io/badge/r_coverage-80%25%2B-brightgreen" alt="R Coverage"></a>
+<a href="./LICENSE" target="_blank"><img src="https://img.shields.io/github/license/perpetual-ml/perpetual" alt="License"></a>
 
 </div>
 

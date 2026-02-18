@@ -29,6 +29,8 @@ Key Features
    quickstart
    api
    calibration
+   continual_learning
+   explainability
    Causal ML <causal_ml/index>
    tutorials/index
    architecture

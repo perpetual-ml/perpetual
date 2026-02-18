@@ -17,8 +17,8 @@ jobs:
       - name: Install deps
         run: pip install numpy pandas seaborn scikit-learn toml
       - run: |
-          cp README.md python-package/README.md
-          cp LICENSE python-package/LICENSE
+          cp README.md package-python/README.md
+          cp LICENSE package-python/LICENSE
       - name: Update TOML
         run: python scripts/remove-optional-deps.py
       - name: Build test data

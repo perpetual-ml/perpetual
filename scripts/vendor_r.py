@@ -81,7 +81,9 @@ def vendor_r(skip_deps=False):
         if skipping_section:
             continue
 
-        # Comment out license-file and readme
+        # Comment out license, license-file and readme
+        if 'license = "Apache-2.0"' in line:
+            line = line.replace('license = "Apache-2.0"', '# license = "Apache-2.0"')
         if 'license-file = "LICENSE"' in line:
             line = line.replace(
                 'license-file = "LICENSE"', '# license-file = "LICENSE"'

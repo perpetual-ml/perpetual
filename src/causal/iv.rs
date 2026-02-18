@@ -115,6 +115,7 @@ impl IVBooster {
             iteration_limit,
             memory_limit,
             stopping_rounds,
+            false,
             CalibrationMethod::default(),
         )?;
 
@@ -142,6 +143,7 @@ impl IVBooster {
             iteration_limit,
             memory_limit,
             stopping_rounds,
+            false,
             CalibrationMethod::default(),
         )?;
 

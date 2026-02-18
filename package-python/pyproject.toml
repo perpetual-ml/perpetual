@@ -4,9 +4,10 @@ build-backend = "maturin"
 
 [project]
 name = "perpetual"
-version = "1.6.0"
+version = "1.7.0"
 description = "A self-generalizing gradient boosting machine that doesn't need hyperparameter optimization"
 readme = "README_PYTHON.md"
+license = "Apache-2.0"
 keywords = [
   "rust",
   "perpetual",

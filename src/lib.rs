@@ -67,6 +67,7 @@
 //!     None,       // iteration_limit
 //!     None,       // memory_limit
 //!     None,       // stopping_rounds
+//!     false,      // save_node_stats
 //!     perpetual::booster::config::CalibrationMethod::MinMax,
 //! ).expect("Failed to initialize booster");
 //!

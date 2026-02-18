@@ -28,7 +28,7 @@ get_resources_dir <- function() {
 
 skip_if_no_resources <- function() {
   if (is.null(get_resources_dir())) {
-    stop("Test resources not found! This is required for all tests to run.")
+    testthat::skip("Test resources not found!")
   }
 }
 

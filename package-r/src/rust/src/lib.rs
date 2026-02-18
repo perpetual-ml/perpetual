@@ -186,6 +186,8 @@ pub unsafe extern "C" fn PerpetualBooster_new(
     memory_limit: SEXP,
     stopping_rounds: SEXP,
     seed: SEXP,
+    calibration_method: SEXP,
+    save_node_stats: SEXP,
 ) -> SEXP {
     r_safe!(unsafe {
         let mut config = BoosterConfig::default();
@@ -230,6 +232,12 @@ pub unsafe extern "C" fn PerpetualBooster_new(
             }
         }
 
+        if let Some(m_str) = opt_str(calibration_method) {
+            if let Ok(m) = serde_plain::from_str::<CalibrationMethod>(&m_str) {
+                config.calibration_method = m;
+            }
+        }
+
         if let Some(val) = opt_i32(log_iterations) {
             config.log_iterations = val as usize;
         }
@@ -253,6 +261,10 @@ pub unsafe extern "C" fn PerpetualBooster_new(
         }
         if let Some(val) = opt_i32(seed) {
             config.seed = val as u64;
+        }
+
+        if let Some(val) = opt_bool(save_node_stats) {
+            config.save_node_stats = val;
         }
 
         let booster = PerpetualBoosterWrapper {
@@ -365,6 +377,7 @@ pub unsafe extern "C" fn PerpetualBooster_fit(ptr: SEXP, flat_data: SEXP, rows: 
                 booster.config.iteration_limit,
                 booster.config.memory_limit,
                 booster.config.stopping_rounds,
+                booster.config.save_node_stats,
                 booster.config.calibration_method.clone(),
             )
             .or_r_error("Failed to create PerpetualBooster");
@@ -607,15 +620,16 @@ pub unsafe extern "C" fn PerpetualBooster_calibrate(
     cols_cal: SEXP,
     y_cal: SEXP,
     alpha: SEXP,
+    method: SEXP,
 ) -> SEXP {
     r_safe!(unsafe {
         let booster = &mut *(R_ExternalPtrAddr(ptr) as *mut PerpetualBoosterWrapper);
-        let rows_val = get_int(rows) as usize;
-        let cols_val = get_int(cols) as usize;
-        let data_slice = slice::from_raw_parts(REAL(flat_data), rows_val * cols_val);
-        let y_slice = slice::from_raw_parts(REAL(y), Rf_xlength(y) as usize);
-        let _data_vec = data_slice.to_vec();
-        let matrix = Matrix::new(&_data_vec, rows_val, cols_val);
+
+        if let Some(m_str) = opt_str(method) {
+            if let Ok(m) = serde_plain::from_str::<CalibrationMethod>(&m_str) {
+                booster.config.calibration_method = m;
+            }
+        }
 
         let rows_cal_val = get_int(rows_cal) as usize;
         let cols_cal_val = get_int(cols_cal) as usize;
@@ -625,16 +639,30 @@ pub unsafe extern "C" fn PerpetualBooster_calibrate(
 
         let _data_cal_vec = data_cal_slice.to_vec();
         let matrix_cal = Matrix::new(&_data_cal_vec, rows_cal_val, cols_cal_val);
+        let _y_cal_vec = y_cal_slice.to_vec();
+        let _alpha_vec = alpha_slice.to_vec();
 
         match &mut booster.internal {
             Some(InternalBooster::Single(b)) => {
-                let _y_cal_vec = y_cal_slice.to_vec();
-                let _alpha_vec = alpha_slice.to_vec();
-                b.calibrate(
-                    booster.config.calibration_method.clone(),
-                    (&matrix_cal, &_y_cal_vec, &_alpha_vec),
-                )
-                .or_r_error("Failed to calibrate");
+                let curr_method = booster.config.calibration_method;
+                let is_classification = matches!(booster.config.objective, Objective::LogLoss);
+
+                if !is_classification && matches!(curr_method, CalibrationMethod::Conformal) {
+                    let rows_val = get_int(rows) as usize;
+                    let cols_val = get_int(cols) as usize;
+                    let data_slice = slice::from_raw_parts(REAL(flat_data), rows_val * cols_val);
+                    let y_slice = slice::from_raw_parts(REAL(y), Rf_xlength(y) as usize);
+
+                    let _data_vec = data_slice.to_vec();
+                    let matrix = Matrix::new(&_data_vec, rows_val, cols_val);
+                    let _y_vec = y_slice.to_vec();
+
+                    b.calibrate_conformal(&matrix, &_y_vec, None, None, (&matrix_cal, &_y_cal_vec, &_alpha_vec))
+                        .or_r_error("Failed to calibrate (conformal)");
+                } else {
+                    b.calibrate(curr_method, (&matrix_cal, &_y_cal_vec, &_alpha_vec))
+                        .or_r_error("Failed to calibrate");
+                }
             }
             _ => r_error("Calibration is only supported for single-output boosters currently"),
         }
@@ -789,9 +817,7 @@ pub unsafe extern "C" fn PerpetualBooster_get_objective(ptr: SEXP) -> SEXP {
 #[no_mangle]
 pub unsafe extern "C" fn test_binding() -> SEXP {
     r_safe!(unsafe {
-        let msg = CString::new("Hello from New Rust V3 (No Extendr)!").unwrap();
-        let result = Rf_protect(Rf_mkString(msg.as_ptr()));
-        Rf_unprotect(1);
-        result
+        let msg = CString::new("Binding OK").unwrap();
+        Rf_mkString(msg.as_ptr())
     })
 }

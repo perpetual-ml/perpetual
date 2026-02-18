@@ -1,7 +1,7 @@
 Package: perpetual
 Type: Package
 Title: PerpetualBooster
-Version: 1.6.0
+Version: 1.7.0
 Authors@R: c(
     person("Mutlu", "Simsek", email = "msimsek@perpetual-ml.com", role = c("aut", "cre")),
     person("Serkan", "Korkmaz", email = "serkor1@duck.com", role = "aut"),
@@ -9,7 +9,7 @@ Authors@R: c(
   )
 Description: A self-generalizing gradient boosting machine that doesn't need hyperparameter optimization.
 URL: https://perpetual-ml.github.io/perpetual/r/
-License: GPL-3
+License: Apache-2.0
 Suggests: 
     jsonlite,
     testthat (>= 3.0.0)

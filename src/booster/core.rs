@@ -156,6 +156,7 @@ impl PerpetualBooster {
         iteration_limit: Option<usize>,
         memory_limit: Option<f32>,
         stopping_rounds: Option<usize>,
+        save_node_stats: bool,
         calibration_method: CalibrationMethod,
     ) -> Result<Self, PerpetualError> {
         let cfg = BoosterConfig {
@@ -180,7 +181,7 @@ impl PerpetualBooster {
             iteration_limit,
             memory_limit,
             stopping_rounds,
-            save_node_stats: false,
+            save_node_stats,
             calibration_method,
         };
 
@@ -202,11 +203,6 @@ impl PerpetualBooster {
     /// Validate the configuration parameters.
     pub fn validate_parameters(&self) -> Result<(), PerpetualError> {
         Ok(())
-    }
-
-    /// Reset the booster, clearing all trained trees.
-    pub fn reset(&mut self) {
-        self.trees = Vec::new();
     }
 
     /// Train the model on the provided dataset.
@@ -341,6 +337,7 @@ impl PerpetualBooster {
         // If reset, reset the trees. Otherwise continue training.
         let mut yhat;
         if self.cfg.reset.unwrap_or(true) || self.trees.is_empty() {
+            self.trees.clear();
             if self.base_score.is_nan() {
                 self.base_score = objective_fn.initial_value(y, sample_weight, group);
             }
@@ -585,6 +582,7 @@ impl PerpetualBooster {
         // If reset, reset the trees. Otherwise continue training.
         let mut yhat;
         if self.cfg.reset.unwrap_or(true) || self.trees.is_empty() {
+            self.trees.clear();
             if self.base_score.is_nan() {
                 self.base_score = objective_fn.initial_value(y, sample_weight, group);
             }

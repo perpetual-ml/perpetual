@@ -317,6 +317,10 @@ jobs:
         # Cargo tests in the Rust package might still need the 'resources' folder
         # to exist and contain the data, which is now guaranteed by the download step.
         run: cargo test --verbose
+      - name: Install cargo-tarpaulin
+        run: cargo install cargo-tarpaulin
+      - name: Run coverage
+        run: cargo tarpaulin --verbose --fail-under 90 --out Xml
 
   # 7. R Package Check Job (depends on resources)
   R-CMD-check:
@@ -366,7 +370,7 @@ jobs:
 
       - uses: r-lib/actions/setup-r-dependencies@v2
         with:
-          extra-packages: any::rcmdcheck, any::devtools, any::testthat, any::roxygen2, any::jsonlite
+          extra-packages: any::rcmdcheck, any::devtools, any::testthat, any::roxygen2, any::jsonlite, any::covr
           needs: check
           working-directory: package-r
 
@@ -408,3 +412,9 @@ jobs:
         uses: r-lib/actions/check-r-package@v2
         with:
           working-directory: package-r
+
+      - name: Check Coverage
+        if: success() && matrix.config.os == 'ubuntu-latest'
+        run: |
+           Rscript -e "cov_val <- covr::package_coverage('package-r'); print(cov_val); if (covr::percent_coverage(cov_val) < 80) { stop('Coverage is below 80%') }"
+        shell: bash

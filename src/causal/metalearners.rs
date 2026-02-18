@@ -60,6 +60,7 @@ fn create_booster(
         iteration_limit,
         memory_limit,
         stopping_rounds,
+        false,
         CalibrationMethod::default(),
     )
 }

@@ -159,13 +159,6 @@ impl MultiOutputBooster {
         })
     }
 
-    /// Reset all boosters.
-    pub fn reset(&mut self) {
-        for b in &mut self.boosters {
-            b.reset();
-        }
-    }
-
     /// Fit the multi-output booster.
     pub fn fit(
         &mut self,
