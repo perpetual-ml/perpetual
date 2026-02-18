@@ -58,3 +58,5 @@ package-r/inst/c/
 *.pyd
 *.pyd.old
 *.pyd.*
+
+*.profraw

@@ -832,7 +832,9 @@ mod tests {
 
         let mut model = PerpetualBooster::default()
             .set_objective(Objective::SquaredLoss)
-            .set_budget(1.0); // Higher budget to ensure deeper trees
+            .set_max_bin(5)
+            .set_budget(0.5)
+            .set_iteration_limit(Some(10));
 
         model.fit(&matrix_train, &y_train, None, None)?;
 

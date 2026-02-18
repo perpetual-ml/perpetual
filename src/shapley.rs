@@ -223,3 +223,315 @@ pub fn predict_contributions_row_shapley(tree: &Tree, row: &[f64], contribs: &mu
         missing,
     )
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::tree::core::{Tree, TreeStopper};
+    use std::collections::HashMap;
+
+    #[test]
+    fn test_tree_shapley_simple() {
+        let mut nodes = HashMap::new();
+        // Root node: split on feature 0 at value 5.0
+        nodes.insert(
+            0,
+            Node {
+                num: 0,
+                weight_value: 0.0,
+                hessian_sum: 10.0,
+                split_value: 5.0,
+                split_feature: 0,
+                split_gain: 1.0,
+                missing_node: 1,
+                left_child: 1,
+                right_child: 2,
+                is_leaf: false,
+                parent_node: 0,
+                left_cats: None,
+                stats: None,
+            },
+        );
+        // Left child: leaf with weight 1.0
+        nodes.insert(
+            1,
+            Node {
+                num: 1,
+                weight_value: 1.0,
+                hessian_sum: 5.0,
+                split_value: 0.0,
+                split_feature: 0,
+                split_gain: 0.0,
+                missing_node: 1,
+                left_child: 1,
+                right_child: 1,
+                is_leaf: true,
+                parent_node: 0,
+                left_cats: None,
+                stats: None,
+            },
+        );
+        // Right child: leaf with weight 2.0
+        nodes.insert(
+            2,
+            Node {
+                num: 2,
+                weight_value: 2.0,
+                hessian_sum: 5.0,
+                split_value: 0.0,
+                split_feature: 0,
+                split_gain: 0.0,
+                missing_node: 2,
+                left_child: 2,
+                right_child: 2,
+                is_leaf: true,
+                parent_node: 0,
+                left_cats: None,
+                stats: None,
+            },
+        );
+
+        let tree = Tree {
+            nodes,
+            stopper: TreeStopper::MaxNodes,
+            depth: 1,
+            n_leaves: 2,
+            leaf_bounds: Vec::new(),
+            train_index: Vec::new(),
+        };
+
+        let row = vec![1.0]; // Should go left (1.0 < 5.0)
+        let mut contribs = vec![0.0; 2]; // feature 0 + bias
+        predict_contributions_row_shapley(&tree, &row, &mut contribs, &f64::NAN);
+
+        // Prediction should be 1.0
+        // Bias should be average weight: (1.0 * 5.0 + 2.0 * 5.0) / 10.0 = 1.5
+        // Contrib 0 should be 1.0 - 1.5 = -0.5
+        assert_eq!(contribs[1], 1.5); // Bias
+        assert_eq!(contribs[0], -0.5); // Feature 0
+        assert_eq!(contribs[0] + contribs[1], 1.0);
+
+        let row2 = vec![6.0]; // Should go right (6.0 > 5.0)
+        let mut contribs2 = vec![0.0; 2];
+        predict_contributions_row_shapley(&tree, &row2, &mut contribs2, &f64::NAN);
+        assert_eq!(contribs2[1], 1.5); // Bias
+        assert_eq!(contribs2[0], 0.5); // Feature 0
+        assert_eq!(contribs2[0] + contribs2[1], 2.0);
+    }
+
+    #[test]
+    fn test_tree_shapley_complex() {
+        let mut nodes = HashMap::new();
+        // Root: split on feature 0 at 5.0
+        nodes.insert(
+            0,
+            Node {
+                num: 0,
+                weight_value: 0.0,
+                hessian_sum: 10.0,
+                split_value: 5.0,
+                split_feature: 0,
+                split_gain: 1.0,
+                missing_node: 2,
+                left_child: 1,
+                right_child: 2,
+                is_leaf: false,
+                parent_node: 0,
+                left_cats: None,
+                stats: None,
+            },
+        );
+        // Left: split on feature 1 at 10.0
+        nodes.insert(
+            1,
+            Node {
+                num: 1,
+                weight_value: 0.0,
+                hessian_sum: 6.0,
+                split_value: 10.0,
+                split_feature: 1,
+                split_gain: 1.0,
+                missing_node: 4,
+                left_child: 3,
+                right_child: 4,
+                is_leaf: false,
+                parent_node: 0,
+                left_cats: None,
+                stats: None,
+            },
+        );
+        // Right: leaf weight 3.0
+        nodes.insert(
+            2,
+            Node {
+                num: 2,
+                weight_value: 3.0,
+                hessian_sum: 4.0,
+                split_value: 0.0,
+                split_feature: 0,
+                split_gain: 0.0,
+                missing_node: 2,
+                left_child: 2,
+                right_child: 2,
+                is_leaf: true,
+                parent_node: 0,
+                left_cats: None,
+                stats: None,
+            },
+        );
+        // Node 3: leaf weight 1.0 (on feature 1 left)
+        nodes.insert(
+            3,
+            Node {
+                num: 3,
+                weight_value: 1.0,
+                hessian_sum: 2.0,
+                split_value: 0.0,
+                split_feature: 1,
+                split_gain: 0.0,
+                missing_node: 3,
+                left_child: 3,
+                right_child: 3,
+                is_leaf: true,
+                parent_node: 1,
+                left_cats: None,
+                stats: None,
+            },
+        );
+        // Node 4: leaf weight 2.0 (on feature 1 right)
+        nodes.insert(
+            4,
+            Node {
+                num: 4,
+                weight_value: 2.0,
+                hessian_sum: 4.0,
+                split_value: 0.0,
+                split_feature: 1,
+                split_gain: 0.0,
+                missing_node: 4,
+                left_child: 4,
+                right_child: 4,
+                is_leaf: true,
+                parent_node: 1,
+                left_cats: None,
+                stats: None,
+            },
+        );
+
+        let tree = Tree {
+            nodes,
+            stopper: TreeStopper::MaxNodes,
+            depth: 2,
+            n_leaves: 3,
+            leaf_bounds: Vec::new(),
+            train_index: Vec::new(),
+        };
+
+        let row = vec![1.0, 1.0]; // Goes to Node 3 (weight 1.0)
+        let mut contribs = vec![0.0; 3]; // f0, f1, bias
+        predict_contributions_row_shapley(&tree, &row, &mut contribs, &f64::NAN);
+
+        // Bias = average leaf weight
+        // Node 3: 1.0 * 2.0 = 2.0
+        // Node 4: 2.0 * 4.0 = 8.0
+        // Node 2: 3.0 * 4.0 = 12.0
+        // Total = (2 + 8 + 12) / 10 = 22 / 10 = 2.2
+        assert!((contribs[2] - 2.2).abs() < 1e-7);
+        assert!((contribs[0] + contribs[1] + contribs[2] - 1.0).abs() < 1e-7);
+    }
+
+    #[test]
+    fn test_tree_shapley_missing() {
+        let mut nodes = HashMap::new();
+        // Root: split on feature 0 at 5.0, missing branch to node 3
+        nodes.insert(
+            0,
+            Node {
+                num: 0,
+                weight_value: 0.0,
+                hessian_sum: 10.0,
+                split_value: 5.0,
+                split_feature: 0,
+                split_gain: 1.0,
+                missing_node: 3,
+                left_child: 1,
+                right_child: 2,
+                is_leaf: false,
+                parent_node: 0,
+                left_cats: None,
+                stats: None,
+            },
+        );
+        nodes.insert(
+            1,
+            Node {
+                num: 1,
+                weight_value: 1.0,
+                hessian_sum: 4.0,
+                split_value: 0.0,
+                split_feature: 0,
+                split_gain: 0.0,
+                missing_node: 1,
+                left_child: 1,
+                right_child: 1,
+                is_leaf: true,
+                parent_node: 0,
+                left_cats: None,
+                stats: None,
+            },
+        );
+        nodes.insert(
+            2,
+            Node {
+                num: 2,
+                weight_value: 2.0,
+                hessian_sum: 4.0,
+                split_value: 0.0,
+                split_feature: 0,
+                split_gain: 0.0,
+                missing_node: 2,
+                left_child: 2,
+                right_child: 2,
+                is_leaf: true,
+                parent_node: 0,
+                left_cats: None,
+                stats: None,
+            },
+        );
+        nodes.insert(
+            3,
+            Node {
+                num: 3,
+                weight_value: 3.0,
+                hessian_sum: 2.0,
+                split_value: 0.0,
+                split_feature: 0,
+                split_gain: 0.0,
+                missing_node: 3,
+                left_child: 3,
+                right_child: 3,
+                is_leaf: true,
+                parent_node: 0,
+                left_cats: None,
+                stats: None,
+            },
+        );
+
+        let tree = Tree {
+            nodes,
+            stopper: TreeStopper::MaxNodes,
+            depth: 1,
+            n_leaves: 3,
+            leaf_bounds: Vec::new(),
+            train_index: Vec::new(),
+        };
+
+        let row = vec![f64::NAN]; // Goes to missing node 3
+        let mut contribs = vec![0.0; 2];
+        predict_contributions_row_shapley(&tree, &row, &mut contribs, &f64::NAN);
+
+        // Bias = (1.0*4 + 2.0*4 + 3.0*2)/10 = (4 + 8 + 6)/10 = 1.8
+        assert!((contribs[1] - 1.8).abs() < 1e-7);
+        assert!((contribs[0] + contribs[1] - 3.0).abs() < 1e-7);
+    }
+}

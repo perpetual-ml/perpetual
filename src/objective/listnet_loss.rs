@@ -294,3 +294,39 @@ impl ListNetLoss {
         LOSS_FOR_SINGLE_GROUP
     }
 }
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_compute_softmax() {
+        let input = vec![1.0, 2.0, 3.0];
+        let mut output = vec![0.0f32; 3];
+        compute_softmax_inplace(&input, &mut output);
+        let sum: f32 = output.iter().sum();
+        assert!((sum - 1.0).abs() < 1e-6);
+        assert!(output[2] > output[1]);
+        assert!(output[1] > output[0]);
+    }
+
+    #[test]
+    fn test_listnet_loss() {
+        let y = vec![3.0, 1.0, 0.0];
+        let yhat = vec![2.0, 1.0, 0.5];
+        let loss_fn = ListNetLoss::default();
+
+        let l = loss_fn.loss(&y, &yhat, None, None);
+        assert_eq!(l.len(), 3);
+        // All samples in a group get the same per-sample loss
+        assert_eq!(l[0], l[1]);
+        assert_eq!(l[1], l[2]);
+
+        let (g, h) = loss_fn.gradient(&y, &yhat, None, None);
+        let h = h.unwrap();
+        assert_eq!(g.len(), 3);
+        assert_eq!(h.len(), 3);
+        // Sum of gradients in ListNet should be 0 (p_yhat - p_y)
+        let g_sum: f32 = g.iter().sum();
+        assert!(g_sum.abs() < 1e-6);
+    }
+}

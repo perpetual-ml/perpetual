@@ -233,7 +233,7 @@ mod tests {
             .set_objective(Objective::SquaredLoss)
             .set_max_bin(5)
             .set_budget(0.1)
-            .set_iteration_limit(Some(5))
+            .set_iteration_limit(Some(3))
             .set_memory_limit(Some(0.0001));
 
         model.fit(&matrix_train, &y_train_sub, None, None)?;

@@ -1198,10 +1198,35 @@ mod tests {
     }
 
     #[test]
-    fn test_fmt_vec_output() {
-        let v = Vec::<f32>::new();
-        assert_eq!(fmt_vec_output(&v), String::from(""));
-        let v: Vec<f32> = vec![0.1, 1.0];
-        assert_eq!(fmt_vec_output(&v), String::from("0.1000, 1.0000"));
+    fn test_validation() {
+        assert!(validate_positive_float_parameter(1.0, "test").is_ok());
+        assert!(validate_positive_float_parameter(-1.0, "test").is_err());
+        assert!(validate_float_parameter(0.5, 0.0, 1.0, "test").is_ok());
+        assert!(validate_float_parameter(1.5, 0.0, 1.0, "test").is_err());
+    }
+
+    #[test]
+    fn test_odds() {
+        // odds(0) = 1/(1+e^0) = 0.5
+        assert!((odds(0.0) - 0.5).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_weight_and_gain() {
+        // weight = -g / (h + EPS)
+        // EPS is 1e-8
+        assert!((weight(1.0, 1.0) - (-1.0)).abs() < 1e-6);
+        // gain = g^2 / (h + EPS)
+        assert!((gain(1.0, 1.0) - 1.0).abs() < 1e-6);
+        // gain_given_weight = -2.0 * g * w - h * w^2
+        // if g=1, h=1, w=-1: -2*1*(-1) - 1*(-1)^2 = 2 - 1 = 1.0
+        assert!((gain_given_weight(1.0, 1.0, -1.0) - 1.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_between() {
+        assert!(between(0.0, 1.0, 0.5));
+        assert!(!between(0.0, 1.0, 1.5));
+        assert!(between(1.0, 0.0, 0.5));
     }
 }

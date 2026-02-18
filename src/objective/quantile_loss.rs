@@ -185,3 +185,42 @@ impl QuantileLoss {
         }
     }
 }
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_quantile_loss() {
+        let y = vec![1.0, 1.0];
+        let yhat = vec![2.0, 0.5]; // diffs (yhat - y): 1.0, -0.5. s (y - yhat): -1.0, 0.5
+        let loss_fn = QuantileLoss { quantile: Some(0.7) };
+
+        // Test loss: if s >= 0: q*s else (q-1)*s
+        // s = -1.0 < 0 -> (0.7-1)*(-1.0) = -0.3 * -1.0 = 0.3
+        // s = 0.5 >= 0 -> 0.7 * 0.5 = 0.35
+        let l = loss_fn.loss(&y, &yhat, None, None);
+        assert!((l[0] - 0.3).abs() < 1e-6);
+        assert!((l[1] - 0.35).abs() < 1e-6);
+
+        // Test gradient: diff >= 0 (yhat >= y) -> (1-q), diff < 0 (yhat < y) -> -q
+        // diff = 1.0 >= 0 -> 1.0 - 0.7 = 0.3
+        // diff = -0.5 < 0 -> -0.7
+        let (g, _) = loss_fn.gradient(&y, &yhat, None, None);
+        assert!((g[0] - 0.3).abs() < 1e-6);
+        assert!((g[1] - (-0.7)).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_quantile_initial_value() {
+        let y = vec![1.0, 2.0, 3.0, 4.0, 5.0];
+        let loss_fn = QuantileLoss { quantile: Some(0.5) };
+        // median of [1,2,3,4,5] is 3
+        assert_eq!(loss_fn.initial_value(&y, None, None), 3.0);
+
+        let loss_fn_q = QuantileLoss { quantile: Some(0.8) };
+        // 0.8 quantile of 5 elements is the 4th or 5th. w_target = 5 * 0.8 = 4.0.
+        // indices 0..5, w_cum reaching 4.0 at index 3 (value 4.0) or index 4?
+        // Let's trace: 1(1.0), 2(2.0), 3(3.0), 4(4.0) -> w_cum=4.0 >= 4.0. So 4.0.
+        assert_eq!(loss_fn_q.initial_value(&y, None, None), 4.0);
+    }
+}

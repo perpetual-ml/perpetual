@@ -458,3 +458,88 @@ impl PerpetualBooster {
         results
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::Matrix;
+    use crate::booster::config::CalibrationMethod;
+    use crate::objective::Objective;
+
+    #[test]
+    fn test_calibrate_classification_all_methods() {
+        let n_features = 2;
+        let train_vec = vec![0.1, 0.2, 0.8, 0.9, 0.15, 0.25, 0.85, 0.95];
+        let y_train = vec![0.0, 1.0, 0.0, 1.0];
+        let train_data = Matrix::new(&train_vec, 4, n_features);
+
+        let mut booster = PerpetualBooster::default()
+            .set_objective(Objective::LogLoss)
+            .set_save_node_stats(true)
+            .set_num_threads(Some(1));
+        booster.fit(&train_data, &y_train, None, None).unwrap();
+
+        let cal_vec = vec![0.12, 0.22, 0.82, 0.92, 0.11, 0.21, 0.81, 0.91, 0.13, 0.23, 0.83, 0.93];
+        let y_cal = vec![0.0, 1.0, 0.0];
+        let alpha = vec![0.1];
+        let cal_data = Matrix::new(&cal_vec, 3, n_features);
+
+        let methods = [
+            CalibrationMethod::Conformal,
+            CalibrationMethod::WeightVariance,
+            CalibrationMethod::MinMax,
+            CalibrationMethod::GRP,
+        ];
+
+        for method in methods {
+            let mut b = booster.clone();
+            b.calibrate_classification(method, (&cal_data, &y_cal, &alpha)).unwrap();
+            assert!(
+                b.isotonic_calibrator.is_some(),
+                "Isotonic calibrator should be set for method {:?}",
+                method
+            );
+            assert!(
+                b.cal_params.contains_key("0.1"),
+                "Calibration params should contain alpha 0.1 for method {:?}",
+                method
+            );
+
+            let sets = b.predict_sets(&cal_data, false);
+            assert!(
+                sets.contains_key("0.1"),
+                "Predict sets should return alpha 0.1 for method {:?}",
+                method
+            );
+        }
+    }
+
+    #[test]
+    fn test_calibrate_classification_columnar() {
+        let n_features = 2;
+        let train_vec = vec![0.1, 0.2, 0.8, 0.9, 0.15, 0.25, 0.85, 0.95];
+        let y_train = vec![0.0, 1.0, 0.0, 1.0];
+        let train_data = Matrix::new(&train_vec, 4, n_features);
+
+        let mut booster = PerpetualBooster::default()
+            .set_objective(Objective::LogLoss)
+            .set_save_node_stats(true)
+            .set_num_threads(Some(1));
+        booster.fit(&train_data, &y_train, None, None).unwrap();
+
+        let cal_vec = vec![0.12, 0.22, 0.82, 0.92];
+        let y_cal = vec![0.0, 1.0];
+        let alpha = vec![0.1];
+        let matrix = Matrix::new(&cal_vec, 2, n_features);
+        let columns: Vec<&[f64]> = (0..n_features).map(|j| matrix.get_col(j)).collect();
+        let cal_data = ColumnarMatrix::new(columns, None, 2);
+
+        let mut b = booster.clone();
+        b.calibrate_classification_columnar(CalibrationMethod::Conformal, (&cal_data, &y_cal, &alpha))
+            .unwrap();
+        assert!(b.isotonic_calibrator.is_some());
+
+        let sets = b.predict_sets_columnar(&cal_data, false);
+        assert!(sets.contains_key("0.1"));
+    }
+}

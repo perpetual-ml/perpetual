@@ -186,3 +186,34 @@ impl AdaptiveHuberLoss {
         }
     }
 }
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_adaptive_huber_loss() {
+        let y = vec![1.0, 2.0, 3.0, 4.0];
+        let yhat = vec![1.1, 2.2, 3.3, 4.4]; // diffs: 0.1, 0.2, 0.3, 0.4
+        // n=4, alpha=0.5 -> index = floor(4 * 0.5) = 2. abs_res[2] = 0.3
+        let loss_fn = AdaptiveHuberLoss { quantile: Some(0.5) };
+        let delta = adaptive_delta(&y, &yhat, 0.5);
+        assert!((delta - 0.3).abs() < 1e-6);
+
+        let l = loss_fn.loss(&y, &yhat, None, None);
+        assert_eq!(l.len(), 4);
+        // diff 0.1 <= 0.3 -> quadratic: 0.5 * 0.1 * 0.1 = 0.005
+        assert!((l[0] - 0.005).abs() < 1e-6);
+        // diff 0.4 > 0.3 -> linear: 0.3 * (0.4 - 0.15) = 0.3 * 0.25 = 0.075
+        assert!((l[3] - 0.075).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_adaptive_delta() {
+        let y = vec![0.0, 1.0, 2.0, 3.0, 4.0];
+        let yhat = vec![0.1, 1.2, 2.3, 3.4, 4.5]; // abs_res: 0.1, 0.2, 0.3, 0.4, 0.5
+        // n=5, alpha=0.5 -> index = floor(5 * 0.5) = 2. abs_res[2] = 0.3
+        assert!((adaptive_delta(&y, &yhat, 0.5) - 0.3).abs() < 1e-6);
+        // alpha=0.9 -> index = floor(5 * 0.9) = 4. abs_res[4] = 0.5
+        assert!((adaptive_delta(&y, &yhat, 0.9) - 0.5).abs() < 1e-6);
+    }
+}

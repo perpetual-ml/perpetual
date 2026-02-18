@@ -90,7 +90,11 @@ fn test_calibration_min_max() {
 
     let mut booster = PerpetualBooster::default()
         .set_objective(Objective::SquaredLoss)
-        .set_save_node_stats(true);
+        .set_save_node_stats(true)
+        .set_max_bin(5)
+        .set_budget(0.1)
+        .set_iteration_limit(Some(5))
+        .set_memory_limit(Some(0.0001));
     booster.fit(&train_data, &y_train, None, None).unwrap();
 
     booster
@@ -146,7 +150,11 @@ fn test_calibration_grp() {
 
     let mut booster = PerpetualBooster::default()
         .set_objective(Objective::SquaredLoss)
-        .set_save_node_stats(true);
+        .set_save_node_stats(true)
+        .set_max_bin(5)
+        .set_budget(0.1)
+        .set_iteration_limit(Some(5))
+        .set_memory_limit(Some(0.0001));
     booster.fit(&train_data, &y_train, None, None).unwrap();
 
     booster
@@ -200,7 +208,11 @@ fn test_calibration_weight_variance() {
 
     let mut booster = PerpetualBooster::default()
         .set_objective(Objective::SquaredLoss)
-        .set_save_node_stats(true);
+        .set_save_node_stats(true)
+        .set_max_bin(5)
+        .set_budget(0.1)
+        .set_iteration_limit(Some(5))
+        .set_memory_limit(Some(0.0001));
     booster.fit(&train_data, &y_train, None, None).unwrap();
 
     booster
@@ -250,7 +262,11 @@ fn test_calibrate_without_save_node_stats() {
     // Create booster with save_node_stats = false (default)
     let mut booster = PerpetualBooster::default()
         .set_objective(Objective::SquaredLoss)
-        .set_save_node_stats(false); // Explicitly False, though default is false
+        .set_save_node_stats(false)
+        .set_max_bin(5)
+        .set_budget(0.1)
+        .set_iteration_limit(Some(5))
+        .set_memory_limit(Some(0.0001));
 
     booster.fit(&train_data, &y_train, None, None).unwrap();
 

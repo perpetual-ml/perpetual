@@ -171,3 +171,49 @@ impl HuberLoss {
         }
     }
 }
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_huber_loss() {
+        let y = vec![1.0, 2.0];
+        let yhat = vec![1.1, 3.0]; // diffs: 0.1, 1.0. Delta default is 1.0.
+        let loss_fn = HuberLoss { delta: Some(1.0) };
+
+        // Test loss
+        let l = loss_fn.loss(&y, &yhat, None, None);
+        assert_eq!(l.len(), 2);
+        assert!((l[0] - 0.5 * 0.1 * 0.1).abs() < 1e-6); // quadratic
+        assert!((l[1] - 0.5).abs() < 1e-6); // linear boundary (1.0 * (1.0 - 0.5))
+
+        // Test gradient/hessian
+        let (g, h) = loss_fn.gradient(&y, &yhat, None, None);
+        let h = h.unwrap();
+        // g = yhat - y for |diff| <= delta
+        assert!((g[0] - 0.1).abs() < 1e-6);
+        assert!((h[0] - 1.0).abs() < 1e-6);
+        // g = delta * sign(yhat - y) for |diff| > delta
+        // at diff=1.0, sign is 1.0, g=1.0*1.0=1.0
+        assert!((g[1] - 1.0).abs() < 1e-6);
+        assert!((h[1] - 1.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_huber_loss_weighted() {
+        let y = vec![1.0];
+        let yhat = vec![2.0]; // diff = 1.0
+        let weights = vec![0.5];
+        let loss_fn = HuberLoss { delta: Some(0.5) }; // delta < diff, so linear
+
+        let l = loss_fn.loss(&y, &yhat, Some(&weights), None);
+        // loss = delta * (diff - 0.5*delta) * weight = 0.5 * (1.0 - 0.25) * 0.5 = 0.5 * 0.75 * 0.5 = 0.1875
+        assert!((l[0] - 0.1875).abs() < 1e-6);
+
+        let (g, h) = loss_fn.gradient(&y, &yhat, Some(&weights), None);
+        let h = h.unwrap();
+        // g = delta * sign(diff) * weight = 0.5 * 1.0 * 0.5 = 0.25
+        assert!((g[0] - 0.25).abs() < 1e-6);
+        assert!((h[0] - 0.0).abs() < 1e-6);
+    }
+}

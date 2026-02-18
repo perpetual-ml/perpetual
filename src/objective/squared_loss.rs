@@ -150,3 +150,43 @@ impl SquaredLoss {
         }
     }
 }
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_squared_loss() {
+        let y = vec![1.0, 2.0];
+        let yhat = vec![1.5, 1.0]; // diffs (yhat - y): 0.5, -1.0. s (y - yhat): -0.5, 1.0
+        let loss_fn = SquaredLoss::default();
+
+        // Test loss: s*s
+        // s = -0.5 -> 0.25
+        // s = 1.0 -> 1.0
+        let l = loss_fn.loss(&y, &yhat, None, None);
+        assert!((l[0] - 0.25).abs() < 1e-6);
+        assert!((l[1] - 1.0).abs() < 1e-6);
+
+        // Test gradient/hessian: g = yhat - y, h = 1.0
+        let (g, h) = loss_fn.gradient(&y, &yhat, None, None);
+        assert_eq!(h, None); // SquaredLoss returns None for constant hessian when no weights
+        assert!((g[0] - 0.5).abs() < 1e-6);
+        assert!((g[1] - (-1.0)).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_squared_loss_weighted() {
+        let y = vec![1.0];
+        let yhat = vec![2.0]; // diff = 1.0
+        let weights = vec![0.5];
+        let loss_fn = SquaredLoss::default();
+
+        let l = loss_fn.loss(&y, &yhat, Some(&weights), None);
+        assert!((l[0] - 0.5).abs() < 1e-6);
+
+        let (g, h) = loss_fn.gradient(&y, &yhat, Some(&weights), None);
+        let h = h.unwrap();
+        assert!((g[0] - 0.5).abs() < 1e-6);
+        assert!((h[0] - 0.5).abs() < 1e-6);
+    }
+}

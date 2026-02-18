@@ -195,3 +195,35 @@ impl LogLoss {
         }
     }
 }
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_log_loss() {
+        let y = vec![1.0, 0.0];
+        let yhat = vec![1.0, -1.0]; // p approx 0.73, 0.27
+        let loss_fn = LogLoss::default();
+
+        let l = loss_fn.loss(&y, &yhat, None, None);
+        assert_eq!(l.len(), 2);
+        // p = 1/(1+e^-1) = 0.73105857863
+        // loss = -(1*ln(0.731) + 0*ln(1-0.731)) = 0.31326168751
+        assert!((l[0] - 0.3132617).abs() < 1e-6);
+
+        let (g, h) = loss_fn.gradient(&y, &yhat, None, None);
+        let h = h.unwrap();
+        // g = p - y = 0.731 - 1.0 = -0.2689414
+        // h = p * (1 - p) = 0.731 * 0.269 = 0.1966119
+        assert!((g[0] - (-0.2689414)).abs() < 1e-6);
+        assert!((h[0] - 0.1966119).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_log_loss_init() {
+        let y = vec![1.0, 1.0, 0.0]; // 2 ones, 1 zero
+        let loss_fn = LogLoss::default();
+        // log(2/1) = ln(2) = 0.693147
+        assert!((loss_fn.initial_value(&y, None, None) - 0.693147).abs() < 1e-6);
+    }
+}

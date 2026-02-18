@@ -114,3 +114,61 @@ impl IsotonicCalibrator {
         calibrated
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_isotonic_simple() {
+        let y_pred = vec![0.1, 0.2, 0.3, 0.4];
+        let y_true = vec![0.0, 0.0, 1.0, 1.0];
+        let calibrator = IsotonicCalibrator::new(&y_pred, &y_true);
+
+        assert_eq!(calibrator.thresholds.len(), 4);
+        // Blocks are not merged since y_true is monotonic
+        // Thresholds: 0.1, 0.2, 0.3, 0.4
+        // Values: 0.0, 0.0, 1.0, 1.0
+        assert_eq!(calibrator.thresholds[0], 0.1);
+        assert_eq!(calibrator.values[0], 0.0);
+        assert_eq!(calibrator.thresholds[1], 0.2);
+        assert_eq!(calibrator.values[1], 0.0);
+        assert_eq!(calibrator.thresholds[2], 0.3);
+        assert_eq!(calibrator.values[2], 1.0);
+        assert_eq!(calibrator.thresholds[3], 0.4);
+        assert_eq!(calibrator.values[3], 1.0);
+
+        let test_pred = vec![0.1, 0.25, 0.4];
+        let transformed = calibrator.transform(&test_pred);
+        assert_eq!(transformed[0], 0.0); // <= 0.1
+        assert_eq!(transformed[2], 1.0); // >= 0.4
+        // 0.25 is between thresholds 0.2 and 0.3
+        // y0 = 0.0, y1 = 1.0, x0 = 0.2, x1 = 0.3
+        // slope = (1-0)/(0.3-0.2) = 1/0.1 = 10
+        // y = 0 + 10 * (0.25 - 0.2) = 10 * 0.05 = 0.5
+        assert!((transformed[1] - 0.5).abs() < 1e-7);
+    }
+
+    #[test]
+    fn test_isotonic_decreasing() {
+        // Non-monotonic data should be pooled
+        let y_pred = vec![0.1, 0.2, 0.3];
+        let y_true = vec![1.0, 0.0, 1.0];
+        let calibrator = IsotonicCalibrator::new(&y_pred, &y_true);
+        // Initially: (1,1,1), (0,1,0), (1,1,1)
+        // (1,1,1) > (0,1,0) -> Merge -> (1,2,0.5)
+        // (0.5, 2) < (1,1,1) -> OK
+        // Result: 0.5, 0.5, 1.0 (after merging)
+        assert_eq!(calibrator.values.len(), 2);
+        assert_eq!(calibrator.values[0], 0.5);
+        assert_eq!(calibrator.values[1], 1.0);
+    }
+
+    #[test]
+    fn test_isotonic_empty() {
+        let calibrator = IsotonicCalibrator::new(&[], &[]);
+        assert!(calibrator.thresholds.is_empty());
+        let transformed = calibrator.transform(&[0.5]);
+        assert_eq!(transformed[0], 0.5);
+    }
+}
