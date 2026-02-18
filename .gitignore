@@ -45,9 +45,10 @@ typescript
 wsl_*.sh
 
 # Rust vendoring artifacts
+package-r/src/v/
+package-r/src/rust/core/
 package-r/inst/v/
 package-r/inst/c/
-package-r/src/rust/core/
 
 # Python cache
 .ruff_cache/

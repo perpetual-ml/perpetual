@@ -7,7 +7,14 @@ $(SHLIB): $(STATLIB)
 $(STATLIB):
 	@echo "Building Rust library for Unix/macOS..."
 	rustc --version
-	cd rust && cargo build --release --lib --verbose --config 'source.crates-io.replace-with="vendored-sources"' --config 'source.vendored-sources.directory="../v"'
+	@if [ -d "../v" ]; then \
+		echo "Found vendored dependencies in src/v, using them."; \
+		find ../v -name "cargo-checksum.json" -exec sh -c 'mv "$$1" "$${1%cargo-checksum.json}.cargo-checksum.json"' _ {} \; ; \
+		cd rust && cargo build --release --lib --verbose --config 'source.crates-io.replace-with="vendored-sources"' --config 'source.vendored-sources.directory="../v"'; \
+	else \
+		echo "No vendored dependencies found in src/v, using crates.io (online)."; \
+		cd rust && cargo build --release --lib --verbose; \
+	fi
 
 clean:
 	rm -rf rust/target

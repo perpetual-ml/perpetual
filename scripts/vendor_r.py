@@ -156,8 +156,73 @@ def vendor_dependencies(project_root):
     # 6. Prune unnecessary large/deep files to stay under 100 char path limit
     prune_vendor(vendor_dir)
 
+    # 6.5 Aggressively prune windows crate if present
+    prune_windows_crate(vendor_dir)
+
     # 7. Fix checksums for potential missing files
     fix_checksums(vendor_dir)
+
+
+def prune_windows_crate(vendor_dir):
+    windows_dir = os.path.join(vendor_dir, "windows")
+    if not os.path.exists(windows_dir):
+        return
+
+    print("Aggressively pruning 'windows' crate...")
+    # Keep only necessary namespaces for sysinfo:
+    # Win32::Foundation, Win32::System, Win32::Storage, Win32::NetworkManagement, core
+    win_src = os.path.join(windows_dir, "src", "Windows")
+    if not os.path.exists(win_src):
+        return
+
+    to_keep = ["Win32", "Foundation", "System", "Storage", "Networking", "core"]
+    for d in os.listdir(win_src):
+        if d not in to_keep and os.path.isdir(os.path.join(win_src, d)):
+            print(f"Pruning unused namespace: {d}")
+            force_rmtree(os.path.join(win_src, d))
+
+    # Keep only necessary Win32 sub-namespaces:
+    win32_src = os.path.join(win_src, "Win32")
+    if os.path.exists(win32_src):
+        to_keep_win32 = [
+            "Foundation",
+            "System",
+            "Storage",
+            "NetworkManagement",
+            "Networking",
+        ]
+        for d in os.listdir(win32_src):
+            if d not in to_keep_win32 and os.path.isdir(os.path.join(win32_src, d)):
+                print(f"Pruning unused Win32 namespace: {d}")
+                force_rmtree(os.path.join(win32_src, d))
+
+    # Further prune Win32/System:
+    win32_sys = os.path.join(win32_src, "System")
+    if os.path.exists(win32_sys):
+        to_keep_sys = [
+            "Diagnostics",
+            "ProcessStatus",
+            "Registry",
+            "SystemInformation",
+            "Threading",
+            "IO",
+            "Ioctl",
+            "SystemServices",
+            "WindowsProgramming",
+        ]
+        for d in os.listdir(win32_sys):
+            if d not in to_keep_sys and os.path.isdir(os.path.join(win32_sys, d)):
+                print(f"Pruning unused Win32/System namespace: {d}")
+                force_rmtree(os.path.join(win32_sys, d))
+
+    # Prune Win32/System/Diagnostics except ToolHelp:
+    win32_diag = os.path.join(win32_sys, "Diagnostics")
+    if os.path.exists(win32_diag):
+        to_keep_diag = ["ToolHelp"]
+        for d in os.listdir(win32_diag):
+            if d not in to_keep_diag and os.path.isdir(os.path.join(win32_diag, d)):
+                print(f"Pruning unused Win32/System/Diagnostics namespace: {d}")
+                force_rmtree(os.path.join(win32_diag, d))
 
 
 def prune_vendor(vendor_dir):
@@ -205,13 +270,15 @@ def prune_vendor(vendor_dir):
                 or lower_name.endswith(".dll")
                 or lower_name.endswith(".lib")
                 or lower_name.endswith(".pdb")
+                or lower_name.endswith(".exp")
+                or lower_name.endswith(".exe")
                 or name == "AppVeyor.yml"
             ):
                 print(f"Removing artifact: {full_path}")
                 force_remove(full_path)
                 continue
 
-            # Truncate documentation/text files to save space
+            # Delete documentation/text/config files to save space and reduce file count
             if (
                 lower_name.endswith(".md")
                 or lower_name.endswith(".txt")
@@ -219,16 +286,22 @@ def prune_vendor(vendor_dir):
                 or lower_name.endswith(".pdf")
                 or lower_name.endswith(".yml")
                 or lower_name.endswith(".yaml")
+                or lower_name.endswith(".sh")
+                or lower_name.endswith(".bat")
+                or lower_name.endswith(".ps1")
+                or name
+                in [
+                    "LICENSE",
+                    "COPYING",
+                    "CONTRIBUTING",
+                    "AUTHORS",
+                    "CHANGELOG",
+                    "Cargo.toml.orig",
+                ]
             ):
-                # Truncate to zero size
-                try:
-                    open(full_path, "w", encoding="utf-8").close()
-                except PermissionError:
-                    try:
-                        os.chmod(full_path, stat.S_IWRITE)
-                        open(full_path, "w", encoding="utf-8").close()
-                    except Exception as e:
-                        print(f"Failed to truncate {full_path}: {e}")
+                print(f"Deleting unnecessary file: {full_path}")
+                force_remove(full_path)
+                continue
 
     # 6.5 Patch vendored Cargo.toml files
     patch_vendored_cargo_tomls(vendor_dir)
@@ -322,15 +395,28 @@ def fix_checksums(vendor_dir):
             if changed:
                 data["files"] = new_files_dict
                 try:
-                    # Handle readonly files
-                    if not os.access(checksum_path, os.W_OK):
-                        os.chmod(checksum_path, stat.S_IWRITE)
+                    # Rename to cargo-checksum.json (no dot) to avoid R hidden file warnings
+                    # We will rename it back during the build in Makevars
+                    new_checksum_path = os.path.join(root, "cargo-checksum.json")
+                    if os.path.exists(checksum_path):
+                        force_remove(checksum_path)
 
-                    with open(checksum_path, "w", encoding="utf-8") as f:
+                    with open(new_checksum_path, "w", encoding="utf-8") as f:
                         json.dump(data, f, separators=(",", ":"))
                     patched_count += 1
                 except Exception as e:
-                    print(f"Failed to write {checksum_path}: {e}")
+                    print(f"Failed to write {new_checksum_path}: {e}")
+            else:
+                # Even if not changed, rename it to avoid hidden file warnings
+                new_checksum_path = os.path.join(root, "cargo-checksum.json")
+                if not os.path.exists(new_checksum_path) and os.path.exists(
+                    checksum_path
+                ):
+                    try:
+                        os.rename(checksum_path, new_checksum_path)
+                        patched_count += 1
+                    except Exception as e:
+                        print(f"Failed to rename {checksum_path}: {e}")
 
     print(f"Done. Patched checksums in {patched_count} crates.")
 

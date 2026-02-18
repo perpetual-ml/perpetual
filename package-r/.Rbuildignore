@@ -4,6 +4,7 @@
 ^examples$
 ^LICENSE$
 ^\.github$
+^cran-comments\.md$
 
 
 
