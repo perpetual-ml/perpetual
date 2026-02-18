@@ -94,9 +94,11 @@ jobs:
         uses: codecov/codecov-action@v5
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
+          slug: perpetual-ml/perpetual
           directory: ./package-python
           flags: windows
           fail_ci_if_error: true
+          verbose: true
       - name: Save Artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -162,9 +164,11 @@ jobs:
         uses: codecov/codecov-action@v5
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
+          slug: perpetual-ml/perpetual
           directory: ./package-python
           flags: macos
           fail_ci_if_error: true
+          verbose: true
       - name: Save Artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -230,9 +234,11 @@ jobs:
         uses: codecov/codecov-action@v5
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
+          slug: perpetual-ml/perpetual
           directory: ./package-python
           flags: linux-x64
           fail_ci_if_error: true
+          verbose: true
       - name: Save Artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -297,9 +303,11 @@ jobs:
         uses: codecov/codecov-action@v5
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
+          slug: perpetual-ml/perpetual
           directory: ./package-python
           flags: linux-arm
           fail_ci_if_error: true
+          verbose: true
       - name: Save Artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -346,16 +354,18 @@ jobs:
         # to exist and contain the data, which is now guaranteed by the download step.
         run: cargo test --verbose
       - name: Install cargo-tarpaulin
-        run: cargo install cargo-tarpaulin
+        uses: taiki-e/install-action@cargo-tarpaulin
       - name: Run coverage
         run: cargo tarpaulin --verbose --out Xml
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v5
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
+          slug: perpetual-ml/perpetual
           files: ./cobertura.xml
           flags: rust
           fail_ci_if_error: true
+          verbose: true
 
   # 7. R Package Check Job (depends on resources)
   R-CMD-check:
@@ -457,6 +467,8 @@ jobs:
         uses: codecov/codecov-action@v5
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
+          slug: perpetual-ml/perpetual
           files: package-r/cobertura.xml
           flags: r
           fail_ci_if_error: true
+          verbose: true
