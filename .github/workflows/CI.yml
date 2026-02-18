@@ -88,8 +88,15 @@ jobs:
           cd package-python
           ruff check .
           ruff format --check .
-          pytest --cov-fail-under=90 tests
+          pytest --cov=perpetual --cov-report=xml tests
           cd ..
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          directory: ./package-python
+          flags: windows
+          fail_ci_if_error: true
       - name: Save Artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -149,8 +156,15 @@ jobs:
           cd package-python
           ruff check .
           ruff format --check .
-          pytest --cov-fail-under=90 tests
+          pytest --cov=perpetual --cov-report=xml tests
           cd ..
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          directory: ./package-python
+          flags: macos
+          fail_ci_if_error: true
       - name: Save Artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -210,8 +224,15 @@ jobs:
           cd package-python
           ruff check .
           ruff format --check .
-          pytest --cov-fail-under=90 tests
+          pytest --cov=perpetual --cov-report=xml tests
           cd ..
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          directory: ./package-python
+          flags: linux-x64
+          fail_ci_if_error: true
       - name: Save Artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -270,8 +291,15 @@ jobs:
           cd package-python
           ruff check .
           ruff format --check .
-          pytest --cov-fail-under=90 tests
+          pytest --cov=perpetual --cov-report=xml tests
           cd ..
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          directory: ./package-python
+          flags: linux-arm
+          fail_ci_if_error: true
       - name: Save Artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -320,7 +348,14 @@ jobs:
       - name: Install cargo-tarpaulin
         run: cargo install cargo-tarpaulin
       - name: Run coverage
-        run: cargo tarpaulin --verbose --fail-under 90 --out Xml
+        run: cargo tarpaulin --verbose --out Xml
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./cobertura.xml
+          flags: rust
+          fail_ci_if_error: true
 
   # 7. R Package Check Job (depends on resources)
   R-CMD-check:
@@ -416,5 +451,12 @@ jobs:
       - name: Check Coverage
         if: success() && matrix.config.os == 'ubuntu-latest'
         run: |
-           Rscript -e "cov_val <- covr::package_coverage('package-r'); print(cov_val); if (covr::percent_coverage(cov_val) < 80) { stop('Coverage is below 80%') }"
+           Rscript -e "cov <- covr::package_coverage('package-r'); covr::to_cobertura(cov, filename = 'package-r/cobertura.xml')"
         shell: bash
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: package-r/cobertura.xml
+          flags: r
+          fail_ci_if_error: true
