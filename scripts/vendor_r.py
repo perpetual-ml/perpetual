@@ -109,6 +109,12 @@ def vendor_r(skip_deps=False):
     else:
         print("Skipping dependency vendoring as requested.")
 
+    # 6. Strip executable permissions from ALL files under package-r/src/
+    # R CMD check warns about any files with the execute bit set.
+    # This must cover both vendored deps (src/v/) and copied Rust source (src/rust/core/).
+    src_dir = os.path.join(project_root, "package-r", "src")
+    strip_exec_permissions(src_dir)
+
 
 def vendor_dependencies(project_root):
     rust_dir = os.path.join(project_root, "package-r", "src", "rust")
@@ -158,10 +164,6 @@ def vendor_dependencies(project_root):
 
     # 6.5 Aggressively prune windows crate if present
     prune_windows_crate(vendor_dir)
-
-    # 6.6 Strip executable permissions from all vendored files
-    # R CMD check warns about executable files in the package source.
-    strip_exec_permissions(vendor_dir)
 
     # 7. Fix checksums for potential missing files
     fix_checksums(vendor_dir)
