@@ -3,7 +3,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  # 1. Job to create and upload the resources/data files
+  # 1. Job to create and update the resources/data files
   prepare-resources:
     runs-on: ubuntu-latest
     steps:
@@ -27,14 +27,15 @@ jobs:
           cd package-python
           uv pip install --system -e .[dev]
           cd ..
-      - name: Build test data (create resources)
-        run: python scripts/make_resources.py
-      - name: Upload Resources Artifact
-        uses: actions/upload-artifact@v4
+      - name: Cache resources
+        id: cache-resources
+        uses: actions/cache@v4
         with:
-          name: perpetual-resources
           path: resources
-          retention-days: 1 # Keep artifacts for a short time
+          key: ${{ runner.os }}-resources-${{ hashFiles('scripts/make_resources.py') }}
+      - name: Build test data (create resources)
+        if: steps.cache-resources.outputs.cache-hit != 'true'
+        run: python scripts/make_resources.py
 
   # 2. Windows Build and Test Job (depends on resources)
   windows-build-test:
@@ -50,11 +51,11 @@ jobs:
         uses: astral-sh/setup-uv@v5
         with:
           enable-cache: true
-      - name: Download Resources Artifact
-        uses: actions/download-artifact@v4
+      - name: Restore resources cache
+        uses: actions/cache@v4
         with:
-          name: perpetual-resources
           path: resources
+          key: ${{ runner.os }}-resources-${{ hashFiles('scripts/make_resources.py') }}
       - name: Install latest stable Rust
         uses: dtolnay/rust-toolchain@stable
         with:
@@ -122,11 +123,11 @@ jobs:
           enable-cache: true
       - name: Install OpenMP
         run: brew install libomp
-      - name: Download Resources Artifact
-        uses: actions/download-artifact@v4
+      - name: Restore resources cache
+        uses: actions/cache@v4
         with:
-          name: perpetual-resources
           path: resources
+          key: ${{ runner.os }}-resources-${{ hashFiles('scripts/make_resources.py') }}
       - name: Install latest stable Rust
         uses: dtolnay/rust-toolchain@stable
         with:
@@ -189,11 +190,11 @@ jobs:
         uses: astral-sh/setup-uv@v5
         with:
           enable-cache: true
-      - name: Download Resources Artifact
-        uses: actions/download-artifact@v4
+      - name: Restore resources cache
+        uses: actions/cache@v4
         with:
-          name: perpetual-resources
           path: resources
+          key: ${{ runner.os }}-resources-${{ hashFiles('scripts/make_resources.py') }}
       - name: Install latest stable Rust
         uses: dtolnay/rust-toolchain@stable
         with:
@@ -259,11 +260,11 @@ jobs:
         uses: astral-sh/setup-uv@v5
         with:
           enable-cache: true
-      - name: Download Resources Artifact
-        uses: actions/download-artifact@v4
+      - name: Restore resources cache
+        uses: actions/cache@v4
         with:
-          name: perpetual-resources
           path: resources
+          key: ${{ runner.os }}-resources-${{ hashFiles('scripts/make_resources.py') }}
       - name: Install latest stable Rust
         uses: dtolnay/rust-toolchain@stable
         with:
@@ -325,11 +326,11 @@ jobs:
         uses: astral-sh/setup-uv@v5
         with:
           enable-cache: true
-      - name: Download Resources Artifact
-        uses: actions/download-artifact@v4
+      - name: Restore resources cache
+        uses: actions/cache@v4
         with:
-          name: perpetual-resources
           path: resources
+          key: ${{ runner.os }}-resources-${{ hashFiles('scripts/make_resources.py') }}
       - name: Install latest stable Rust
         uses: dtolnay/rust-toolchain@stable
         with:
@@ -387,11 +388,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Download Resources Artifact
-        uses: actions/download-artifact@v4
+      - name: Restore resources cache
+        uses: actions/cache@v4
         with:
-          name: perpetual-resources
           path: resources
+          key: ${{ runner.os }}-resources-${{ hashFiles('scripts/make_resources.py') }}
 
       - name: Copy Resources for Tests
         run: |
