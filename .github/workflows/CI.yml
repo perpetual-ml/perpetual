@@ -8,6 +8,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
@@ -47,6 +49,8 @@ jobs:
     runs-on: "windows-latest"
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - name: Setup uv
         uses: astral-sh/setup-uv@v5
         with:
@@ -99,7 +103,7 @@ jobs:
         uses: codecov/codecov-action@v5
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
-          slug: perpetual-ml/perpetual
+          slug: ${{ github.repository }}
           directory: ./package-python
           flags: windows
           fail_ci_if_error: true
@@ -121,6 +125,8 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - name: Setup uv
         uses: astral-sh/setup-uv@v5
         with:
@@ -173,7 +179,7 @@ jobs:
         uses: codecov/codecov-action@v5
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
-          slug: perpetual-ml/perpetual
+          slug: ${{ github.repository }}
           directory: ./package-python
           flags: macos
           fail_ci_if_error: true
@@ -194,6 +200,8 @@ jobs:
         pyversion: ["3.10", "3.11", "3.12", "3.13", "3.14"]
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - name: Setup uv
         uses: astral-sh/setup-uv@v5
         with:
@@ -247,7 +255,7 @@ jobs:
         uses: codecov/codecov-action@v5
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
-          slug: perpetual-ml/perpetual
+          slug: ${{ github.repository }}
           directory: ./package-python
           flags: linux-x64
           fail_ci_if_error: true
@@ -268,6 +276,8 @@ jobs:
         pyversion: ["3.10", "3.11", "3.12", "3.13", "3.14"]
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - name: Setup uv
         uses: astral-sh/setup-uv@v5
         with:
@@ -320,7 +330,7 @@ jobs:
         uses: codecov/codecov-action@v5
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
-          slug: perpetual-ml/perpetual
+          slug: ${{ github.repository }}
           directory: ./package-python
           flags: linux-arm
           fail_ci_if_error: true
@@ -338,6 +348,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - name: Setup uv
         uses: astral-sh/setup-uv@v5
         with:
@@ -382,7 +394,7 @@ jobs:
         uses: codecov/codecov-action@v5
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
-          slug: perpetual-ml/perpetual
+          slug: ${{ github.repository }}
           files: ./cobertura.xml
           flags: rust
           fail_ci_if_error: true
@@ -407,6 +419,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Restore resources cache
         id: restore-resources
@@ -507,7 +521,7 @@ jobs:
         uses: codecov/codecov-action@v5
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
-          slug: perpetual-ml/perpetual
+          slug: ${{ github.repository }}
           files: package-r/cobertura.xml
           flags: r
           fail_ci_if_error: true
