@@ -31,14 +31,14 @@ rust-target:
 		echo "DEBUG: Target $(TARGET) found. Entering rust directory..."; \
 		ls -ld rust; \
 		if [ -d "rust" ]; then echo "DEBUG: rust is a dir"; else echo "DEBUG: rust is NOT a dir"; fi; \
-		cd ./rust && cargo build --release --lib --manifest-path Cargo.toml --target $(TARGET) --verbose --config 'source.crates-io.replace-with="vendored-sources"' --config 'source.vendored-sources.directory="../../inst/v"'; \
+		cd ./rust && cargo build --release --lib --manifest-path Cargo.toml --target $(TARGET) --verbose --config 'source.crates-io.replace-with="vendored-sources"' --config 'source.vendored-sources.directory="../v"'; \
 	else \
 		echo "Target $(TARGET) build failed or missing. Detailed log:"; \
 		cat rust/cargo_build.log || true; \
 		echo "Falling back to default host target..."; \
 		echo "DEBUG: Current dir in else: $$(pwd)"; \
 		ls -F; \
-		cd ./rust && cargo build --release --lib --manifest-path Cargo.toml --verbose --config 'source.crates-io.replace-with="vendored-sources"' --config 'source.vendored-sources.directory="../../inst/v"'; \
+		cd ./rust && cargo build --release --lib --manifest-path Cargo.toml --verbose --config 'source.crates-io.replace-with="vendored-sources"' --config 'source.vendored-sources.directory="../v"'; \
 	fi
 	@if [ ! -f rust/target/$(TARGET)/release/libperpetual_r.a ] && [ ! -f rust/target/release/libperpetual_r.a ] && [ ! -f rust/target/release/perpetual_r.lib ]; then \
 		echo "ERROR: Detailed build log follow:"; \

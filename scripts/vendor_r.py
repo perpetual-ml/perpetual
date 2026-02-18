@@ -113,7 +113,7 @@ def vendor_r(skip_deps=False):
 def vendor_dependencies(project_root):
     rust_dir = os.path.join(project_root, "package-r", "src", "rust")
     # Use short paths to avoid 100 char limit for tarball
-    vendor_dir = os.path.join(project_root, "package-r", "inst", "v")
+    vendor_dir = os.path.join(project_root, "package-r", "src", "v")
     config_dir = os.path.join(project_root, "package-r", "inst", "c")
 
     # Clean up old .cargo directory in rust_dir if it exists
@@ -122,7 +122,7 @@ def vendor_dependencies(project_root):
         force_rmtree(old_config_dir)
 
     # Clean up old vendor locations to avoid confusion/bloat
-    for old in ["inst/vendor", "inst/cargo_home", "v"]:
+    for old in ["inst/vendor", "inst/cargo_home", "inst/v", "v"]:
         old_path = os.path.join(project_root, "package-r", old)
         if os.path.exists(old_path):
             force_rmtree(old_path)
@@ -136,7 +136,7 @@ def vendor_dependencies(project_root):
         # Note: cargo vendor might fail if target dir exists and has readonly files?
         # Typically cargo handles it, but let's be safe.
         subprocess.run(
-            ["cargo", "vendor", "../../inst/v"],
+            ["cargo", "vendor", "../v"],
             cwd=rust_dir,
             capture_output=True,
             text=True,

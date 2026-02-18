@@ -7,7 +7,7 @@ $(SHLIB): $(STATLIB)
 $(STATLIB):
 	@echo "Building Rust library for Unix/macOS..."
 	rustc --version
-	cd rust && cargo build --release --lib --verbose --config 'source.crates-io.replace-with="vendored-sources"' --config 'source.vendored-sources.directory="../../inst/v"'
+	cd rust && cargo build --release --lib --verbose --config 'source.crates-io.replace-with="vendored-sources"' --config 'source.vendored-sources.directory="../v"'
 
 clean:
 	rm -rf rust/target
