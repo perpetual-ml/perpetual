@@ -159,6 +159,10 @@ def vendor_dependencies(project_root):
     # 6.5 Aggressively prune windows crate if present
     prune_windows_crate(vendor_dir)
 
+    # 6.6 Strip executable permissions from all vendored files
+    # R CMD check warns about executable files in the package source.
+    strip_exec_permissions(vendor_dir)
+
     # 7. Fix checksums for potential missing files
     fix_checksums(vendor_dir)
 
@@ -250,6 +254,28 @@ def prune_windows_crate(vendor_dir):
             if entry not in to_keep_diag and os.path.isdir(path):
                 print(f"  Pruning Win32/System/Diagnostics/{entry}")
                 force_rmtree(path)
+
+
+def strip_exec_permissions(vendor_dir):
+    """Strip executable permission bits from all vendored files.
+
+    R CMD check warns about any files with the execute bit set.
+    """
+    print("Stripping executable permissions from vendored files...")
+    count = 0
+    for root, dirs, files in os.walk(vendor_dir):
+        for f in files:
+            fpath = os.path.join(root, f)
+            try:
+                current = os.stat(fpath).st_mode
+                # Remove all execute bits (user, group, other)
+                new_mode = current & ~(stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+                if new_mode != current:
+                    os.chmod(fpath, new_mode)
+                    count += 1
+            except Exception:
+                pass
+    print(f"  Stripped execute bit from {count} files.")
 
 
 def prune_vendor(vendor_dir):

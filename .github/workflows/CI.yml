@@ -495,7 +495,7 @@ jobs:
       - name: Manual Install Test
         run: |
           tarball=$(ls perpetual_*.tar.gz | head -n 1)
-          R CMD INSTALL "$tarball" --verbose --no-test-load
+          R CMD INSTALL "$tarball" --no-test-load
         shell: bash
 
       - name: Dump all check files on failure
