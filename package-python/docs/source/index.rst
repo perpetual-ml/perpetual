@@ -31,6 +31,7 @@ Key Features
    calibration
    continual_learning
    explainability
+   model_io_export
    Causal ML <causal_ml/index>
    tutorials/index
    architecture
