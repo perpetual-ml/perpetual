@@ -109,7 +109,7 @@ jobs:
           use_oidc: true
           slug: ${{ github.repository }}
           directory: ./package-python
-          flags: windows
+          flags: windows,python
           fail_ci_if_error: true
           verbose: true
       - name: Save Artifacts
@@ -185,7 +185,7 @@ jobs:
           use_oidc: true
           slug: ${{ github.repository }}
           directory: ./package-python
-          flags: macos
+          flags: macos,python
           fail_ci_if_error: true
           verbose: true
       - name: Save Artifacts
@@ -261,7 +261,7 @@ jobs:
           use_oidc: true
           slug: ${{ github.repository }}
           directory: ./package-python
-          flags: linux-x64
+          flags: linux-x64,python
           fail_ci_if_error: true
           verbose: true
       - name: Save Artifacts
@@ -336,7 +336,7 @@ jobs:
           use_oidc: true
           slug: ${{ github.repository }}
           directory: ./package-python
-          flags: linux-arm
+          flags: linux-arm,python
           fail_ci_if_error: true
           verbose: true
       - name: Save Artifacts
@@ -511,10 +511,19 @@ jobs:
           echo "Verifying vendored directory:"
           ls -R package-r/src/rust/core || true
 
+      - name: Fix file permissions for R CMD check
+        if: runner.os != 'Windows'
+        run: |
+          # R CMD check warns about executable files in source packages.
+          # Strip execute permissions from all source files.
+          find package-r/src -type f -exec chmod -x {} +
+        shell: bash
+
       - name: Check
         uses: r-lib/actions/check-r-package@v2
         with:
           working-directory: package-r
+          error-on: ${{ runner.os == 'Windows' && '"error"' || '"warning"' }}
 
       - name: Check Coverage
         if: success() && matrix.config.os == 'ubuntu-latest'

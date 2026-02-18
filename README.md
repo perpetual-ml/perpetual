@@ -16,9 +16,9 @@
 <a href="https://pypi.org/project/perpetual" target="_blank"><img src="https://img.shields.io/pypi/dm/perpetual?logo=pypi" alt="PyPI - Downloads"></a>
 <a href="https://github.com/pre-commit/pre-commit" target="_blank"><img src="https://img.shields.io/badge/pre--commit-enabled-brightgreen?logo=pre-commit&logoColor=white" alt="pre-commit"></a>
 <a href="https://github.com/astral-sh/ruff" target="_blank"><img src="https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json" alt="Ruff"></a>
-<a href="https://app.codecov.io/gh/perpetual-ml/perpetual" target="_blank"><img src="https://codecov.io/gh/perpetual-ml/perpetual/branch/main/graph/badge.svg?flag=python" alt="Python Coverage"></a>
-<a href="https://app.codecov.io/gh/perpetual-ml/perpetual" target="_blank"><img src="https://codecov.io/gh/perpetual-ml/perpetual/branch/main/graph/badge.svg?flag=rust" alt="Rust Coverage"></a>
-<a href="https://app.codecov.io/gh/perpetual-ml/perpetual" target="_blank"><img src="https://codecov.io/gh/perpetual-ml/perpetual/branch/main/graph/badge.svg?flag=r" alt="R Coverage"></a>
+<a href="https://app.codecov.io/gh/perpetual-ml/perpetual" target="_blank"><img src="https://img.shields.io/codecov/c/github/perpetual-ml/perpetual?flag=python&label=codecov%20python" alt="Python Coverage"></a>
+<a href="https://app.codecov.io/gh/perpetual-ml/perpetual" target="_blank"><img src="https://img.shields.io/codecov/c/github/perpetual-ml/perpetual?flag=rust&label=codecov%20rust" alt="Rust Coverage"></a>
+<a href="https://app.codecov.io/gh/perpetual-ml/perpetual" target="_blank"><img src="https://img.shields.io/codecov/c/github/perpetual-ml/perpetual?flag=r&label=codecov%20r" alt="R Coverage"></a>
 <a href="./LICENSE" target="_blank"><img src="https://img.shields.io/github/license/perpetual-ml/perpetual" alt="License"></a>
 
 </div>
