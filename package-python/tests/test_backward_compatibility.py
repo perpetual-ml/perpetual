@@ -3,7 +3,6 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import pytest
-import seaborn as sns
 from perpetual import PerpetualBooster
 from sklearn.model_selection import train_test_split
 
@@ -21,7 +20,7 @@ def test_load_v0_10_0_model():
     model = PerpetualBooster.load_booster(str(model_path))
 
     # Replicate Titanic data loading to match generation script
-    df = sns.load_dataset("titanic")
+    df = pd.read_csv(resource_dir / "titanic.csv")
     X = df.drop(columns=["survived"])
     y = df["survived"]
     X["sex"] = pd.get_dummies(X["sex"], drop_first=True, dtype=float).to_numpy()

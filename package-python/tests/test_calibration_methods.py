@@ -1,15 +1,24 @@
+import os
+
 import numpy as np
+import pandas as pd
 import pytest
 from perpetual import PerpetualBooster
-from sklearn.datasets import fetch_california_housing
 from sklearn.model_selection import train_test_split
 
 
 @pytest.fixture
 def data():
-    data = fetch_california_housing(as_frame=True)
-    X = data.data
-    y = data.target
+    # Use pre-generated resources to avoid external downloads in CI
+    resource_dir = os.path.join(os.path.dirname(__file__), "../../resources")
+    train_df = pd.read_csv(os.path.join(resource_dir, "cal_housing_train.csv"))
+    test_df = pd.read_csv(os.path.join(resource_dir, "cal_housing_test.csv"))
+
+    # Merge them because the test does its own custom 3-way split
+    df = pd.concat([train_df, test_df], axis=0)
+    X = df.drop(columns=["MedHouseVal"])
+    y = df["MedHouseVal"]
+
     X_rest, X_test, y_rest, y_test = train_test_split(
         X, y, test_size=0.2, random_state=42
     )

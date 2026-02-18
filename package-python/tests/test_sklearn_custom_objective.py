@@ -1,16 +1,23 @@
+import os
+
 import numpy as np
 import pandas as pd
 import pytest
 from perpetual.sklearn import PerpetualRegressor
-from sklearn.datasets import fetch_california_housing
 from sklearn.model_selection import train_test_split
 
 
 @pytest.fixture
 def data():
-    data = fetch_california_housing()
-    X = pd.DataFrame(data.data, columns=data.feature_names)
-    y = data.target
+    # Use pre-generated resources to avoid external downloads in CI
+    resource_dir = os.path.join(os.path.dirname(__file__), "../../resources")
+    train_df = pd.read_csv(os.path.join(resource_dir, "cal_housing_train.csv"))
+    test_df = pd.read_csv(os.path.join(resource_dir, "cal_housing_test.csv"))
+
+    # Merge them because the test does its own custom split
+    df = pd.concat([train_df, test_df], axis=0)
+    X = df.drop(columns=["MedHouseVal"])
+    y = df["MedHouseVal"]
     return train_test_split(X, y, test_size=0.2, random_state=42)
 
 
