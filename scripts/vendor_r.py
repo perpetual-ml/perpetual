@@ -279,26 +279,43 @@ def prune_vendor(vendor_dir):
                 continue
 
             # Delete documentation/text/config files to save space and reduce file count
-            if (
-                lower_name.endswith(".md")
-                or lower_name.endswith(".txt")
-                or lower_name.endswith(".html")
-                or lower_name.endswith(".pdf")
-                or lower_name.endswith(".yml")
-                or lower_name.endswith(".yaml")
-                or lower_name.endswith(".sh")
-                or lower_name.endswith(".bat")
-                or lower_name.endswith(".ps1")
-                or name
-                in [
-                    "LICENSE",
-                    "COPYING",
-                    "CONTRIBUTING",
-                    "AUTHORS",
-                    "CHANGELOG",
-                    "Cargo.toml.orig",
-                ]
-            ):
+            if lower_name.endswith(
+                (
+                    ".md",
+                    ".txt",
+                    ".html",
+                    ".pdf",
+                    ".sh",
+                    ".bat",
+                    ".ps1",
+                    ".yml",
+                    ".yaml",
+                    ".o",
+                    ".a",
+                    ".so",
+                    ".dylib",
+                    ".dll",
+                    ".lib",
+                    ".pdb",
+                    ".exp",
+                    ".exe",
+                    ".git",
+                    ".gitignore",
+                    ".gitattributes",
+                    ".github",
+                )
+            ) or name in [
+                "LICENSE",
+                "COPYING",
+                "CONTRIBUTING",
+                "AUTHORS",
+                "CHANGELOG",
+                "Cargo.toml.orig",
+                "Makefile",
+                "GNUmakefile",
+                "Kbuild",
+                "Doxyfile",
+            ]:
                 print(f"Deleting unnecessary file: {full_path}")
                 force_remove(full_path)
                 continue

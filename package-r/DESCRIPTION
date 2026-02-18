@@ -9,7 +9,7 @@ Authors@R: c(
   )
 Description: A self-generalizing gradient boosting machine that doesn't need hyperparameter optimization.
 URL: https://perpetual-ml.github.io/perpetual/r/
-License: Apache-2.0
+License: Apache License (== 2.0)
 Suggests: 
     jsonlite,
     testthat (>= 3.0.0)

@@ -297,6 +297,10 @@ perpetual_to_json <- function(model) {
   .Call("PerpetualBooster_json_dump", model$.ptr, PACKAGE = "perpetual")
 }
 
+#' PerpetualBooster
+#'
+#' PerpetualBooster object for creating and loading models.
+#'
 #' @export
 PerpetualBooster <- list(
     new = function(...) {
