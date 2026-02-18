@@ -2,6 +2,10 @@ on:
   pull_request:
   workflow_dispatch:
 
+permissions:
+  id-token: write
+  contents: read
+
 jobs:
   # 1. Job to create and upload the resources/data files
   prepare-resources:
@@ -102,7 +106,7 @@ jobs:
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v5
         with:
-          token: ${{ secrets.CODECOV_TOKEN }}
+          use_oidc: true
           slug: ${{ github.repository }}
           directory: ./package-python
           flags: windows
@@ -178,7 +182,7 @@ jobs:
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v5
         with:
-          token: ${{ secrets.CODECOV_TOKEN }}
+          use_oidc: true
           slug: ${{ github.repository }}
           directory: ./package-python
           flags: macos
@@ -254,7 +258,7 @@ jobs:
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v5
         with:
-          token: ${{ secrets.CODECOV_TOKEN }}
+          use_oidc: true
           slug: ${{ github.repository }}
           directory: ./package-python
           flags: linux-x64
@@ -329,7 +333,7 @@ jobs:
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v5
         with:
-          token: ${{ secrets.CODECOV_TOKEN }}
+          use_oidc: true
           slug: ${{ github.repository }}
           directory: ./package-python
           flags: linux-arm
@@ -393,7 +397,7 @@ jobs:
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v5
         with:
-          token: ${{ secrets.CODECOV_TOKEN }}
+          use_oidc: true
           slug: ${{ github.repository }}
           files: ./cobertura.xml
           flags: rust
@@ -520,7 +524,7 @@ jobs:
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v5
         with:
-          token: ${{ secrets.CODECOV_TOKEN }}
+          use_oidc: true
           slug: ${{ github.repository }}
           files: package-r/cobertura.xml
           flags: r
