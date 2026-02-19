@@ -5,7 +5,7 @@ Calibrate a PerpetualBooster model
 ## Usage
 
 ``` r
-perpetual_calibrate(model, x, y, x_cal, y_cal, alpha)
+perpetual_calibrate(model, x, y, x_cal, y_cal, alpha, method = NULL)
 ```
 
 ## Arguments
@@ -33,3 +33,8 @@ perpetual_calibrate(model, x, y, x_cal, y_cal, alpha)
 - alpha:
 
   Calibration parameter.
+
+- method:
+
+  String specifying the calibration method to use. If NULL, uses the
+  method configured in the model.

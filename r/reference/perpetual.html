@@ -11,7 +11,7 @@ based on the provided budget."></head><body>
 
     <a class="navbar-brand me-2" href="../index.html">perpetual</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.6.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.7.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -60,6 +60,8 @@ based on the provided budget.</p>
 <span>  timeout <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  memory_limit <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  seed <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  calibration_method <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  save_node_stats <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  <span class="va">...</span></span>
 <span><span class="op">)</span></span></code></pre></div>
     </div>
@@ -138,6 +140,14 @@ based on the provided budget.</p>
 
 <dt id="arg-seed">seed<a class="anchor" aria-label="anchor" href="#arg-seed"></a></dt>
 <dd><p>Integer seed for reproducibility.</p></dd>
+
+
+<dt id="arg-calibration-method">calibration_method<a class="anchor" aria-label="anchor" href="#arg-calibration-method"></a></dt>
+<dd><p>String specifying the calibration method for prediction intervals. Options: "WeightVariance", "MinMax", "GRP", "Conformal".</p></dd>
+
+
+<dt id="arg-save-node-stats">save_node_stats<a class="anchor" aria-label="anchor" href="#arg-save-node-stats"></a></dt>
+<dd><p>Boolean. Whether to save node statistics (required for some calibration methods and importance types).</p></dd>
 
 
 <dt id="arg--">...<a class="anchor" aria-label="anchor" href="#arg--"></a></dt>

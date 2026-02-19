@@ -11,7 +11,7 @@ Traditional gradient boosting frameworks often require expensive modifications t
 - **CV-based Calibration**: Requires K-fold cross-validation or nested cross-validation, increasing training time by a factor of K.
 - **Conformal Prediction Wrappers**: Often require splitting data and wrapping external models, leading to complexity.
 
-**PerpetualBooster** changes this paradigm by offering **post-hoc calibration**. You train your model *once* with standard settings (ensuring ``save_node_stats=True`` is set). You can then apply various calibration methods to the already-trained model using a small calibration set. This process is instantaneous and does not modify the underlying ensemble.
+**PerpetualBooster** changes this paradigm by offering **post-hoc calibration**. You train your model *once* with standard settings (ensuring ``save_node_stats=True`` is set). You can then apply various calibration methods to the already-trained model using a small calibration set. This process is instantaneous, does not modify the underlying ensemble, and allows you to calibrate for **tens or even hundreds of alpha levels** in a single pass without any retraining overhead.
 
 Probability Calibration (Classification)
 ----------------------------------------
@@ -36,14 +36,18 @@ Example
     from perpetual import PerpetualBooster
 
     # 1. Train once
-    model = PerpetualBooster(objective="LogLoss")
-    model.fit(X_train, y_train, save_node_stats=True)
+    model = PerpetualBooster(objective="LogLoss", save_node_stats=True)
+    model.fit(X_train, y_train)
 
-    # 2. Calibrate post-hoc on a small set
-    model.calibrate(X_cal, y_cal)
+    # 2. Calibrate post-hoc (accepts a single alpha or a list of levels)
+    model.calibrate(X_cal, y_cal, alpha=[0.01, 0.05, 0.1])
 
     # 3. Predict well-calibrated probabilities
     probs = model.predict_proba(X_test, calibrated=True)
+
+    # 4. Get prediction sets (Conformal Sets) for each alpha level
+    # Returns a dict: {"0.05": [labels], "0.1": [labels]}
+    sets = model.predict_sets(X_test)
 
 Uncertainty Quantification (Regression)
 ---------------------------------------
@@ -53,9 +57,10 @@ For regression, Perpetual provides rigorous **Prediction Intervals**. Instead of
 Native Calibration Methods
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-* **Conformal**: Implements a method similar to Split Conformal Prediction or CQR. It ensures conservative coverage on any unseen data distributed similarly to the calibration set.
-* **MinMax**: A proprietary method that uses the range of target values observed in the leaves of the ensemble to drive local uncertainty.
-* **GRP (Generalized Residual Percentiles)**: Uses log-odds percentiles and statistical spreads within trees to generate extremely efficient and narrow intervals that still respect the coverage guarantees.
+* **Conformal**: Implements a method similar to Split Conformal Prediction or CQR. It ensures conservative coverage on any unseen data distributed similarly to the calibration set. Unlike other methods, Conformal works even if ``save_node_stats=False``.
+* **MinMax**: A proprietary method that uses the range of target values observed in the leaves of the ensemble to drive local uncertainty. (Requires ``save_node_stats=True``).
+* **WeightVariance**: Scales intervals based on the standard deviation of fold weights within trees. It is particularly effective for heteroscedastic data where uncertainty varies across the feature space. (Requires ``save_node_stats=True``).
+* **GRP (Generalized Residual Percentiles)**: Uses log-odds percentiles and statistical spreads within trees to generate extremely efficient and narrow intervals that still respect the coverage guarantees. (Requires ``save_node_stats=True``).
 
 Example
 ~~~~~~~
@@ -63,10 +68,10 @@ Example
 .. code-block:: python
 
     # Define desired coverage (alpha=0.1 means 90% confidence)
-    model.calibrate(X_cal, y_cal, alpha=0.1, method="GRP")
+    model.calibrate(X_cal, y_cal, alpha=[0.1, 0.2], method="GRP")
 
-    # Get lower/upper bounds
-    intervals = model.predict(X_test, interval=True)
+    # Get lower/upper bounds for all alpha levels
+    intervals = model.predict_intervals(X_test)
 
 Why Perpetual is Better
 -----------------------
@@ -74,7 +79,8 @@ Why Perpetual is Better
 1. **Superior ECE**: In benchmarks against LightGBM and Scikit-Learn, Perpetual consistently delivers lower Expected Calibration Error, making it the preferred choice for risk assessment and financial modeling.
 2. **Narrower Intervals**: Perpetual's internal methods (GRP, MinMax) often produce significantly narrower prediction intervals than standard conformal wrappers while maintaining the requested coverage.
 3. **Rust Efficiency**: Calibration occurs at the C-layer speed, meaning thousands of calibration points can be processed in milliseconds.
-4. **API Simplicity**: A single ``calibrate()`` method handles everything. The booster automatically detects the task (classification vs regression) and chooses the most appropriate internal engine.
+4. **API Simplicity**: A single ``calibrate()`` method handles everything. The booster automatically detects the task (classification vs regression) and chooses the most appropriate internal engine. For Conformal calibration, you can also use the explicit ``calibrate_conformal()`` method if you need to provide the training set again.
+5. **Multi-level Support**: You can pass a list of alpha levels to ``calibrate()`` and receive all corresponding intervals or sets in a single prediction call. Since the internal methods (GRP, MinMax, WeightVariance) are extremely efficient and don't require re-training, providing tens or many alphas comes with virtually no additional computational cost.
 
 Tutorials
 ---------

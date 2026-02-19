@@ -26,6 +26,8 @@ perpetual(
   timeout = NULL,
   memory_limit = NULL,
   seed = NULL,
+  calibration_method = NULL,
+  save_node_stats = NULL,
   ...
 )
 ```
@@ -108,6 +110,16 @@ perpetual(
 - seed:
 
   Integer seed for reproducibility.
+
+- calibration_method:
+
+  String specifying the calibration method for prediction intervals.
+  Options: "WeightVariance", "MinMax", "GRP", "Conformal".
+
+- save_node_stats:
+
+  Boolean. Whether to save node statistics (required for some
+  calibration methods and importance types).
 
 - ...:
 

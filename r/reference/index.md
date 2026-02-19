@@ -4,6 +4,8 @@
 
 - [`perpetual()`](https://perpetual-ml.github.io/perpetual/r/reference/perpetual.md)
   : Train a PerpetualBooster model
+- [`PerpetualBooster`](https://perpetual-ml.github.io/perpetual/r/reference/PerpetualBooster.md)
+  : PerpetualBooster
 
 ## Prediction and Interpretation
 

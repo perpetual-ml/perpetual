@@ -6,7 +6,7 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Calibration and Uncertainty Quantification &mdash; Perpetual 1.6.0 documentation</title>
+  <title>Calibration and Uncertainty Quantification &mdash; Perpetual 1.7.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="_static/custom.css?v=9cdd1368" />
@@ -14,14 +14,14 @@
   
       <script src="_static/jquery.js?v=5d32c60e"></script>
       <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="_static/documentation_options.js?v=72d88caf"></script>
+      <script src="_static/documentation_options.js?v=030dc6f6"></script>
       <script src="_static/doctools.js?v=fd6eb6e6"></script>
       <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
     <script src="_static/js/theme.js"></script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
-    <link rel="next" title="Causal ML" href="causal_ml/index.html" />
+    <link rel="next" title="Continual Learning" href="continual_learning.html" />
     <link rel="prev" title="API Reference" href="api.html" /> 
 </head>
 
@@ -66,6 +66,9 @@
 <li class="toctree-l2"><a class="reference internal" href="#next-steps">Next Steps</a></li>
 </ul>
 </li>
+<li class="toctree-l1"><a class="reference internal" href="continual_learning.html">Continual Learning</a></li>
+<li class="toctree-l1"><a class="reference internal" href="explainability.html">Explainability</a></li>
+<li class="toctree-l1"><a class="reference internal" href="model_io_export.html">Model IO &amp; Export</a></li>
 <li class="toctree-l1"><a class="reference internal" href="causal_ml/index.html">Causal ML</a></li>
 <li class="toctree-l1"><a class="reference internal" href="tutorials/index.html">Tutorials</a></li>
 <li class="toctree-l1"><a class="reference internal" href="architecture.html">Architecture</a></li>
@@ -106,7 +109,7 @@
 - <strong>Quantile Regression</strong>: Requires retraining multiple models (one for each quantile).
 - <strong>CV-based Calibration</strong>: Requires K-fold cross-validation or nested cross-validation, increasing training time by a factor of K.
 - <strong>Conformal Prediction Wrappers</strong>: Often require splitting data and wrapping external models, leading to complexity.</p>
-<p><strong>PerpetualBooster</strong> changes this paradigm by offering <strong>post-hoc calibration</strong>. You train your model <em>once</em> with standard settings (ensuring <code class="docutils literal notranslate"><span class="pre">save_node_stats=True</span></code> is set). You can then apply various calibration methods to the already-trained model using a small calibration set. This process is instantaneous and does not modify the underlying ensemble.</p>
+<p><strong>PerpetualBooster</strong> changes this paradigm by offering <strong>post-hoc calibration</strong>. You train your model <em>once</em> with standard settings (ensuring <code class="docutils literal notranslate"><span class="pre">save_node_stats=True</span></code> is set). You can then apply various calibration methods to the already-trained model using a small calibration set. This process is instantaneous, does not modify the underlying ensemble, and allows you to calibrate for <strong>tens or even hundreds of alpha levels</strong> in a single pass without any retraining overhead.</p>
 </section>
 <section id="probability-calibration-classification">
 <h2>Probability Calibration (Classification)<a class="headerlink" href="#probability-calibration-classification" title="Link to this heading"></a></h2>
@@ -125,14 +128,18 @@
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">perpetual</span><span class="w"> </span><span class="kn">import</span> <span class="n">PerpetualBooster</span>
 
 <span class="c1"># 1. Train once</span>
-<span class="n">model</span> <span class="o">=</span> <span class="n">PerpetualBooster</span><span class="p">(</span><span class="n">objective</span><span class="o">=</span><span class="s2">&quot;LogLoss&quot;</span><span class="p">)</span>
-<span class="n">model</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">X_train</span><span class="p">,</span> <span class="n">y_train</span><span class="p">,</span> <span class="n">save_node_stats</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="n">model</span> <span class="o">=</span> <span class="n">PerpetualBooster</span><span class="p">(</span><span class="n">objective</span><span class="o">=</span><span class="s2">&quot;LogLoss&quot;</span><span class="p">,</span> <span class="n">save_node_stats</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="n">model</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">X_train</span><span class="p">,</span> <span class="n">y_train</span><span class="p">)</span>
 
-<span class="c1"># 2. Calibrate post-hoc on a small set</span>
-<span class="n">model</span><span class="o">.</span><span class="n">calibrate</span><span class="p">(</span><span class="n">X_cal</span><span class="p">,</span> <span class="n">y_cal</span><span class="p">)</span>
+<span class="c1"># 2. Calibrate post-hoc (accepts a single alpha or a list of levels)</span>
+<span class="n">model</span><span class="o">.</span><span class="n">calibrate</span><span class="p">(</span><span class="n">X_cal</span><span class="p">,</span> <span class="n">y_cal</span><span class="p">,</span> <span class="n">alpha</span><span class="o">=</span><span class="p">[</span><span class="mf">0.01</span><span class="p">,</span> <span class="mf">0.05</span><span class="p">,</span> <span class="mf">0.1</span><span class="p">])</span>
 
 <span class="c1"># 3. Predict well-calibrated probabilities</span>
 <span class="n">probs</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">predict_proba</span><span class="p">(</span><span class="n">X_test</span><span class="p">,</span> <span class="n">calibrated</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+<span class="c1"># 4. Get prediction sets (Conformal Sets) for each alpha level</span>
+<span class="c1"># Returns a dict: {&quot;0.05&quot;: [labels], &quot;0.1&quot;: [labels]}</span>
+<span class="n">sets</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">predict_sets</span><span class="p">(</span><span class="n">X_test</span><span class="p">)</span>
 </pre></div>
 </div>
 </section>
@@ -143,18 +150,19 @@
 <section id="native-calibration-methods">
 <h3>Native Calibration Methods<a class="headerlink" href="#native-calibration-methods" title="Link to this heading"></a></h3>
 <ul class="simple">
-<li><p><strong>Conformal</strong>: Implements a method similar to Split Conformal Prediction or CQR. It ensures conservative coverage on any unseen data distributed similarly to the calibration set.</p></li>
-<li><p><strong>MinMax</strong>: A proprietary method that uses the range of target values observed in the leaves of the ensemble to drive local uncertainty.</p></li>
-<li><p><strong>GRP (Generalized Residual Percentiles)</strong>: Uses log-odds percentiles and statistical spreads within trees to generate extremely efficient and narrow intervals that still respect the coverage guarantees.</p></li>
+<li><p><strong>Conformal</strong>: Implements a method similar to Split Conformal Prediction or CQR. It ensures conservative coverage on any unseen data distributed similarly to the calibration set. Unlike other methods, Conformal works even if <code class="docutils literal notranslate"><span class="pre">save_node_stats=False</span></code>.</p></li>
+<li><p><strong>MinMax</strong>: A proprietary method that uses the range of target values observed in the leaves of the ensemble to drive local uncertainty. (Requires <code class="docutils literal notranslate"><span class="pre">save_node_stats=True</span></code>).</p></li>
+<li><p><strong>WeightVariance</strong>: Scales intervals based on the standard deviation of fold weights within trees. It is particularly effective for heteroscedastic data where uncertainty varies across the feature space. (Requires <code class="docutils literal notranslate"><span class="pre">save_node_stats=True</span></code>).</p></li>
+<li><p><strong>GRP (Generalized Residual Percentiles)</strong>: Uses log-odds percentiles and statistical spreads within trees to generate extremely efficient and narrow intervals that still respect the coverage guarantees. (Requires <code class="docutils literal notranslate"><span class="pre">save_node_stats=True</span></code>).</p></li>
 </ul>
 </section>
 <section id="id1">
 <h3>Example<a class="headerlink" href="#id1" title="Link to this heading"></a></h3>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Define desired coverage (alpha=0.1 means 90% confidence)</span>
-<span class="n">model</span><span class="o">.</span><span class="n">calibrate</span><span class="p">(</span><span class="n">X_cal</span><span class="p">,</span> <span class="n">y_cal</span><span class="p">,</span> <span class="n">alpha</span><span class="o">=</span><span class="mf">0.1</span><span class="p">,</span> <span class="n">method</span><span class="o">=</span><span class="s2">&quot;GRP&quot;</span><span class="p">)</span>
+<span class="n">model</span><span class="o">.</span><span class="n">calibrate</span><span class="p">(</span><span class="n">X_cal</span><span class="p">,</span> <span class="n">y_cal</span><span class="p">,</span> <span class="n">alpha</span><span class="o">=</span><span class="p">[</span><span class="mf">0.1</span><span class="p">,</span> <span class="mf">0.2</span><span class="p">],</span> <span class="n">method</span><span class="o">=</span><span class="s2">&quot;GRP&quot;</span><span class="p">)</span>
 
-<span class="c1"># Get lower/upper bounds</span>
-<span class="n">intervals</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="n">X_test</span><span class="p">,</span> <span class="n">interval</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="c1"># Get lower/upper bounds for all alpha levels</span>
+<span class="n">intervals</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">predict_intervals</span><span class="p">(</span><span class="n">X_test</span><span class="p">)</span>
 </pre></div>
 </div>
 </section>
@@ -165,7 +173,8 @@
 <li><p><strong>Superior ECE</strong>: In benchmarks against LightGBM and Scikit-Learn, Perpetual consistently delivers lower Expected Calibration Error, making it the preferred choice for risk assessment and financial modeling.</p></li>
 <li><p><strong>Narrower Intervals</strong>: Perpetual’s internal methods (GRP, MinMax) often produce significantly narrower prediction intervals than standard conformal wrappers while maintaining the requested coverage.</p></li>
 <li><p><strong>Rust Efficiency</strong>: Calibration occurs at the C-layer speed, meaning thousands of calibration points can be processed in milliseconds.</p></li>
-<li><p><strong>API Simplicity</strong>: A single <code class="docutils literal notranslate"><span class="pre">calibrate()</span></code> method handles everything. The booster automatically detects the task (classification vs regression) and chooses the most appropriate internal engine.</p></li>
+<li><p><strong>API Simplicity</strong>: A single <code class="docutils literal notranslate"><span class="pre">calibrate()</span></code> method handles everything. The booster automatically detects the task (classification vs regression) and chooses the most appropriate internal engine. For Conformal calibration, you can also use the explicit <code class="docutils literal notranslate"><span class="pre">calibrate_conformal()</span></code> method if you need to provide the training set again.</p></li>
+<li><p><strong>Multi-level Support</strong>: You can pass a list of alpha levels to <code class="docutils literal notranslate"><span class="pre">calibrate()</span></code> and receive all corresponding intervals or sets in a single prediction call. Since the internal methods (GRP, MinMax, WeightVariance) are extremely efficient and don’t require re-training, providing tens or many alphas comes with virtually no additional computational cost.</p></li>
 </ol>
 </section>
 <section id="tutorials">
@@ -187,7 +196,7 @@
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
         <a href="api.html" class="btn btn-neutral float-left" title="API Reference" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
-        <a href="causal_ml/index.html" class="btn btn-neutral float-right" title="Causal ML" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="continual_learning.html" class="btn btn-neutral float-right" title="Continual Learning" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 
   <hr/>
