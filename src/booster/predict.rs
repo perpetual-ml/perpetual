@@ -26,7 +26,8 @@ impl PerpetualBooster {
     /// * For classification: The log-odds (logit). Apply sigmoid to get probabilities.
     pub fn predict(&self, data: &Matrix<f64>, parallel: bool) -> Vec<f64> {
         let mut init_preds = vec![self.base_score; data.rows];
-        self.get_prediction_trees().iter().for_each(|tree| {
+        let trees = self.get_prediction_trees();
+        trees.iter().for_each(|tree| {
             for (p_, val) in init_preds
                 .iter_mut()
                 .zip(tree.predict(data, parallel, &self.cfg.missing))
@@ -570,5 +571,401 @@ impl MultiOutputBooster {
             }
         }
         results
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::node::Node;
+    use crate::objective::Objective;
+    use crate::tree::core::Tree;
+    use approx::assert_relative_eq;
+
+    fn create_mock_booster() -> PerpetualBooster {
+        let mut booster = PerpetualBooster::default();
+        booster.cfg.objective = Objective::SquaredLoss;
+        booster.base_score = 0.5;
+        let mut tree = Tree::new();
+        let root = Node {
+            num: 0,
+            weight_value: 0.1,
+            hessian_sum: 10.0,
+            split_value: 0.0,
+            split_feature: 0,
+            split_gain: 0.0,
+            missing_node: 0,
+            left_child: 0,
+            right_child: 0,
+            is_leaf: true,
+            parent_node: 0,
+            left_cats: None,
+            stats: None,
+        };
+        tree.nodes.insert(0, root);
+        tree.n_leaves = 1;
+        booster.trees = vec![tree];
+        booster
+    }
+
+    fn create_mock_multi_booster() -> MultiOutputBooster {
+        let mut booster = MultiOutputBooster::default();
+        booster.boosters = vec![create_mock_booster(), create_mock_booster()];
+        booster.n_boosters = 2;
+        booster
+    }
+
+    #[test]
+    fn test_predict_basic() {
+        let booster = create_mock_booster();
+        let data = Matrix::new(&[1.0, 2.0], 1, 2);
+        let preds = booster.predict(&data, false);
+        assert_eq!(preds.len(), 1);
+        assert_relative_eq!(preds[0], 0.6, epsilon = 1e-7);
+    }
+
+    #[test]
+    fn test_predict_parallel() {
+        let booster = create_mock_booster();
+        let data = Matrix::new(&[1.0, 2.0, 3.0, 4.0], 2, 2);
+        let preds = booster.predict(&data, true);
+        assert_eq!(preds.len(), 2);
+        assert_relative_eq!(preds[0], 0.6, epsilon = 1e-7);
+    }
+
+    #[test]
+    fn test_predict_columnar() {
+        let booster = create_mock_booster();
+        let data_vec = vec![1.0, 2.0, 3.0, 4.0];
+        let col0 = &data_vec[0..2];
+        let col1 = &data_vec[2..4];
+        let data = ColumnarMatrix::new(vec![col0, col1], None, 2);
+        let preds = booster.predict_columnar(&data, false);
+        assert_eq!(preds.len(), 2);
+        assert_relative_eq!(preds[0], 0.6, epsilon = 1e-7);
+    }
+
+    #[test]
+    fn test_predict_proba_basic() {
+        let mut booster = create_mock_booster();
+        booster.cfg.objective = Objective::LogLoss;
+        booster.base_score = 0.0;
+        let data = Matrix::new(&[1.0, 2.0], 1, 2);
+        let proba = booster.predict_proba(&data, false, false);
+        assert_relative_eq!(proba[0], 0.52497918747894, epsilon = 1e-7);
+    }
+
+    #[test]
+    fn test_predict_proba_parallel() {
+        let mut booster = create_mock_booster();
+        booster.cfg.objective = Objective::LogLoss;
+        booster.base_score = 0.0;
+        let data = Matrix::new(&[1.0, 2.0], 1, 2);
+        let proba = booster.predict_proba(&data, true, false);
+        assert_relative_eq!(proba[0], 0.52497918747894, epsilon = 1e-7);
+    }
+
+    #[test]
+    fn test_predict_contributions_methods() {
+        let booster = create_mock_booster();
+        let data = Matrix::new(&[1.0, 2.0], 1, 2);
+        let methods = vec![
+            ContributionsMethod::Weight,
+            ContributionsMethod::Average,
+            ContributionsMethod::MidpointDifference,
+            ContributionsMethod::BranchDifference,
+            ContributionsMethod::ModeDifference,
+            ContributionsMethod::Shapley,
+        ];
+        for method in methods {
+            let contribs = booster.predict_contributions(&data, method, false);
+            assert_eq!(contribs.len(), 3);
+        }
+    }
+
+    #[test]
+    fn test_predict_contributions_probability_change() {
+        let mut booster = create_mock_booster();
+        booster.cfg.objective = Objective::LogLoss;
+        let data = Matrix::new(&[1.0, 2.0], 1, 2);
+        let contribs = booster.predict_contributions(&data, ContributionsMethod::ProbabilityChange, false);
+        assert_eq!(contribs.len(), 3);
+        // Sum of contributions + bias should ≈ probability?
+        // Actually for ProbabilityChange it depends on the implementation.
+    }
+
+    #[test]
+    fn test_predict_proba_calibrated() {
+        let mut booster = create_mock_booster();
+        booster.cfg.objective = Objective::LogLoss;
+        // Adding a dummy calibrator would be complex, but let's see if we can trigger the code path.
+        let data = Matrix::new(&[1.0, 2.0], 1, 2);
+        let proba = booster.predict_proba(&data, false, true);
+        assert_eq!(proba.len(), 1);
+    }
+
+    #[test]
+    fn test_predict_nodes() {
+        let booster = create_mock_booster();
+        let data = Matrix::new(&[1.0, 2.0], 1, 2);
+        let nodes = booster.predict_nodes(&data, false);
+        assert_eq!(nodes.len(), 1);
+        assert_eq!(nodes[0].len(), 1);
+        assert!(nodes[0][0].contains(&0));
+    }
+
+    #[test]
+    fn test_multi_output_predict_basic() {
+        let booster = create_mock_multi_booster();
+        let data = Matrix::new(&[1.0, 2.0], 1, 2);
+        let preds = booster.predict(&data, false);
+        assert_eq!(preds.len(), 2);
+        assert_relative_eq!(preds[0], 0.6, epsilon = 1e-7);
+    }
+
+    #[test]
+    fn test_multi_output_predict_proba_basic() {
+        let booster = create_mock_multi_booster();
+        let data = Matrix::new(&[1.0, 2.0], 1, 2);
+        let proba = booster.predict_proba(&data, false);
+        assert_eq!(proba.len(), 2);
+        assert_relative_eq!(proba[0], 0.5, epsilon = 1e-7);
+    }
+
+    #[test]
+    fn test_multi_output_predict_intervals_columnar() {
+        let booster = create_mock_multi_booster();
+        let data_vec = vec![1.0, 2.0, 3.0, 4.0];
+        let col0 = &data_vec[0..2];
+        let col1 = &data_vec[2..4];
+        let data = ColumnarMatrix::new(vec![col0, col1], None, 2);
+        let intervals = booster.predict_intervals_columnar(&data, false);
+        assert!(intervals.is_empty());
+    }
+
+    #[test]
+    fn test_predict_contributions_columnar() {
+        let booster = create_mock_booster();
+        let data_vec = vec![1.0, 2.0, 3.0, 4.0];
+        let col0 = &data_vec[0..2];
+        let col1 = &data_vec[2..4];
+        let data = ColumnarMatrix::new(vec![col0, col1], None, 2);
+        let contribs = booster.predict_contributions_columnar(&data, ContributionsMethod::Weight, false);
+        assert_eq!(contribs.len(), 6); // 2 rows * (2 features + 1 bias)
+    }
+
+    #[test]
+    fn test_multi_output_predict_contributions_columnar() {
+        let booster = create_mock_multi_booster();
+        let data_vec = vec![1.0, 2.0, 3.0, 4.0];
+        let col0 = &data_vec[0..2];
+        let col1 = &data_vec[2..4];
+        let data = ColumnarMatrix::new(vec![col0, col1], None, 2);
+        let contribs = booster.predict_contributions_columnar(&data, ContributionsMethod::Weight, false);
+        assert_eq!(contribs.len(), 12); // 2 rows * 3 items * 2 boosters
+    }
+
+    // ---- Additional tests for uncovered paths ----
+
+    #[test]
+    fn test_predict_proba_columnar() {
+        let mut booster = create_mock_booster();
+        booster.cfg.objective = Objective::LogLoss;
+        booster.base_score = 0.0;
+        let data_vec = vec![1.0, 2.0, 3.0, 4.0];
+        let col0 = &data_vec[0..2];
+        let col1 = &data_vec[2..4];
+        let data = ColumnarMatrix::new(vec![col0, col1], None, 2);
+        let proba = booster.predict_proba_columnar(&data, false, false);
+        assert_eq!(proba.len(), 2);
+        for p in &proba {
+            assert!(*p > 0.0 && *p < 1.0);
+        }
+    }
+
+    #[test]
+    fn test_predict_proba_columnar_parallel() {
+        let mut booster = create_mock_booster();
+        booster.cfg.objective = Objective::LogLoss;
+        booster.base_score = 0.0;
+        let data_vec = vec![1.0, 2.0, 3.0, 4.0];
+        let col0 = &data_vec[0..2];
+        let col1 = &data_vec[2..4];
+        let data = ColumnarMatrix::new(vec![col0, col1], None, 2);
+        let proba = booster.predict_proba_columnar(&data, true, false);
+        assert_eq!(proba.len(), 2);
+    }
+
+    #[test]
+    fn test_predict_nodes_columnar() {
+        let booster = create_mock_booster();
+        let data_vec = vec![1.0, 2.0, 3.0, 4.0];
+        let col0 = &data_vec[0..2];
+        let col1 = &data_vec[2..4];
+        let data = ColumnarMatrix::new(vec![col0, col1], None, 2);
+        let nodes = booster.predict_nodes_columnar(&data, false);
+        assert_eq!(nodes.len(), 1); // 1 tree
+        assert_eq!(nodes[0].len(), 2); // 2 rows
+    }
+
+    #[test]
+    fn test_predict_contributions_average_parallel() {
+        let booster = create_mock_booster();
+        let data = Matrix::new(&[1.0, 2.0, 3.0, 4.0], 2, 2);
+        let contribs = booster.predict_contributions(&data, ContributionsMethod::Average, true);
+        assert_eq!(contribs.len(), 6); // 2 rows * (2 features + 1 bias)
+    }
+
+    #[test]
+    fn test_predict_contributions_weight_parallel() {
+        let booster = create_mock_booster();
+        let data = Matrix::new(&[1.0, 2.0, 3.0, 4.0], 2, 2);
+        let contribs = booster.predict_contributions(&data, ContributionsMethod::Weight, true);
+        assert_eq!(contribs.len(), 6);
+    }
+
+    #[test]
+    fn test_predict_contributions_columnar_average() {
+        let booster = create_mock_booster();
+        let data_vec = vec![1.0, 2.0, 3.0, 4.0];
+        let col0 = &data_vec[0..2];
+        let col1 = &data_vec[2..4];
+        let data = ColumnarMatrix::new(vec![col0, col1], None, 2);
+        let contribs = booster.predict_contributions_columnar(&data, ContributionsMethod::Average, false);
+        assert_eq!(contribs.len(), 6);
+    }
+
+    #[test]
+    fn test_predict_contributions_columnar_average_parallel() {
+        let booster = create_mock_booster();
+        let data_vec = vec![1.0, 2.0, 3.0, 4.0];
+        let col0 = &data_vec[0..2];
+        let col1 = &data_vec[2..4];
+        let data = ColumnarMatrix::new(vec![col0, col1], None, 2);
+        let contribs = booster.predict_contributions_columnar(&data, ContributionsMethod::Average, true);
+        assert_eq!(contribs.len(), 6);
+    }
+
+    #[test]
+    fn test_predict_contributions_columnar_all_methods() {
+        let booster = create_mock_booster();
+        let data_vec = vec![1.0, 2.0, 3.0, 4.0];
+        let col0 = &data_vec[0..2];
+        let col1 = &data_vec[2..4];
+        let data = ColumnarMatrix::new(vec![col0, col1], None, 2);
+        let methods = vec![
+            ContributionsMethod::Weight,
+            ContributionsMethod::BranchDifference,
+            ContributionsMethod::MidpointDifference,
+            ContributionsMethod::ModeDifference,
+            ContributionsMethod::Shapley,
+        ];
+        for method in methods {
+            let contribs = booster.predict_contributions_columnar(&data, method, false);
+            assert_eq!(contribs.len(), 6);
+        }
+    }
+
+    #[test]
+    fn test_predict_contributions_columnar_probability_change() {
+        let mut booster = create_mock_booster();
+        booster.cfg.objective = Objective::LogLoss;
+        let data_vec = vec![1.0, 2.0, 3.0, 4.0];
+        let col0 = &data_vec[0..2];
+        let col1 = &data_vec[2..4];
+        let data = ColumnarMatrix::new(vec![col0, col1], None, 2);
+        let contribs = booster.predict_contributions_columnar(&data, ContributionsMethod::ProbabilityChange, false);
+        assert_eq!(contribs.len(), 6);
+    }
+
+    #[test]
+    fn test_predict_contributions_columnar_probability_change_parallel() {
+        let mut booster = create_mock_booster();
+        booster.cfg.objective = Objective::LogLoss;
+        let data_vec = vec![1.0, 2.0, 3.0, 4.0];
+        let col0 = &data_vec[0..2];
+        let col1 = &data_vec[2..4];
+        let data = ColumnarMatrix::new(vec![col0, col1], None, 2);
+        let contribs = booster.predict_contributions_columnar(&data, ContributionsMethod::ProbabilityChange, true);
+        assert_eq!(contribs.len(), 6);
+    }
+
+    #[test]
+    fn test_predict_contributions_tree_alone_columnar_parallel() {
+        let booster = create_mock_booster();
+        let data_vec = vec![1.0, 2.0, 3.0, 4.0];
+        let col0 = &data_vec[0..2];
+        let col1 = &data_vec[2..4];
+        let data = ColumnarMatrix::new(vec![col0, col1], None, 2);
+        let contribs = booster.predict_contributions_columnar(&data, ContributionsMethod::Weight, true);
+        assert_eq!(contribs.len(), 6);
+    }
+
+    #[test]
+    fn test_multi_output_predict_columnar() {
+        let booster = create_mock_multi_booster();
+        let data_vec = vec![1.0, 2.0, 3.0, 4.0];
+        let col0 = &data_vec[0..2];
+        let col1 = &data_vec[2..4];
+        let data = ColumnarMatrix::new(vec![col0, col1], None, 2);
+        let preds = booster.predict_columnar(&data, false);
+        assert_eq!(preds.len(), 4); // 2 rows * 2 boosters
+    }
+
+    #[test]
+    fn test_multi_output_predict_proba_columnar() {
+        let booster = create_mock_multi_booster();
+        let data_vec = vec![1.0, 2.0, 3.0, 4.0];
+        let col0 = &data_vec[0..2];
+        let col1 = &data_vec[2..4];
+        let data = ColumnarMatrix::new(vec![col0, col1], None, 2);
+        let proba = booster.predict_proba_columnar(&data, false);
+        assert_eq!(proba.len(), 4);
+        // Probabilities should sum to 1 per row
+    }
+
+    #[test]
+    fn test_multi_output_predict_nodes() {
+        let booster = create_mock_multi_booster();
+        let data = Matrix::new(&[1.0, 2.0], 1, 2);
+        let nodes = booster.predict_nodes(&data, false);
+        assert_eq!(nodes.len(), 2); // 2 boosters
+    }
+
+    #[test]
+    fn test_multi_output_predict_nodes_columnar() {
+        let booster = create_mock_multi_booster();
+        let data_vec = vec![1.0, 2.0, 3.0, 4.0];
+        let col0 = &data_vec[0..2];
+        let col1 = &data_vec[2..4];
+        let data = ColumnarMatrix::new(vec![col0, col1], None, 2);
+        let nodes = booster.predict_nodes_columnar(&data, false);
+        assert_eq!(nodes.len(), 2); // 2 boosters
+    }
+
+    #[test]
+    fn test_multi_output_predict_contributions() {
+        let booster = create_mock_multi_booster();
+        let data = Matrix::new(&[1.0, 2.0], 1, 2);
+        let contribs = booster.predict_contributions(&data, ContributionsMethod::Weight, false);
+        assert_eq!(contribs.len(), 6); // 1 row * 3 items * 2 boosters
+    }
+
+    #[test]
+    fn test_multi_output_predict_intervals() {
+        let booster = create_mock_multi_booster();
+        let data = Matrix::new(&[1.0, 2.0], 1, 2);
+        let intervals = booster.predict_intervals(&data, false);
+        // No calibration params set, so intervals should be empty
+        assert!(intervals.is_empty());
+    }
+
+    #[test]
+    fn test_predict_contributions_probability_change_parallel() {
+        let mut booster = create_mock_booster();
+        booster.cfg.objective = Objective::LogLoss;
+        let data = Matrix::new(&[1.0, 2.0, 3.0, 4.0], 2, 2);
+        let contribs = booster.predict_contributions(&data, ContributionsMethod::ProbabilityChange, true);
+        assert_eq!(contribs.len(), 6);
     }
 }

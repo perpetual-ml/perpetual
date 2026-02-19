@@ -223,4 +223,81 @@ mod tests {
         // Let's trace: 1(1.0), 2(2.0), 3(3.0), 4(4.0) -> w_cum=4.0 >= 4.0. So 4.0.
         assert_eq!(loss_fn_q.initial_value(&y, None, None), 4.0);
     }
+
+    #[test]
+    fn test_quantile_loss_weighted() {
+        let y = vec![1.0, 1.0];
+        let yhat = vec![2.0, 0.5];
+        let w = vec![2.0, 1.0];
+        let loss_fn = QuantileLoss { quantile: Some(0.7) };
+        let l = loss_fn.loss(&y, &yhat, Some(&w), None);
+        assert_eq!(l.len(), 2);
+        // s=-1.0 -> (0.7-1)*(-1)*2 = 0.6
+        assert!((l[0] - 0.6).abs() < 1e-5);
+    }
+
+    #[test]
+    fn test_quantile_gradient_weighted() {
+        let y = vec![1.0, 1.0];
+        let yhat = vec![2.0, 0.5];
+        let w = vec![2.0, 1.0];
+        let loss_fn = QuantileLoss { quantile: Some(0.7) };
+        let (g, h) = loss_fn.gradient(&y, &yhat, Some(&w), None);
+        let h = h.unwrap();
+        assert_eq!(g.len(), 2);
+        assert_eq!(h.len(), 2);
+        // diff=1.0>=0 -> (1-0.7)*2 = 0.6
+        assert!((g[0] - 0.6).abs() < 1e-5);
+        assert!((h[0] - 2.0).abs() < 1e-5);
+    }
+
+    #[test]
+    fn test_quantile_initial_value_weighted() {
+        let y = vec![1.0, 2.0, 3.0];
+        let w = vec![1.0, 3.0, 1.0]; // total=5, target=0.5*5=2.5
+        let loss_fn = QuantileLoss { quantile: Some(0.5) };
+        // sorted y: 1,2,3; w_cum: 1, 4, 5. First >= 2.5 at index 1 (y=2.0)
+        let init = loss_fn.initial_value(&y, Some(&w), None);
+        assert!((init - 2.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_quantile_gradient_and_loss() {
+        let y = vec![1.0, 1.0];
+        let yhat = vec![2.0, 0.5];
+        let loss_fn = QuantileLoss { quantile: Some(0.7) };
+        let (g, h, l) = loss_fn.gradient_and_loss(&y, &yhat, None, None);
+        assert_eq!(g.len(), 2);
+        assert!(h.is_none()); // unweighted quantile returns None for h
+        assert_eq!(l.len(), 2);
+    }
+
+    #[test]
+    fn test_quantile_gradient_and_loss_weighted() {
+        let y = vec![1.0, 1.0];
+        let yhat = vec![2.0, 0.5];
+        let w = vec![2.0, 1.0];
+        let loss_fn = QuantileLoss { quantile: Some(0.7) };
+        let (g, h, l) = loss_fn.gradient_and_loss(&y, &yhat, Some(&w), None);
+        assert_eq!(g.len(), 2);
+        assert!(h.is_some());
+        assert_eq!(l.len(), 2);
+    }
+
+    #[test]
+    fn test_quantile_loss_single() {
+        let loss_fn = QuantileLoss { quantile: Some(0.5) };
+        let l1 = loss_fn.loss_single(1.0, 2.0, None); // s=-1, q-1=-0.5 * -1 = 0.5
+        assert!((l1 - 0.5).abs() < 1e-5);
+        let l2 = loss_fn.loss_single(2.0, 1.0, None); // s=1, q*1 = 0.5
+        assert!((l2 - 0.5).abs() < 1e-5);
+        let l3 = loss_fn.loss_single(1.0, 2.0, Some(2.0));
+        assert!((l3 - 1.0).abs() < 1e-5);
+    }
+
+    #[test]
+    fn test_quantile_requires_batch() {
+        let loss_fn = QuantileLoss { quantile: Some(0.5) };
+        assert!(!loss_fn.requires_batch_evaluation());
+    }
 }

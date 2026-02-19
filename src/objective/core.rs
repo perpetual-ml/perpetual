@@ -411,4 +411,75 @@ mod test {
         assert!(good_loss_sum == also_good_loss_sum);
         assert!(good_grad_sum == also_good_grad_sum);
     }
+
+    #[test]
+    fn test_objective_dispatch_gradient_and_loss() {
+        let objectives: Vec<Objective> = vec![
+            Objective::LogLoss,
+            Objective::SquaredLoss,
+            Objective::QuantileLoss { quantile: Some(0.5) },
+            Objective::HuberLoss { delta: Some(1.0) },
+            Objective::AdaptiveHuberLoss { quantile: Some(0.5) },
+        ];
+        for obj in &objectives {
+            let (g, _h, l) = obj.gradient_and_loss(Y, YHAT1, None, None);
+            assert_eq!(g.len(), Y.len());
+            assert_eq!(l.len(), Y.len());
+        }
+        // ListNetLoss needs group
+        let (g, _h, l) = Objective::ListNetLoss.gradient_and_loss(Y_RANK, YHAT1_RANK, None, Some(GROUP));
+        assert_eq!(g.len(), Y_RANK.len());
+        assert_eq!(l.len(), Y_RANK.len());
+    }
+
+    #[test]
+    fn test_objective_dispatch_gradient_and_loss_into() {
+        let objectives: Vec<Objective> = vec![
+            Objective::LogLoss,
+            Objective::SquaredLoss,
+            Objective::QuantileLoss { quantile: Some(0.5) },
+            Objective::HuberLoss { delta: Some(1.0) },
+            Objective::AdaptiveHuberLoss { quantile: Some(0.5) },
+        ];
+        for obj in &objectives {
+            let mut grad = vec![0.0_f32; Y.len()];
+            let mut hess: Option<Vec<f32>> = None;
+            let mut loss = vec![0.0_f32; Y.len()];
+            obj.gradient_and_loss_into(Y, YHAT1, None, None, &mut grad, &mut hess, &mut loss);
+        }
+    }
+
+    #[test]
+    fn test_objective_loss_single_all() {
+        let l1 = Objective::LogLoss.loss_single(1.0, 0.5, None);
+        assert!(l1 > 0.0);
+        let l2 = Objective::SquaredLoss.loss_single(1.0, 2.0, None);
+        assert!((l2 - 1.0).abs() < 1e-5);
+        let l3 = Objective::QuantileLoss { quantile: Some(0.5) }.loss_single(1.0, 2.0, None);
+        assert!(l3 > 0.0);
+        let l4 = Objective::HuberLoss { delta: Some(1.0) }.loss_single(1.0, 2.0, None);
+        assert!(l4 > 0.0);
+        let l5 = Objective::AdaptiveHuberLoss { quantile: Some(0.5) }.loss_single(1.0, 2.0, None);
+        assert!(l5 > 0.0);
+        let l6 = Objective::ListNetLoss.loss_single(1.0, 2.0, None);
+        assert_eq!(l6, f32::INFINITY);
+    }
+
+    #[test]
+    fn test_objective_requires_batch() {
+        assert!(!Objective::LogLoss.requires_batch_evaluation());
+        assert!(!Objective::SquaredLoss.requires_batch_evaluation());
+        // ListNetLoss inherits default `true` from trait
+        assert!(Objective::ListNetLoss.requires_batch_evaluation());
+    }
+
+    #[test]
+    fn test_objective_dispatch_default_metric() {
+        let _ = Objective::LogLoss.default_metric();
+        let _ = Objective::SquaredLoss.default_metric();
+        let _ = Objective::ListNetLoss.default_metric();
+        let _ = Objective::HuberLoss { delta: Some(1.0) }.default_metric();
+        let _ = Objective::QuantileLoss { quantile: Some(0.5) }.default_metric();
+        let _ = Objective::AdaptiveHuberLoss { quantile: Some(0.5) }.default_metric();
+    }
 }

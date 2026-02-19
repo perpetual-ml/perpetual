@@ -189,4 +189,63 @@ mod tests {
         assert!((g[0] - 0.5).abs() < 1e-6);
         assert!((h[0] - 0.5).abs() < 1e-6);
     }
+
+    #[test]
+    fn test_squared_gradient_and_loss() {
+        let y = vec![1.0, 2.0];
+        let yhat = vec![1.5, 1.0];
+        let loss_fn = SquaredLoss::default();
+        let (g, h, l) = loss_fn.gradient_and_loss(&y, &yhat, None, None);
+        assert_eq!(g.len(), 2);
+        assert!(h.is_none()); // no hessian when unweighted
+        assert_eq!(l.len(), 2);
+        assert!((l[0] - 0.25).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_squared_gradient_and_loss_weighted() {
+        let y = vec![1.0, 2.0];
+        let yhat = vec![1.5, 1.0];
+        let w = vec![2.0, 1.0];
+        let loss_fn = SquaredLoss::default();
+        let (g, h, l) = loss_fn.gradient_and_loss(&y, &yhat, Some(&w), None);
+        assert_eq!(g.len(), 2);
+        assert!(h.is_some());
+        assert_eq!(l.len(), 2);
+    }
+
+    #[test]
+    fn test_squared_gradient_and_loss_into() {
+        let y = vec![1.0, 2.0];
+        let yhat = vec![1.5, 1.0];
+        let loss_fn = SquaredLoss::default();
+        let mut grad = vec![0.0_f32; 2];
+        let mut hess: Option<Vec<f32>> = Some(vec![0.0; 2]);
+        let mut loss = vec![0.0_f32; 2];
+        loss_fn.gradient_and_loss_into(&y, &yhat, None, None, &mut grad, &mut hess, &mut loss);
+        assert!(hess.is_none()); // unweighted sets hess to None
+        assert!((loss[0] - 0.25).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_squared_gradient_and_loss_into_weighted() {
+        let y = vec![1.0, 2.0];
+        let yhat = vec![1.5, 1.0];
+        let w = vec![2.0, 1.0];
+        let loss_fn = SquaredLoss::default();
+        let mut grad = vec![0.0_f32; 2];
+        let mut hess: Option<Vec<f32>> = None;
+        let mut loss = vec![0.0_f32; 2];
+        loss_fn.gradient_and_loss_into(&y, &yhat, Some(&w), None, &mut grad, &mut hess, &mut loss);
+        assert!(hess.is_some());
+    }
+
+    #[test]
+    fn test_squared_loss_single() {
+        let loss_fn = SquaredLoss::default();
+        let l1 = loss_fn.loss_single(1.0, 2.0, None); // (1-2)^2 = 1
+        assert!((l1 - 1.0).abs() < 1e-5);
+        let l2 = loss_fn.loss_single(1.0, 2.0, Some(2.0)); // 1 * 2 = 2
+        assert!((l2 - 2.0).abs() < 1e-5);
+    }
 }

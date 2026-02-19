@@ -313,4 +313,65 @@ mod tests {
         let result = Metric::from_str("NDCG@@10");
         assert!(result.is_err(), "Expected error for invalid format");
     }
+
+    #[test]
+    fn test_is_comparison_better_maximize() {
+        // Normal comparison: maximize
+        assert!(is_comparison_better(0.5, 0.8, true)); // 0.8 > 0.5
+        assert!(!is_comparison_better(0.8, 0.5, true)); // 0.5 < 0.8
+    }
+
+    #[test]
+    fn test_is_comparison_better_minimize() {
+        assert!(is_comparison_better(0.8, 0.5, false)); // 0.5 < 0.8
+        assert!(!is_comparison_better(0.5, 0.8, false));
+    }
+
+    #[test]
+    fn test_is_comparison_better_nan() {
+        // Both NaN
+        assert!(!is_comparison_better(f64::NAN, f64::NAN, true));
+        // Value is NaN, comparison is not -> comparison is better
+        assert!(is_comparison_better(f64::NAN, 0.5, true));
+        // Comparison is NaN, value is not -> not better
+        assert!(!is_comparison_better(0.5, f64::NAN, true));
+    }
+
+    #[test]
+    fn test_metric_callables_all() {
+        let metrics = vec![
+            Metric::AUC,
+            Metric::LogLoss,
+            Metric::RootMeanSquaredLogError,
+            Metric::RootMeanSquaredError,
+            Metric::QuantileLoss,
+            Metric::NDCG {
+                k: None,
+                gain: GainScheme::Burges,
+            },
+        ];
+        for m in &metrics {
+            let (_func, maximize) = metric_callables(m);
+            // Just call them to ensure they work
+            match m {
+                Metric::AUC => assert!(maximize),
+                Metric::LogLoss => assert!(!maximize),
+                Metric::RootMeanSquaredLogError => assert!(!maximize),
+                Metric::RootMeanSquaredError => assert!(!maximize),
+                Metric::QuantileLoss => assert!(!maximize),
+                Metric::NDCG { .. } => assert!(maximize),
+            }
+        }
+    }
+
+    #[test]
+    fn test_metric_from_str_all() {
+        assert!(Metric::from_str("AUC").is_ok());
+        assert!(Metric::from_str("LogLoss").is_ok());
+        assert!(Metric::from_str("RootMeanSquaredLogError").is_ok());
+        assert!(Metric::from_str("RootMeanSquaredError").is_ok());
+        assert!(Metric::from_str("NDCG").is_ok());
+        assert!(Metric::from_str("NDCG@5").is_ok());
+        assert!(Metric::from_str("InvalidMetric").is_err());
+    }
 }

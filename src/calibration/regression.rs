@@ -465,3 +465,208 @@ impl PerpetualBooster {
         intervals
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::PerpetualBooster;
+    use crate::booster::config::CalibrationMethod;
+    use crate::data::{ColumnarMatrix, Matrix};
+    use crate::objective::Objective;
+    use std::error::Error;
+    use std::fs;
+
+    fn make_fitted_booster() -> Result<(PerpetualBooster, Vec<f64>, Vec<f64>), Box<dyn Error>> {
+        let file = fs::read_to_string("resources/contiguous_with_missing.csv")?;
+        let data_vec: Vec<f64> = file.lines().map(|x| x.parse::<f64>().unwrap_or(f64::NAN)).collect();
+        let file = fs::read_to_string("resources/performance.csv")?;
+        let y: Vec<f64> = file.lines().map(|x| x.parse::<f64>().unwrap()).collect();
+        let mut booster = PerpetualBooster::default()
+            .set_objective(Objective::SquaredLoss)
+            .set_budget(0.1)
+            .set_max_bin(10)
+            .set_save_node_stats(true);
+        let data = Matrix::new(&data_vec, y.len(), 5);
+        booster.fit(&data, &y, None, None)?;
+        Ok((booster, data_vec, y))
+    }
+
+    #[test]
+    fn test_compute_score_weight_variance() {
+        let booster = PerpetualBooster::default();
+        let log_odds = [0.5, 0.6, 0.7, 0.8, 0.9];
+        let score = booster.compute_score_weight_variance(&log_odds);
+        assert!(score.is_finite());
+        assert!(score > 0.0);
+    }
+
+    #[test]
+    fn test_compute_score_min_max() {
+        let booster = PerpetualBooster::default();
+        let log_odds = [0.5, 0.6, 0.7, 0.8, 0.9];
+        let score = booster.compute_score_min_max(&log_odds);
+        assert!(score.is_finite());
+        assert!(score > 0.0);
+    }
+
+    #[test]
+    fn test_compute_score_grp() {
+        let booster = PerpetualBooster::default();
+        let log_odds = [0.5, 0.6, 0.7, 0.8, 0.9];
+        let stat_q = [0.0, 0.25, 0.5, 0.75, 1.0];
+        let score = booster.compute_score_grp(&log_odds, &stat_q);
+        assert!(score.is_finite());
+        assert!(score > 0.0);
+    }
+
+    #[test]
+    fn test_calibrate_min_max() -> Result<(), Box<dyn Error>> {
+        let (mut booster, data_vec, y) = make_fitted_booster()?;
+        let data = Matrix::new(&data_vec, y.len(), 5);
+        let alpha_vec = vec![0.1, 0.2];
+        booster.calibrate_min_max((&data, &y, &alpha_vec))?;
+        assert!(!booster.cal_params.is_empty());
+        // Verify intervals can be predicted
+        let intervals = booster.predict_intervals_min_max(&data, false);
+        assert!(!intervals.is_empty());
+        for (_alpha, sample_intervals) in &intervals {
+            assert_eq!(sample_intervals.len(), y.len());
+            for si in sample_intervals {
+                assert_eq!(si.len(), 2); // [lower, upper]
+            }
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn test_calibrate_min_max_columnar() -> Result<(), Box<dyn Error>> {
+        let (mut booster, data_vec, y) = make_fitted_booster()?;
+        let n = y.len();
+        // Build columnar data from the 5 columns
+        let col0: Vec<f64> = (0..n).map(|i| data_vec[i * 5]).collect();
+        let col1: Vec<f64> = (0..n).map(|i| data_vec[i * 5 + 1]).collect();
+        let col2: Vec<f64> = (0..n).map(|i| data_vec[i * 5 + 2]).collect();
+        let col3: Vec<f64> = (0..n).map(|i| data_vec[i * 5 + 3]).collect();
+        let col4: Vec<f64> = (0..n).map(|i| data_vec[i * 5 + 4]).collect();
+        let cols: Vec<&[f64]> = vec![&col0, &col1, &col2, &col3, &col4];
+        let data = ColumnarMatrix::new(cols, None, n);
+        let alpha_vec = vec![0.1];
+        booster.calibrate_min_max_columnar((&data, &y, &alpha_vec))?;
+        assert!(!booster.cal_params.is_empty());
+        let intervals = booster.predict_intervals_min_max_columnar(&data, false);
+        assert!(!intervals.is_empty());
+        Ok(())
+    }
+
+    #[test]
+    fn test_calibrate_grp() -> Result<(), Box<dyn Error>> {
+        let (mut booster, data_vec, y) = make_fitted_booster()?;
+        let data = Matrix::new(&data_vec, y.len(), 5);
+        let alpha_vec = vec![0.1, 0.2];
+        booster.calibrate_grp((&data, &y, &alpha_vec))?;
+        assert!(!booster.cal_params.is_empty());
+        let intervals = booster.predict_intervals_grp(&data, false);
+        assert!(!intervals.is_empty());
+        for (_alpha, sample_intervals) in &intervals {
+            assert_eq!(sample_intervals.len(), y.len());
+            for si in sample_intervals {
+                assert_eq!(si.len(), 2);
+            }
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn test_calibrate_grp_columnar() -> Result<(), Box<dyn Error>> {
+        let (mut booster, data_vec, y) = make_fitted_booster()?;
+        let n = y.len();
+        let col0: Vec<f64> = (0..n).map(|i| data_vec[i * 5]).collect();
+        let col1: Vec<f64> = (0..n).map(|i| data_vec[i * 5 + 1]).collect();
+        let col2: Vec<f64> = (0..n).map(|i| data_vec[i * 5 + 2]).collect();
+        let col3: Vec<f64> = (0..n).map(|i| data_vec[i * 5 + 3]).collect();
+        let col4: Vec<f64> = (0..n).map(|i| data_vec[i * 5 + 4]).collect();
+        let cols: Vec<&[f64]> = vec![&col0, &col1, &col2, &col3, &col4];
+        let data = ColumnarMatrix::new(cols, None, n);
+        let alpha_vec = vec![0.1];
+        booster.calibrate_grp_columnar((&data, &y, &alpha_vec))?;
+        assert!(!booster.cal_params.is_empty());
+        let intervals = booster.predict_intervals_grp_columnar(&data, false);
+        assert!(!intervals.is_empty());
+        Ok(())
+    }
+
+    #[test]
+    fn test_calibrate_weight_variance() -> Result<(), Box<dyn Error>> {
+        let (mut booster, data_vec, y) = make_fitted_booster()?;
+        let data = Matrix::new(&data_vec, y.len(), 5);
+        let alpha_vec = vec![0.1, 0.2];
+        booster.calibrate_weight_variance((&data, &y, &alpha_vec))?;
+        assert!(!booster.cal_params.is_empty());
+        let intervals = booster.predict_intervals_weight_variance(&data, false);
+        assert!(!intervals.is_empty());
+        for (_alpha, sample_intervals) in &intervals {
+            assert_eq!(sample_intervals.len(), y.len());
+            for si in sample_intervals {
+                assert_eq!(si.len(), 2);
+            }
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn test_calibrate_weight_variance_columnar() -> Result<(), Box<dyn Error>> {
+        let (mut booster, data_vec, y) = make_fitted_booster()?;
+        let n = y.len();
+        let col0: Vec<f64> = (0..n).map(|i| data_vec[i * 5]).collect();
+        let col1: Vec<f64> = (0..n).map(|i| data_vec[i * 5 + 1]).collect();
+        let col2: Vec<f64> = (0..n).map(|i| data_vec[i * 5 + 2]).collect();
+        let col3: Vec<f64> = (0..n).map(|i| data_vec[i * 5 + 3]).collect();
+        let col4: Vec<f64> = (0..n).map(|i| data_vec[i * 5 + 4]).collect();
+        let cols: Vec<&[f64]> = vec![&col0, &col1, &col2, &col3, &col4];
+        let data = ColumnarMatrix::new(cols, None, n);
+        let alpha_vec = vec![0.1];
+        booster.calibrate_weight_variance_columnar((&data, &y, &alpha_vec))?;
+        assert!(!booster.cal_params.is_empty());
+        let intervals = booster.predict_intervals_weight_variance_columnar(&data, false);
+        assert!(!intervals.is_empty());
+        Ok(())
+    }
+
+    #[test]
+    fn test_calibrate_via_base_method() -> Result<(), Box<dyn Error>> {
+        // Test the calibrate() dispatch method from base.rs for MinMax
+        let (mut booster, data_vec, y) = make_fitted_booster()?;
+        let data = Matrix::new(&data_vec, y.len(), 5);
+        let alpha_vec = vec![0.1];
+        booster.calibrate(CalibrationMethod::MinMax, (&data, &y, &alpha_vec))?;
+        assert!(!booster.cal_params.is_empty());
+        let intervals = booster.predict_intervals(&data, false);
+        assert!(!intervals.is_empty());
+        Ok(())
+    }
+
+    #[test]
+    fn test_calibrate_via_base_grp() -> Result<(), Box<dyn Error>> {
+        // Test the calibrate() dispatch method from base.rs for GRP
+        let (mut booster, data_vec, y) = make_fitted_booster()?;
+        let data = Matrix::new(&data_vec, y.len(), 5);
+        let alpha_vec = vec![0.1];
+        booster.calibrate(CalibrationMethod::GRP, (&data, &y, &alpha_vec))?;
+        assert!(!booster.cal_params.is_empty());
+        let intervals = booster.predict_intervals(&data, false);
+        assert!(!intervals.is_empty());
+        Ok(())
+    }
+
+    #[test]
+    fn test_calibrate_via_base_weight_variance() -> Result<(), Box<dyn Error>> {
+        // Test the calibrate() dispatch method from base.rs for WeightVariance
+        let (mut booster, data_vec, y) = make_fitted_booster()?;
+        let data = Matrix::new(&data_vec, y.len(), 5);
+        let alpha_vec = vec![0.1];
+        booster.calibrate(CalibrationMethod::WeightVariance, (&data, &y, &alpha_vec))?;
+        assert!(!booster.cal_params.is_empty());
+        let intervals = booster.predict_intervals(&data, false);
+        assert!(!intervals.is_empty());
+        Ok(())
+    }
+}

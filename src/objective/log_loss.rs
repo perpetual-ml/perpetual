@@ -226,4 +226,115 @@ mod tests {
         // log(2/1) = ln(2) = 0.693147
         assert!((loss_fn.initial_value(&y, None, None) - 0.693147).abs() < 1e-6);
     }
+
+    #[test]
+    fn test_log_loss_weighted() {
+        let y = vec![1.0, 0.0];
+        let yhat = vec![1.0, -1.0];
+        let w = vec![2.0, 1.0];
+        let loss_fn = LogLoss::default();
+        let l = loss_fn.loss(&y, &yhat, Some(&w), None);
+        assert_eq!(l.len(), 2);
+        // Weighted loss should be ~2x for first sample
+        assert!((l[0] - 0.3132617 * 2.0).abs() < 1e-5);
+    }
+
+    #[test]
+    fn test_log_loss_gradient_weighted() {
+        let y = vec![1.0, 0.0];
+        let yhat = vec![1.0, -1.0];
+        let w = vec![2.0, 1.0];
+        let loss_fn = LogLoss::default();
+        let (g, h) = loss_fn.gradient(&y, &yhat, Some(&w), None);
+        let h = h.unwrap();
+        assert_eq!(g.len(), 2);
+        assert_eq!(h.len(), 2);
+        // g[0] = (p - y) * w = (0.731 - 1.0) * 2.0
+        assert!((g[0] - (-0.2689414 * 2.0)).abs() < 1e-5);
+    }
+
+    #[test]
+    fn test_log_loss_init_weighted() {
+        let y = vec![1.0, 1.0, 0.0];
+        let w = vec![1.0, 2.0, 1.0]; // ytot=3, ntot=4
+        let loss_fn = LogLoss::default();
+        let init = loss_fn.initial_value(&y, Some(&w), None);
+        // ln(3/1) = ln(3)
+        assert!((init - 3.0_f64.ln()).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_log_loss_gradient_and_loss() {
+        let y = vec![1.0, 0.0];
+        let yhat = vec![1.0, -1.0];
+        let loss_fn = LogLoss::default();
+        let (g, h, l) = loss_fn.gradient_and_loss(&y, &yhat, None, None);
+        let h = h.unwrap();
+        assert_eq!(g.len(), 2);
+        assert_eq!(h.len(), 2);
+        assert_eq!(l.len(), 2);
+        assert!((l[0] - 0.3132617).abs() < 1e-5);
+        assert!((g[0] - (-0.2689414)).abs() < 1e-5);
+    }
+
+    #[test]
+    fn test_log_loss_gradient_and_loss_weighted() {
+        let y = vec![1.0, 0.0];
+        let yhat = vec![1.0, -1.0];
+        let w = vec![2.0, 1.0];
+        let loss_fn = LogLoss::default();
+        let (g, h, l) = loss_fn.gradient_and_loss(&y, &yhat, Some(&w), None);
+        let h = h.unwrap();
+        assert_eq!(g.len(), 2);
+        assert_eq!(h.len(), 2);
+        assert_eq!(l.len(), 2);
+    }
+
+    #[test]
+    fn test_log_loss_gradient_and_loss_into() {
+        let y = vec![1.0, 0.0];
+        let yhat = vec![1.0, -1.0];
+        let loss_fn = LogLoss::default();
+        let mut grad = vec![0.0_f32; 2];
+        let mut hess: Option<Vec<f32>> = None;
+        let mut loss = vec![0.0_f32; 2];
+        loss_fn.gradient_and_loss_into(&y, &yhat, None, None, &mut grad, &mut hess, &mut loss);
+        assert!(hess.is_some());
+        assert!((grad[0] - (-0.2689414)).abs() < 1e-5);
+        assert!((loss[0] - 0.3132617).abs() < 1e-5);
+    }
+
+    #[test]
+    fn test_log_loss_gradient_and_loss_into_weighted() {
+        let y = vec![1.0, 0.0];
+        let yhat = vec![1.0, -1.0];
+        let w = vec![2.0, 1.0];
+        let loss_fn = LogLoss::default();
+        let mut grad = vec![0.0_f32; 2];
+        let mut hess: Option<Vec<f32>> = None;
+        let mut loss = vec![0.0_f32; 2];
+        loss_fn.gradient_and_loss_into(&y, &yhat, Some(&w), None, &mut grad, &mut hess, &mut loss);
+        assert!(hess.is_some());
+    }
+
+    #[test]
+    fn test_log_loss_single() {
+        let loss_fn = LogLoss::default();
+        let l1 = loss_fn.loss_single(1.0, 1.0, None);
+        assert!(l1 > 0.0 && l1 < 1.0);
+        let l2 = loss_fn.loss_single(1.0, 1.0, Some(2.0));
+        assert!((l2 - l1 * 2.0).abs() < 1e-5);
+    }
+
+    #[test]
+    fn test_log_loss_default_metric() {
+        let loss_fn = LogLoss::default();
+        assert!(matches!(loss_fn.default_metric(), Metric::LogLoss));
+    }
+
+    #[test]
+    fn test_log_loss_requires_batch() {
+        let loss_fn = LogLoss::default();
+        assert!(!loss_fn.requires_batch_evaluation());
+    }
 }

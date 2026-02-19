@@ -503,4 +503,96 @@ mod tests {
         assert_eq!(jmatrix.get_col(0), vec![0]);
         assert_eq!(jmatrix.get_col(2), vec![4, 5]);
     }
+
+    #[test]
+    fn test_columnar_matrix() {
+        let col0 = vec![1.0, 2.0, 3.0];
+        let col1 = vec![4.0, 5.0, 6.0];
+        let cm = ColumnarMatrix::new(vec![&col0, &col1], None, 3);
+        assert_eq!(cm.rows, 3);
+        assert_eq!(cm.cols, 2);
+        assert_eq!(*cm.get(0, 0), 1.0);
+        assert_eq!(*cm.get(2, 1), 6.0);
+        assert_eq!(cm.get_col(0), &[1.0, 2.0, 3.0]);
+        assert_eq!(cm.get_col_slice(1, 0, 2), &[4.0, 5.0]);
+        assert_eq!(cm.get_row(1), vec![2.0, 5.0]);
+    }
+
+    #[test]
+    fn test_columnar_matrix_is_valid_no_mask() {
+        let col0 = vec![1.0, 2.0];
+        let cm = ColumnarMatrix::new(vec![&col0], None, 2);
+        assert!(cm.is_valid(0, 0));
+        assert!(cm.is_valid(1, 0));
+    }
+
+    #[test]
+    fn test_columnar_matrix_is_valid_with_mask() {
+        let col0 = vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0];
+        // Bitmap: 0b10101010 = byte 170dim, bits 1,3,5,7 are set (valid)
+        let mask: Vec<u8> = vec![0b10101010, 0b00000001]; // 9 rows
+        let cm = ColumnarMatrix::new(vec![&col0], Some(vec![Some(&mask)]), 9);
+        // Bit 0 of byte 0 = 0 -> not valid
+        assert!(!cm.is_valid(0, 0));
+        // Bit 1 of byte 0 = 1 -> valid
+        assert!(cm.is_valid(1, 0));
+        // Bit 7 of byte 0 = 1 -> valid
+        assert!(cm.is_valid(7, 0));
+        // Bit 0 of byte 1 = 1 -> valid
+        assert!(cm.is_valid(8, 0));
+    }
+
+    #[test]
+    fn test_columnar_matrix_is_valid_none_mask() {
+        let col0 = vec![1.0, 2.0];
+        let cm = ColumnarMatrix::new(vec![&col0], Some(vec![None]), 2);
+        assert!(cm.is_valid(0, 0));
+        assert!(cm.is_valid(1, 0));
+    }
+
+    #[test]
+    fn test_float_data_trait() {
+        assert_eq!(f64::ZERO, 0.0);
+        assert_eq!(f64::ONE, 1.0);
+        assert_eq!(f64::from_usize(5), 5.0);
+        assert_eq!(f64::from_u16(10), 10.0);
+        assert!(f64::NAN.is_nan());
+        assert!((f64::ONE.ln() - 0.0_f64).abs() < 1e-10);
+        assert!((f64::ONE.exp() - std::f64::consts::E).abs() < 1e-10);
+
+        assert_eq!(f32::ZERO, 0.0_f32);
+        assert_eq!(f32::from_usize(5), 5.0_f32);
+        assert_eq!(f32::from_u16(10), 10.0_f32);
+        assert!(f32::NAN.is_nan());
+    }
+
+    #[test]
+    fn test_jagged_matrix_new_and_default() {
+        let jm: JaggedMatrix<f64> = JaggedMatrix::new();
+        assert_eq!(jm.cols, 0);
+        assert_eq!(jm.n_records, 0);
+        let jm2: JaggedMatrix<f64> = JaggedMatrix::default();
+        assert_eq!(jm2.cols, 0);
+    }
+
+    #[test]
+    fn test_jagged_matrix_get_col_mut() {
+        let vecs = vec![vec![1.0, 2.0], vec![3.0, 4.0]];
+        let mut jm = JaggedMatrix::from_vecs(&vecs);
+        let col = jm.get_col_mut(0);
+        col[0] = 99.0;
+        assert_eq!(jm.data[0], 99.0);
+        let col1 = jm.get_col_mut(1);
+        col1[1] = 88.0;
+        assert_eq!(jm.data[3], 88.0);
+    }
+
+    #[test]
+    fn test_matrix_display() {
+        let v = vec![1, 2, 3, 4];
+        let m = Matrix::new(&v, 2, 2);
+        let s = format!("{}", m);
+        assert!(s.contains("1"));
+        assert!(s.contains("4"));
+    }
 }

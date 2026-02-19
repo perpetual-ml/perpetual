@@ -165,4 +165,87 @@ mod tests {
         };
         assert!(update_bin.counts == [1, 2, 3, 4, 5]);
     }
+
+    #[test]
+    fn test_from_parent_two_children() {
+        let mut root = Bin::empty(0, 0.0);
+        root.g_folded = [10.0, 20.0, 30.0, 40.0, 50.0];
+        root.h_folded = [5.0, 5.0, 5.0, 5.0, 5.0];
+        root.counts = [100, 100, 100, 100, 100];
+        let mut c1 = Bin::empty(1, 0.0);
+        c1.g_folded = [3.0, 6.0, 9.0, 12.0, 15.0];
+        c1.h_folded = [1.0, 1.0, 1.0, 1.0, 1.0];
+        c1.counts = [30, 30, 30, 30, 30];
+        let mut c2 = Bin::empty(2, 0.0);
+        c2.g_folded = [2.0, 4.0, 6.0, 8.0, 10.0];
+        c2.h_folded = [1.0, 2.0, 1.0, 2.0, 1.0];
+        c2.counts = [20, 20, 20, 20, 20];
+        let mut update = Bin::empty(3, 0.0);
+        unsafe {
+            Bin::from_parent_two_children(
+                &mut root as *mut Bin,
+                &mut c1 as *mut Bin,
+                &mut c2 as *mut Bin,
+                &mut update as *mut Bin,
+            );
+        }
+        assert!((update.g_folded[0] - 5.0).abs() < 1e-6);
+        assert!((update.h_folded[1] - 2.0).abs() < 1e-6);
+        assert_eq!(update.counts[0], 50);
+    }
+
+    #[test]
+    fn test_sort_cat_bins_by_num() {
+        let b1 = Bin::empty_const_hess(3, 0.0);
+        let b2 = Bin::empty_const_hess(1, 0.0);
+        let b3 = Bin::empty_const_hess(2, 0.0);
+        let c1 = UnsafeCell::new(b1);
+        let c2 = UnsafeCell::new(b2);
+        let c3 = UnsafeCell::new(b3);
+        let mut hist: Vec<&UnsafeCell<Bin>> = vec![&c1, &c2, &c3];
+        sort_cat_bins_by_num(&mut hist);
+        unsafe {
+            assert_eq!(hist[0].get().as_ref().unwrap().num, 1);
+            assert_eq!(hist[1].get().as_ref().unwrap().num, 2);
+            assert_eq!(hist[2].get().as_ref().unwrap().num, 3);
+        }
+    }
+
+    #[test]
+    fn test_sort_cat_bins_by_stat_const_hess() {
+        let b0 = Bin::empty_const_hess(0, 0.0); // num=0, always first
+        let mut b1 = Bin::empty_const_hess(1, 0.0);
+        b1.g_folded = [1.0; 5];
+        b1.counts = [10; 5]; // g/c = 0.1
+        let mut b2 = Bin::empty_const_hess(2, 0.0);
+        b2.g_folded = [5.0; 5];
+        b2.counts = [10; 5]; // g/c = 0.5
+        let c0 = UnsafeCell::new(b0);
+        let c1 = UnsafeCell::new(b1);
+        let c2 = UnsafeCell::new(b2);
+        let mut hist: Vec<&UnsafeCell<Bin>> = vec![&c2, &c0, &c1];
+        sort_cat_bins_by_stat(&mut hist, true);
+        unsafe {
+            assert_eq!(hist[0].get().as_ref().unwrap().num, 0); // num=0 always first
+        }
+    }
+
+    #[test]
+    fn test_sort_cat_bins_by_stat_non_const() {
+        let b0 = Bin::empty(0, 0.0); // num=0, always first
+        let mut b1 = Bin::empty(1, 0.0);
+        b1.g_folded = [1.0; 5];
+        b1.h_folded = [10.0; 5]; // g/h = 0.1
+        let mut b2 = Bin::empty(2, 0.0);
+        b2.g_folded = [5.0; 5];
+        b2.h_folded = [10.0; 5]; // g/h = 0.5
+        let c0 = UnsafeCell::new(b0);
+        let c1 = UnsafeCell::new(b1);
+        let c2 = UnsafeCell::new(b2);
+        let mut hist: Vec<&UnsafeCell<Bin>> = vec![&c2, &c0, &c1];
+        sort_cat_bins_by_stat(&mut hist, false);
+        unsafe {
+            assert_eq!(hist[0].get().as_ref().unwrap().num, 0); // num=0 always first
+        }
+    }
 }

@@ -779,3 +779,247 @@ mod multi_output_booster_test {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::Matrix;
+    use crate::PerpetualBooster;
+    use crate::booster::config::BoosterIO;
+    use crate::objective::Objective;
+
+    #[test]
+    fn test_multi_output_new() {
+        let booster = MultiOutputBooster::new(
+            2,
+            Objective::SquaredLoss,
+            0.5,
+            256,
+            None,
+            None,
+            None,
+            false,
+            f64::NAN,
+            true,
+            true,
+            std::collections::HashSet::new(),
+            crate::booster::config::MissingNodeTreatment::AverageNodeWeight,
+            10,
+            42,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            false,
+            CalibrationMethod::WeightVariance,
+        )
+        .unwrap();
+        assert_eq!(booster.n_boosters, 2);
+        assert_eq!(booster.boosters.len(), 2);
+    }
+
+    #[test]
+    fn test_multi_output_setters() {
+        let mut booster = MultiOutputBooster::default();
+        booster = booster.set_n_boosters(3);
+        assert_eq!(booster.n_boosters, 3);
+        assert_eq!(booster.boosters.len(), 3);
+
+        booster = booster.set_objective(Objective::LogLoss);
+        for b in &booster.boosters {
+            match b.cfg.objective {
+                Objective::LogLoss => {}
+                _ => panic!("Objective is not LogLoss"),
+            }
+        }
+
+        booster = booster.set_budget(1.0);
+        for b in &booster.boosters {
+            assert_eq!(b.cfg.budget, 1.0);
+        }
+
+        booster = booster.set_max_bin(128);
+        for b in &booster.boosters {
+            assert_eq!(b.cfg.max_bin, 128);
+        }
+    }
+
+    #[test]
+    fn test_multi_output_serialization() {
+        let mut booster = MultiOutputBooster::default();
+        booster.n_boosters = 1;
+        booster.boosters = vec![PerpetualBooster::default()];
+        let json = booster.json_dump().unwrap();
+        let booster2 = MultiOutputBooster::from_json(&json).unwrap();
+        assert_eq!(booster2.n_boosters, 1);
+    }
+
+    #[test]
+    fn test_multi_output_fit() {
+        let mut booster = MultiOutputBooster::default();
+        booster = booster.set_n_boosters(2);
+        booster = booster.set_budget(0.1);
+
+        let data = Matrix::new(&[1.0, 2.0, 3.0, 4.0], 2, 2);
+        let y = Matrix::new(&[1.0, 0.0, 0.0, 1.0], 2, 2);
+
+        booster.fit(&data, &y, None, None).unwrap();
+        assert_eq!(booster.boosters.len(), 2);
+        assert!(!booster.boosters[0].trees.is_empty());
+        assert!(!booster.boosters[1].trees.is_empty());
+    }
+
+    #[test]
+    fn test_multi_output_calibrate() {
+        let mut booster = MultiOutputBooster::default();
+        booster = booster.set_n_boosters(2);
+        booster = booster.set_save_node_stats(true);
+        booster = booster.set_budget(0.1);
+
+        let data = Matrix::new(&[1.0, 2.0, 3.0, 4.0], 2, 2);
+        let y = Matrix::new(&[1.0, 0.0, 0.0, 1.0], 2, 2);
+
+        booster.fit(&data, &y, None, None).unwrap();
+
+        let alpha = vec![0.05, 0.95];
+        let data_cal = (&data, &y, alpha.as_slice());
+        booster
+            .calibrate(crate::booster::config::CalibrationMethod::WeightVariance, data_cal)
+            .unwrap();
+
+        for b in &booster.boosters {
+            assert!(!b.cal_params.is_empty());
+        }
+    }
+
+    #[test]
+    fn test_multi_output_calibrate_conformal() {
+        let mut booster = MultiOutputBooster::default();
+        booster = booster.set_n_boosters(2);
+        booster = booster.set_budget(0.1);
+
+        let data = Matrix::new(&[1.0, 2.0, 3.0, 4.0], 2, 2);
+        let y = Matrix::new(&[1.0, 0.0, 0.0, 1.0], 2, 2);
+
+        booster.fit(&data, &y, None, None).unwrap();
+
+        let alpha = vec![0.05, 0.95];
+        let data_cal = (&data, &y, alpha.as_slice());
+        booster.calibrate_conformal(&data, &y, None, None, data_cal).unwrap();
+
+        for b in &booster.boosters {
+            assert!(!b.cal_models.is_empty());
+        }
+    }
+
+    #[test]
+    fn test_multi_output_fit_columnar() {
+        let mut booster = MultiOutputBooster::default();
+        booster = booster.set_n_boosters(2);
+        booster = booster.set_budget(0.1);
+
+        let data_vec = vec![1.0, 2.0, 3.0, 4.0];
+        let col0 = &data_vec[0..2];
+        let col1 = &data_vec[2..4];
+        let data = ColumnarMatrix::new(vec![col0, col1], None, 2);
+        let y = Matrix::new(&[1.0, 0.0, 0.0, 1.0], 2, 2);
+
+        booster.fit_columnar(&data, &y, None, None).unwrap();
+        assert!(!booster.boosters[0].trees.is_empty());
+    }
+
+    #[test]
+    fn test_multi_output_prune() {
+        let mut booster = MultiOutputBooster::default();
+        booster = booster.set_n_boosters(2);
+        booster = booster.set_budget(0.1);
+
+        let data = Matrix::new(&[1.0, 2.0, 3.0, 4.0], 2, 2);
+        let y = Matrix::new(&[1.0, 0.0, 0.0, 1.0], 2, 2);
+
+        booster.fit(&data, &y, None, None).unwrap();
+        booster.prune(&data, &y, None, None).unwrap();
+    }
+
+    #[test]
+    fn test_multi_output_calibrate_columnar() {
+        let mut booster = MultiOutputBooster::default();
+        booster = booster.set_n_boosters(2);
+        booster = booster.set_save_node_stats(true);
+        booster = booster.set_budget(0.1);
+
+        let data_vec = vec![1.0, 2.0, 3.0, 4.0];
+        let col0 = &data_vec[0..2];
+        let col1 = &data_vec[2..4];
+        let data = ColumnarMatrix::new(vec![col0, col1], None, 2);
+        let y = Matrix::new(&[1.0, 0.0, 0.0, 1.0], 2, 2);
+
+        booster.fit_columnar(&data, &y, None, None).unwrap();
+
+        let alpha = vec![0.05, 0.95];
+        let data_cal = (&data, &y, alpha.as_slice());
+        booster
+            .calibrate_columnar(crate::booster::config::CalibrationMethod::WeightVariance, data_cal)
+            .unwrap();
+    }
+
+    #[test]
+    fn test_multi_output_metadata() {
+        let mut booster = MultiOutputBooster::default();
+        booster.insert_metadata("key".to_string(), "value".to_string());
+        assert_eq!(booster.get_metadata(&"key".to_string()), Some("value".to_string()));
+    }
+
+    #[test]
+    fn test_multi_output_partial_dependence() {
+        let mut booster = MultiOutputBooster::default();
+        booster = booster.set_n_boosters(2);
+        booster = booster.set_budget(0.1);
+        let data = Matrix::new(&[1.0, 2.0, 3.0, 4.0], 2, 2);
+        let y = Matrix::new(&[1.0, 0.0, 0.0, 1.0], 2, 2);
+        booster.fit(&data, &y, None, None).unwrap();
+        let pd = booster.value_partial_dependence(0, 1.5);
+        assert!(pd != 0.0);
+    }
+
+    #[test]
+    fn test_multi_output_feature_importance() {
+        let mut booster = MultiOutputBooster::default();
+        booster = booster.set_n_boosters(2);
+        booster = booster.set_budget(0.1);
+        let data = Matrix::new(&[1.0, 2.0, 3.0, 4.0], 2, 2);
+        let y = Matrix::new(&[1.0, 0.0, 0.0, 1.0], 2, 2);
+        booster.fit(&data, &y, None, None).unwrap();
+        let importance = booster.calculate_feature_importance(ImportanceMethod::Weight, true);
+        assert!(!importance.is_empty());
+    }
+
+    #[test]
+    fn test_multi_output_all_setters() {
+        let booster = MultiOutputBooster::default()
+            .set_num_threads(Some(2))
+            .set_monotone_constraints(None)
+            .set_interaction_constraints(None)
+            .set_force_children_to_bound_parent(true)
+            .set_missing(f64::NAN)
+            .set_allow_missing_splits(true)
+            .set_create_missing_branch(true)
+            .set_terminate_missing_features(HashSet::new())
+            .set_missing_node_treatment(MissingNodeTreatment::None)
+            .set_log_iterations(0)
+            .set_seed(123)
+            .set_quantile(None)
+            .set_reset(None)
+            .set_categorical_features(None)
+            .set_timeout(None)
+            .set_iteration_limit(None)
+            .set_memory_limit(None)
+            .set_stopping_rounds(None)
+            .set_save_node_stats(false)
+            .set_calibration_method(CalibrationMethod::WeightVariance);
+        assert_eq!(booster.cfg.seed, 123);
+    }
+}

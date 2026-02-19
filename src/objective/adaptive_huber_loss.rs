@@ -216,4 +216,78 @@ mod tests {
         // alpha=0.9 -> index = floor(5 * 0.9) = 4. abs_res[4] = 0.5
         assert!((adaptive_delta(&y, &yhat, 0.9) - 0.5).abs() < 1e-6);
     }
+
+    #[test]
+    fn test_adaptive_huber_loss_weighted() {
+        let y = vec![1.0, 2.0, 3.0, 4.0];
+        let yhat = vec![1.1, 2.2, 3.3, 4.4];
+        let w = vec![2.0, 1.0, 1.0, 2.0];
+        let loss_fn = AdaptiveHuberLoss { quantile: Some(0.5) };
+        let l = loss_fn.loss(&y, &yhat, Some(&w), None);
+        assert_eq!(l.len(), 4);
+        // diff 0.1 <= delta=0.3 -> quadratic: 0.5*0.1*0.1*2 = 0.01
+        assert!((l[0] - 0.01).abs() < 1e-5);
+    }
+
+    #[test]
+    fn test_adaptive_huber_gradient_weighted() {
+        let y = vec![1.0, 2.0, 3.0, 4.0];
+        let yhat = vec![1.1, 2.2, 3.3, 4.4];
+        let w = vec![2.0, 1.0, 1.0, 2.0];
+        let loss_fn = AdaptiveHuberLoss { quantile: Some(0.5) };
+        let (g, h) = loss_fn.gradient(&y, &yhat, Some(&w), None);
+        let h = h.unwrap();
+        assert_eq!(g.len(), 4);
+        assert_eq!(h.len(), 4);
+    }
+
+    #[test]
+    fn test_adaptive_huber_initial_value_weighted() {
+        let y = vec![1.0, 2.0, 3.0];
+        let w = vec![1.0, 3.0, 1.0];
+        let loss_fn = AdaptiveHuberLoss { quantile: Some(0.5) };
+        let init = loss_fn.initial_value(&y, Some(&w), None);
+        assert!(init.is_finite());
+    }
+
+    #[test]
+    fn test_adaptive_huber_gradient_and_loss() {
+        let y = vec![1.0, 2.0, 3.0, 4.0];
+        let yhat = vec![1.1, 2.2, 3.3, 4.4];
+        let loss_fn = AdaptiveHuberLoss { quantile: Some(0.5) };
+        let (g, h, l) = loss_fn.gradient_and_loss(&y, &yhat, None, None);
+        assert_eq!(g.len(), 4);
+        assert!(h.is_some());
+        assert_eq!(l.len(), 4);
+    }
+
+    #[test]
+    fn test_adaptive_huber_gradient_and_loss_weighted() {
+        let y = vec![1.0, 2.0, 3.0, 4.0];
+        let yhat = vec![1.1, 2.2, 3.3, 4.4];
+        let w = vec![2.0, 1.0, 1.0, 2.0];
+        let loss_fn = AdaptiveHuberLoss { quantile: Some(0.5) };
+        let (g, h, l) = loss_fn.gradient_and_loss(&y, &yhat, Some(&w), None);
+        assert_eq!(g.len(), 4);
+        assert!(h.is_some());
+        assert_eq!(l.len(), 4);
+    }
+
+    #[test]
+    fn test_adaptive_huber_loss_single() {
+        let loss_fn = AdaptiveHuberLoss { quantile: Some(0.5) };
+        // delta=1.0 (hardcoded in loss_single)
+        let l1 = loss_fn.loss_single(1.0, 1.5, None); // r=-0.5, ar=0.5 <= 1 -> 0.5*0.25=0.125
+        assert!((l1 - 0.125).abs() < 1e-5);
+        let l2 = loss_fn.loss_single(1.0, 3.0, None); // r=-2, ar=2 > 1 -> 1*(2-0.5)=1.5
+        assert!((l2 - 1.5).abs() < 1e-5);
+        let l3 = loss_fn.loss_single(1.0, 1.5, Some(2.0));
+        assert!((l3 - 0.25).abs() < 1e-5);
+    }
+
+    #[test]
+    fn test_adaptive_huber_requires_batch() {
+        let loss_fn = AdaptiveHuberLoss { quantile: Some(0.5) };
+        assert!(!loss_fn.requires_batch_evaluation());
+    }
 }

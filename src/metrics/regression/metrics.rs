@@ -74,3 +74,128 @@ pub fn root_mean_squared_error(y: &[f64], yhat: &[f64], sample_weight: &[f64]) -
         .sum::<f64>();
     (res / w_sum).sqrt()
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_quantile_loss_median() {
+        let y = vec![1.0, 2.0, 3.0, 4.0];
+        let yhat = vec![1.5, 2.5, 2.5, 3.5];
+        let w = vec![1.0; 4];
+        let loss = quantile_loss(&y, &yhat, &w, Some(0.5));
+        assert!(loss.is_finite());
+        // median quantile: symmetric penalty
+        assert!((loss - 0.0).abs() < 1.0); // sanity check
+    }
+
+    #[test]
+    fn test_quantile_loss_low_alpha() {
+        let y = vec![1.0, 2.0, 3.0];
+        let yhat = vec![2.0, 3.0, 4.0]; // all over-predicted
+        let w = vec![1.0; 3];
+        let loss = quantile_loss(&y, &yhat, &w, Some(0.1));
+        assert!(loss.is_finite());
+    }
+
+    #[test]
+    fn test_quantile_loss_high_alpha() {
+        let y = vec![1.0, 2.0, 3.0];
+        let yhat = vec![0.0, 1.0, 2.0]; // all under-predicted
+        let w = vec![1.0; 3];
+        let loss = quantile_loss(&y, &yhat, &w, Some(0.9));
+        assert!(loss.is_finite());
+    }
+
+    #[test]
+    fn test_quantile_loss_weighted() {
+        let y = vec![1.0, 2.0, 3.0];
+        let yhat = vec![1.5, 2.5, 2.5];
+        let w = vec![2.0, 1.0, 3.0];
+        let loss = quantile_loss(&y, &yhat, &w, Some(0.5));
+        assert!(loss.is_finite());
+    }
+
+    #[test]
+    fn test_quantile_loss_metric_trait() {
+        let y = vec![1.0, 2.0, 3.0];
+        let yhat = vec![1.5, 2.5, 2.5];
+        let w = vec![1.0; 3];
+        let group = vec![0u64; 3];
+        let metric = QuantileLossMetric::calculate_metric(&y, &yhat, &w, &group, Some(0.5));
+        assert!(metric.is_finite());
+        assert!(!QuantileLossMetric::maximize());
+    }
+
+    #[test]
+    fn test_rmsle_perfect() {
+        let y = vec![1.0, 2.0, 3.0];
+        let yhat = vec![1.0, 2.0, 3.0];
+        let w = vec![1.0; 3];
+        let rmsle = root_mean_squared_log_error(&y, &yhat, &w);
+        assert!((rmsle - 0.0).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_rmsle_imperfect() {
+        let y = vec![1.0, 2.0, 3.0];
+        let yhat = vec![1.5, 2.5, 3.5];
+        let w = vec![1.0; 3];
+        let rmsle = root_mean_squared_log_error(&y, &yhat, &w);
+        assert!(rmsle > 0.0);
+        assert!(rmsle.is_finite());
+    }
+
+    #[test]
+    fn test_rmsle_metric_trait() {
+        let y = vec![1.0, 2.0, 3.0];
+        let yhat = vec![1.5, 2.5, 3.5];
+        let w = vec![1.0; 3];
+        let group = vec![0u64; 3];
+        let metric = RootMeanSquaredLogErrorMetric::calculate_metric(&y, &yhat, &w, &group, None);
+        assert!(metric > 0.0);
+        assert!(!RootMeanSquaredLogErrorMetric::maximize());
+    }
+
+    #[test]
+    fn test_rmse_perfect() {
+        let y = vec![1.0, 2.0, 3.0];
+        let yhat = vec![1.0, 2.0, 3.0];
+        let w = vec![1.0; 3];
+        let rmse = root_mean_squared_error(&y, &yhat, &w);
+        assert!((rmse - 0.0).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_rmse_imperfect() {
+        let y = vec![1.0, 2.0, 3.0];
+        let yhat = vec![2.0, 3.0, 4.0];
+        let w = vec![1.0; 3];
+        let rmse = root_mean_squared_error(&y, &yhat, &w);
+        // Each error is 1.0, so MSE = 1.0, RMSE = 1.0
+        assert!((rmse - 1.0).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_rmse_weighted() {
+        let y = vec![1.0, 2.0];
+        let yhat = vec![2.0, 2.0]; // errors: 1.0 and 0.0
+        let w = vec![2.0, 1.0]; // weight = 2.0 on error=1
+        let rmse = root_mean_squared_error(&y, &yhat, &w);
+        // weighted MSE = (2.0*1.0 + 1.0*0.0) / 3.0 = 2/3
+        let expected = (2.0_f64 / 3.0).sqrt();
+        assert!((rmse - expected).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_rmse_metric_trait() {
+        let y = vec![1.0, 2.0, 3.0];
+        let yhat = vec![2.0, 3.0, 4.0];
+        let w = vec![1.0; 3];
+        let group = vec![0u64; 3];
+        let metric = RootMeanSquaredErrorMetric::calculate_metric(&y, &yhat, &w, &group, None);
+        assert!((metric - 1.0).abs() < 1e-10);
+        assert!(!RootMeanSquaredErrorMetric::maximize());
+    }
+}

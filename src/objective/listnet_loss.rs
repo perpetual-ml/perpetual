@@ -329,4 +329,151 @@ mod tests {
         let g_sum: f32 = g.iter().sum();
         assert!(g_sum.abs() < 1e-6);
     }
+
+    #[test]
+    fn test_listnet_loss_weighted() {
+        let y = vec![3.0, 1.0, 0.0];
+        let yhat = vec![2.0, 1.0, 0.5];
+        let w = vec![2.0, 1.0, 1.0];
+        let loss_fn = ListNetLoss::default();
+        let l = loss_fn.loss(&y, &yhat, Some(&w), None);
+        assert_eq!(l.len(), 3);
+        let (g, h) = loss_fn.gradient(&y, &yhat, Some(&w), None);
+        let h = h.unwrap();
+        assert_eq!(g.len(), 3);
+        assert_eq!(h.len(), 3);
+    }
+
+    #[test]
+    fn test_listnet_loss_grouped() {
+        let y = vec![3.0, 1.0, 0.0, 2.0, 1.0];
+        let yhat = vec![2.0, 1.0, 0.5, 1.5, 0.5];
+        let group = vec![3u64, 2];
+        let loss_fn = ListNetLoss::default();
+        let l = loss_fn.loss(&y, &yhat, None, Some(&group));
+        assert_eq!(l.len(), 5);
+        // First 3 should be equal, last 2 should be equal
+        assert_eq!(l[0], l[1]);
+        assert_eq!(l[0], l[2]);
+        assert_eq!(l[3], l[4]);
+
+        let (g, h) = loss_fn.gradient(&y, &yhat, None, Some(&group));
+        let h = h.unwrap();
+        assert_eq!(g.len(), 5);
+        assert_eq!(h.len(), 5);
+    }
+
+    #[test]
+    fn test_listnet_loss_grouped_weighted() {
+        let y = vec![3.0, 1.0, 0.0, 2.0, 1.0];
+        let yhat = vec![2.0, 1.0, 0.5, 1.5, 0.5];
+        let w = vec![2.0, 1.0, 1.0, 1.5, 0.5];
+        let group = vec![3u64, 2];
+        let loss_fn = ListNetLoss::default();
+        let l = loss_fn.loss(&y, &yhat, Some(&w), Some(&group));
+        assert_eq!(l.len(), 5);
+        let (g, h) = loss_fn.gradient(&y, &yhat, Some(&w), Some(&group));
+        assert_eq!(g.len(), 5);
+        assert!(h.is_some());
+    }
+
+    #[test]
+    fn test_listnet_gradient_and_loss_no_group() {
+        let y = vec![3.0, 1.0, 0.0];
+        let yhat = vec![2.0, 1.0, 0.5];
+        let loss_fn = ListNetLoss::default();
+        let (g, h, l) = loss_fn.gradient_and_loss(&y, &yhat, None, None);
+        assert_eq!(g.len(), 3);
+        assert!(h.is_some());
+        assert_eq!(l.len(), 3);
+    }
+
+    #[test]
+    fn test_listnet_gradient_and_loss_grouped() {
+        let y = vec![3.0, 1.0, 0.0, 2.0, 1.0];
+        let yhat = vec![2.0, 1.0, 0.5, 1.5, 0.5];
+        let group = vec![3u64, 2];
+        let loss_fn = ListNetLoss::default();
+        let (g, h, l) = loss_fn.gradient_and_loss(&y, &yhat, None, Some(&group));
+        assert_eq!(g.len(), 5);
+        assert!(h.is_some());
+        assert_eq!(l.len(), 5);
+    }
+
+    #[test]
+    fn test_listnet_gradient_and_loss_weighted_grouped() {
+        let y = vec![3.0, 1.0, 0.0, 2.0, 1.0];
+        let yhat = vec![2.0, 1.0, 0.5, 1.5, 0.5];
+        let w = vec![2.0, 1.0, 1.0, 1.5, 0.5];
+        let group = vec![3u64, 2];
+        let loss_fn = ListNetLoss::default();
+        let (g, h, l) = loss_fn.gradient_and_loss(&y, &yhat, Some(&w), Some(&group));
+        assert_eq!(g.len(), 5);
+        assert!(h.is_some());
+        assert_eq!(l.len(), 5);
+    }
+
+    #[test]
+    fn test_listnet_loss_single() {
+        let loss_fn = ListNetLoss::default();
+        let l = loss_fn.loss_single(1.0, 2.0, None);
+        assert_eq!(l, f32::INFINITY);
+    }
+
+    #[test]
+    fn test_listnet_initial_value() {
+        let loss_fn = ListNetLoss::default();
+        assert_eq!(loss_fn.initial_value(&[1.0, 2.0], None, None), 0.0);
+    }
+
+    #[test]
+    fn test_listnet_small_input() {
+        let loss_fn = ListNetLoss::default();
+        // Single sample edge case
+        let l = loss_fn.loss(&[1.0], &[2.0], None, None);
+        assert_eq!(l.len(), 1);
+        assert_eq!(l[0], f32::INFINITY);
+        let (g, _h) = loss_fn.gradient(&[1.0], &[2.0], None, None);
+        assert_eq!(g[0], 0.0);
+    }
+
+    #[test]
+    fn test_listnet_gradient_and_loss_small() {
+        let loss_fn = ListNetLoss::default();
+        let (g, h, l) = loss_fn.gradient_and_loss(&[1.0], &[2.0], None, None);
+        assert_eq!(g.len(), 1);
+        assert!(h.is_none());
+        assert_eq!(l[0], f32::INFINITY);
+    }
+
+    #[test]
+    fn test_compute_listnet_loss_weighted() {
+        let softmax_y = vec![0.5, 0.3, 0.2];
+        let softmax_yhat = vec![0.6, 0.3, 0.1];
+        let w = vec![2.0, 1.0, 1.0];
+        let l_w = compute_listnet_loss(&softmax_y, &softmax_yhat, Some(&w));
+        let l_nw = compute_listnet_loss(&softmax_y, &softmax_yhat, None);
+        assert!(l_w > 0.0);
+        assert!(l_nw > 0.0);
+    }
+
+    #[test]
+    fn test_compute_group_gradients_weighted() {
+        let softmax_y = vec![0.5, 0.3, 0.2];
+        let softmax_yhat = vec![0.6, 0.3, 0.1];
+        let w = vec![2.0, 1.0, 1.0];
+        let mut output = vec![0.0f32; 3];
+        compute_group_gradients(&softmax_y, &softmax_yhat, Some(&w), &mut output);
+        assert_eq!(output.len(), 3);
+    }
+
+    #[test]
+    fn test_compute_group_hessian_weighted() {
+        let softmax_yhat = vec![0.6, 0.3, 0.1];
+        let w = vec![2.0, 1.0, 1.0];
+        let mut output = vec![0.0f32; 3];
+        compute_group_hessian(&softmax_yhat, Some(&w), &mut output);
+        assert_eq!(output.len(), 3);
+        assert!(output[0] > 0.0);
+    }
 }

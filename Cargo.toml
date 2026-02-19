@@ -44,6 +44,7 @@ criterion = "0.8.2"
 reqwest = { version = "0.13.2", features = ["blocking"] }
 csv = "1.4.0"
 chrono = "0.4.43"
+tempfile = "3.25.0"
 
 [[bench]]
 name = "training_benchmark"

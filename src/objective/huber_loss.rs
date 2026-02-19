@@ -216,4 +216,38 @@ mod tests {
         assert!((g[0] - 0.25).abs() < 1e-6);
         assert!((h[0] - 0.0).abs() < 1e-6);
     }
+
+    #[test]
+    fn test_huber_gradient_and_loss() {
+        let y = vec![1.0, 2.0];
+        let yhat = vec![1.1, 3.0];
+        let loss_fn = HuberLoss { delta: Some(1.0) };
+        let (g, h, l) = loss_fn.gradient_and_loss(&y, &yhat, None, None);
+        assert_eq!(g.len(), 2);
+        assert!(h.is_some());
+        assert_eq!(l.len(), 2);
+    }
+
+    #[test]
+    fn test_huber_gradient_and_loss_weighted() {
+        let y = vec![1.0, 2.0];
+        let yhat = vec![1.1, 3.0];
+        let w = vec![2.0, 1.0];
+        let loss_fn = HuberLoss { delta: Some(1.0) };
+        let (g, h, l) = loss_fn.gradient_and_loss(&y, &yhat, Some(&w), None);
+        assert_eq!(g.len(), 2);
+        assert!(h.is_some());
+        assert_eq!(l.len(), 2);
+    }
+
+    #[test]
+    fn test_huber_loss_single() {
+        let loss_fn = HuberLoss { delta: Some(1.0) };
+        let l1 = loss_fn.loss_single(1.0, 1.5, None); // r=0.5, ar=0.5<=1 -> 0.5*0.25=0.125
+        assert!((l1 - 0.125).abs() < 1e-5);
+        let l2 = loss_fn.loss_single(1.0, 3.0, None); // r=2, ar=2>1 -> 1*(2-0.5)=1.5
+        assert!((l2 - 1.5).abs() < 1e-5);
+        let l3 = loss_fn.loss_single(1.0, 1.5, Some(2.0));
+        assert!((l3 - 0.25).abs() < 1e-5);
+    }
 }

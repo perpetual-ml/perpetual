@@ -186,3 +186,70 @@ impl PerpetualBooster {
         self
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::booster::config::MissingNodeTreatment;
+    use crate::constraints::ConstraintMap;
+    use crate::objective::Objective;
+    use std::collections::HashSet;
+
+    #[test]
+    fn test_setters() {
+        let booster = PerpetualBooster::default()
+            .set_objective(Objective::LogLoss)
+            .set_budget(2.0)
+            .set_base_score(0.5)
+            .set_max_bin(128)
+            .set_num_threads(Some(4))
+            .set_monotone_constraints(Some(ConstraintMap::new()))
+            .set_interaction_constraints(Some(vec![vec![0, 1]]))
+            .set_force_children_to_bound_parent(true)
+            .set_missing(0.0)
+            .set_allow_missing_splits(false)
+            .set_create_missing_branch(false)
+            .set_terminate_missing_features(HashSet::from([0]))
+            .set_missing_node_treatment(MissingNodeTreatment::AverageNodeWeight)
+            .set_log_iterations(10)
+            .set_ref_log_iterations(20)
+            .set_seed(42)
+            .set_quantile(Some(0.5))
+            .set_reset(Some(true))
+            .set_categorical_features(Some(HashSet::from([1])))
+            .set_timeout(Some(100.0))
+            .set_iteration_limit(Some(50))
+            .set_memory_limit(Some(1024.0))
+            .set_stopping_rounds(Some(5))
+            .set_save_node_stats(true)
+            .set_calibration_method(CalibrationMethod::MinMax);
+
+        assert!(matches!(booster.cfg.objective, Objective::LogLoss));
+        assert_eq!(booster.cfg.budget, 2.0);
+        assert_eq!(booster.base_score, 0.5);
+        assert_eq!(booster.cfg.max_bin, 128);
+        assert_eq!(booster.cfg.num_threads, Some(4));
+        assert!(booster.cfg.monotone_constraints.is_some());
+        assert_eq!(booster.cfg.interaction_constraints, Some(vec![vec![0, 1]]));
+        assert!(booster.cfg.force_children_to_bound_parent);
+        assert_eq!(booster.cfg.missing, 0.0);
+        assert!(!booster.cfg.allow_missing_splits);
+        assert!(!booster.cfg.create_missing_branch);
+        assert!(booster.cfg.terminate_missing_features.contains(&0));
+        assert_eq!(
+            booster.cfg.missing_node_treatment,
+            MissingNodeTreatment::AverageNodeWeight
+        );
+        assert_eq!(booster.cfg.log_iterations, 20);
+        assert_eq!(booster.cfg.seed, 42);
+        assert_eq!(booster.cfg.quantile, Some(0.5));
+        assert_eq!(booster.cfg.reset, Some(true));
+        assert!(booster.cfg.categorical_features.as_ref().unwrap().contains(&1));
+        assert_eq!(booster.cfg.timeout, Some(100.0));
+        assert_eq!(booster.cfg.iteration_limit, Some(50));
+        assert_eq!(booster.cfg.memory_limit, Some(1024.0));
+        assert_eq!(booster.cfg.stopping_rounds, Some(5));
+        assert!(booster.cfg.save_node_stats);
+        assert_eq!(booster.cfg.calibration_method, CalibrationMethod::MinMax);
+    }
+}

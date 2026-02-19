@@ -232,7 +232,7 @@ impl Tree {
     fn predict_row(&self, data: &Matrix<f64>, row: usize, missing: &f64) -> f64 {
         let mut node_idx = 0;
         loop {
-            let node = &self.nodes.get(&node_idx).unwrap();
+            let node = self.nodes.get(&node_idx).unwrap();
             if node.is_leaf {
                 return node.weight_value as f64;
             } else {
@@ -458,5 +458,153 @@ impl Tree {
         } else {
             self.predict_nodes_single_threaded_columnar(data, missing)
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::Matrix;
+    use crate::node::Node;
+    use std::collections::HashMap;
+
+    fn create_mock_tree() -> Tree {
+        let mut tree = Tree::new();
+        // Node 0: split on feat 0 at 0.5, left 1, right 2
+        let root = Node {
+            num: 0,
+            weight_value: 0.0, // root weight doesn't matter much for predict_row
+            hessian_sum: 30.0,
+            split_value: 0.5,
+            split_feature: 0,
+            split_gain: 0.0,
+            missing_node: 1,
+            left_child: 1,
+            right_child: 2,
+            is_leaf: false,
+            parent_node: 0,
+            left_cats: None,
+            stats: None,
+        };
+        let left = Node {
+            num: 1,
+            weight_value: 0.1,
+            hessian_sum: 10.0,
+            split_value: 0.0,
+            split_feature: 0,
+            split_gain: 0.0,
+            missing_node: 1,
+            left_child: 0,
+            right_child: 0,
+            is_leaf: true,
+            parent_node: 0,
+            left_cats: None,
+            stats: None,
+        };
+        let right = Node {
+            num: 2,
+            weight_value: 0.2,
+            hessian_sum: 20.0,
+            split_value: 0.0,
+            split_feature: 0,
+            split_gain: 0.0,
+            missing_node: 2,
+            left_child: 0,
+            right_child: 0,
+            is_leaf: true,
+            parent_node: 0,
+            left_cats: None,
+            stats: None,
+        };
+        tree.nodes.insert(0, root);
+        tree.nodes.insert(1, left);
+        tree.nodes.insert(2, right);
+        tree.n_leaves = 2;
+        tree
+    }
+
+    #[test]
+    fn test_tree_predict_row() {
+        let tree = create_mock_tree();
+        // Column major: [row0_feat0, row1_feat0, row0_feat1, row1_feat1]
+        let data = Matrix::new(&[0.1, 0.6, 0.0, 0.0], 2, 2);
+        let missing = f64::NAN;
+
+        let p0 = tree.predict_row(&data, 0, &missing);
+        let p1 = tree.predict_row(&data, 1, &missing);
+        // Compare with f32 precision as weight_value is f32
+        assert_eq!(p0, 0.1f32 as f64);
+        assert_eq!(p1, 0.2f32 as f64);
+    }
+
+    #[test]
+    fn test_tree_predict() {
+        let tree = create_mock_tree();
+        let data = Matrix::new(&[0.1, 0.6, 0.0, 0.0], 2, 2);
+        let missing = f64::NAN;
+
+        let preds = tree.predict(&data, false, &missing);
+        assert_eq!(preds, vec![0.1f32 as f64, 0.2f32 as f64]);
+    }
+
+    #[test]
+    fn test_tree_predict_contributions_weight() {
+        let tree = create_mock_tree();
+        let row = [0.1, 0.0];
+        let mut contribs = vec![0.0; 3]; // 2 features + 1 bias
+        let missing = f64::NAN;
+
+        tree.predict_contributions_row_weight(&row, &mut contribs, &missing);
+        // Node 0 weight is 0.0, Node 1 weight is 0.1.
+        // Bias (index 2) = Node 0 weight = 0.0
+        // Feat 0 (index 0) = Node 1 weight - Node 0 weight = 0.1 - 0.0 = 0.1
+        assert_eq!(contribs[2], 0.0);
+        assert_eq!(contribs[0], 0.1f32 as f64);
+    }
+
+    #[test]
+    fn test_tree_predict_contributions_average() {
+        let tree = create_mock_tree();
+        let row = [0.1, 0.0];
+        let mut contribs = vec![0.0; 3];
+        let missing = f64::NAN;
+
+        let mut weights = HashMap::new();
+        weights.insert(0, 0.15);
+        weights.insert(1, 0.1);
+        weights.insert(2, 0.2);
+
+        tree.predict_contributions_row_average(&row, &mut contribs, &weights, &missing);
+        assert_eq!(contribs[2], 0.15);
+        assert!((contribs[0] - (-0.05)).abs() < 1e-7);
+    }
+
+    #[test]
+    fn test_tree_predict_contributions_probability_change() {
+        let tree = create_mock_tree();
+        let row = [0.1, 0.0];
+        let mut contribs = vec![0.0; 3];
+        let missing = f64::NAN;
+
+        tree.predict_contributions_row_probability_change(&row, &mut contribs, &missing, 0.0);
+        assert!(contribs[2].abs() < 1e-7);
+        // sigmoid(0.1) - sigmoid(0.0)
+        let expected = 1.0 / (1.0 + (-0.1f64).exp()) - 0.5;
+        assert!((contribs[0] - expected).abs() < 1e-7);
+    }
+
+    #[test]
+    fn test_tree_predict_contributions_midpoint() {
+        let tree = create_mock_tree();
+        let row = [0.1, 0.0];
+        let mut contribs = vec![0.0; 3];
+        let missing = f64::NAN;
+
+        tree.predict_contributions_row_midpoint_difference(&row, &mut contribs, &missing);
+        // Child 1 weight = 0.1, Child 2 weight = 0.2
+        // Midpoint = (0.1*10 + 0.2*20)/(10+20) = 0.16666666
+        // Delta = 0.1 - 0.16666666
+        let expected = 0.1f32 - (0.1f32 * 10.0 + 0.2f32 * 20.0) / 30.0;
+        assert!((contribs[0] - expected as f64).abs() < 1e-7);
     }
 }

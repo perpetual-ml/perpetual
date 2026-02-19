@@ -44,9 +44,11 @@ pub struct PerpetualBooster {
     pub cfg: BoosterConfig,
     /// The initial prediction value of the model (bias term).
     /// If not provided, this is usually initialized to the mean (or log-odds) of the target.
+    #[serde(deserialize_with = "crate::booster::config::parse_missing")]
     pub base_score: f64,
     /// The global learning rate (step size) derived from the budget.
     /// A higher budget implies a smaller eta, allowing for more fine-grained learning steps.
+    #[serde(deserialize_with = "crate::booster::config::parse_f32")]
     pub eta: f32,
     /// The ensemble of trained `Tree` structures.
     pub trees: Vec<Tree>,
@@ -996,6 +998,7 @@ impl BoosterIO for PerpetualBooster {
 mod perpetual_booster_test {
 
     use crate::booster::config::*;
+    use crate::constraints::{Constraint, ConstraintMap};
     use crate::metrics::ranking::{GainScheme, ndcg_at_k_metric};
     use crate::objective::{Objective, ObjectiveFunction};
     use crate::utils::between;
@@ -1574,5 +1577,38 @@ mod perpetual_booster_test {
         assert!(final_ndcg > random_ndcg);
 
         Ok(())
+    }
+
+    #[test]
+    fn test_booster_timeout() {
+        let (data, y) = read_data("resources/cal_housing_test.csv").unwrap();
+        let matrix = Matrix::new(&data, y.len(), 8);
+        let mut booster = PerpetualBooster::default().set_budget(2.0).set_timeout(Some(0.001)); // Extremely low timeout forces early exit
+        booster.fit(&matrix, &y, None, None).unwrap();
+        // With budget=2.0, many iterations would be needed, but timeout exits early
+    }
+
+    #[test]
+    fn test_booster_constraints() {
+        let mut constraints = ConstraintMap::new();
+        constraints.insert(0, Constraint::Positive);
+        let mut booster = PerpetualBooster::default()
+            .set_budget(0.1)
+            .set_monotone_constraints(Some(constraints))
+            .set_interaction_constraints(Some(vec![vec![0, 1]]));
+        let data = Matrix::new(&[1.0, 2.0, 3.0, 4.0], 2, 2);
+        let y = vec![1.0, 2.0];
+        booster.fit(&data, &y, None, None).unwrap();
+    }
+
+    #[test]
+    fn test_booster_categorical() {
+        let cat_features = HashSet::from([0]);
+        let mut booster = PerpetualBooster::default()
+            .set_budget(0.1)
+            .set_categorical_features(Some(cat_features));
+        let data = Matrix::new(&[1.0, 2.0, 3.0, 4.0], 2, 2);
+        let y = vec![1.0, 2.0];
+        booster.fit(&data, &y, None, None).unwrap();
     }
 }

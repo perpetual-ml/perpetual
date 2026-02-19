@@ -11,7 +11,7 @@ use std::fs;
 use std::path::Path;
 
 /// Methods for calculating feature contributions.
-#[derive(Serialize, Deserialize, Clone, Copy)]
+#[derive(Serialize, Deserialize, Clone, Copy, PartialEq, Debug)]
 pub enum ContributionsMethod {
     /// Saabas-style contributions using leaf weights.
     Weight,
@@ -30,7 +30,7 @@ pub enum ContributionsMethod {
 }
 
 /// Method to calculate variable importance.
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
 pub enum ImportanceMethod {
     /// The number of times a feature is used to split the data across all trees.
     Weight,
@@ -45,7 +45,7 @@ pub enum ImportanceMethod {
 }
 
 /// Strategies for handling missing values during training.
-#[derive(Serialize, Deserialize, Clone, Copy)]
+#[derive(Serialize, Deserialize, Clone, Copy, PartialEq, Debug)]
 pub enum MissingNodeTreatment {
     /// No constraints on missing node weights.
     None,
@@ -108,11 +108,18 @@ fn default_log_iterations() -> usize {
 fn default_force_children_to_bound_parent() -> bool {
     false
 }
-fn parse_missing<'de, D>(d: D) -> Result<f64, D::Error>
+pub(crate) fn parse_missing<'de, D>(d: D) -> Result<f64, D::Error>
 where
     D: Deserializer<'de>,
 {
     Deserialize::deserialize(d).map(|x: Option<_>| x.unwrap_or(f64::NAN))
+}
+
+pub(crate) fn parse_f32<'de, D>(d: D) -> Result<f32, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    Deserialize::deserialize(d).map(|x: Option<_>| x.unwrap_or(f32::NAN))
 }
 fn default_interaction_constraints() -> Option<Vec<Vec<usize>>> {
     None
@@ -249,3 +256,66 @@ pub trait BoosterIO: Serialize + DeserializeOwned + Sized {
 }
 
 impl BoosterIO for BoosterConfig {}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::tempdir;
+
+    #[test]
+    fn test_booster_config_default() {
+        let config = BoosterConfig::default();
+        assert_eq!(config.budget, 0.5);
+        assert_eq!(config.max_bin, 256);
+        assert!(config.missing.is_nan());
+        assert_eq!(config.calibration_method, CalibrationMethod::WeightVariance);
+    }
+
+    #[test]
+    fn test_booster_io_json() {
+        let config = BoosterConfig::default();
+        let json = config.json_dump().unwrap();
+        let config2 = BoosterConfig::from_json(&json).unwrap();
+        assert_eq!(config.budget, config2.budget);
+        assert_eq!(config.max_bin, config2.max_bin);
+    }
+
+    #[test]
+    fn test_booster_io_file() {
+        let dir = tempdir().unwrap();
+        let file_path = dir.path().join("booster.json");
+        let config = BoosterConfig::default();
+        config.save_booster(&file_path).unwrap();
+        let config2 = BoosterConfig::load_booster(&file_path).unwrap();
+        assert_eq!(config.budget, config2.budget);
+        assert_eq!(config.max_bin, config2.max_bin);
+    }
+
+    #[test]
+    fn test_parse_missing() {
+        let json = r#"{"objective": "LogLoss", "max_bin": 256, "seed": 0, "allow_missing_splits": true, "create_missing_branch": false, "save_node_stats": false, "missing": null}"#;
+        let config: BoosterConfig = serde_json::from_str(json).unwrap();
+        assert!(config.missing.is_nan());
+
+        let json2 = r#"{"objective": "LogLoss", "max_bin": 256, "seed": 0, "allow_missing_splits": true, "create_missing_branch": false, "save_node_stats": false, "missing": 123.45}"#;
+        let config2: BoosterConfig = serde_json::from_str(json2).unwrap();
+        assert_eq!(config2.missing, 123.45);
+    }
+
+    #[test]
+    fn test_parse_f32() {
+        use serde::Deserialize;
+        #[derive(Deserialize)]
+        struct TestStruct {
+            #[serde(deserialize_with = "parse_f32")]
+            val: f32,
+        }
+        let json = r#"{"val": null}"#;
+        let s: TestStruct = serde_json::from_str(json).unwrap();
+        assert!(s.val.is_nan());
+
+        let json2 = r#"{"val": 0.5}"#;
+        let s2: TestStruct = serde_json::from_str(json2).unwrap();
+        assert_eq!(s2.val, 0.5);
+    }
+}
