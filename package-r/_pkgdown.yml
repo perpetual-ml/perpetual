@@ -12,6 +12,7 @@ reference:
   - title: Model Training
     contents:
       - perpetual
+      - PerpetualBooster
   - title: Prediction and Interpretation
     contents:
       - predict.PerpetualBooster
