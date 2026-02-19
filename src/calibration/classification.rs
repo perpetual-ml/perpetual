@@ -534,12 +534,24 @@ mod tests {
         let columns: Vec<&[f64]> = (0..n_features).map(|j| matrix.get_col(j)).collect();
         let cal_data = ColumnarMatrix::new(columns, None, 2);
 
-        let mut b = booster.clone();
-        b.calibrate_classification_columnar(CalibrationMethod::Conformal, (&cal_data, &y_cal, &alpha))
-            .unwrap();
-        assert!(b.isotonic_calibrator.is_some());
+        for method in [
+            CalibrationMethod::Conformal,
+            CalibrationMethod::WeightVariance,
+            CalibrationMethod::MinMax,
+            CalibrationMethod::GRP,
+        ] {
+            let mut b = booster.clone();
+            b.calibrate_classification_columnar(method, (&cal_data, &y_cal, &alpha))
+                .unwrap();
 
-        let sets = b.predict_sets_columnar(&cal_data, false);
-        assert!(sets.contains_key("0.1"));
+            if matches!(method, CalibrationMethod::Conformal) {
+                assert!(b.isotonic_calibrator.is_some());
+            } else {
+                assert!(b.cal_params.contains_key("0.1"));
+            }
+
+            let sets = b.predict_sets_columnar(&cal_data, false);
+            assert!(sets.contains_key("0.1"));
+        }
     }
 }

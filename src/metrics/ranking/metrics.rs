@@ -168,3 +168,76 @@ pub fn ndcg_at_k_metric(
         0.0
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_compute_discount() {
+        assert!((compute_discount(0) - 1.0).abs() < 1e-10); // 1/log2(2) = 1
+        assert!((compute_discount(1) - 1.0 / 3.0f64.log2()).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_compute_gain() {
+        assert_eq!(compute_gain(3.0, &GainScheme::Jarvelin), 3.0);
+        assert_eq!(compute_gain(3.0, &GainScheme::Burges), 7.0); // 2^3 - 1 = 7
+    }
+
+    #[test]
+    fn test_compute_group_dcg() {
+        let relevance = vec![3.0, 2.0, 1.0];
+        let weights = vec![1.0, 1.0, 1.0];
+
+        // Jarvelin: 3/log(2) + 2/log(3) + 1/log(4)
+        let dcg = compute_group_dcg(&relevance, None, &weights, &GainScheme::Jarvelin);
+        let expected = 3.0 / 2.0f64.log2() + 2.0 / 3.0f64.log2() + 1.0 / 4.0f64.log2();
+        assert!((dcg - expected).abs() < 1e-10);
+
+        // K=1
+        let dcg_k1 = compute_group_dcg(&relevance, Some(1), &weights, &GainScheme::Jarvelin);
+        assert!((dcg_k1 - 3.0).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_compute_group_ndcg() {
+        let y = vec![1.0, 3.0, 2.0];
+        let yhat = vec![0.1, 0.3, 0.2]; // same order as y, but unsorted
+        let weights = vec![1.0, 1.0, 1.0];
+
+        // If yhat and y have same order, NDCG should be 1.0
+        let ndcg = compute_group_ndcg(&y, &yhat, &weights, None, &GainScheme::Jarvelin);
+        assert!((ndcg - 1.0).abs() < 1e-10);
+
+        let yhat_bad = vec![0.3, 0.1, 0.2]; // bad order
+        let ndcg_bad = compute_group_ndcg(&y, &yhat_bad, &weights, None, &GainScheme::Jarvelin);
+        assert!(ndcg_bad < 1.0);
+    }
+
+    #[test]
+    fn test_ndcg_at_k_metric() {
+        let y = vec![3.0, 2.0, 3.0, 0.0];
+        let yhat = vec![0.5, 0.4, 0.5, 0.1];
+        let weights = vec![1.0, 1.0, 1.0, 1.0];
+        let groups = vec![2, 2];
+
+        let ndcg = ndcg_at_k_metric(&y, &yhat, &weights, &groups, None, &GainScheme::Jarvelin);
+        assert!(ndcg > 0.0 && ndcg <= 1.0);
+
+        // Empty case
+        assert_eq!(ndcg_at_k_metric(&[], &[], &[], &[], None, &GainScheme::Jarvelin), 0.0);
+    }
+
+    #[test]
+    fn test_ndcg_metric_struct() {
+        let y = vec![3.0, 2.0];
+        let yhat = vec![0.5, 0.4];
+        let weights = vec![1.0, 1.0];
+        let groups = vec![2];
+
+        // This tests the calculate_metric implementation which is currently a bit of a placeholder in the source
+        let val = NDCGMetric::calculate_metric(&y, &yhat, &weights, &groups, None);
+        assert!(val >= 0.0);
+    }
+}

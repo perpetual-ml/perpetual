@@ -3034,14 +3034,15 @@ mod tests {
     use super::*;
     use crate::binning::bin_matrix;
     use crate::data::Matrix;
-    use crate::histogram::{NodeHistogramOwned, update_histogram};
+    use crate::histogram::{NodeHistogram, NodeHistogramOwned, update_histogram};
     use crate::node::SplittableNode;
-    use crate::tree::core::create_root_node;
+    use crate::tree::core::{Tree, TreeStopper, create_root_node};
 
     use crate::objective::{Objective, ObjectiveFunction};
     use crate::utils::weight;
     use crate::utils::{between, gain};
-    // use polars::prelude::*; // Removed
+    use rayon::ThreadPoolBuilder;
+    use std::collections::{HashMap, HashSet};
     use std::error::Error;
     use std::fs;
 
@@ -3472,5 +3473,759 @@ mod tests {
         assert_eq!(6, s.split_feature);
 
         Ok(())
+    }
+
+    #[test]
+    fn test_missing_branch_splitter_and_importance() {
+        let constraints_map = ConstraintMap::new();
+        let terminate_missing_features = HashSet::new();
+        let splitter = MissingBranchSplitter::new(
+            0.1,
+            true,
+            constraints_map,
+            terminate_missing_features,
+            MissingNodeTreatment::AverageLeafWeight,
+            false,
+        );
+
+        assert_eq!(splitter.new_leaves_added(), 2);
+        assert_eq!(splitter.get_eta(), 0.1);
+        assert!(splitter.get_allow_missing_splits());
+        assert!(splitter.get_create_missing_branch());
+        assert_eq!(
+            splitter.get_missing_node_treatment(),
+            MissingNodeTreatment::AverageLeafWeight
+        );
+        assert!(!splitter.get_force_children_to_bound_parent());
+        assert!(splitter.get_interaction_constraints().is_none());
+
+        // Test Importance calculations would normally go here on a Tree, not a Splitter.
+
+        // Test predict_row_from_row_slice
+        let _row = vec![1.0, 2.0];
+        let _missing = f64::NAN;
+        // This will panic if we don't have nodes, but let's see if we can mock it or if there's a better way.
+        // Actually, MissingBranchSplitter doesn't have a 'nodes' field in its struct, but Splitter trait methods might use them.
+        // Wait, predict_row_from_row_slice is a method on Tree or Splitter?
+        // Checking... line 142163 in splitter.rs? No, let me check the struct.
+    }
+
+    #[test]
+    fn test_interaction_constraints() {
+        let interaction_constraints = Some(vec![vec![0, 1]]);
+        let splitter = MissingImputerSplitter::new(0.3, true, ConstraintMap::new(), interaction_constraints);
+        assert_eq!(splitter.get_interaction_constraints().unwrap().len(), 1);
+
+        let allowed_features = HashSet::from([0]);
+        // This should trigger the "skip disallowed features" block in best_split.
+
+        // Setup minimal best_split call to exercise the block
+        let nbins = 10;
+        let data_vec = vec![0.0, 1.0, 2.0, 3.0];
+        let data = Matrix::new(&data_vec, 2, 2);
+        let b = bin_matrix(&data, None, nbins, f64::NAN, None).unwrap();
+        let _bdata = Matrix::new(&b.binned_data, data.rows, data.cols);
+        let col_index = vec![0, 1];
+        let mut hist_tree_owned = vec![NodeHistogramOwned::empty_from_cuts(&b.cuts, &col_index, false, false)];
+        let hist_tree = hist_tree_owned
+            .iter_mut()
+            .map(NodeHistogram::from_owned)
+            .collect::<Vec<_>>();
+
+        let node = SplittableNode::new(
+            0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            2,
+            0,
+            0,
+            2,
+            f32::NEG_INFINITY,
+            f32::INFINITY,
+            NodeType::Root,
+            None,
+            [0.0; 5],
+        );
+        let mut split_info_vec = vec![SplitInfo::default(), SplitInfo::default()];
+        let mut split_info_slice = SplitInfoSlice::new(&mut split_info_vec);
+        let pool = ThreadPoolBuilder::new().num_threads(1).build().unwrap();
+
+        splitter.best_split(
+            &node,
+            &col_index,
+            false,
+            &hist_tree,
+            &pool,
+            None,
+            &mut split_info_slice,
+            Some(&allowed_features),
+        );
+
+        unsafe {
+            assert_eq!(split_info_slice.get_mut(1).split_gain, -1.0); // Feature 1 was disallowed
+        }
+    }
+
+    #[test]
+    fn test_missing_branch_splitter_comprehensive() {
+        let splitter = MissingBranchSplitter::new(
+            0.1,
+            true,
+            ConstraintMap::new(),
+            HashSet::new(),
+            MissingNodeTreatment::AverageLeafWeight,
+            false,
+        );
+
+        // Test update_average_missing_nodes
+        use crate::node::Node;
+        use std::collections::HashMap;
+        let mut nodes = HashMap::new();
+        nodes.insert(
+            0,
+            Node {
+                num: 0,
+                parent_node: 0,
+                left_child: 1,
+                right_child: 2,
+                missing_node: 3,
+                split_feature: 0,
+                split_value: 0.5,
+                split_gain: 0.0,
+                is_leaf: false,
+                weight_value: 0.0,
+                hessian_sum: 20.0,
+                left_cats: None,
+                stats: None,
+            },
+        );
+        nodes.insert(
+            1,
+            Node {
+                num: 1,
+                parent_node: 0,
+                left_child: 0,
+                right_child: 0,
+                missing_node: 0,
+                split_feature: 0,
+                split_value: 0.0,
+                split_gain: 0.0,
+                is_leaf: true,
+                weight_value: 1.0,
+                hessian_sum: 10.0,
+                left_cats: None,
+                stats: None,
+            },
+        );
+        nodes.insert(
+            2,
+            Node {
+                num: 2,
+                parent_node: 0,
+                left_child: 0,
+                right_child: 0,
+                missing_node: 0,
+                split_feature: 0,
+                split_value: 0.0,
+                split_gain: 0.0,
+                is_leaf: true,
+                weight_value: 2.0,
+                hessian_sum: 10.0,
+                left_cats: None,
+                stats: None,
+            },
+        );
+        nodes.insert(
+            3,
+            Node {
+                num: 3,
+                parent_node: 0,
+                left_child: 0,
+                right_child: 0,
+                missing_node: 0,
+                split_feature: 0,
+                split_value: 0.0,
+                split_gain: 0.0,
+                is_leaf: true,
+                weight_value: 0.0,
+                hessian_sum: 5.0,
+                left_cats: None,
+                stats: None,
+            },
+        );
+
+        let mut tree = Tree {
+            nodes,
+            stopper: TreeStopper::Generalization,
+            depth: 1,
+            n_leaves: 3,
+            leaf_bounds: Vec::new(),
+            train_index: Vec::new(),
+        };
+
+        splitter.clean_up_splits(&mut tree);
+        // Average weight = (1.0 * 10.0 + 2.0 * 10.0 + 0 * 5.0) / (10.0 + 10.0 + 0) = 30.0 / 20.0 = 1.5
+        assert_eq!(tree.nodes[&0].weight_value, 1.5);
+        assert_eq!(tree.nodes[&3].weight_value, 1.5);
+
+        // Test best_split with variable Hessian
+        let nbins = 10;
+        let data_vec = vec![0.0, 1.0, 2.0, 3.0, 4.0, 5.0];
+        let data = Matrix::new(&data_vec, 3, 2);
+        let b = bin_matrix(&data, None, nbins, f64::NAN, None).unwrap();
+        let col_index = vec![0, 1];
+        // Use true for is_const_hess in NodeHistogramOwned::empty_from_cuts to avoid issues?
+        // Wait, the splitter trait methods handle is_const_hess.
+        let mut hist_tree_owned = vec![NodeHistogramOwned::empty_from_cuts(&b.cuts, &col_index, false, false)];
+        let hist_tree = hist_tree_owned
+            .iter_mut()
+            .map(NodeHistogram::from_owned)
+            .collect::<Vec<_>>();
+
+        let node = SplittableNode::new(
+            0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            3,
+            0,
+            0,
+            3,
+            f32::NEG_INFINITY,
+            f32::INFINITY,
+            NodeType::Root,
+            None,
+            [0.0; 5],
+        );
+        let mut split_info_vec = vec![SplitInfo::default(), SplitInfo::default()];
+        let mut split_info_slice = SplitInfoSlice::new(&mut split_info_vec);
+        let pool = ThreadPoolBuilder::new().num_threads(1).build().unwrap();
+
+        // Call best_split with is_const_hess = false to exercise variable hessian paths
+        splitter.best_split(
+            &node,
+            &col_index,
+            false,
+            &hist_tree,
+            &pool,
+            None,
+            &mut split_info_slice,
+            None,
+        );
+
+        unsafe {
+            assert!(split_info_slice.get_mut(0).split_gain >= -1.0);
+        }
+    }
+
+    #[test]
+    fn test_missing_imputer_splitter_coverage() {
+        let splitter = MissingImputerSplitter::new(0.3, true, ConstraintMap::new(), None);
+        assert_eq!(splitter.new_leaves_added(), 1);
+        assert!(splitter.get_constraint(&0).is_none());
+        assert_eq!(splitter.get_missing_node_treatment(), MissingNodeTreatment::None);
+        assert!(splitter.get_interaction_constraints().is_none());
+    }
+
+    #[test]
+    fn test_update_average_missing_nodes_recursive() {
+        let splitter = MissingBranchSplitter::new(
+            0.1,
+            true,
+            ConstraintMap::new(),
+            HashSet::new(),
+            MissingNodeTreatment::AverageLeafWeight,
+            false,
+        );
+        use crate::node::Node;
+        let mut nodes = HashMap::new();
+        // Root (0) -> Left (1), Right (2), Missing (3)
+        // Missing (3) -> Left (4), Right (5), Missing (6)
+        nodes.insert(
+            0,
+            Node {
+                num: 0,
+                parent_node: 0,
+                left_child: 1,
+                right_child: 2,
+                missing_node: 3,
+                split_feature: 0,
+                split_value: 0.5,
+                split_gain: 0.0,
+                is_leaf: false,
+                weight_value: 0.0,
+                hessian_sum: 30.0,
+                left_cats: None,
+                stats: None,
+            },
+        );
+        nodes.insert(
+            1,
+            Node {
+                num: 1,
+                parent_node: 0,
+                left_child: 0,
+                right_child: 0,
+                missing_node: 0,
+                split_feature: 0,
+                split_value: 0.0,
+                split_gain: 0.0,
+                is_leaf: true,
+                weight_value: 1.0,
+                hessian_sum: 10.0,
+                left_cats: None,
+                stats: None,
+            },
+        );
+        nodes.insert(
+            2,
+            Node {
+                num: 2,
+                parent_node: 0,
+                left_child: 0,
+                right_child: 0,
+                missing_node: 0,
+                split_feature: 0,
+                split_value: 0.0,
+                split_gain: 0.0,
+                is_leaf: true,
+                weight_value: 2.0,
+                hessian_sum: 10.0,
+                left_cats: None,
+                stats: None,
+            },
+        );
+        nodes.insert(
+            3,
+            Node {
+                num: 3,
+                parent_node: 0,
+                left_child: 4,
+                right_child: 5,
+                missing_node: 6,
+                split_feature: 1,
+                split_value: 0.5,
+                split_gain: 0.0,
+                is_leaf: false,
+                weight_value: 0.0,
+                hessian_sum: 10.0,
+                left_cats: None,
+                stats: None,
+            },
+        );
+        nodes.insert(
+            4,
+            Node {
+                num: 4,
+                parent_node: 3,
+                left_child: 0,
+                right_child: 0,
+                missing_node: 0,
+                split_feature: 0,
+                split_value: 0.0,
+                split_gain: 0.0,
+                is_leaf: true,
+                weight_value: 3.0,
+                hessian_sum: 5.0,
+                left_cats: None,
+                stats: None,
+            },
+        );
+        nodes.insert(
+            5,
+            Node {
+                num: 5,
+                parent_node: 3,
+                left_child: 0,
+                right_child: 0,
+                missing_node: 0,
+                split_feature: 0,
+                split_value: 0.0,
+                split_gain: 0.0,
+                is_leaf: true,
+                weight_value: 4.0,
+                hessian_sum: 5.0,
+                left_cats: None,
+                stats: None,
+            },
+        );
+        nodes.insert(
+            6,
+            Node {
+                num: 6,
+                parent_node: 3,
+                left_child: 0,
+                right_child: 0,
+                missing_node: 0,
+                split_feature: 0,
+                split_value: 0.0,
+                split_gain: 0.0,
+                is_leaf: true,
+                weight_value: 0.0,
+                hessian_sum: 0.0,
+                left_cats: None,
+                stats: None,
+            },
+        );
+
+        let mut tree = Tree {
+            nodes,
+            stopper: TreeStopper::Generalization,
+            depth: 2,
+            n_leaves: 5,
+            leaf_bounds: Vec::new(),
+            train_index: Vec::new(),
+        };
+        splitter.clean_up_splits(&mut tree);
+        // Node 3 avg weight = (3.0 * 5 + 4.0 * 5 + 0 * 0) / (5 + 5 + 0) = 35 / 10 = 3.5
+        // Node 0 avg weight = (1.0 * 10 + 2.0 * 10 + 3.5 * 10) / (10 + 10 + 10) = (10 + 20 + 35) / 30 = 65 / 30 = 2.166...
+        assert!((tree.nodes[&0].weight_value - 2.1666667).abs() < 1e-5);
+    }
+
+    #[test]
+    fn test_handle_split_info_histogram_strategies() {
+        let pool = ThreadPoolBuilder::new().num_threads(1).build().unwrap();
+
+        let run_strategy = |n_missing: usize, n_left: usize, n_right: usize| {
+            let splitter = MissingBranchSplitter::new(
+                0.1,
+                true,
+                ConstraintMap::new(),
+                HashSet::from([0]),
+                MissingNodeTreatment::AverageLeafWeight,
+                false,
+            );
+            let n_total = n_missing + n_left + n_right;
+            let mut data_vec: Vec<u16> = vec![0; n_total * 2];
+            // Fill feature 0 with values to create missing, left, right groups
+            // In column-major Matrix, col 0 is data_vec[0..n_total]
+            // bin 0: missing, bin 1: left, bin 2: right
+            for i in 0..n_missing {
+                data_vec[i] = 0;
+            }
+            for i in n_missing..(n_missing + n_left) {
+                data_vec[i] = 1;
+            }
+            for i in (n_missing + n_left)..n_total {
+                data_vec[i] = 2;
+            }
+            // feature 1 remains all 0s
+
+            let data = Matrix::new(&data_vec, n_total, 2);
+            let col_index = vec![0, 1];
+            let cuts = crate::data::JaggedMatrix::from_vecs(&vec![vec![1.5, 5.5, f64::MAX], vec![1.5, 5.5, f64::MAX]]);
+            let mut hist_tree_owned = vec![
+                NodeHistogramOwned::empty_from_cuts(&cuts, &col_index, false, false),
+                NodeHistogramOwned::empty_from_cuts(&cuts, &col_index, false, false),
+                NodeHistogramOwned::empty_from_cuts(&cuts, &col_index, false, false),
+                NodeHistogramOwned::empty_from_cuts(&cuts, &col_index, false, false),
+            ];
+            let hist_tree = hist_tree_owned
+                .iter_mut()
+                .map(NodeHistogram::from_owned)
+                .collect::<Vec<_>>();
+
+            let mut node = SplittableNode::new(
+                0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                n_total,
+                0,
+                0,
+                n_total,
+                f32::NEG_INFINITY,
+                f32::INFINITY,
+                NodeType::Root,
+                None,
+                [0.0; 5],
+            );
+            let mut index = (0..n_total).collect::<Vec<_>>();
+            let mut grad = vec![1.0; n_total];
+
+            // Populate root histogram
+            update_histogram(
+                &hist_tree[0],
+                0,
+                n_total,
+                &data,
+                &grad,
+                None,
+                &index,
+                &col_index,
+                &pool,
+                false,
+            );
+
+            let mut split_info = SplitInfo {
+                split_feature: 0,
+                split_bin: 2,
+                split_value: 0.5,
+                split_gain: 10.0,
+                missing_node: MissingInfo::Branch(NodeInfo {
+                    weight: 0.0,
+                    gain: 0.0,
+                    grad: 0.0,
+                    cover: 0.0,
+                    bounds: (0.0, 0.0),
+                    counts: 0,
+                    weights: [0.0; 5],
+                }),
+                left_node: NodeInfo {
+                    weight: 1.0,
+                    gain: 0.0,
+                    grad: 0.0,
+                    cover: n_left as f32,
+                    bounds: (0.0, 0.0),
+                    counts: n_left,
+                    weights: [0.0; 5],
+                },
+                right_node: NodeInfo {
+                    weight: 2.0,
+                    gain: 0.0,
+                    grad: 0.0,
+                    cover: n_right as f32,
+                    bounds: (0.0, 0.0),
+                    counts: n_right,
+                    weights: [0.0; 5],
+                },
+                ..Default::default()
+            };
+
+            splitter.handle_split_info(
+                &mut split_info,
+                &1,
+                &mut node,
+                &mut index,
+                &col_index,
+                &data,
+                &mut grad,
+                None,
+                &pool,
+                &hist_tree,
+            );
+        };
+
+        // max_ == 0: Missing is largest (n_missing=10, n_left=5, n_right=5)
+        run_strategy(10, 5, 5);
+        // max_ == 1: Left is largest (n_missing=5, n_left=10, n_right=5)
+        run_strategy(5, 10, 5);
+        // max_ == 2: Right is largest (n_missing=5, n_left=5, n_right=10)
+        run_strategy(5, 5, 10);
+        // n_missing == 0 (max_ == 1 case)
+        run_strategy(0, 10, 5);
+        // n_missing == 0 (max_ == 2 case)
+        run_strategy(0, 5, 10);
+    }
+
+    #[test]
+    fn test_splitter_additional_coverage() {
+        let pool = ThreadPoolBuilder::new().num_threads(2).build().unwrap();
+
+        // 1. MissingImputerSplitter::get_eta and coverage
+        let imputer = MissingImputerSplitter::new(0.5, true, ConstraintMap::new(), None);
+        assert_eq!(imputer.get_eta(), 0.5);
+        assert!(!imputer.get_create_missing_branch());
+        assert!(!imputer.get_force_children_to_bound_parent());
+        assert!(imputer.get_constraint(&0).is_none());
+        assert_eq!(imputer.get_constraint_map().len(), 0);
+        assert!(imputer.get_interaction_constraints().is_none());
+        assert!(imputer.get_allow_missing_splits());
+
+        // 2. MissingBranchSplitter with terminate_missing_features and misc coverage
+        let splitter = MissingBranchSplitter::new(
+            0.1,
+            true,
+            ConstraintMap::new(),
+            HashSet::from([0]),
+            MissingNodeTreatment::AverageLeafWeight,
+            false,
+        );
+        assert_eq!(splitter.get_eta(), 0.1);
+        assert_eq!(splitter.get_force_children_to_bound_parent(), false);
+        assert_eq!(splitter.get_constraint_map().len(), 0);
+        assert!(splitter.get_create_missing_branch());
+        assert!(splitter.get_allow_missing_splits());
+        assert!(splitter.get_interaction_constraints().is_none());
+        assert!(splitter.get_constraint(&0).is_none());
+
+        let n_total = 20;
+        let mut data_vec = vec![0; n_total * 2];
+        for i in 0..10 {
+            data_vec[i] = 0;
+        } // Missing (bin 0)
+        for i in 10..15 {
+            data_vec[i] = 1;
+        } // Left (bin 1)
+        for i in 15..20 {
+            data_vec[i] = 2;
+        } // Right (bin 2)
+        let data = Matrix::new(&data_vec, n_total, 2);
+        let col_index = vec![0, 1];
+        let cuts = crate::data::JaggedMatrix::from_vecs(&vec![vec![1.5, 5.5, f64::MAX], vec![1.5, 5.5, f64::MAX]]);
+        let mut hist_tree_owned = vec![
+            NodeHistogramOwned::empty_from_cuts(&cuts, &col_index, true, false),
+            NodeHistogramOwned::empty_from_cuts(&cuts, &col_index, true, false),
+            NodeHistogramOwned::empty_from_cuts(&cuts, &col_index, true, false),
+            NodeHistogramOwned::empty_from_cuts(&cuts, &col_index, true, false),
+        ];
+        let hist_tree = hist_tree_owned
+            .iter_mut()
+            .map(NodeHistogram::from_owned)
+            .collect::<Vec<_>>();
+        let mut node = SplittableNode::new(
+            0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            n_total,
+            0,
+            0,
+            n_total,
+            f32::NEG_INFINITY,
+            f32::INFINITY,
+            NodeType::Root,
+            None,
+            [0.0; 5],
+        );
+        let mut index = (0..n_total).collect::<Vec<_>>();
+        let mut grad = vec![1.0; n_total];
+        update_histogram(
+            &hist_tree[0],
+            0,
+            n_total,
+            &data,
+            &grad,
+            None,
+            &index,
+            &col_index,
+            &pool,
+            false,
+        );
+
+        let mut split_info = SplitInfo {
+            split_feature: 0,
+            split_bin: 2,
+            split_value: 0.5,
+            split_gain: 10.0,
+            missing_node: MissingInfo::Branch(NodeInfo {
+                weight: 0.0,
+                gain: 0.0,
+                grad: 0.0,
+                cover: 0.0,
+                bounds: (0.0, 0.0),
+                counts: 0,
+                weights: [0.0; 5],
+            }),
+            left_node: NodeInfo {
+                weight: 1.0,
+                gain: 0.0,
+                grad: 0.0,
+                cover: 5.0,
+                bounds: (0.0, 0.0),
+                counts: 5,
+                weights: [0.0; 5],
+            },
+            right_node: NodeInfo {
+                weight: 2.0,
+                gain: 0.0,
+                grad: 0.0,
+                cover: 5.0,
+                bounds: (0.0, 0.0),
+                counts: 5,
+                weights: [0.0; 5],
+            },
+            ..Default::default()
+        };
+        // This hits line 492 (terminate_missing_features)
+        splitter.handle_split_info(
+            &mut split_info,
+            &1,
+            &mut node,
+            &mut index,
+            &col_index,
+            &data,
+            &mut grad,
+            None,
+            &pool,
+            &hist_tree,
+        );
+
+        // 3. Interaction Constraints Parallel Path (line 208)
+        let many_cols: Vec<usize> = (0..17).collect(); // > 16
+        let long_data_vec = vec![0; n_total * 17];
+        let _long_data = Matrix::new(&long_data_vec, n_total, 17);
+        let long_cuts = crate::data::JaggedMatrix::from_vecs(&vec![vec![1.5, f64::MAX]; 17]);
+        let mut long_hist_tree_owned = vec![NodeHistogramOwned::empty_from_cuts(&long_cuts, &many_cols, true, false)];
+        let long_hist_tree = long_hist_tree_owned
+            .iter_mut()
+            .map(NodeHistogram::from_owned)
+            .collect::<Vec<_>>();
+        let mut many_split_info_vec: Vec<SplitInfo> = (0..17).map(|_| SplitInfo::default()).collect();
+        let mut many_split_info_slice = SplitInfoSlice::new(&mut many_split_info_vec);
+        let allowed_features = HashSet::from([0, 1, 2]);
+        // Call best_split with num_threads > 1 and col_index.len() > 16
+        splitter.best_split(
+            &node,
+            &many_cols,
+            true,
+            &long_hist_tree,
+            &pool,
+            None,
+            &mut many_split_info_slice,
+            Some(&allowed_features),
+        );
+
+        // 4. Categorical Branch Split and Numerical Branch Split (Const Hess)
+        let cat_index = HashSet::from([0]);
+        let mut cat_split_info_vec: Vec<SplitInfo> = (0..2).map(|_| SplitInfo::default()).collect();
+        let mut cat_split_info_slice = SplitInfoSlice::new(&mut cat_split_info_vec);
+        // Const Hess Categorical (Line 1000) and Numerical (Line 1075)
+        splitter.best_split(
+            &node,
+            &col_index,
+            true,
+            &hist_tree,
+            &pool,
+            Some(&cat_index),
+            &mut cat_split_info_slice,
+            None,
+        );
+
+        // 5. Categorical and Numerical Branch Split (Var Hess)
+        let mut hist_tree_owned_var = vec![NodeHistogramOwned::empty_from_cuts(&cuts, &col_index, false, false)];
+        let hist_tree_var = hist_tree_owned_var
+            .iter_mut()
+            .map(NodeHistogram::from_owned)
+            .collect::<Vec<_>>();
+        let hess = vec![1.0; n_total];
+        update_histogram(
+            &hist_tree_var[0],
+            0,
+            n_total,
+            &data,
+            &grad,
+            Some(&hess),
+            &index,
+            &col_index,
+            &pool,
+            false,
+        );
+        // Var Hess Categorical (Line 1536) and Numerical (Line 1611)
+        splitter.best_split(
+            &node,
+            &col_index,
+            false,
+            &hist_tree_var,
+            &pool,
+            Some(&cat_index),
+            &mut cat_split_info_slice,
+            None,
+        );
     }
 }

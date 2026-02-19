@@ -53,6 +53,9 @@ package-r/inst/c/
 # Python cache
 .ruff_cache/
 
+# Pytest cache
+.pytest_cache/
+
 # Python wheel
 *.whl
 *.pyd

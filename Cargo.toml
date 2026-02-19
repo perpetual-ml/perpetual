@@ -50,3 +50,10 @@ tempfile = "3.25.0"
 name = "training_benchmark"
 harness = false
 
+[package.metadata.llvm-cov]
+ignore-filename = [
+    "package-python/.*",
+    "package-r/.*",
+    "package-python\\\\.*",
+    "package-r\\\\.*",
+]

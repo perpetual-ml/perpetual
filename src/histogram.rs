@@ -775,11 +775,14 @@ pub fn update_two_histograms_and_subtract(
 mod tests {
     use crate::Matrix;
     use crate::binning::bin_matrix;
+    use crate::data::JaggedMatrix;
     use crate::histogram::{
-        FeatureHistogram, FeatureHistogramOwned, NodeHistogram, NodeHistogramOwned, update_histogram,
+        FeatureHistogram, FeatureHistogramOwned, HistogramArena, NodeHistogram, NodeHistogramOwned, update_cuts,
+        update_histogram,
     };
     use crate::objective::{Objective, ObjectiveFunction};
     use approx::assert_relative_eq;
+    use rayon::ThreadPoolBuilder;
     use std::collections::HashSet;
     use std::fs;
 
@@ -1032,5 +1035,116 @@ mod tests {
                 assert_relative_eq!(h1, h2);
             });
         });
+    }
+
+    #[test]
+    fn test_histogram_constructors_and_arena() {
+        let nbins = 10;
+        let col_amount = 3;
+        let is_const_hess = true;
+        let parallel = false;
+
+        // Test FeatureHistogramOwned::empty
+        let fh_owned = FeatureHistogramOwned::empty(nbins, is_const_hess);
+        assert_eq!(fh_owned.data.len(), (nbins + 2) as usize);
+
+        let fh_owned_var = FeatureHistogramOwned::empty(nbins, false);
+        assert_eq!(fh_owned_var.data.len(), (nbins + 2) as usize);
+
+        // Test NodeHistogramOwned::empty
+        let nh_owned = NodeHistogramOwned::empty(nbins, col_amount, is_const_hess, parallel);
+        assert_eq!(nh_owned.data.len(), col_amount);
+        assert_eq!(nh_owned.data[0].data.len(), (nbins + 2) as usize);
+
+        let nh_owned_par = NodeHistogramOwned::empty(nbins, col_amount, is_const_hess, true);
+        assert_eq!(nh_owned_par.data.len(), col_amount);
+
+        // Test HistogramArena::from_fixed
+        let n_nodes = 2;
+        let mut arena = HistogramArena::from_fixed(nbins, col_amount, is_const_hess, n_nodes);
+        let n_hists = arena.as_node_histograms();
+        assert_eq!(n_hists.len(), n_nodes);
+        assert_eq!(n_hists[0].data.len(), col_amount);
+
+        // Test HistogramArena::from_cuts
+        let cuts_vec = vec![vec![0.1, 0.5, 0.9], vec![1.0, 2.0], vec![0.5]];
+        let cuts = JaggedMatrix::from_vecs(&cuts_vec);
+        let col_index = vec![0, 1, 2];
+        let mut arena_cuts = HistogramArena::from_cuts(&cuts, &col_index, is_const_hess, n_nodes);
+        let n_hists_cuts = arena_cuts.as_node_histograms();
+        assert_eq!(n_hists_cuts.len(), n_nodes);
+        assert_eq!(n_hists_cuts[0].data.len(), col_amount);
+
+        // Test update_cuts
+        update_cuts(&n_hists_cuts[0], &col_index, &cuts, false);
+        update_cuts(&n_hists_cuts[1], &col_index, &cuts, true);
+    }
+
+    #[test]
+    fn test_histogram_subtraction_ternary() {
+        let nbins = 10;
+        let n_rows = 1000;
+        let data_vec: Vec<f64> = (0..n_rows).map(|i| i as f64).collect();
+        let data = Matrix::new(&data_vec, n_rows, 1);
+        let b = bin_matrix(&data, None, nbins, f64::NAN, None).unwrap();
+        let bdata = Matrix::new(&b.binned_data, data.rows, data.cols);
+        let y = vec![0.0; n_rows];
+        let yhat = vec![0.5; n_rows];
+        let (g, h) = Objective::LogLoss.gradient(&y, &yhat, None, None);
+
+        let col_index = vec![0];
+        let mut arena = HistogramArena::from_cuts(&b.cuts, &col_index, false, 4);
+        let hist_tree = arena.as_node_histograms();
+
+        // Populate parent
+        update_histogram(
+            &hist_tree[0],
+            0,
+            n_rows,
+            &bdata,
+            &g,
+            h.as_deref(),
+            &bdata.index,
+            &col_index,
+            &ThreadPoolBuilder::new().build().unwrap(),
+            false,
+        );
+
+        // Ternary split simulation: first node 0..300, second 300..600, update (missing) derived
+        let pool = ThreadPoolBuilder::new().num_threads(2).build().unwrap();
+
+        // Test update_two_histograms_and_subtract parallel path
+        use crate::histogram::update_two_histograms_and_subtract;
+        update_two_histograms_and_subtract(
+            &hist_tree,
+            0, // parent
+            1, // first
+            0,
+            300,
+            2, // second
+            300,
+            600,
+            3, // update
+            &bdata,
+            &g,
+            h.as_deref(),
+            &bdata.index,
+            &col_index,
+            &pool,
+        );
+
+        // Verify subtraction: parent = first + second + update
+        let p_bin = unsafe { hist_tree[0].data[0].data[0].get().as_ref().unwrap() };
+        let f_bin = unsafe { hist_tree[1].data[0].data[0].get().as_ref().unwrap() };
+        let s_bin = unsafe { hist_tree[2].data[0].data[0].get().as_ref().unwrap() };
+        let u_bin = unsafe { hist_tree[3].data[0].data[0].get().as_ref().unwrap() };
+
+        assert_relative_eq!(
+            p_bin.g_folded.iter().sum::<f32>(),
+            f_bin.g_folded.iter().sum::<f32>()
+                + s_bin.g_folded.iter().sum::<f32>()
+                + u_bin.g_folded.iter().sum::<f32>(),
+            epsilon = 1e-4
+        );
     }
 }

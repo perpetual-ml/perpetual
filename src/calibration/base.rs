@@ -222,3 +222,106 @@ impl PerpetualBooster {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::Matrix;
+    use crate::booster::config::CalibrationMethod;
+    use std::error::Error;
+
+    fn read_data(path: &str) -> Result<(Vec<f64>, Vec<f64>), Box<dyn Error>> {
+        let mut rdr = csv::Reader::from_path(path)?;
+        let mut data = Vec::new();
+        let mut y = Vec::new();
+        for result in rdr.records() {
+            let record = result?;
+            for i in 0..8 {
+                data.push(record[i].parse()?);
+            }
+            y.push(record[8].parse()?);
+        }
+        Ok((data, y))
+    }
+
+    #[test]
+    fn test_base_calibration_methods() -> Result<(), Box<dyn Error>> {
+        let (data_train, y_train) = read_data("resources/cal_housing_train.csv")?;
+        let rows_full = y_train.len();
+        let limit = 200.min(rows_full);
+        let mut data_train_sub = Vec::new();
+        for c in 0..8 {
+            let col_start = c * rows_full;
+            data_train_sub.extend_from_slice(&data_train[col_start..col_start + limit]);
+        }
+        let y_train_sub = y_train[0..limit].to_vec();
+        let matrix_train = Matrix::new(&data_train_sub, y_train_sub.len(), 8);
+
+        let mut model = PerpetualBooster::default()
+            .set_objective(Objective::SquaredLoss)
+            .set_max_bin(5)
+            .set_budget(0.1)
+            .set_iteration_limit(Some(2))
+            .set_save_node_stats(true);
+
+        model.fit(&matrix_train, &y_train_sub, None, None)?;
+
+        let alpha = vec![0.1];
+        let data_cal = (&matrix_train, y_train_sub.as_slice(), alpha.as_slice());
+
+        // Test MinMax
+        model.calibrate(CalibrationMethod::MinMax, data_cal)?;
+        let intervals = model.predict_intervals(&matrix_train, false);
+        assert!(intervals.contains_key("0.1"));
+
+        // Test GRP
+        model.calibrate(CalibrationMethod::GRP, data_cal)?;
+        let _ = model.predict_intervals(&matrix_train, false);
+
+        // Test WeightVariance
+        model.calibrate(CalibrationMethod::WeightVariance, data_cal)?;
+        let _ = model.predict_intervals(&matrix_train, false);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_base_calibration_columnar() -> Result<(), Box<dyn Error>> {
+        let (data_train, y_train) = read_data("resources/cal_housing_train.csv")?;
+        let rows_full = y_train.len();
+        let limit = 200.min(rows_full);
+        let mut data_train_sub = Vec::new();
+        for c in 0..8 {
+            let col_start = c * rows_full;
+            data_train_sub.extend_from_slice(&data_train[col_start..col_start + limit]);
+        }
+        let y_train_sub = y_train[0..limit].to_vec();
+        let matrix_train = Matrix::new(&data_train_sub, y_train_sub.len(), 8);
+
+        let columns_train: Vec<&[f64]> = (0..8).map(|j| matrix_train.get_col(j)).collect();
+        let col_matrix_train = crate::ColumnarMatrix::new(columns_train, None, y_train_sub.len());
+
+        let mut model = PerpetualBooster::default()
+            .set_objective(Objective::SquaredLoss)
+            .set_max_bin(5)
+            .set_budget(0.1)
+            .set_iteration_limit(Some(2))
+            .set_save_node_stats(true);
+
+        model.fit_columnar(&col_matrix_train, &y_train_sub, None, None)?;
+
+        let alpha = vec![0.1];
+        let data_cal = (&col_matrix_train, y_train_sub.as_slice(), alpha.as_slice());
+
+        // Test Columnar Calibrate
+        model.calibrate_columnar(CalibrationMethod::MinMax, data_cal)?;
+        let intervals = model.predict_intervals_columnar(&col_matrix_train, false);
+        assert!(intervals.contains_key("0.1"));
+
+        // Test Columnar Scores
+        let scores = model.get_calibration_scores_columnar(&col_matrix_train, false);
+        assert_eq!(scores.len(), y_train_sub.len());
+
+        Ok(())
+    }
+}

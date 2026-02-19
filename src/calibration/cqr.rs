@@ -248,4 +248,55 @@ mod tests {
 
         Ok(())
     }
+
+    #[test]
+    fn test_cqr_columnar() -> Result<(), Box<dyn Error>> {
+        let (data_train, y_train) = read_data("resources/cal_housing_train.csv")?;
+        let (data_test, y_test) = read_data("resources/cal_housing_test.csv")?;
+
+        let rows_full = y_train.len();
+        let limit_train = 200.min(rows_full);
+        let mut data_train_sub = Vec::new();
+        for c in 0..8 {
+            let col_start = c * rows_full;
+            data_train_sub.extend_from_slice(&data_train[col_start..col_start + limit_train]);
+        }
+        let y_train_sub = y_train[0..limit_train].to_vec();
+
+        let rows_test_full = y_test.len();
+        let limit_test = 100.min(rows_test_full);
+        let mut data_test_sub = Vec::new();
+        for c in 0..8 {
+            let col_start = c * rows_test_full;
+            data_test_sub.extend_from_slice(&data_test[col_start..col_start + limit_test]);
+        }
+        let y_test_sub = y_test[0..limit_test].to_vec();
+
+        let matrix_train = Matrix::new(&data_train_sub, y_train_sub.len(), 8);
+        let columns_train: Vec<&[f64]> = (0..8).map(|j| matrix_train.get_col(j)).collect();
+        let col_matrix_train = crate::ColumnarMatrix::new(columns_train, None, y_train_sub.len());
+
+        let matrix_test = Matrix::new(&data_test_sub, y_test_sub.len(), 8);
+        let columns_test: Vec<&[f64]> = (0..8).map(|j| matrix_test.get_col(j)).collect();
+        let col_matrix_test = crate::ColumnarMatrix::new(columns_test, None, y_test_sub.len());
+
+        let mut model = PerpetualBooster::default()
+            .set_objective(Objective::SquaredLoss)
+            .set_max_bin(5)
+            .set_budget(0.1)
+            .set_iteration_limit(Some(2));
+
+        model.fit_columnar(&col_matrix_train, &y_train_sub, None, None)?;
+
+        let alpha = vec![0.1];
+        let data_cal = (&col_matrix_test, y_test_sub.as_slice(), alpha.as_slice());
+
+        model.calibrate_conformal_columnar(&col_matrix_train, &y_train_sub, None, None, data_cal)?;
+
+        let intervals = model.predict_intervals_columnar(&col_matrix_test, true);
+        assert!(intervals.contains_key("0.1"));
+        assert_eq!(intervals.get("0.1").unwrap().len(), y_test_sub.len());
+
+        Ok(())
+    }
 }
