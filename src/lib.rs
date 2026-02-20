@@ -78,6 +78,20 @@
 //! let predictions = model.predict(&matrix, false);
 //! println!("Predictions: {:?}", predictions);
 //! ```
+//!
+//! ### Alternative Initialization
+//!
+//! You can also initialize the booster using the `Default` trait and configure it with setters:
+//!
+//! ```rust
+//! use perpetual::PerpetualBooster;
+//! use perpetual::objective::Objective;
+//!
+//! let mut model = PerpetualBooster::default()
+//!     .set_objective(Objective::LogLoss)
+//!     .set_budget(1.0)
+//!     .set_seed(42);
+//! ```
 
 mod node;
 mod partial_dependence;
@@ -92,6 +106,7 @@ pub mod causal;
 pub mod constants;
 pub mod constraints;
 pub mod data;
+pub mod drift;
 pub mod errors;
 pub mod grower;
 pub mod histogram;

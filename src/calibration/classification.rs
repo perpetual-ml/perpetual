@@ -6,11 +6,17 @@ use std::collections::HashMap;
 use std::convert::TryInto;
 
 impl PerpetualBooster {
-    /// Calibrate the booster for classification.
+    /// Calibrate the booster for classification tasks.
+    ///
+    /// For binary classification, this method fits an `IsotonicCalibrator` on the calibration set
+    /// to adjust raw model outputs into well-calibrated probabilities. It also calculates
+    /// calibration parameters for set prediction (Conformal Prediction).
     ///
     /// # Arguments
-    /// * `method` - The calibration method.
-    /// * `data_cal` - (features, targets, alphas). Targets should be 0 or 1.
+    ///
+    /// * `method` - The calibration method to use (Conformal, WeightVariance, MinMax, or GRP).
+    /// * `data_cal` - A tuple containing (features, targets, alphas). Targets must be binary (0.0 or 1.0).
+    ///   `alphas` is a list of significance levels for conformal sets.
     pub fn calibrate_classification(
         &mut self,
         method: CalibrationMethod,
@@ -36,6 +42,12 @@ impl PerpetualBooster {
         }
     }
 
+    /// Calibrate the booster for classification using columnar data.
+    ///
+    /// # Arguments
+    ///
+    /// * `method` - The calibration method.
+    /// * `data_cal` - A tuple of (features, targets, alphas) in columnar format.
     pub fn calibrate_classification_columnar(
         &mut self,
         method: CalibrationMethod,
@@ -308,8 +320,15 @@ impl PerpetualBooster {
         }
         Ok(())
     }
-    /// Returns a map from alpha to a vector of sets (represented as bitmasks or vectors of labels).
-    /// For binary, we'll return Vec<Vec<f64>> where each inner vec contains 0, 1, or both.
+    /// Predict label sets for the given classification data using Conformal Prediction.
+    ///
+    /// For each sample and each significance level `alpha`, it returns a set of possible labels
+    /// (e.g., `[0.0]`, `[1.0]`, `[0.0, 1.0]`, or `[]`).
+    ///
+    /// # Arguments
+    ///
+    /// * `data` - The input features.
+    /// * `parallel` - Whether to parallelize prediction.
     pub fn predict_sets(&self, data: &Matrix<f64>, parallel: bool) -> HashMap<String, Vec<Vec<f64>>> {
         let mut results = HashMap::new();
         let fold_weights = self.predict_fold_weights(data, parallel);
@@ -386,6 +405,12 @@ impl PerpetualBooster {
         results
     }
 
+    /// Predict label sets for columnar classification data.
+    ///
+    /// # Arguments
+    ///
+    /// * `data` - The input features in columnar format.
+    /// * `parallel` - Whether to parallelize prediction.
     pub fn predict_sets_columnar(&self, data: &ColumnarMatrix<f64>, parallel: bool) -> HashMap<String, Vec<Vec<f64>>> {
         let mut results = HashMap::new();
         let fold_weights = self.predict_fold_weights_columnar(data, parallel);

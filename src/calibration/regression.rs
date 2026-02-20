@@ -4,6 +4,10 @@ use crate::{ColumnarMatrix, Matrix, PerpetualBooster};
 use std::collections::HashMap;
 
 impl PerpetualBooster {
+    /// Computes a calibration score based on the variance of predictions across virtual folds.
+    ///
+    /// The score is defined as the mean probability divided by the standard deviation
+    /// across folds, providing a measure of prediction uncertainty.
     pub(crate) fn compute_score_weight_variance(&self, log_odds: &[f64; 5]) -> f64 {
         let fold_probs: Vec<f64> = log_odds.iter().map(|&z| 1.0 / (1.0 + (-z).exp())).collect();
         let mean_p = fold_probs.iter().sum::<f64>() / 5.0;
@@ -12,6 +16,7 @@ impl PerpetualBooster {
         mean_p / sigma
     }
 
+    /// Computes a calibration score based on the range (min-max) of predictions across virtual folds.
     pub(crate) fn compute_score_min_max(&self, log_odds: &[f64; 5]) -> f64 {
         let fold_probs: Vec<f64> = log_odds.iter().map(|&z| 1.0 / (1.0 + (-z).exp())).collect();
         let min_p = fold_probs.iter().copied().fold(f64::INFINITY, f64::min);
@@ -21,6 +26,10 @@ impl PerpetualBooster {
         mean_p / diff
     }
 
+    /// Computes a calibration score using Generalized Residual Prediction (GRP).
+    ///
+    /// The score is defined as the mean prediction divided by the spread estimated
+    /// from the distribution of fold predictions.
     pub(crate) fn compute_score_grp(&self, log_odds: &[f64; 5], stat_q: &[f64; 5]) -> f64 {
         let mut fold_probs: Vec<f64> = log_odds.iter().map(|&z| 1.0 / (1.0 + (-z).exp())).collect();
         fold_probs.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
@@ -32,6 +41,14 @@ impl PerpetualBooster {
         mean_p / spread
     }
 
+    /// Calibrates the model using the MinMax method to produce prediction intervals.
+    ///
+    /// It calculates the relative position of the target values within the predicted
+    /// range per sample and stores the quantiles of these positions.
+    ///
+    /// # Arguments
+    ///
+    /// * `data_cal` - A tuple of (features, targets, alphas).
     pub fn calibrate_min_max(&mut self, data_cal: (&Matrix<f64>, &[f64], &[f64])) -> Result<(), PerpetualError> {
         let (x_cal, y_cal, alpha_vec) = data_cal;
         let fold_weights = self.predict_fold_weights(x_cal, true);
@@ -104,6 +121,10 @@ impl PerpetualBooster {
         Ok(())
     }
 
+    /// Calibrates the model using Generalized Residual Prediction (GRP).
+    ///
+    /// Similar to MinMax, but uses a more robust estimation of the prediction
+    /// spread across folds using interpolation.
     pub fn calibrate_grp(&mut self, data_cal: (&Matrix<f64>, &[f64], &[f64])) -> Result<(), PerpetualError> {
         let (x_cal, y_cal, alpha_vec) = data_cal;
         let fold_weights = self.predict_fold_weights(x_cal, true);
@@ -230,6 +251,10 @@ impl PerpetualBooster {
         Ok(())
     }
 
+    /// Calibrates the model using the Weight Variance method.
+    ///
+    /// This method scales absolute residuals by the standard deviation of
+    /// predictions across trees and folds to estimate uncertainty.
     pub fn calibrate_weight_variance(
         &mut self,
         data_cal: (&Matrix<f64>, &[f64], &[f64]),

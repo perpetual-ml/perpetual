@@ -764,6 +764,54 @@ class PerpetualBooster:
             parallel=parallel,
         )
 
+    def predict_distribution(
+        self, X, n: int = 100, parallel: Union[bool, None] = None
+    ) -> np.ndarray:
+        """
+        Predict a distribution using uncalibrated leaf weights from internal nodes.
+
+        Generates `n` predictions for each sample by randomly sampling one of the 5
+        weights stored in each leaf node. This returns a raw, uncalibrated distribution
+        of predictions.
+
+        Note: This method is only available if the booster was fitted with
+        `save_node_stats=True`.
+
+        Parameters
+        ----------
+        X : array-like of shape (n_samples, n_features)
+            New data for prediction.
+        n : int, default=100
+            Number of simulations/predictions to generate for each sample.
+        parallel : bool, optional
+            Whether to run prediction in parallel. If None, uses class default.
+
+        Returns
+        -------
+        distribution : ndarray of shape (n_samples, n)
+            A 2D array where each row contains `n` predictions for the corresponding sample.
+        """
+        is_polars = type_df(X) == "polars_df"
+        if is_polars:
+            features_, columns, masks, rows, cols = transform_input_frame_columnar(
+                X, self.cat_mapping
+            )
+            self._validate_features(features_)
+            return self.booster.predict_distribution_columnar(
+                columns=columns, masks=masks, rows=rows, n=n, parallel=parallel
+            )
+
+        features_, flat_data, rows, cols = transform_input_frame(X, self.cat_mapping)
+        self._validate_features(features_)
+
+        return self.booster.predict_distribution(
+            flat_data=flat_data,
+            rows=rows,
+            cols=cols,
+            n=n,
+            parallel=parallel,
+        )
+
     def predict(self, X, parallel: Union[bool, None] = None) -> np.ndarray:
         """
         Predict with the fitted booster on new data.
@@ -909,6 +957,55 @@ class PerpetualBooster:
                 f"predict_proba not implemented for regression. n_classes = {len(self.classes_)}"
             )
             return np.ones((rows, 1))
+
+    def calculate_drift(
+        self, X, drift_type: str = "data", parallel: Union[bool, None] = None
+    ) -> float:
+        """
+        Calculate drift metrics (data or concept) for the model.
+
+        Parameters
+        ----------
+        X : array-like of shape (n_samples, n_features)
+            New data to evaluate for drift.
+        drift_type : str, default="data"
+            Type of drift to calculate. Options:
+
+            - "data": Multivariate data drift across all tree nodes.
+            - "concept": Concept drift focusing on nodes that are parents of leaves.
+
+        parallel : bool, optional
+            Whether to run prediction in parallel. If None, uses class default.
+
+        Returns
+        -------
+        drift_score : float
+            The calculated drift score (average Chi-squared statistic).
+        """
+        is_polars = type_df(X) == "polars_df"
+        if is_polars:
+            features_, columns, masks, rows, cols = transform_input_frame_columnar(
+                X, self.cat_mapping
+            )
+            self._validate_features(features_)
+            return self.booster.calculate_drift_columnar(
+                columns=columns,
+                masks=masks,
+                rows=rows,
+                drift_type=drift_type,
+                parallel=parallel,
+            )
+
+        features_, flat_data, rows, cols = transform_input_frame(X, self.cat_mapping)
+        self._validate_features(features_)
+
+        return self.booster.calculate_drift(
+            flat_data=flat_data,
+            rows=rows,
+            cols=cols,
+            drift_type=drift_type,
+            parallel=parallel,
+        )
 
     def predict_log_proba(self, X, parallel: Union[bool, None] = None) -> np.ndarray:
         """

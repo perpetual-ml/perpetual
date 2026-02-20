@@ -259,7 +259,6 @@ class DRLearner:
         self,
         budget: float = 0.5,
         propensity_budget: Optional[float] = None,
-        clip: float = 0.01,  # Note: clip is currently handled inside Rust fit logic for stable IPW
         **kwargs,
     ):
         self.budget = budget

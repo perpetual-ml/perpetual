@@ -103,8 +103,18 @@ impl ObjectiveFunction for RLearnerObjective {
         (grad, Some(hess))
     }
 
-    fn initial_value(&self, _y: &[f64], _sample_weight: Option<&[f64]>, _group: Option<&[u64]>) -> f64 {
-        0.0 // Start with 0 treatment effect
+    fn initial_value(&self, y: &[f64], _sample_weight: Option<&[f64]>, _group: Option<&[u64]>) -> f64 {
+        // OLS-style initial estimate for tau: sum(y_res * w_res) / sum(w_res^2)
+        let mut num = 0.0;
+        let mut den = 0.0;
+        for (i, y_i) in y.iter().enumerate() {
+            let y_res = y_i - self.outcome_predicted[i];
+            let p_clipped = self.treatment_predicted[i].clamp(PROPENSITY_CLIP_MIN, PROPENSITY_CLIP_MAX);
+            let w_res = self.treatment[i] - p_clipped;
+            num += y_res * w_res;
+            den += w_res * w_res;
+        }
+        if den.abs() < HESSIAN_FLOOR { 0.0 } else { num / den }
     }
 
     fn default_metric(&self) -> Metric {

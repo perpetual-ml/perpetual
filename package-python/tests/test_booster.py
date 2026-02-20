@@ -880,3 +880,23 @@ def test_custom_objective():
     pred_custom = model_custom_loss.predict(X_test)
 
     assert np.allclose(pred_regular, pred_custom)
+
+
+def test_predict_distribution(X_y):
+    X, y = X_y
+    model = PerpetualBooster(objective="LogLoss", save_node_stats=True)
+    model.fit(X, y)
+
+    n_sims = 50
+    dist = model.predict_distribution(X, n=n_sims)
+
+    assert dist.shape == (len(X), n_sims)
+
+    # We should have some variance in the predictions for each sample
+    assert np.var(dist, axis=1).mean() > 0.0
+
+    # The mean of the distribution should be vaguely correlated with the predictions
+    preds = model.predict(X)
+    dist_mean = np.mean(dist, axis=1)
+    correlation = np.corrcoef(preds, dist_mean)[0, 1]
+    assert correlation > 0.5

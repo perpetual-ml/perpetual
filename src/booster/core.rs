@@ -38,6 +38,31 @@ type ImportanceFn = fn(&Tree, &mut HashMap<usize, (f32, usize)>);
 ///
 /// The booster manages an ensemble of decision trees (`trees`) and automatically adjusts
 /// the learning rate `eta` based on the provided budget.
+///
+/// # Example
+///
+/// ```rust
+/// use perpetual::PerpetualBooster;
+/// use perpetual::objective::Objective;
+/// use perpetual::Matrix;
+///
+/// // Prepare data
+/// let data_vec = vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0];
+/// let matrix = Matrix::new(&data_vec, 3, 2);
+/// let target = vec![0.0, 1.0, 0.0];
+///
+/// // Initialize with Default and use setters for configuration
+/// let mut model = PerpetualBooster::default()
+///     .set_objective(Objective::LogLoss)
+///     .set_budget(1.0)
+///     .set_seed(42);
+///
+/// // Fit the model
+/// model.fit(&matrix, &target, None, None).unwrap();
+///
+/// // Predict
+/// let predictions = model.predict(&matrix, false);
+/// ```
 #[derive(Clone, Serialize, Deserialize)]
 pub struct PerpetualBooster {
     /// Configuration parameter set for the booster.

@@ -9,5 +9,8 @@ Perpetual provides specialized modules for causal inference, treatment effect es
    :caption: Solution Guides
 
    uplift
+   dml
+   policy
    iv
    risk
+   fairness

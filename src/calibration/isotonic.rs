@@ -1,5 +1,10 @@
 use serde::{Deserialize, Serialize};
 
+/// Isotonic Calibrator
+///
+/// Implements Isotonic Regression using the Pool Adjacent Violators Algorithm (PAVA).
+/// It maps raw model outputs to calibrated probabilities by finding a non-decreasing
+/// step function that minimizes the squared error relative to the true labels.
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]
 pub struct IsotonicCalibrator {
     /// Thresholds (input probabilities)
@@ -13,6 +18,12 @@ pub struct IsotonicCalibrator {
 }
 
 impl IsotonicCalibrator {
+    /// Creates a new `IsotonicCalibrator` by fitting it to the provided predictions and true labels.
+    ///
+    /// # Arguments
+    ///
+    /// * `y_pred` - The raw predictions (e.g., scores or probabilities from the base model).
+    /// * `y_true` - The true binary targets (0.0 or 1.0).
     pub fn new(y_pred: &[f64], y_true: &[f64]) -> Self {
         if y_pred.is_empty() {
             return Self::default();
@@ -83,6 +94,10 @@ impl IsotonicCalibrator {
         }
     }
 
+    /// Transforms raw predictions into calibrated probabilities using the fitted isotonic function.
+    ///
+    /// It uses linear interpolation between the computed thresholds.
+    /// Values outside the calibration range are clamped to the boundaries.
     pub fn transform(&self, y_pred: &[f64]) -> Vec<f64> {
         if self.thresholds.is_empty() {
             return y_pred.to_vec();

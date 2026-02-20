@@ -6,7 +6,14 @@ use std::collections::HashMap;
 
 impl PerpetualBooster {
     /// Calculate calibration scores for the given data based on the configured calibration method.
-    /// These scores are used as input to the Isotonic Calibrator.
+    ///
+    /// These scores are used as input to the Isotonic Calibrator or other calibration models.
+    /// The specific derivation of the score depends on the `calibration_method` set in the configuration.
+    ///
+    /// # Arguments
+    ///
+    /// * `data` - The input features as a `Matrix`.
+    /// * `parallel` - Whether to parallelize the prediction across samples.
     pub fn get_calibration_scores(&self, data: &Matrix<f64>, parallel: bool) -> Vec<f64> {
         match self.cfg.calibration_method {
             CalibrationMethod::Conformal => self.predict_proba(data, parallel, false),
@@ -32,6 +39,12 @@ impl PerpetualBooster {
         }
     }
 
+    /// Calculate calibration scores for the given data in columnar format.
+    ///
+    /// # Arguments
+    ///
+    /// * `data` - The input features as a `ColumnarMatrix`.
+    /// * `parallel` - Whether to parallelize the prediction.
     pub fn get_calibration_scores_columnar(&self, data: &ColumnarMatrix<f64>, parallel: bool) -> Vec<f64> {
         match self.cfg.calibration_method {
             CalibrationMethod::Conformal => self.predict_proba_columnar(data, parallel, false),
@@ -58,8 +71,17 @@ impl PerpetualBooster {
     }
 
     /// Internal method to predict fold weights for each sample.
-    /// Returns a vector of [f64; 5] for each sample, where each element is the sum
+    ///
+    /// For each sample, it retrieves the weights assigned by each tree in the ensemble
+    /// across 5 virtual folds (derived from the internally stored node statistics).
+    ///
+    /// Returns a vector of arrays `[f64; 5]` for each sample, where each element is the sum
     /// of the corresponding fold weight across all trees, plus the base score.
+    ///
+    /// # Arguments
+    ///
+    /// * `data` - The input features.
+    /// * `parallel` - Whether to parallelize calculation across samples.
     pub fn predict_fold_weights(&self, data: &Matrix<f64>, parallel: bool) -> Vec<[f64; 5]> {
         let n_samples = data.rows;
         let mut results = vec![[self.base_score; 5]; n_samples];
@@ -85,6 +107,12 @@ impl PerpetualBooster {
         results
     }
 
+    /// Internal method to predict fold weights for each sample using columnar data.
+    ///
+    /// # Arguments
+    ///
+    /// * `data` - The input features in columnar format.
+    /// * `parallel` - Whether to parallelize calculation.
     pub fn predict_fold_weights_columnar(&self, data: &ColumnarMatrix<f64>, parallel: bool) -> Vec<[f64; 5]> {
         let n_samples = data.index.len();
         let mut results = vec![[self.base_score; 5]; n_samples];
@@ -173,6 +201,15 @@ impl PerpetualBooster {
         }
     }
 
+    /// Predict intervals for the given data using the fitted calibration models.
+    ///
+    /// Returns a `HashMap` where keys are the `alpha` values (as strings) and values are
+    /// vectors of intervals `[lower, upper]` for each sample.
+    ///
+    /// # Arguments
+    ///
+    /// * `data` - The input features.
+    /// * `parallel` - Whether to parallelize prediction.
     pub fn predict_intervals(&self, data: &Matrix<f64>, parallel: bool) -> HashMap<String, Vec<Vec<f64>>> {
         if !self.cal_models.is_empty() {
             return self.predict_intervals_conformal(data, parallel);
@@ -185,6 +222,12 @@ impl PerpetualBooster {
         }
     }
 
+    /// Predict intervals for the given columnar data using the fitted calibration models.
+    ///
+    /// # Arguments
+    ///
+    /// * `data` - The input features in columnar format.
+    /// * `parallel` - Whether to parallelize prediction.
     pub fn predict_intervals_columnar(
         &self,
         data: &ColumnarMatrix<f64>,
@@ -201,6 +244,16 @@ impl PerpetualBooster {
         }
     }
 
+    /// Performs Generalized Residual Prediction (GRP) interpolation.
+    ///
+    /// Given a probability `p`, it interpolates the corresponding value from the
+    /// `vals` array (representing quantiles of fold predictions) using `stat_q` as the reference quantiles.
+    ///
+    /// # Arguments
+    ///
+    /// * `p` - The target probability/quantile.
+    /// * `vals` - The 5 values representing the 0, 0.25, 0.5, 0.75, and 1.0 quantiles of fold predictions.
+    /// * `stat_q` - The reference quantiles `[0.0, 0.25, 0.5, 0.75, 1.0]`.
     pub(crate) fn grp_interp(&self, p: f64, vals: &[f64; 5], stat_q: &[f64; 5]) -> f64 {
         if p <= 0.0 {
             let slope = (vals[1] - vals[0]) / (stat_q[1] - stat_q[0]);

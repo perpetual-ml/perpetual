@@ -79,15 +79,88 @@ impl GroupStats {
 
 impl ObjectiveFunction for FairnessObjective {
     fn loss(&self, y: &[f64], yhat: &[f64], _sample_weight: Option<&[f64]>, _group: Option<&[u64]>) -> Vec<f32> {
-        // Standard LogLoss (the penalty is applied via gradient modification only).
-        y.iter()
-            .zip(yhat.iter())
-            .map(|(y_i, yhat_i)| {
-                let p = 1.0 / (1.0 + (-yhat_i).exp());
-                let score = -(y_i * p.max(1e-15).ln() + (1.0 - y_i) * (1.0 - p).max(1e-15).ln());
-                score as f32
-            })
-            .collect()
+        let n = y.len();
+        let probs: Vec<f64> = yhat.iter().map(|yh| 1.0 / (1.0 + (-yh).exp())).collect();
+        let mut loss = Vec::with_capacity(n);
+
+        // Standard LogLoss
+        for i in 0..n {
+            let y_i = y[i];
+            let p = probs[i];
+            let score = -(y_i * p.max(1e-15).ln() + (1.0 - y_i) * (1.0 - p).max(1e-15).ln());
+            loss.push(score as f32);
+        }
+
+        let n_f64 = n as f64;
+
+        match &self.fairness_type {
+            FairnessType::DemographicParity => {
+                let mut s1 = GroupStats::default();
+                let mut s0 = GroupStats::default();
+                for (i, &p) in probs.iter().enumerate() {
+                    if self.sensitive_attr[i] == 1 {
+                        s1.sum += p;
+                        s1.count += 1.0;
+                    } else {
+                        s0.sum += p;
+                        s0.count += 1.0;
+                    }
+                }
+                let diff = s1.mean() - s0.mean();
+                let penalty = (self.lambda as f64) * diff * diff * n_f64;
+
+                // We evenly distribute the squared diff penalty amongst the batch
+                // essentially returning sum(logloss) + lambda * diff^2 * N when globally reduced.
+                // In Perpetual, the loss output vector is summed. So each element is + penalty/N
+                let p_per_n = (penalty / n_f64) as f32;
+                for l in loss.iter_mut() {
+                    *l += p_per_n;
+                }
+            }
+            FairnessType::EqualizedOdds => {
+                let mut s0_y0 = GroupStats::default();
+                let mut s0_y1 = GroupStats::default();
+                let mut s1_y0 = GroupStats::default();
+                let mut s1_y1 = GroupStats::default();
+
+                for i in 0..n {
+                    let p = probs[i];
+                    let label = if y[i] >= 0.5 { 1 } else { 0 };
+                    let group = self.sensitive_attr[i];
+                    match (group, label) {
+                        (1, 1) => {
+                            s1_y1.sum += p;
+                            s1_y1.count += 1.0;
+                        }
+                        (1, 0) => {
+                            s1_y0.sum += p;
+                            s1_y0.count += 1.0;
+                        }
+                        (_, 1) => {
+                            s0_y1.sum += p;
+                            s0_y1.count += 1.0;
+                        }
+                        (_, 0) => {
+                            s0_y0.sum += p;
+                            s0_y0.count += 1.0;
+                        }
+                        _ => unreachable!(),
+                    }
+                }
+
+                let diff_y0 = s1_y0.mean() - s0_y0.mean();
+                let diff_y1 = s1_y1.mean() - s0_y1.mean();
+
+                let penalty = (self.lambda as f64) * (diff_y0 * diff_y0 + diff_y1 * diff_y1) * n_f64;
+                let p_per_n = (penalty / n_f64) as f32;
+
+                for l in loss.iter_mut() {
+                    *l += p_per_n;
+                }
+            }
+        }
+
+        loss
     }
 
     fn gradient(
@@ -204,8 +277,10 @@ impl ObjectiveFunction for FairnessObjective {
         (grad, Some(hess))
     }
 
-    fn initial_value(&self, _y: &[f64], _sample_weight: Option<&[f64]>, _group: Option<&[u64]>) -> f64 {
-        0.0
+    fn initial_value(&self, y: &[f64], _sample_weight: Option<&[f64]>, _group: Option<&[u64]>) -> f64 {
+        let mean = y.iter().sum::<f64>() / y.len() as f64;
+        let p = mean.clamp(1e-15, 1.0 - 1e-15);
+        (p / (1.0 - p)).ln()
     }
 
     fn default_metric(&self) -> Metric {

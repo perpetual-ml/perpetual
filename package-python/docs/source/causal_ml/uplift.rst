@@ -15,7 +15,7 @@ where :math:`W` is the treatment indicator.
 Perpetual provides several ways to perform uplift modeling.
 
 UpliftBooster (R-Learner)
---------------------------
+-------------------------
 
 The :class:`uplift.UpliftBooster` implements the **R-Learner** (Residual-on-Residual) meta-algorithm. This is a very powerful approach that can handle continuous outcomes and automatically accounts for selection bias if the propensity scores are modeled correctly.
 
@@ -64,7 +64,7 @@ Example:
 
    from perpetual.meta_learners import DRLearner
 
-   model = DRLearner(budget=0.5, clip=0.01)
+   model = DRLearner(budget=0.5)
    model.fit(X, w, y)
    cate = model.predict(X_test)
 

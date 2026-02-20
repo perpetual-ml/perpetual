@@ -648,6 +648,26 @@ impl PerpetualBooster {
         Ok(py_dict)
     }
 
+    pub fn predict_distribution<'py>(
+        &self,
+        py: Python<'py>,
+        flat_data: PyReadonlyArray1<f64>,
+        rows: usize,
+        cols: usize,
+        n: usize,
+        parallel: Option<bool>,
+    ) -> PyResult<Bound<'py, PyArray2<f64>>> {
+        let flat_data = flat_data.as_slice()?;
+        let data = Matrix::new(flat_data, rows, cols);
+        let parallel = parallel.unwrap_or(true);
+
+        let predictions: Vec<Vec<f64>> = self.booster.predict_distribution(&data, n, parallel);
+
+        let py_array = PyArray2::from_vec2(py, &predictions)?;
+
+        Ok(py_array)
+    }
+
     /// Predict intervals using columnar data (zero-copy from Polars).
     pub fn predict_intervals_columnar<'py>(
         &self,
@@ -686,6 +706,43 @@ impl PerpetualBooster {
         }
 
         Ok(py_dict)
+    }
+
+    /// Predict distribution using columnar data (zero-copy from Polars).
+    pub fn predict_distribution_columnar<'py>(
+        &self,
+        py: Python<'py>,
+        columns: Vec<PyReadonlyArray1<f64>>,
+        masks: Option<Vec<Option<PyReadonlyArray1<u8>>>>,
+        rows: usize,
+        n: usize,
+        parallel: Option<bool>,
+    ) -> PyResult<Bound<'py, PyArray2<f64>>> {
+        let col_slices: Vec<&[f64]> = columns
+            .iter()
+            .map(|col| col.as_slice())
+            .collect::<Result<Vec<_>, _>>()?;
+
+        let mut mask_slices: Option<Vec<Option<&[u8]>>> = None;
+        if let Some(ref m) = masks {
+            let mut v = Vec::with_capacity(m.len());
+            for mask in m {
+                if let Some(arr) = mask {
+                    v.push(Some(arr.as_slice()?));
+                } else {
+                    v.push(None);
+                }
+            }
+            mask_slices = Some(v);
+        }
+        let data = ColumnarMatrix::new(col_slices, mask_slices, rows);
+        let parallel = parallel.unwrap_or(true);
+
+        let predictions: Vec<Vec<f64>> = self.booster.predict_distribution_columnar(&data, n, parallel);
+
+        let py_array = PyArray2::from_vec2(py, &predictions)?;
+
+        Ok(py_array)
     }
 
     pub fn predict_sets<'py>(
@@ -996,6 +1053,70 @@ impl PerpetualBooster {
                 key
             ))),
         }
+    }
+
+    /// Calculate drift metrics (data or concept) for the model.
+    ///
+    /// # Arguments
+    ///
+    /// * `flat_data` - Feature matrix (flattened).
+    /// * `rows` - Number of samples.
+    /// * `cols` - Number of features.
+    /// * `drift_type` - Type of drift: "data" or "concept".
+    /// * `parallel` - Whether to use parallel processing.
+    pub fn calculate_drift(
+        &self,
+        flat_data: PyReadonlyArray1<f64>,
+        rows: usize,
+        cols: usize,
+        drift_type: &str,
+        parallel: Option<bool>,
+    ) -> PyResult<f32> {
+        let flat_data = flat_data.as_slice()?;
+        let data = Matrix::new(flat_data, rows, cols);
+        let parallel = parallel.unwrap_or(true);
+        Ok(perpetual_rs::drift::calculate_drift(
+            &self.booster,
+            &data,
+            drift_type,
+            parallel,
+        ))
+    }
+
+    /// Calculate drift metrics using columnar data (zero-copy from Polars).
+    pub fn calculate_drift_columnar(
+        &self,
+        columns: Vec<PyReadonlyArray1<f64>>,
+        masks: Option<Vec<Option<PyReadonlyArray1<u8>>>>,
+        rows: usize,
+        drift_type: &str,
+        parallel: Option<bool>,
+    ) -> PyResult<f32> {
+        let col_slices: Vec<&[f64]> = columns
+            .iter()
+            .map(|col| col.as_slice())
+            .collect::<Result<Vec<_>, _>>()?;
+
+        let mut mask_slices: Option<Vec<Option<&[u8]>>> = None;
+        if let Some(ref m) = masks {
+            let mut v = Vec::with_capacity(m.len());
+            for mask in m {
+                if let Some(arr) = mask {
+                    v.push(Some(arr.as_slice()?));
+                } else {
+                    v.push(None);
+                }
+            }
+            mask_slices = Some(v);
+        }
+        let data = ColumnarMatrix::new(col_slices, mask_slices, rows);
+        let parallel = parallel.unwrap_or(true);
+        Ok(perpetual_rs::drift::calculate_drift_columnar(
+            &self.booster,
+            &data,
+            drift_type,
+            parallel,
+        ))
     }
 
     #[classmethod]

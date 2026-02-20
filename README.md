@@ -25,6 +25,19 @@
 
 PerpetualBooster is a gradient boosting machine (GBM) that doesn't need hyperparameter optimization unlike other GBMs. Similar to AutoML libraries, it has a `budget` parameter. Increasing the `budget` parameter increases the predictive power of the algorithm and gives better results on unseen data. Start with a small budget (e.g. 0.5) and increase it (e.g. 1.0) once you are confident with your features. If you don't see any improvement with further increasing the `budget`, it means that you are already extracting the most predictive power out of your data.
 
+## Features
+
+- **Hyperparameter-Free Learning:** Achieves optimal accuracy in a single run via a simple `budget` parameter, eliminating the need for time-consuming hyperparameter optimization.
+- **High-Performance Rust Core:** Blazing-fast training and inference with a native Rust core, zero-copy support for Polars/Arrow data, and robust Python & R bindings.
+- **Comprehensive Objectives:** Fully supports Classification (Binary & Multi-class), Regression, and Ranking tasks.
+- **Advanced Tree Features:** Natively handles categorical variables, learnable missing value splits, monotonic constraints, and feature interaction constraints.
+- **Built-in Causal ML:** Out-of-the-box support for causal machine learning to estimate treatment effects.
+- **Robust Drift Monitoring:** Built-in capabilities to monitor both data drift and concept drift without requiring ground truth labels or model retraining.
+- **Continual Learning:** Built-in continual learning capabilities that significantly reduce computational time from O(n²) to O(n).
+- **Native Calibration:** Built-in calibration features to predict fully calibrated distributions (marginal coverage) and conditional coverage without retraining.
+- **Explainability:** Easily interpret model decisions using built-in feature importance, partial dependence plots, and Shapley (SHAP) values.
+- **Production Ready & Interoperable:** Ready for production applications; seamlessly export models to industry-standard XGBoost or ONNX formats for straightforward deployment.
+
 ## Supported Languages
 
 Perpetual is built in Rust and provides high-performance bindings for Python and R.
@@ -38,11 +51,11 @@ Perpetual is built in Rust and provides high-performance bindings for Python and
 
 ### Optional Dependencies
 
-* `pandas`: Enables support for training directly on Pandas DataFrames.
-* `polars`: Enables zero-copy training support for Polars DataFrames.
-* `scikit-learn`: Provides a scikit-learn compatible wrapper interface.
-* `xgboost`: Enables saving and loading models in XGBoost format for interoperability.
-* `onnxruntime`: Enables exporting and loading models in ONNX standard format.
+- `pandas`: Enables support for training directly on Pandas DataFrames.
+- `polars`: Enables zero-copy training support for Polars DataFrames.
+- `scikit-learn`: Provides a scikit-learn compatible wrapper interface.
+- `xgboost`: Enables saving and loading models in XGBoost format for interoperability.
+- `onnxruntime`: Enables exporting and loading models in ONNX standard format.
 
 ## Usage
 
@@ -135,7 +148,7 @@ The **Perpetual ML Suite** is a comprehensive, batteries-included ML platform de
 
 For a fully managed, **serverless ML experience**, visit <a href="https://app.perpetual-ml.com" target="_blank">app.perpetual-ml.com</a>.
 
-* **Serverless Marimo Notebooks**: Run interactive, reactive notebooks without managing any infrastructure.
-* **Serverless ML Endpoints**: One-click deployment of models as production-ready endpoints for real-time inference.
+- **Serverless Marimo Notebooks**: Run interactive, reactive notebooks without managing any infrastructure.
+- **Serverless ML Endpoints**: One-click deployment of models as production-ready endpoints for real-time inference.
 
 Perpetual is also designed to live where your data lives. It is available as a native application on the <a href="https://app.snowflake.com/marketplace/listing/GZSYZX0EMJ/perpetual-ml-perpetual-ml-suite" target="_blank">Snowflake Marketplace</a>, with support for Databricks and other major data warehouses coming soon.

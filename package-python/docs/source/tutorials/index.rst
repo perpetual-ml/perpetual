@@ -20,3 +20,4 @@ Tutorials
    causal/fairness_aware_modeling.ipynb
    causal/fair_classification.ipynb
    causal/customer_retention_uplift.ipynb
+   drift_tutorial.ipynb

@@ -1,7 +1,10 @@
 //! Conformalized Quantile Regression (CQR)
 //!
-//! Calibrates upper and lower quantile models on held-out data to produce
-//! prediction intervals with marginal coverage of at least `1 - alpha`.
+//! Prediction intervals are obtained by training two separate quantile models
+//! (for `alpha/2` and `1 - alpha/2`) and kemudian correcting the boundaries
+//! using a calibration score calculated on a held-out set.
+//!
+//! This implementation follows the CQR procedure to ensure marginal coverage.
 use crate::objective::Objective;
 use crate::{ColumnarMatrix, Matrix, PerpetualBooster, errors::PerpetualError, utils::percentiles};
 use std::collections::HashMap;
@@ -13,8 +16,19 @@ pub type CalData<'a> = (&'a Matrix<'a, f64>, &'a [f64], &'a [f64]);
 pub type CalDataColumnar<'a> = (&'a ColumnarMatrix<'a, f64>, &'a [f64], &'a [f64]);
 
 impl PerpetualBooster {
-    /// Calibrate models to get prediction intervals
-    /// * `alpha` - Alpha list to train calibration models for
+    /// Calibrate models using Conformalized Quantile Regression (CQR).
+    ///
+    /// This method fits two separate quantile regression models on the training data
+    /// and then uses the `data_cal` set to compute the conformity scores needed to
+    /// adjust the predicted intervals.
+    ///
+    /// # Arguments
+    ///
+    /// * `data` - Training features.
+    /// * `y` - Training targets.
+    /// * `sample_weight` - Optional training sample weights.
+    /// * `group` - Optional grouping for ranking/categorical data.
+    /// * `data_cal` - A tuple of (features, targets, alphas) for the calibration set.
     pub fn calibrate_conformal(
         &mut self,
         data: &Matrix<f64>,

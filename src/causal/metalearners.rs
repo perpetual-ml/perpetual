@@ -65,9 +65,44 @@ fn create_booster(
     )
 }
 
-// ---------------------------------------------------------------------------
-// S-Learner
-// ---------------------------------------------------------------------------
+fn extract_subsets(x: &Matrix<f64>, w: &[f64], y: &[f64]) -> (Vec<f64>, Vec<f64>, usize, Vec<f64>, Vec<f64>, usize) {
+    let n = x.rows;
+    let idx0: Vec<usize> = w
+        .iter()
+        .enumerate()
+        .filter(|&(_, &v)| v == 0.0)
+        .map(|(i, _)| i)
+        .collect();
+    let idx1: Vec<usize> = w
+        .iter()
+        .enumerate()
+        .filter(|&(_, &v)| v == 1.0)
+        .map(|(i, _)| i)
+        .collect();
+
+    let n0 = idx0.len();
+    let n1 = idx1.len();
+
+    let get_subset = |indices: &[usize]| -> (Vec<f64>, Vec<f64>) {
+        let mut sub_x = Vec::with_capacity(indices.len() * x.cols);
+        let mut sub_y = Vec::with_capacity(indices.len());
+        for col in 0..x.cols {
+            let col_data = &x.data[col * n..(col + 1) * n];
+            for &i in indices {
+                sub_x.push(col_data[i]);
+            }
+        }
+        for &i in indices {
+            sub_y.push(y[i]);
+        }
+        (sub_x, sub_y)
+    };
+
+    let (x0_data, y0) = get_subset(&idx0);
+    let (x1_data, y1) = get_subset(&idx1);
+
+    (x0_data, y0, n0, x1_data, y1, n1)
+}
 
 /// S-Learner (Single Learner).
 ///
@@ -252,61 +287,7 @@ impl TLearner {
     }
 
     pub fn fit(&mut self, x: &Matrix<f64>, w: &[f64], y: &[f64]) -> Result<(), PerpetualError> {
-        // Split data into control and treated
-        // This is expensive as we create new Matrix instances.
-        // Optimization: Use sample weights or indices if Booster supported it directly without copy.
-        // For now, explicit copy.
-
-        // Count 0s and 1s
-        let n = x.rows;
-        let n0 = w.iter().filter(|&&v| v == 0.0).count();
-        let n1 = w.iter().filter(|&&v| v == 1.0).count();
-
-        let mut x0_data = Vec::with_capacity(n0 * x.cols);
-        let mut y0 = Vec::with_capacity(n0);
-
-        let mut x1_data = Vec::with_capacity(n1 * x.cols);
-        let mut y1 = Vec::with_capacity(n1);
-
-        // Column-major implies we must iterate cols then rows.
-        // BUT slice helpers `x.get_col(j)` exist.
-        // Constructing sub-matrices in column-major is tricky if we stream rows.
-        // Easiest is to identify indices first.
-        let idx0: Vec<usize> = w
-            .iter()
-            .enumerate()
-            .filter(|&(_, &v)| v == 0.0)
-            .map(|(i, _)| i)
-            .collect();
-        let idx1: Vec<usize> = w
-            .iter()
-            .enumerate()
-            .filter(|&(_, &v)| v == 1.0)
-            .map(|(i, _)| i)
-            .collect();
-
-        // Construct x0
-        for col in 0..x.cols {
-            let col_data = &x.data[col * n..(col + 1) * n];
-            for &i in &idx0 {
-                x0_data.push(col_data[i]);
-            }
-        }
-        for &i in &idx0 {
-            y0.push(y[i]);
-        }
-
-        // Construct x1
-        for col in 0..x.cols {
-            let col_data = &x.data[col * n..(col + 1) * n];
-            for &i in &idx1 {
-                x1_data.push(col_data[i]);
-            }
-        }
-        for &i in &idx1 {
-            y1.push(y[i]);
-        }
-
+        let (x0_data, y0, n0, x1_data, y1, n1) = extract_subsets(x, w, y);
         let matrix0 = Matrix::new(&x0_data, n0, x.cols);
         let matrix1 = Matrix::new(&x1_data, n1, x.cols);
 
@@ -404,44 +385,7 @@ impl XLearner {
     }
 
     pub fn fit(&mut self, x: &Matrix<f64>, w: &[f64], y: &[f64]) -> Result<(), PerpetualError> {
-        let n = x.rows;
-
-        // 1. Split data
-        let idx0: Vec<usize> = w
-            .iter()
-            .enumerate()
-            .filter(|&(_, &v)| v == 0.0)
-            .map(|(i, _)| i)
-            .collect();
-        let idx1: Vec<usize> = w
-            .iter()
-            .enumerate()
-            .filter(|&(_, &v)| v == 1.0)
-            .map(|(i, _)| i)
-            .collect();
-
-        let n0 = idx0.len();
-        let n1 = idx1.len();
-
-        // Construct partial matrices helper (cloning data)
-        let get_subset = |indices: &[usize]| -> (Vec<f64>, Vec<f64>) {
-            let mut sub_x = Vec::with_capacity(indices.len() * x.cols);
-            let mut sub_y = Vec::with_capacity(indices.len());
-            for col in 0..x.cols {
-                let col_data = &x.data[col * n..(col + 1) * n];
-                for &i in indices {
-                    sub_x.push(col_data[i]);
-                }
-            }
-            for &i in indices {
-                sub_y.push(y[i]);
-            }
-            (sub_x, sub_y)
-        };
-
-        let (x0_data, y0) = get_subset(&idx0);
-        let (x1_data, y1) = get_subset(&idx1);
-
+        let (x0_data, y0, n0, x1_data, y1, n1) = extract_subsets(x, w, y);
         let matrix0 = Matrix::new(&x0_data, n0, x.cols);
         let matrix1 = Matrix::new(&x1_data, n1, x.cols);
 
@@ -566,40 +510,7 @@ impl DRLearner {
         let n = x.rows;
 
         // 1. Split data (Similar reuse to T/X Learner, effectively T-Learner step)
-        let idx0: Vec<usize> = w
-            .iter()
-            .enumerate()
-            .filter(|&(_, &v)| v == 0.0)
-            .map(|(i, _)| i)
-            .collect();
-        let idx1: Vec<usize> = w
-            .iter()
-            .enumerate()
-            .filter(|&(_, &v)| v == 1.0)
-            .map(|(i, _)| i)
-            .collect();
-
-        let n0 = idx0.len();
-        let n1 = idx1.len();
-
-        let get_subset = |indices: &[usize]| -> (Vec<f64>, Vec<f64>) {
-            let mut sub_x = Vec::with_capacity(indices.len() * x.cols);
-            let mut sub_y = Vec::with_capacity(indices.len());
-            for col in 0..x.cols {
-                let col_data = &x.data[col * n..(col + 1) * n];
-                for &i in indices {
-                    sub_x.push(col_data[i]);
-                }
-            }
-            for &i in indices {
-                sub_y.push(y[i]);
-            }
-            (sub_x, sub_y)
-        };
-
-        let (x0_data, y0) = get_subset(&idx0);
-        let (x1_data, y1) = get_subset(&idx1);
-
+        let (x0_data, y0, n0, x1_data, y1, n1) = extract_subsets(x, w, y);
         let matrix0 = Matrix::new(&x0_data, n0, x.cols);
         let matrix1 = Matrix::new(&x1_data, n1, x.cols);
 

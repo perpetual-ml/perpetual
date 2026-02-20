@@ -445,6 +445,74 @@ impl PerpetualBooster {
             _ => self.predict_contributions_tree_alone_columnar(data, parallel, method),
         }
     }
+
+    /// Predict a distribution using uncalibrated leaf weights from internal nodes.
+    /// Returns `n` predictions for each sample, resulting in a matrix of size `(n_samples, n)`.
+    pub fn predict_distribution(&self, data: &Matrix<f64>, n: usize, parallel: bool) -> Vec<Vec<f64>> {
+        use rand::RngExt;
+        use rand::SeedableRng;
+        let n_samples = data.rows;
+        let mut results = vec![vec![self.base_score; n]; n_samples];
+
+        for tree in &self.trees {
+            let tree_weights = tree.predict_weights(data, parallel, &self.cfg.missing);
+            for (i, row_weights) in tree_weights.iter().enumerate() {
+                // Ensure reproducible results for each sample across different runs
+                // by hashing the provided seed with the sample index and tree index.
+                let mut rng = rand::rngs::StdRng::seed_from_u64(
+                    self.cfg
+                        .seed
+                        .wrapping_add(i as u64)
+                        .wrapping_add(tree.nodes.len() as u64),
+                );
+                for val in results[i].iter_mut().take(n) {
+                    let idx = rng.random_range(0..5);
+                    *val += row_weights[idx] as f64;
+                }
+            }
+        }
+        // Sanitize any non-finite values (defensive: replace NaN/inf with base_score)
+        for row in results.iter_mut() {
+            for v in row.iter_mut() {
+                if !v.is_finite() {
+                    *v = self.base_score;
+                }
+            }
+        }
+        results
+    }
+
+    pub fn predict_distribution_columnar(&self, data: &ColumnarMatrix<f64>, n: usize, parallel: bool) -> Vec<Vec<f64>> {
+        use rand::RngExt;
+        use rand::SeedableRng;
+        let n_samples = data.index.len();
+        let mut results = vec![vec![self.base_score; n]; n_samples];
+
+        for tree in &self.trees {
+            let tree_weights = tree.predict_weights_columnar(data, parallel, &self.cfg.missing);
+            for (i, row_weights) in tree_weights.iter().enumerate() {
+                let mut rng = rand::rngs::StdRng::seed_from_u64(
+                    self.cfg
+                        .seed
+                        .wrapping_add(i as u64)
+                        .wrapping_add(tree.nodes.len() as u64),
+                );
+                for val in results[i].iter_mut().take(n) {
+                    let idx = rng.random_range(0..5);
+                    *val += row_weights[idx] as f64;
+                }
+            }
+        }
+        // Sanitize any non-finite values (defensive: replace NaN/inf with base_score)
+        for row in results.iter_mut() {
+            for v in row.iter_mut() {
+                if !v.is_finite() {
+                    *v = self.base_score;
+                }
+            }
+        }
+        results
+    }
 }
 
 impl MultiOutputBooster {
@@ -572,6 +640,32 @@ impl MultiOutputBooster {
         }
         results
     }
+
+    /// Predict a distribution using uncalibrated leaf weights from internal nodes.
+    /// Returns `n` predictions for each sample, resulting in a matrix of size `(n_samples, n_boosters * n)`.
+    pub fn predict_distribution(&self, data: &Matrix<f64>, n: usize, parallel: bool) -> Vec<Vec<f64>> {
+        let n_samples = data.rows;
+        let mut results = vec![Vec::with_capacity(self.boosters.len() * n); n_samples];
+        for booster in self.boosters.iter() {
+            let booster_dist = booster.predict_distribution(data, n, parallel);
+            for (i, sample_dist) in booster_dist.into_iter().enumerate() {
+                results[i].extend(sample_dist);
+            }
+        }
+        results
+    }
+
+    pub fn predict_distribution_columnar(&self, data: &ColumnarMatrix<f64>, n: usize, parallel: bool) -> Vec<Vec<f64>> {
+        let n_samples = data.index.len();
+        let mut results = vec![Vec::with_capacity(self.boosters.len() * n); n_samples];
+        for booster in self.boosters.iter() {
+            let booster_dist = booster.predict_distribution_columnar(data, n, parallel);
+            for (i, sample_dist) in booster_dist.into_iter().enumerate() {
+                results[i].extend(sample_dist);
+            }
+        }
+        results
+    }
 }
 
 #[cfg(test)]
@@ -653,6 +747,23 @@ mod tests {
         let data = Matrix::new(&[1.0, 2.0], 1, 2);
         let proba = booster.predict_proba(&data, false, false);
         assert_relative_eq!(proba[0], 0.52497918747894, epsilon = 1e-7);
+    }
+
+    #[test]
+    fn test_predict_distribution() {
+        let booster = create_mock_booster();
+        let data = Matrix::new(&[1.0, 2.0, 3.0, 4.0], 2, 2);
+        let n = 100;
+        let dist = booster.predict_distribution(&data, n, false);
+        assert_eq!(dist.len(), 2);
+        assert_eq!(dist[0].len(), n);
+
+        // base_score (0.5) + leaf weight_value (0.1) = 0.6
+        // Since stats is None, it defaults to weight_value repeated 5 times
+        for i in 0..n {
+            assert_relative_eq!(dist[0][i], 0.6, epsilon = 1e-7);
+            assert_relative_eq!(dist[1][i], 0.6, epsilon = 1e-7);
+        }
     }
 
     #[test]
