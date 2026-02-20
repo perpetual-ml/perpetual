@@ -41,3 +41,8 @@ The drift score is an average Chi-squared statistic. Larger values indicate more
 * **Large values**: Suggest a significant shift in data distribution (Data Drift) or prediction patterns (Concept Drift).
 
 Note: This method is unsupervised and does not require target values for the new data.
+
+Examples
+--------
+
+For a detailed walkthrough, see the :doc:`Drift Detection Tutorial <tutorials/drift_tutorial.ipynb>`.
