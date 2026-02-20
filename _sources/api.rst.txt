@@ -4,7 +4,7 @@ API Reference
 This page contains the detailed API reference for the Perpetual Python package.
 
 PerpetualBooster
----------------
+----------------
 
 .. autoclass:: perpetual.PerpetualBooster
    :members:
@@ -51,7 +51,7 @@ Causal ML
    :show-inheritance:
 
 Double Machine Learning
-----------------------
+-----------------------
 
 .. autoclass:: perpetual.dml.DMLEstimator
    :members:

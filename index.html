@@ -6,7 +6,7 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Perpetual Documentation &mdash; Perpetual 1.7.0 documentation</title>
+  <title>Perpetual Documentation &mdash; Perpetual 1.8.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="_static/custom.css?v=9cdd1368" />
@@ -14,7 +14,7 @@
   
       <script src="_static/jquery.js?v=5d32c60e"></script>
       <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="_static/documentation_options.js?v=030dc6f6"></script>
+      <script src="_static/documentation_options.js?v=b51e6972"></script>
       <script src="_static/doctools.js?v=fd6eb6e6"></script>
       <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
@@ -48,11 +48,12 @@
 <li class="toctree-l1"><a class="reference internal" href="installation.html">Installation</a></li>
 <li class="toctree-l1"><a class="reference internal" href="quickstart.html">Quickstart</a></li>
 <li class="toctree-l1"><a class="reference internal" href="api.html">API Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="causal_ml/index.html">Causal ML</a></li>
 <li class="toctree-l1"><a class="reference internal" href="calibration.html">Calibration and Uncertainty Quantification</a></li>
+<li class="toctree-l1"><a class="reference internal" href="drift_detection.html">Drift Detection</a></li>
 <li class="toctree-l1"><a class="reference internal" href="continual_learning.html">Continual Learning</a></li>
 <li class="toctree-l1"><a class="reference internal" href="explainability.html">Explainability</a></li>
 <li class="toctree-l1"><a class="reference internal" href="model_io_export.html">Model IO &amp; Export</a></li>
-<li class="toctree-l1"><a class="reference internal" href="causal_ml/index.html">Causal ML</a></li>
 <li class="toctree-l1"><a class="reference internal" href="tutorials/index.html">Tutorials</a></li>
 <li class="toctree-l1"><a class="reference internal" href="architecture.html">Architecture</a></li>
 <li class="toctree-l1"><a class="reference internal" href="parameters_tuning.html">Parameters Tuning</a></li>
@@ -91,10 +92,16 @@
 <section id="key-features">
 <h2>Key Features<a class="headerlink" href="#key-features" title="Link to this heading"></a></h2>
 <ul class="simple">
-<li><p><strong>Self-Generalizing</strong>: No need for complex grid searches or Bayesian optimization.</p></li>
-<li><p><strong>Efficient</strong>: Built in Rust with a zero-copy Python interface.</p></li>
-<li><p><strong>Versatile</strong>: Supports regression, classification, and ranking.</p></li>
-<li><p><strong>Interpretable</strong>: Built-in support for SHAP-like contributions and partial dependence plots.</p></li>
+<li><p><strong>Hyperparameter-Free Learning</strong>: Achieves optimal accuracy in a single run via a simple <code class="docutils literal notranslate"><span class="pre">budget</span></code> parameter, eliminating the need for time-consuming hyperparameter optimization.</p></li>
+<li><p><strong>High-Performance Rust Core</strong>: Blazing-fast training and inference with a native Rust core, zero-copy support for Polars/Arrow data, and robust Python &amp; R bindings.</p></li>
+<li><p><strong>Comprehensive Objectives</strong>: Fully supports Classification (Binary &amp; Multi-class), Regression, and Ranking tasks.</p></li>
+<li><p><strong>Advanced Tree Features</strong>: Natively handles categorical variables, learnable missing value splits, monotonic constraints, and feature interaction constraints.</p></li>
+<li><p><strong>Built-in Causal ML</strong>: Out-of-the-box support for causal machine learning to estimate treatment effects.</p></li>
+<li><p><strong>Robust Drift Monitoring</strong>: Built-in capabilities to monitor both data drift and concept drift without requiring ground truth labels or model retraining.</p></li>
+<li><p><strong>Continual Learning</strong>: Built-in continual learning capabilities that significantly reduce computational time from O(n²) to O(n).</p></li>
+<li><p><strong>Native Calibration</strong>: Built-in calibration features to predict fully calibrated distributions (marginal coverage) and conditional coverage without retraining.</p></li>
+<li><p><strong>Explainability</strong>: Easily interpret model decisions using built-in feature importance, partial dependence plots, and Shapley (SHAP) values.</p></li>
+<li><p><strong>Production Ready &amp; Interoperable</strong>: Ready for production applications; seamlessly export models to industry-standard XGBoost or ONNX formats for straightforward deployment.</p></li>
 </ul>
 <div class="toctree-wrapper compound">
 <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
@@ -123,13 +130,29 @@
 <li class="toctree-l2"><a class="reference internal" href="api.html#regulatory-risk">Regulatory Risk</a></li>
 </ul>
 </li>
+<li class="toctree-l1"><a class="reference internal" href="causal_ml/index.html">Causal ML</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="causal_ml/uplift.html">Uplift Modeling</a></li>
+<li class="toctree-l2"><a class="reference internal" href="causal_ml/dml.html">Double Machine Learning (DML)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="causal_ml/policy.html">Policy Learning</a></li>
+<li class="toctree-l2"><a class="reference internal" href="causal_ml/iv.html">Instrumental Variables (BoostIV)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="causal_ml/risk.html">Regulatory Risk &amp; Interpretability</a></li>
+<li class="toctree-l2"><a class="reference internal" href="causal_ml/fairness.html">Fairness and Algorithmic Bias</a></li>
+</ul>
+</li>
 <li class="toctree-l1"><a class="reference internal" href="calibration.html">Calibration and Uncertainty Quantification</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="calibration.html#the-fundamental-advantage-post-hoc-calibration">The Fundamental Advantage: Post-Hoc Calibration</a></li>
 <li class="toctree-l2"><a class="reference internal" href="calibration.html#probability-calibration-classification">Probability Calibration (Classification)</a></li>
 <li class="toctree-l2"><a class="reference internal" href="calibration.html#uncertainty-quantification-regression">Uncertainty Quantification (Regression)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="calibration.html#raw-prediction-distributions">Raw Prediction Distributions</a></li>
 <li class="toctree-l2"><a class="reference internal" href="calibration.html#why-perpetual-is-better">Why Perpetual is Better</a></li>
 <li class="toctree-l2"><a class="reference internal" href="calibration.html#tutorials">Tutorials</a></li>
 <li class="toctree-l2"><a class="reference internal" href="calibration.html#next-steps">Next Steps</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="drift_detection.html">Drift Detection</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="drift_detection.html#how-it-works">How it Works</a></li>
+<li class="toctree-l2"><a class="reference internal" href="drift_detection.html#usage">Usage</a></li>
+<li class="toctree-l2"><a class="reference internal" href="drift_detection.html#interpreting-the-score">Interpreting the Score</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="continual_learning.html">Continual Learning</a><ul>
@@ -155,12 +178,6 @@
 <li class="toctree-l2"><a class="reference internal" href="model_io_export.html#example">Example</a></li>
 </ul>
 </li>
-<li class="toctree-l1"><a class="reference internal" href="causal_ml/index.html">Causal ML</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="causal_ml/uplift.html">Uplift Modeling</a></li>
-<li class="toctree-l2"><a class="reference internal" href="causal_ml/iv.html">Instrumental Variables (BoostIV)</a></li>
-<li class="toctree-l2"><a class="reference internal" href="causal_ml/risk.html">Regulatory Risk &amp; Interpretability</a></li>
-</ul>
-</li>
 <li class="toctree-l1"><a class="reference internal" href="tutorials/index.html">Tutorials</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="tutorials/categorical_data.html">Handling Categorical Data</a></li>
 <li class="toctree-l2"><a class="reference internal" href="tutorials/sklearn_interface.html">Scikit-Learn Interface: Classification, Regression &amp; Ranking</a></li>
@@ -177,6 +194,7 @@
 <li class="toctree-l2"><a class="reference internal" href="tutorials/causal/fairness_aware_modeling.html">Fairness-Aware Credit Scoring</a></li>
 <li class="toctree-l2"><a class="reference internal" href="tutorials/causal/fair_classification.html">Fairness-Aware Classification with FairClassifier</a></li>
 <li class="toctree-l2"><a class="reference internal" href="tutorials/causal/customer_retention_uplift.html">Customer Retention: Uplift Modeling for Churn Prevention</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tutorials/drift_tutorial.html">Advanced Drift Detection in Perpetual</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="architecture.html">Architecture</a><ul>

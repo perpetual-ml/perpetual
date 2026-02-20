@@ -1,0 +1,167 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Fairness and Algorithmic Bias &mdash; Perpetual 1.8.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="../_static/custom.css?v=9cdd1368" />
+
+  
+      <script src="../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../_static/documentation_options.js?v=b51e6972"></script>
+      <script src="../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
+      <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Calibration and Uncertainty Quantification" href="../calibration.html" />
+    <link rel="prev" title="Regulatory Risk &amp; Interpretability" href="risk.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            Perpetual
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../api.html">API Reference</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Causal ML</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="uplift.html">Uplift Modeling</a></li>
+<li class="toctree-l2"><a class="reference internal" href="dml.html">Double Machine Learning (DML)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="policy.html">Policy Learning</a></li>
+<li class="toctree-l2"><a class="reference internal" href="iv.html">Instrumental Variables (BoostIV)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="risk.html">Regulatory Risk &amp; Interpretability</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">Fairness and Algorithmic Bias</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#fairclassifier">FairClassifier</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#tutorials">Tutorials</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../calibration.html">Calibration and Uncertainty Quantification</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../drift_detection.html">Drift Detection</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../continual_learning.html">Continual Learning</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../explainability.html">Explainability</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../model_io_export.html">Model IO &amp; Export</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tutorials/index.html">Tutorials</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../architecture.html">Architecture</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../parameters_tuning.html">Parameters Tuning</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../faq.html">Frequently Asked Questions</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">Perpetual</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="index.html">Causal ML</a></li>
+      <li class="breadcrumb-item active">Fairness and Algorithmic Bias</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/causal_ml/fairness.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="fairness-and-algorithmic-bias">
+<h1>Fairness and Algorithmic Bias<a class="headerlink" href="#fairness-and-algorithmic-bias" title="Link to this heading"></a></h1>
+<p>When deploying machine learning models in sensitive domains (like lending, hiring, or criminal justice), it is crucial to ensure that the model’s predictions are fair and unbiased with respect to protected attributes (e.g., race, gender, age).</p>
+<section id="fairclassifier">
+<h2>FairClassifier<a class="headerlink" href="#fairclassifier" title="Link to this heading"></a></h2>
+<p>The <code class="xref py py-class docutils literal notranslate"><span class="pre">fairness.FairClassifier</span></code> enforces fairness constraints natively during the boosting process. It supports definitions of fairness such as Demographic Parity or Equalized Odds, by regularizing the splits that would disproportionately impact the protected group.</p>
+<p>Example:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">perpetual.fairness</span><span class="w"> </span><span class="kn">import</span> <span class="n">FairClassifier</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+
+<span class="c1"># sensitive_feature is the column index of the protected attribute (0 or 1) in X</span>
+<span class="c1"># lam is the strength of the fairness penalty</span>
+<span class="n">model</span> <span class="o">=</span> <span class="n">FairClassifier</span><span class="p">(</span>
+    <span class="n">sensitive_feature</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span>
+    <span class="n">fairness_type</span><span class="o">=</span><span class="s2">&quot;demographic_parity&quot;</span><span class="p">,</span>
+    <span class="n">lam</span><span class="o">=</span><span class="mf">2.0</span>
+<span class="p">)</span>
+
+<span class="n">model</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">y</span><span class="p">)</span>
+
+<span class="c1"># Predictions will be constrained to satisfy the fairness metric</span>
+<span class="n">y_pred</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="n">X_test</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="tutorials">
+<h2>Tutorials<a class="headerlink" href="#tutorials" title="Link to this heading"></a></h2>
+<p>For detailed walkthroughs, see:</p>
+<ul class="simple">
+<li><p><a class="reference internal" href="../tutorials/causal/fair_classification.html"><span class="doc">Fairness-Aware Classification with FairClassifier</span></a></p></li>
+<li><p><a class="reference internal" href="../tutorials/causal/fairness_aware_modeling.html"><span class="doc">Fairness-Aware Credit Scoring</span></a></p></li>
+</ul>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="risk.html" class="btn btn-neutral float-left" title="Regulatory Risk &amp; Interpretability" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="../calibration.html" class="btn btn-neutral float-right" title="Calibration and Uncertainty Quantification" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2026, Mutlu Simsek, Serkan Korkmaz, Pieter Pel.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

@@ -1,0 +1,460 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Advanced Drift Detection in Perpetual &mdash; Perpetual 1.8.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="../_static/nbsphinx-code-cells.css?v=2aa19091" />
+      <link rel="stylesheet" type="text/css" href="../_static/custom.css?v=9cdd1368" />
+
+  
+      <script src="../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../_static/documentation_options.js?v=b51e6972"></script>
+      <script src="../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
+      <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+      <script>window.MathJax = {"tex": {"inlineMath": [["$", "$"], ["\\(", "\\)"]], "processEscapes": true}, "options": {"ignoreHtmlClass": "tex2jax_ignore|mathjax_ignore|document", "processHtmlClass": "tex2jax_process|mathjax_process|math|output_area"}}</script>
+      <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@4/tex-mml-chtml.js"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Architecture" href="../architecture.html" />
+    <link rel="prev" title="Customer Retention: Uplift Modeling for Churn Prevention" href="causal/customer_retention_uplift.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            Perpetual
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../api.html">API Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../causal_ml/index.html">Causal ML</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../calibration.html">Calibration and Uncertainty Quantification</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../drift_detection.html">Drift Detection</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../continual_learning.html">Continual Learning</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../explainability.html">Explainability</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../model_io_export.html">Model IO &amp; Export</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Tutorials</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="categorical_data.html">Handling Categorical Data</a></li>
+<li class="toctree-l2"><a class="reference internal" href="sklearn_interface.html">Scikit-Learn Interface: Classification, Regression &amp; Ranking</a></li>
+<li class="toctree-l2"><a class="reference internal" href="benchmark.html">Performance Benchmarking</a></li>
+<li class="toctree-l2"><a class="reference internal" href="calibration/regression_calibration.html">Mastering Regression Calibration: From Theoretical Basics to Advanced Methods</a></li>
+<li class="toctree-l2"><a class="reference internal" href="calibration/classification_calibration.html">Classification Calibration: Prediction Sets with Perpetual</a></li>
+<li class="toctree-l2"><a class="reference internal" href="custom_objective.html">Custom Objective Tutorial</a></li>
+<li class="toctree-l2"><a class="reference internal" href="causal/uplift_marketing.html">Uplift Modeling with the Criteo Uplift Dataset</a></li>
+<li class="toctree-l2"><a class="reference internal" href="causal/iv_causal_effect.html">Instrumental Variables (Boosted IV)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="causal/dml_wage_gap.html">Double Machine Learning: Estimating the Gender Wage Gap</a></li>
+<li class="toctree-l2"><a class="reference internal" href="causal/policy_learning.html">Policy Learning: Optimal Treatment Assignment</a></li>
+<li class="toctree-l2"><a class="reference internal" href="causal/risk_compliance.html">Risk, Compliance, and Interpretability</a></li>
+<li class="toctree-l2"><a class="reference internal" href="causal/heterogeneous_treatment_effects.html">Heterogeneous Treatment Effects with Meta-Learners</a></li>
+<li class="toctree-l2"><a class="reference internal" href="causal/fairness_aware_modeling.html">Fairness-Aware Credit Scoring</a></li>
+<li class="toctree-l2"><a class="reference internal" href="causal/fair_classification.html">Fairness-Aware Classification with FairClassifier</a></li>
+<li class="toctree-l2"><a class="reference internal" href="causal/customer_retention_uplift.html">Customer Retention: Uplift Modeling for Churn Prevention</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">Advanced Drift Detection in Perpetual</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#1.-Defining-Benchmark-Metrics">1. Defining Benchmark Metrics</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#2.-Load-Data-and-Train-Model">2. Load Data and Train Model</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#3.-Gradual-Drift-Simulation">3. Gradual Drift Simulation</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#4.-Visualizing-Drift-Response">4. Visualizing Drift Response</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#4.-Practical-Threshold-Guidance">4. Practical Threshold Guidance</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#Perpetual-Unsupervised-Scores-(Chi-Squared-Statistic)">Perpetual Unsupervised Scores (Chi-Squared Statistic)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#Benchmark-Ranges">Benchmark Ranges</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#Performance-Diagnostics-(Concept-Drift)">Performance Diagnostics (Concept Drift)</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#5.-Conclusion">5. Conclusion</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../architecture.html">Architecture</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../parameters_tuning.html">Parameters Tuning</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../faq.html">Frequently Asked Questions</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">Perpetual</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="index.html">Tutorials</a></li>
+      <li class="breadcrumb-item active">Advanced Drift Detection in Perpetual</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/tutorials/drift_tutorial.ipynb.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="Advanced-Drift-Detection-in-Perpetual">
+<h1>Advanced Drift Detection in Perpetual<a class="headerlink" href="#Advanced-Drift-Detection-in-Perpetual" title="Link to this heading"></a></h1>
+<p>This tutorial demonstrates how to use Perpetual’s built-in drift detection and compares it against several state-of-the-art methods found in literature. We will explore how these metrics respond as we gradually increase the amount of drift in the California Housing dataset.</p>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">warnings</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">matplotlib.pyplot</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">plt</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pd</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">perpetual</span><span class="w"> </span><span class="kn">import</span> <span class="n">PerpetualBooster</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">scipy</span><span class="w"> </span><span class="kn">import</span> <span class="n">stats</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">sklearn.datasets</span><span class="w"> </span><span class="kn">import</span> <span class="n">fetch_california_housing</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">sklearn.ensemble</span><span class="w"> </span><span class="kn">import</span> <span class="n">RandomForestClassifier</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">sklearn.metrics</span><span class="w"> </span><span class="kn">import</span> <span class="n">mean_squared_error</span><span class="p">,</span> <span class="n">roc_auc_score</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">sklearn.metrics.pairwise</span><span class="w"> </span><span class="kn">import</span> <span class="n">rbf_kernel</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">sklearn.model_selection</span><span class="w"> </span><span class="kn">import</span> <span class="n">train_test_split</span>
+
+<span class="n">warnings</span><span class="o">.</span><span class="n">filterwarnings</span><span class="p">(</span><span class="s2">&quot;ignore&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<section id="1.-Defining-Benchmark-Metrics">
+<h2>1. Defining Benchmark Metrics<a class="headerlink" href="#1.-Defining-Benchmark-Metrics" title="Link to this heading"></a></h2>
+<p>We implement common drift detection methods for comparison.</p>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="k">def</span><span class="w"> </span><span class="nf">calculate_energy_distance</span><span class="p">(</span><span class="n">X_ref</span><span class="p">,</span> <span class="n">X_curr</span><span class="p">,</span> <span class="n">sample_size</span><span class="o">=</span><span class="mi">500</span><span class="p">):</span>
+    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">X_ref</span><span class="p">)</span> <span class="o">&gt;</span> <span class="n">sample_size</span><span class="p">:</span>
+        <span class="n">X_ref</span> <span class="o">=</span> <span class="n">X_ref</span><span class="o">.</span><span class="n">sample</span><span class="p">(</span><span class="n">sample_size</span><span class="p">,</span> <span class="n">random_state</span><span class="o">=</span><span class="mi">42</span><span class="p">)</span>
+    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">X_curr</span><span class="p">)</span> <span class="o">&gt;</span> <span class="n">sample_size</span><span class="p">:</span>
+        <span class="n">X_curr</span> <span class="o">=</span> <span class="n">X_curr</span><span class="o">.</span><span class="n">sample</span><span class="p">(</span><span class="n">sample_size</span><span class="p">,</span> <span class="n">random_state</span><span class="o">=</span><span class="mi">42</span><span class="p">)</span>
+
+    <span class="c1"># Using kernel-based estimate</span>
+    <span class="n">K_xx</span> <span class="o">=</span> <span class="n">rbf_kernel</span><span class="p">(</span><span class="n">X_ref</span><span class="p">,</span> <span class="n">X_ref</span><span class="p">)</span>
+    <span class="n">K_yy</span> <span class="o">=</span> <span class="n">rbf_kernel</span><span class="p">(</span><span class="n">X_curr</span><span class="p">,</span> <span class="n">X_curr</span><span class="p">)</span>
+    <span class="n">K_xy</span> <span class="o">=</span> <span class="n">rbf_kernel</span><span class="p">(</span><span class="n">X_ref</span><span class="p">,</span> <span class="n">X_curr</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">K_xx</span><span class="p">)</span> <span class="o">+</span> <span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">K_yy</span><span class="p">)</span> <span class="o">-</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">K_xy</span><span class="p">)</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">calculate_mahalanobis_distance</span><span class="p">(</span><span class="n">X_ref</span><span class="p">,</span> <span class="n">X_curr</span><span class="p">):</span>
+    <span class="c1"># Center and scale data</span>
+    <span class="n">mean_ref</span> <span class="o">=</span> <span class="n">X_ref</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+    <span class="n">cov_ref</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">cov</span><span class="p">(</span><span class="n">X_ref</span><span class="o">.</span><span class="n">T</span><span class="p">)</span>
+    <span class="c1"># Robust covariance estimate if needed, but for benchmark simple cov is fine</span>
+    <span class="n">inv_cov_ref</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">pinv</span><span class="p">(</span><span class="n">cov_ref</span><span class="p">)</span>
+
+    <span class="n">mean_curr</span> <span class="o">=</span> <span class="n">X_curr</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+    <span class="n">diff</span> <span class="o">=</span> <span class="n">mean_curr</span> <span class="o">-</span> <span class="n">mean_ref</span>
+    <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">diff</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="n">inv_cov_ref</span><span class="p">)</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="n">diff</span><span class="p">))</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">get_adversarial_auc</span><span class="p">(</span><span class="n">X_ref</span><span class="p">,</span> <span class="n">X_curr</span><span class="p">):</span>
+    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">X_ref</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">1000</span><span class="p">:</span>
+        <span class="n">X_ref</span> <span class="o">=</span> <span class="n">X_ref</span><span class="o">.</span><span class="n">sample</span><span class="p">(</span><span class="mi">1000</span><span class="p">,</span> <span class="n">random_state</span><span class="o">=</span><span class="mi">42</span><span class="p">)</span>
+    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">X_curr</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">1000</span><span class="p">:</span>
+        <span class="n">X_curr</span> <span class="o">=</span> <span class="n">X_curr</span><span class="o">.</span><span class="n">sample</span><span class="p">(</span><span class="mi">1000</span><span class="p">,</span> <span class="n">random_state</span><span class="o">=</span><span class="mi">42</span><span class="p">)</span>
+    <span class="n">X_adv</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">concat</span><span class="p">([</span><span class="n">X_ref</span><span class="p">,</span> <span class="n">X_curr</span><span class="p">])</span>
+    <span class="n">y_adv</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mi">0</span><span class="p">]</span> <span class="o">*</span> <span class="nb">len</span><span class="p">(</span><span class="n">X_ref</span><span class="p">)</span> <span class="o">+</span> <span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">*</span> <span class="nb">len</span><span class="p">(</span><span class="n">X_curr</span><span class="p">))</span>
+    <span class="n">clf</span> <span class="o">=</span> <span class="n">RandomForestClassifier</span><span class="p">(</span><span class="n">n_estimators</span><span class="o">=</span><span class="mi">50</span><span class="p">,</span> <span class="n">max_depth</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span> <span class="n">random_state</span><span class="o">=</span><span class="mi">42</span><span class="p">)</span>
+    <span class="n">clf</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">X_adv</span><span class="p">,</span> <span class="n">y_adv</span><span class="p">)</span>
+    <span class="n">probs</span> <span class="o">=</span> <span class="n">clf</span><span class="o">.</span><span class="n">predict_proba</span><span class="p">(</span><span class="n">X_adv</span><span class="p">)[:,</span> <span class="mi">1</span><span class="p">]</span>
+    <span class="k">return</span> <span class="n">roc_auc_score</span><span class="p">(</span><span class="n">y_adv</span><span class="p">,</span> <span class="n">probs</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</section>
+<section id="2.-Load-Data-and-Train-Model">
+<h2>2. Load Data and Train Model<a class="headerlink" href="#2.-Load-Data-and-Train-Model" title="Link to this heading"></a></h2>
+<p>We use the California Housing dataset and train a Perpetual model with <code class="docutils literal notranslate"><span class="pre">save_node_stats=True</span></code>.</p>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">data</span> <span class="o">=</span> <span class="n">fetch_california_housing</span><span class="p">()</span>
+
+<span class="n">X</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">data</span><span class="o">.</span><span class="n">data</span><span class="p">,</span> <span class="n">columns</span><span class="o">=</span><span class="n">data</span><span class="o">.</span><span class="n">feature_names</span><span class="p">)</span>
+<span class="n">y</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">target</span>
+
+<span class="n">X_train</span><span class="p">,</span> <span class="n">X_test</span><span class="p">,</span> <span class="n">y_train</span><span class="p">,</span> <span class="n">y_test</span> <span class="o">=</span> <span class="n">train_test_split</span><span class="p">(</span>
+    <span class="n">X</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">test_size</span><span class="o">=</span><span class="mf">0.2</span><span class="p">,</span> <span class="n">random_state</span><span class="o">=</span><span class="mi">42</span>
+<span class="p">)</span>
+
+<span class="n">model</span> <span class="o">=</span> <span class="n">PerpetualBooster</span><span class="p">(</span><span class="n">objective</span><span class="o">=</span><span class="s2">&quot;SquaredLoss&quot;</span><span class="p">,</span> <span class="n">budget</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span> <span class="n">save_node_stats</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="n">model</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">X_train</span><span class="p">,</span> <span class="n">y_train</span><span class="p">)</span>
+
+<span class="n">y_pred_train</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="n">X_train</span><span class="p">)</span>
+<span class="n">train_residuals</span> <span class="o">=</span> <span class="n">y_train</span> <span class="o">-</span> <span class="n">y_pred_train</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Baseline MSE: </span><span class="si">{</span><span class="n">mean_squared_error</span><span class="p">(</span><span class="n">y_test</span><span class="p">,</span><span class="w"> </span><span class="n">model</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="n">X_test</span><span class="p">))</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</section>
+<section id="3.-Gradual-Drift-Simulation">
+<h2>3. Gradual Drift Simulation<a class="headerlink" href="#3.-Gradual-Drift-Simulation" title="Link to this heading"></a></h2>
+<p>We gradually increase the drift in <code class="docutils literal notranslate"><span class="pre">MedInc</span></code> and record how different metrics respond.</p>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">drift_levels</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mf">1.2</span><span class="p">,</span> <span class="mi">13</span><span class="p">)</span>
+<span class="n">results</span> <span class="o">=</span> <span class="p">[]</span>
+
+<span class="k">for</span> <span class="n">level</span> <span class="ow">in</span> <span class="n">drift_levels</span><span class="p">:</span>
+    <span class="n">X_curr</span> <span class="o">=</span> <span class="n">X_test</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+    <span class="n">X_curr</span><span class="p">[</span><span class="s2">&quot;MedInc&quot;</span><span class="p">]</span> <span class="o">+=</span> <span class="n">level</span>  <span class="c1"># Inject drift</span>
+
+    <span class="c1"># Perpetual Unsupervised Metrics</span>
+    <span class="n">perp_data</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">calculate_drift</span><span class="p">(</span><span class="n">X_curr</span><span class="p">,</span> <span class="n">drift_type</span><span class="o">=</span><span class="s2">&quot;data&quot;</span><span class="p">)</span>
+    <span class="n">perp_concept</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">calculate_drift</span><span class="p">(</span><span class="n">X_curr</span><span class="p">,</span> <span class="n">drift_type</span><span class="o">=</span><span class="s2">&quot;concept&quot;</span><span class="p">)</span>
+
+    <span class="c1"># Multivariate Benchmarks</span>
+    <span class="n">energy</span> <span class="o">=</span> <span class="n">calculate_energy_distance</span><span class="p">(</span><span class="n">X_test</span><span class="p">,</span> <span class="n">X_curr</span><span class="p">)</span>
+    <span class="n">mahalanobis</span> <span class="o">=</span> <span class="n">calculate_mahalanobis_distance</span><span class="p">(</span><span class="n">X_test</span><span class="p">,</span> <span class="n">X_curr</span><span class="p">)</span>
+    <span class="n">adv_auc</span> <span class="o">=</span> <span class="n">get_adversarial_auc</span><span class="p">(</span><span class="n">X_test</span><span class="p">,</span> <span class="n">X_curr</span><span class="p">)</span>
+
+    <span class="c1"># Performance Metrics</span>
+    <span class="n">y_curr_pred</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="n">X_curr</span><span class="p">)</span>
+    <span class="n">mse</span> <span class="o">=</span> <span class="n">mean_squared_error</span><span class="p">(</span><span class="n">y_test</span><span class="p">,</span> <span class="n">y_curr_pred</span><span class="p">)</span>
+    <span class="n">curr_residuals</span> <span class="o">=</span> <span class="n">y_test</span> <span class="o">-</span> <span class="n">y_curr_pred</span>
+    <span class="n">residual_ks</span> <span class="o">=</span> <span class="n">stats</span><span class="o">.</span><span class="n">ks_2samp</span><span class="p">(</span><span class="n">train_residuals</span><span class="p">,</span> <span class="n">curr_residuals</span><span class="p">)</span><span class="o">.</span><span class="n">statistic</span>
+
+    <span class="n">results</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+        <span class="p">{</span>
+            <span class="s2">&quot;Level&quot;</span><span class="p">:</span> <span class="n">level</span><span class="p">,</span>
+            <span class="s2">&quot;Perp Data&quot;</span><span class="p">:</span> <span class="n">perp_data</span><span class="p">,</span>
+            <span class="s2">&quot;Perp Concept&quot;</span><span class="p">:</span> <span class="n">perp_concept</span><span class="p">,</span>
+            <span class="s2">&quot;Energy Distance&quot;</span><span class="p">:</span> <span class="n">energy</span><span class="p">,</span>
+            <span class="s2">&quot;Mahalanobis&quot;</span><span class="p">:</span> <span class="n">mahalanobis</span><span class="p">,</span>
+            <span class="s2">&quot;Adversarial AUC&quot;</span><span class="p">:</span> <span class="n">adv_auc</span><span class="p">,</span>
+            <span class="s2">&quot;Residual KS&quot;</span><span class="p">:</span> <span class="n">residual_ks</span><span class="p">,</span>
+            <span class="s2">&quot;MSE&quot;</span><span class="p">:</span> <span class="n">mse</span><span class="p">,</span>
+        <span class="p">}</span>
+    <span class="p">)</span>
+
+<span class="n">df_res</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">results</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">df_res</span><span class="o">.</span><span class="n">head</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="nb">list</span><span class="p">(</span><span class="n">drift_levels</span><span class="p">)))</span>
+</pre></div>
+</div>
+</div>
+</section>
+<section id="4.-Visualizing-Drift-Response">
+<h2>4. Visualizing Drift Response<a class="headerlink" href="#4.-Visualizing-Drift-Response" title="Link to this heading"></a></h2>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">fig</span><span class="p">,</span> <span class="n">axes</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">subplots</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span> <span class="mi">14</span><span class="p">))</span>
+<span class="n">fig</span><span class="o">.</span><span class="n">subplots_adjust</span><span class="p">(</span><span class="n">hspace</span><span class="o">=</span><span class="mf">0.3</span><span class="p">,</span> <span class="n">right</span><span class="o">=</span><span class="mf">0.75</span><span class="p">)</span>
+
+<span class="c1"># --- Graph 1: Data Drift Metrics ---</span>
+<span class="n">ax1</span> <span class="o">=</span> <span class="n">axes</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+<span class="n">ax2</span> <span class="o">=</span> <span class="n">ax1</span><span class="o">.</span><span class="n">twinx</span><span class="p">()</span>
+<span class="n">ax3</span> <span class="o">=</span> <span class="n">ax1</span><span class="o">.</span><span class="n">twinx</span><span class="p">()</span>
+<span class="n">ax4</span> <span class="o">=</span> <span class="n">ax1</span><span class="o">.</span><span class="n">twinx</span><span class="p">()</span>
+
+<span class="n">ax3</span><span class="o">.</span><span class="n">spines</span><span class="p">[</span><span class="s2">&quot;right&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">set_position</span><span class="p">((</span><span class="s2">&quot;outward&quot;</span><span class="p">,</span> <span class="mi">60</span><span class="p">))</span>
+<span class="n">ax4</span><span class="o">.</span><span class="n">spines</span><span class="p">[</span><span class="s2">&quot;right&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">set_position</span><span class="p">((</span><span class="s2">&quot;outward&quot;</span><span class="p">,</span> <span class="mi">120</span><span class="p">))</span>
+
+<span class="p">(</span><span class="n">p1</span><span class="p">,)</span> <span class="o">=</span> <span class="n">ax1</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span>
+    <span class="n">df_res</span><span class="p">[</span><span class="s2">&quot;Level&quot;</span><span class="p">],</span>
+    <span class="n">df_res</span><span class="p">[</span><span class="s2">&quot;Perp Data&quot;</span><span class="p">],</span>
+    <span class="n">label</span><span class="o">=</span><span class="s2">&quot;Perpetual Data Drift&quot;</span><span class="p">,</span>
+    <span class="n">marker</span><span class="o">=</span><span class="s2">&quot;o&quot;</span><span class="p">,</span>
+    <span class="n">color</span><span class="o">=</span><span class="s2">&quot;C0&quot;</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="p">(</span><span class="n">p2</span><span class="p">,)</span> <span class="o">=</span> <span class="n">ax2</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span>
+    <span class="n">df_res</span><span class="p">[</span><span class="s2">&quot;Level&quot;</span><span class="p">],</span>
+    <span class="n">df_res</span><span class="p">[</span><span class="s2">&quot;Energy Distance&quot;</span><span class="p">],</span>
+    <span class="n">label</span><span class="o">=</span><span class="s2">&quot;Energy Distance&quot;</span><span class="p">,</span>
+    <span class="n">marker</span><span class="o">=</span><span class="s2">&quot;s&quot;</span><span class="p">,</span>
+    <span class="n">color</span><span class="o">=</span><span class="s2">&quot;C1&quot;</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="p">(</span><span class="n">p3</span><span class="p">,)</span> <span class="o">=</span> <span class="n">ax3</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span>
+    <span class="n">df_res</span><span class="p">[</span><span class="s2">&quot;Level&quot;</span><span class="p">],</span>
+    <span class="n">df_res</span><span class="p">[</span><span class="s2">&quot;Mahalanobis&quot;</span><span class="p">],</span>
+    <span class="n">label</span><span class="o">=</span><span class="s2">&quot;Mahalanobis Distance&quot;</span><span class="p">,</span>
+    <span class="n">marker</span><span class="o">=</span><span class="s2">&quot;^&quot;</span><span class="p">,</span>
+    <span class="n">color</span><span class="o">=</span><span class="s2">&quot;C2&quot;</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="p">(</span><span class="n">p4</span><span class="p">,)</span> <span class="o">=</span> <span class="n">ax4</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span>
+    <span class="n">df_res</span><span class="p">[</span><span class="s2">&quot;Level&quot;</span><span class="p">],</span>
+    <span class="n">df_res</span><span class="p">[</span><span class="s2">&quot;Adversarial AUC&quot;</span><span class="p">],</span>
+    <span class="n">label</span><span class="o">=</span><span class="s2">&quot;Adversarial AUC&quot;</span><span class="p">,</span>
+    <span class="n">marker</span><span class="o">=</span><span class="s2">&quot;d&quot;</span><span class="p">,</span>
+    <span class="n">color</span><span class="o">=</span><span class="s2">&quot;C3&quot;</span><span class="p">,</span>
+<span class="p">)</span>
+
+<span class="n">ax1</span><span class="o">.</span><span class="n">set_xlabel</span><span class="p">(</span><span class="s2">&quot;Drift Level (MedInc Shift)&quot;</span><span class="p">,</span> <span class="n">fontweight</span><span class="o">=</span><span class="s2">&quot;bold&quot;</span><span class="p">)</span>
+<span class="n">ax1</span><span class="o">.</span><span class="n">set_ylabel</span><span class="p">(</span><span class="s2">&quot;Perpetual Data Drift&quot;</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">&quot;C0&quot;</span><span class="p">)</span>
+<span class="n">ax2</span><span class="o">.</span><span class="n">set_ylabel</span><span class="p">(</span><span class="s2">&quot;Energy Distance&quot;</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">&quot;C1&quot;</span><span class="p">)</span>
+<span class="n">ax3</span><span class="o">.</span><span class="n">set_ylabel</span><span class="p">(</span><span class="s2">&quot;Mahalanobis Distance&quot;</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">&quot;C2&quot;</span><span class="p">)</span>
+<span class="n">ax4</span><span class="o">.</span><span class="n">set_ylabel</span><span class="p">(</span><span class="s2">&quot;Adversarial AUC&quot;</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">&quot;C3&quot;</span><span class="p">)</span>
+
+<span class="n">ax1</span><span class="o">.</span><span class="n">tick_params</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="s2">&quot;y&quot;</span><span class="p">,</span> <span class="n">colors</span><span class="o">=</span><span class="s2">&quot;C0&quot;</span><span class="p">)</span>
+<span class="n">ax2</span><span class="o">.</span><span class="n">tick_params</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="s2">&quot;y&quot;</span><span class="p">,</span> <span class="n">colors</span><span class="o">=</span><span class="s2">&quot;C1&quot;</span><span class="p">)</span>
+<span class="n">ax3</span><span class="o">.</span><span class="n">tick_params</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="s2">&quot;y&quot;</span><span class="p">,</span> <span class="n">colors</span><span class="o">=</span><span class="s2">&quot;C2&quot;</span><span class="p">)</span>
+<span class="n">ax4</span><span class="o">.</span><span class="n">tick_params</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="s2">&quot;y&quot;</span><span class="p">,</span> <span class="n">colors</span><span class="o">=</span><span class="s2">&quot;C3&quot;</span><span class="p">)</span>
+
+<span class="n">lines1</span> <span class="o">=</span> <span class="p">[</span><span class="n">p1</span><span class="p">,</span> <span class="n">p2</span><span class="p">,</span> <span class="n">p3</span><span class="p">,</span> <span class="n">p4</span><span class="p">]</span>
+<span class="n">ax1</span><span class="o">.</span><span class="n">legend</span><span class="p">(</span><span class="n">lines1</span><span class="p">,</span> <span class="p">[</span><span class="n">line</span><span class="o">.</span><span class="n">get_label</span><span class="p">()</span> <span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="n">lines1</span><span class="p">],</span> <span class="n">loc</span><span class="o">=</span><span class="s2">&quot;upper left&quot;</span><span class="p">)</span>
+<span class="n">ax1</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span><span class="s2">&quot;Data Drift Benchmark&quot;</span><span class="p">,</span> <span class="n">fontsize</span><span class="o">=</span><span class="mi">14</span><span class="p">,</span> <span class="n">fontweight</span><span class="o">=</span><span class="s2">&quot;bold&quot;</span><span class="p">)</span>
+<span class="n">ax1</span><span class="o">.</span><span class="n">grid</span><span class="p">(</span><span class="kc">True</span><span class="p">,</span> <span class="n">alpha</span><span class="o">=</span><span class="mf">0.3</span><span class="p">)</span>
+
+<span class="c1"># --- Graph 2: Concept Drift &amp; Performance Metrics ---</span>
+<span class="n">ax5</span> <span class="o">=</span> <span class="n">axes</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+<span class="n">ax6</span> <span class="o">=</span> <span class="n">ax5</span><span class="o">.</span><span class="n">twinx</span><span class="p">()</span>
+<span class="n">ax7</span> <span class="o">=</span> <span class="n">ax5</span><span class="o">.</span><span class="n">twinx</span><span class="p">()</span>
+
+<span class="n">ax7</span><span class="o">.</span><span class="n">spines</span><span class="p">[</span><span class="s2">&quot;right&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">set_position</span><span class="p">((</span><span class="s2">&quot;outward&quot;</span><span class="p">,</span> <span class="mi">60</span><span class="p">))</span>
+
+<span class="p">(</span><span class="n">p5</span><span class="p">,)</span> <span class="o">=</span> <span class="n">ax5</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span>
+    <span class="n">df_res</span><span class="p">[</span><span class="s2">&quot;Level&quot;</span><span class="p">],</span>
+    <span class="n">df_res</span><span class="p">[</span><span class="s2">&quot;Perp Concept&quot;</span><span class="p">],</span>
+    <span class="n">label</span><span class="o">=</span><span class="s2">&quot;Perpetual Concept Drift&quot;</span><span class="p">,</span>
+    <span class="n">marker</span><span class="o">=</span><span class="s2">&quot;o&quot;</span><span class="p">,</span>
+    <span class="n">color</span><span class="o">=</span><span class="s2">&quot;C0&quot;</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="p">(</span><span class="n">p6</span><span class="p">,)</span> <span class="o">=</span> <span class="n">ax6</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span>
+    <span class="n">df_res</span><span class="p">[</span><span class="s2">&quot;Level&quot;</span><span class="p">],</span>
+    <span class="n">df_res</span><span class="p">[</span><span class="s2">&quot;Residual KS&quot;</span><span class="p">],</span>
+    <span class="n">label</span><span class="o">=</span><span class="s2">&quot;Residual KS Stat&quot;</span><span class="p">,</span>
+    <span class="n">marker</span><span class="o">=</span><span class="s2">&quot;s&quot;</span><span class="p">,</span>
+    <span class="n">color</span><span class="o">=</span><span class="s2">&quot;C1&quot;</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="p">(</span><span class="n">p7</span><span class="p">,)</span> <span class="o">=</span> <span class="n">ax7</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">df_res</span><span class="p">[</span><span class="s2">&quot;Level&quot;</span><span class="p">],</span> <span class="n">df_res</span><span class="p">[</span><span class="s2">&quot;MSE&quot;</span><span class="p">],</span> <span class="n">label</span><span class="o">=</span><span class="s2">&quot;MSE&quot;</span><span class="p">,</span> <span class="n">marker</span><span class="o">=</span><span class="s2">&quot;^&quot;</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">&quot;C2&quot;</span><span class="p">)</span>
+
+<span class="n">ax5</span><span class="o">.</span><span class="n">set_xlabel</span><span class="p">(</span><span class="s2">&quot;Drift Level (MedInc Shift)&quot;</span><span class="p">,</span> <span class="n">fontweight</span><span class="o">=</span><span class="s2">&quot;bold&quot;</span><span class="p">)</span>
+<span class="n">ax5</span><span class="o">.</span><span class="n">set_ylabel</span><span class="p">(</span><span class="s2">&quot;Perpetual Concept Drift&quot;</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">&quot;C0&quot;</span><span class="p">)</span>
+<span class="n">ax6</span><span class="o">.</span><span class="n">set_ylabel</span><span class="p">(</span><span class="s2">&quot;Residual KS Stat&quot;</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">&quot;C1&quot;</span><span class="p">)</span>
+<span class="n">ax7</span><span class="o">.</span><span class="n">set_ylabel</span><span class="p">(</span><span class="s2">&quot;MSE&quot;</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">&quot;C2&quot;</span><span class="p">)</span>
+
+<span class="n">ax5</span><span class="o">.</span><span class="n">tick_params</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="s2">&quot;y&quot;</span><span class="p">,</span> <span class="n">colors</span><span class="o">=</span><span class="s2">&quot;C0&quot;</span><span class="p">)</span>
+<span class="n">ax6</span><span class="o">.</span><span class="n">tick_params</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="s2">&quot;y&quot;</span><span class="p">,</span> <span class="n">colors</span><span class="o">=</span><span class="s2">&quot;C1&quot;</span><span class="p">)</span>
+<span class="n">ax7</span><span class="o">.</span><span class="n">tick_params</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="s2">&quot;y&quot;</span><span class="p">,</span> <span class="n">colors</span><span class="o">=</span><span class="s2">&quot;C2&quot;</span><span class="p">)</span>
+
+<span class="n">lines2</span> <span class="o">=</span> <span class="p">[</span><span class="n">p5</span><span class="p">,</span> <span class="n">p6</span><span class="p">,</span> <span class="n">p7</span><span class="p">]</span>
+<span class="n">ax5</span><span class="o">.</span><span class="n">legend</span><span class="p">(</span><span class="n">lines2</span><span class="p">,</span> <span class="p">[</span><span class="n">line</span><span class="o">.</span><span class="n">get_label</span><span class="p">()</span> <span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="n">lines2</span><span class="p">],</span> <span class="n">loc</span><span class="o">=</span><span class="s2">&quot;upper left&quot;</span><span class="p">)</span>
+<span class="n">ax5</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span><span class="s2">&quot;Concept Drift Benchmark&quot;</span><span class="p">,</span> <span class="n">fontsize</span><span class="o">=</span><span class="mi">14</span><span class="p">,</span> <span class="n">fontweight</span><span class="o">=</span><span class="s2">&quot;bold&quot;</span><span class="p">)</span>
+<span class="n">ax5</span><span class="o">.</span><span class="n">grid</span><span class="p">(</span><span class="kc">True</span><span class="p">,</span> <span class="n">alpha</span><span class="o">=</span><span class="mf">0.3</span><span class="p">)</span>
+
+<span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+</pre></div>
+</div>
+</div>
+</section>
+<section id="4.-Practical-Threshold-Guidance">
+<h2>4. Practical Threshold Guidance<a class="headerlink" href="#4.-Practical-Threshold-Guidance" title="Link to this heading"></a></h2>
+<p>Based on empirical observations, here are the recommended threshold ranges for interpreting these drift scores.</p>
+<section id="Perpetual-Unsupervised-Scores-(Chi-Squared-Statistic)">
+<h3>Perpetual Unsupervised Scores (Chi-Squared Statistic)<a class="headerlink" href="#Perpetual-Unsupervised-Scores-(Chi-Squared-Statistic)" title="Link to this heading"></a></h3>
+<p>The drift score is an average Chi-squared statistic across model nodes.</p>
+<ul class="simple">
+<li><p><strong>&lt; 1.0</strong>: <strong>No Drift.</strong> The current data matches the reference distribution well.</p></li>
+<li><p><strong>1.0 - 2.0</strong>: <strong>Warning.</strong> Slight distributional shift. Monitor model performance closely.</p></li>
+<li><p><strong>&gt; 2.5</strong>: <strong>Significant Drift.</strong> High likelihood of data/concept shift. Retraining or investigative action (e.g., data quality check) is recommended.</p></li>
+</ul>
+</section>
+<section id="Benchmark-Ranges">
+<h3>Benchmark Ranges<a class="headerlink" href="#Benchmark-Ranges" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p><strong>Energy Distance (MMD)</strong>: Scale-dependent, but values significantly above the 0.0 baseline indicate drift. MMD is a kernel-based metric for distribution distance.</p></li>
+<li><p><strong>Mahalanobis Distance</strong>: Measures standard deviations from the mean; values &gt; 3.0 (3 sigma) are typically considered significant outliers/drift.</p></li>
+<li><p><strong>Adversarial AUC (ROC-AUC)</strong>: Ranges from 0.5 (perfectly indistinguishable) to 1.0 (perfectly separable).</p>
+<ul>
+<li><p><strong>0.50 - 0.60</strong>: Low/No drift.</p></li>
+<li><p><strong>0.60 - 0.75</strong>: Moderate drift.</p></li>
+<li><p><strong>&gt; 0.80</strong>: High drift.</p></li>
+</ul>
+</li>
+</ul>
+</section>
+<section id="Performance-Diagnostics-(Concept-Drift)">
+<h3>Performance Diagnostics (Concept Drift)<a class="headerlink" href="#Performance-Diagnostics-(Concept-Drift)" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p><strong>Residual KS Stat</strong>: Measures how much the distribution of prediction errors has changed. A high KS value (&gt; 0.2 in this case) confirms that concept drift is affecting model accuracy.</p></li>
+<li><p><strong>MSE</strong>: A dramatic increase in Mean Squared Error indicates the model is struggling to predict the target under the new shifted distribution.</p></li>
+</ul>
+</section>
+</section>
+<section id="5.-Conclusion">
+<h2>5. Conclusion<a class="headerlink" href="#5.-Conclusion" title="Link to this heading"></a></h2>
+<p>In this tutorial, we compared Perpetual’s unsupervised drift metrics against state-of-the-art multivariate benchmarks:</p>
+<ul class="simple">
+<li><p><strong>Perpetual Data &amp; Concept Drift</strong>: These metrics provide a model-based view of how data shifts affect both the marginal feature distributions and the predictive structure, showing a clear response to gradual drift.</p></li>
+<li><p><strong>Energy Distance</strong>: A robust kernel-based multivariate metric that captures distribution shifts effectively.</p></li>
+<li><p><strong>Mahalanobis Distance</strong>: Useful for detecting changes in the multivariate mean relative to the training feature covariance.</p></li>
+<li><p><strong>Adversarial AUC</strong>: A powerful classifier-based approach that identifies how distinguishable the new data is from the reference data.</p></li>
+</ul>
+<p>We can see that Perpetual’s internal metrics correlate strongly with these established multivariate methods, offering a fast, performant, and unsupervised built-in alternative for drift monitoring during model inference.</p>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="causal/customer_retention_uplift.html" class="btn btn-neutral float-left" title="Customer Retention: Uplift Modeling for Churn Prevention" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="../architecture.html" class="btn btn-neutral float-right" title="Architecture" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2026, Mutlu Simsek, Serkan Korkmaz, Pieter Pel.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

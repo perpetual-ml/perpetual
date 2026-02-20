@@ -7,7 +7,7 @@ In many high-stakes industries like FinTech and Healthcare, it is not enough to 
 Perpetual provides built-in tools to support these requirements.
 
 Adverse Action Codes (Reason Codes)
-------------------------------------
+-----------------------------------
 
 When a credit application is rejected, regulations often require providing the applicant with the main reasons for the rejection (Adverse Action Codes).
 

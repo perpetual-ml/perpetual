@@ -5,7 +5,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>perpetual.booster &mdash; Perpetual 1.7.0 documentation</title>
+  <title>perpetual.booster &mdash; Perpetual 1.8.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../../_static/custom.css?v=9cdd1368" />
@@ -13,7 +13,7 @@
   
       <script src="../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../_static/documentation_options.js?v=030dc6f6"></script>
+      <script src="../../_static/documentation_options.js?v=b51e6972"></script>
       <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
@@ -46,11 +46,12 @@
 <li class="toctree-l1"><a class="reference internal" href="../../installation.html">Installation</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../quickstart.html">Quickstart</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../api.html">API Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../causal_ml/index.html">Causal ML</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../calibration.html">Calibration and Uncertainty Quantification</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../drift_detection.html">Drift Detection</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../continual_learning.html">Continual Learning</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../explainability.html">Explainability</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../model_io_export.html">Model IO &amp; Export</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../causal_ml/index.html">Causal ML</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../tutorials/index.html">Tutorials</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../architecture.html">Architecture</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../parameters_tuning.html">Parameters Tuning</a></li>
@@ -871,6 +872,57 @@
         <span class="p">)</span></div>
 
 
+<div class="viewcode-block" id="PerpetualBooster.predict_distribution">
+<a class="viewcode-back" href="../../api.html#perpetual.PerpetualBooster.predict_distribution">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">predict_distribution</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">X</span><span class="p">,</span> <span class="n">n</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">100</span><span class="p">,</span> <span class="n">parallel</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">bool</span><span class="p">,</span> <span class="kc">None</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Predict a distribution using uncalibrated leaf weights from internal nodes.</span>
+
+<span class="sd">        Generates `n` predictions for each sample by randomly sampling one of the 5</span>
+<span class="sd">        weights stored in each leaf node. This returns a raw, uncalibrated distribution</span>
+<span class="sd">        of predictions.</span>
+
+<span class="sd">        Note: This method is only available if the booster was fitted with</span>
+<span class="sd">        `save_node_stats=True`.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        X : array-like of shape (n_samples, n_features)</span>
+<span class="sd">            New data for prediction.</span>
+<span class="sd">        n : int, default=100</span>
+<span class="sd">            Number of simulations/predictions to generate for each sample.</span>
+<span class="sd">        parallel : bool, optional</span>
+<span class="sd">            Whether to run prediction in parallel. If None, uses class default.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        distribution : ndarray of shape (n_samples, n)</span>
+<span class="sd">            A 2D array where each row contains `n` predictions for the corresponding sample.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">is_polars</span> <span class="o">=</span> <span class="n">type_df</span><span class="p">(</span><span class="n">X</span><span class="p">)</span> <span class="o">==</span> <span class="s2">&quot;polars_df&quot;</span>
+        <span class="k">if</span> <span class="n">is_polars</span><span class="p">:</span>
+            <span class="n">features_</span><span class="p">,</span> <span class="n">columns</span><span class="p">,</span> <span class="n">masks</span><span class="p">,</span> <span class="n">rows</span><span class="p">,</span> <span class="n">cols</span> <span class="o">=</span> <span class="n">transform_input_frame_columnar</span><span class="p">(</span>
+                <span class="n">X</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">cat_mapping</span>
+            <span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_validate_features</span><span class="p">(</span><span class="n">features_</span><span class="p">)</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">booster</span><span class="o">.</span><span class="n">predict_distribution_columnar</span><span class="p">(</span>
+                <span class="n">columns</span><span class="o">=</span><span class="n">columns</span><span class="p">,</span> <span class="n">masks</span><span class="o">=</span><span class="n">masks</span><span class="p">,</span> <span class="n">rows</span><span class="o">=</span><span class="n">rows</span><span class="p">,</span> <span class="n">n</span><span class="o">=</span><span class="n">n</span><span class="p">,</span> <span class="n">parallel</span><span class="o">=</span><span class="n">parallel</span>
+            <span class="p">)</span>
+
+        <span class="n">features_</span><span class="p">,</span> <span class="n">flat_data</span><span class="p">,</span> <span class="n">rows</span><span class="p">,</span> <span class="n">cols</span> <span class="o">=</span> <span class="n">transform_input_frame</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">cat_mapping</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_validate_features</span><span class="p">(</span><span class="n">features_</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">booster</span><span class="o">.</span><span class="n">predict_distribution</span><span class="p">(</span>
+            <span class="n">flat_data</span><span class="o">=</span><span class="n">flat_data</span><span class="p">,</span>
+            <span class="n">rows</span><span class="o">=</span><span class="n">rows</span><span class="p">,</span>
+            <span class="n">cols</span><span class="o">=</span><span class="n">cols</span><span class="p">,</span>
+            <span class="n">n</span><span class="o">=</span><span class="n">n</span><span class="p">,</span>
+            <span class="n">parallel</span><span class="o">=</span><span class="n">parallel</span><span class="p">,</span>
+        <span class="p">)</span></div>
+
+
 <div class="viewcode-block" id="PerpetualBooster.predict">
 <a class="viewcode-back" href="../../api.html#perpetual.PerpetualBooster.predict">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">predict</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">X</span><span class="p">,</span> <span class="n">parallel</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">bool</span><span class="p">,</span> <span class="kc">None</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
@@ -1021,6 +1073,58 @@
                 <span class="sa">f</span><span class="s2">&quot;predict_proba not implemented for regression. n_classes = </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">classes_</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span>
             <span class="p">)</span>
             <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">ones</span><span class="p">((</span><span class="n">rows</span><span class="p">,</span> <span class="mi">1</span><span class="p">))</span></div>
+
+
+<div class="viewcode-block" id="PerpetualBooster.calculate_drift">
+<a class="viewcode-back" href="../../api.html#perpetual.PerpetualBooster.calculate_drift">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">calculate_drift</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">X</span><span class="p">,</span> <span class="n">drift_type</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;data&quot;</span><span class="p">,</span> <span class="n">parallel</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">bool</span><span class="p">,</span> <span class="kc">None</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Calculate drift metrics (data or concept) for the model.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        X : array-like of shape (n_samples, n_features)</span>
+<span class="sd">            New data to evaluate for drift.</span>
+<span class="sd">        drift_type : str, default=&quot;data&quot;</span>
+<span class="sd">            Type of drift to calculate. Options:</span>
+
+<span class="sd">            - &quot;data&quot;: Multivariate data drift across all tree nodes.</span>
+<span class="sd">            - &quot;concept&quot;: Concept drift focusing on nodes that are parents of leaves.</span>
+
+<span class="sd">        parallel : bool, optional</span>
+<span class="sd">            Whether to run prediction in parallel. If None, uses class default.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        drift_score : float</span>
+<span class="sd">            The calculated drift score (average Chi-squared statistic).</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">is_polars</span> <span class="o">=</span> <span class="n">type_df</span><span class="p">(</span><span class="n">X</span><span class="p">)</span> <span class="o">==</span> <span class="s2">&quot;polars_df&quot;</span>
+        <span class="k">if</span> <span class="n">is_polars</span><span class="p">:</span>
+            <span class="n">features_</span><span class="p">,</span> <span class="n">columns</span><span class="p">,</span> <span class="n">masks</span><span class="p">,</span> <span class="n">rows</span><span class="p">,</span> <span class="n">cols</span> <span class="o">=</span> <span class="n">transform_input_frame_columnar</span><span class="p">(</span>
+                <span class="n">X</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">cat_mapping</span>
+            <span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_validate_features</span><span class="p">(</span><span class="n">features_</span><span class="p">)</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">booster</span><span class="o">.</span><span class="n">calculate_drift_columnar</span><span class="p">(</span>
+                <span class="n">columns</span><span class="o">=</span><span class="n">columns</span><span class="p">,</span>
+                <span class="n">masks</span><span class="o">=</span><span class="n">masks</span><span class="p">,</span>
+                <span class="n">rows</span><span class="o">=</span><span class="n">rows</span><span class="p">,</span>
+                <span class="n">drift_type</span><span class="o">=</span><span class="n">drift_type</span><span class="p">,</span>
+                <span class="n">parallel</span><span class="o">=</span><span class="n">parallel</span><span class="p">,</span>
+            <span class="p">)</span>
+
+        <span class="n">features_</span><span class="p">,</span> <span class="n">flat_data</span><span class="p">,</span> <span class="n">rows</span><span class="p">,</span> <span class="n">cols</span> <span class="o">=</span> <span class="n">transform_input_frame</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">cat_mapping</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_validate_features</span><span class="p">(</span><span class="n">features_</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">booster</span><span class="o">.</span><span class="n">calculate_drift</span><span class="p">(</span>
+            <span class="n">flat_data</span><span class="o">=</span><span class="n">flat_data</span><span class="p">,</span>
+            <span class="n">rows</span><span class="o">=</span><span class="n">rows</span><span class="p">,</span>
+            <span class="n">cols</span><span class="o">=</span><span class="n">cols</span><span class="p">,</span>
+            <span class="n">drift_type</span><span class="o">=</span><span class="n">drift_type</span><span class="p">,</span>
+            <span class="n">parallel</span><span class="o">=</span><span class="n">parallel</span><span class="p">,</span>
+        <span class="p">)</span></div>
 
 
 <div class="viewcode-block" id="PerpetualBooster.predict_log_proba">
