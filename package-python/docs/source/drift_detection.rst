@@ -45,4 +45,4 @@ Note: This method is unsupervised and does not require target values for the new
 Examples
 --------
 
-For a detailed walkthrough, see the :doc:`Drift Detection Tutorial <tutorials/drift_tutorial.ipynb>`.
+For a detailed walkthrough, see the :doc:`Drift Detection Tutorial <tutorials/drift_tutorial>`.
