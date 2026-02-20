@@ -1,0 +1,316 @@
+//! Conformalized Quantile Regression (CQR)
+//!
+//! Prediction intervals are obtained by training two separate quantile models
+//! (for `alpha/2` and `1 - alpha/2`) and kemudian correcting the boundaries
+//! using a calibration score calculated on a held-out set.
+//!
+//! This implementation follows the CQR procedure to ensure marginal coverage.
+use crate::objective::Objective;
+use crate::{ColumnarMatrix, Matrix, PerpetualBooster, errors::PerpetualError, utils::percentiles};
+use std::collections::HashMap;
+
+/// Calibration data: `(features, targets, alpha_values)`.
+pub type CalData<'a> = (&'a Matrix<'a, f64>, &'a [f64], &'a [f64]);
+
+/// Calibration data for columnar matrices: `(features, targets, alpha_values)`.
+pub type CalDataColumnar<'a> = (&'a ColumnarMatrix<'a, f64>, &'a [f64], &'a [f64]);
+
+impl PerpetualBooster {
+    /// Calibrate models using Conformalized Quantile Regression (CQR).
+    ///
+    /// This method fits two separate quantile regression models on the training data
+    /// and then uses the `data_cal` set to compute the conformity scores needed to
+    /// adjust the predicted intervals.
+    ///
+    /// # Arguments
+    ///
+    /// * `data` - Training features.
+    /// * `y` - Training targets.
+    /// * `sample_weight` - Optional training sample weights.
+    /// * `group` - Optional grouping for ranking/categorical data.
+    /// * `data_cal` - A tuple of (features, targets, alphas) for the calibration set.
+    pub fn calibrate_conformal(
+        &mut self,
+        data: &Matrix<f64>,
+        y: &[f64],
+        sample_weight: Option<&[f64]>,
+        group: Option<&[u64]>,
+        data_cal: CalData,
+    ) -> Result<(), PerpetualError> {
+        self.cfg.calibration_method = crate::booster::config::CalibrationMethod::Conformal;
+        let (x_cal, y_cal, alpha) = data_cal;
+
+        for alpha_ in alpha {
+            let lower_quantile = Some(alpha_ / 2.0);
+            let mut model_lower = PerpetualBooster::default().set_objective(Objective::QuantileLoss {
+                quantile: lower_quantile,
+            });
+            model_lower.fit(data, y, sample_weight, group)?;
+
+            let upper_quantile = Some(1.0 - alpha_ / 2.0);
+            let mut model_upper = PerpetualBooster::default().set_objective(Objective::QuantileLoss {
+                quantile: upper_quantile,
+            });
+
+            model_upper.fit(data, y, sample_weight, group)?;
+
+            let y_cal_pred_lower = model_lower.predict(x_cal, true);
+            let y_cal_pred_upper = model_upper.predict(x_cal, true);
+            let mut scores: Vec<f64> = Vec::with_capacity(y_cal.len());
+            for i in 0..y_cal.len() {
+                scores.push(f64::max(y_cal_pred_lower[i] - y_cal[i], y_cal[i] - y_cal_pred_upper[i]));
+            }
+            let perc = ((1.0 - *alpha_) * (1.0 + 1.0 / (scores.len() as f64))).min(1.0);
+            let score = percentiles(&scores, &vec![1.0; scores.len()], &[perc])[0];
+            self.cal_models
+                .insert(alpha_.to_string(), [(model_lower, -score), (model_upper, score)]);
+        }
+        Ok(())
+    }
+
+    /// Calibrate models to get prediction intervals using columnar data
+    pub fn calibrate_conformal_columnar(
+        &mut self,
+        data: &ColumnarMatrix<f64>,
+        y: &[f64],
+        sample_weight: Option<&[f64]>,
+        group: Option<&[u64]>,
+        data_cal: CalDataColumnar,
+    ) -> Result<(), PerpetualError> {
+        self.cfg.calibration_method = crate::booster::config::CalibrationMethod::Conformal;
+        let (x_cal, y_cal, alpha) = data_cal;
+
+        for alpha_ in alpha {
+            let lower_quantile = Some(alpha_ / 2.0);
+            let mut model_lower = PerpetualBooster::default().set_objective(Objective::QuantileLoss {
+                quantile: lower_quantile,
+            });
+            model_lower.fit_columnar(data, y, sample_weight, group)?;
+
+            let upper_quantile = Some(1.0 - alpha_ / 2.0);
+            let mut model_upper = PerpetualBooster::default().set_objective(Objective::QuantileLoss {
+                quantile: upper_quantile,
+            });
+
+            model_upper.fit_columnar(data, y, sample_weight, group)?;
+
+            let y_cal_pred_lower = model_lower.predict_columnar(x_cal, true);
+            let y_cal_pred_upper = model_upper.predict_columnar(x_cal, true);
+            let mut scores: Vec<f64> = Vec::with_capacity(y_cal.len());
+            for i in 0..y_cal.len() {
+                scores.push(f64::max(y_cal_pred_lower[i] - y_cal[i], y_cal[i] - y_cal_pred_upper[i]));
+            }
+            let perc = ((1.0 - *alpha_) * (1.0 + 1.0 / (scores.len() as f64))).min(1.0);
+            let score = percentiles(&scores, &vec![1.0; scores.len()], &[perc])[0];
+            self.cal_models
+                .insert(alpha_.to_string(), [(model_lower, -score), (model_upper, score)]);
+        }
+        Ok(())
+    }
+
+    pub fn predict_intervals_conformal(&self, data: &Matrix<f64>, parallel: bool) -> HashMap<String, Vec<Vec<f64>>> {
+        let mut intervals = HashMap::new();
+        for (alpha, value) in &self.cal_models {
+            let (model_lower, score_lower) = &value[0];
+            let (model_upper, score_upper) = &value[1];
+            let lower_preds = model_lower.predict(data, parallel);
+            let upper_preds = model_upper.predict(data, parallel);
+            let mut sample_intervals = Vec::with_capacity(data.rows);
+            for i in 0..data.rows {
+                sample_intervals.push(vec![lower_preds[i] + score_lower, upper_preds[i] + score_upper]);
+            }
+            intervals.insert(alpha.to_string(), sample_intervals);
+        }
+        intervals
+    }
+
+    pub fn predict_intervals_conformal_columnar(
+        &self,
+        data: &ColumnarMatrix<f64>,
+        parallel: bool,
+    ) -> HashMap<String, Vec<Vec<f64>>> {
+        let mut intervals = HashMap::new();
+        let n_samples = data.index.len();
+        for (alpha, value) in &self.cal_models {
+            let (model_lower, score_lower) = &value[0];
+            let (model_upper, score_upper) = &value[1];
+            let lower_preds = model_lower.predict_columnar(data, parallel);
+            let upper_preds = model_upper.predict_columnar(data, parallel);
+            let mut sample_intervals = Vec::with_capacity(n_samples);
+            for i in 0..n_samples {
+                sample_intervals.push(vec![lower_preds[i] + score_lower, upper_preds[i] + score_upper]);
+            }
+            intervals.insert(alpha.to_string(), sample_intervals);
+        }
+        intervals
+    }
+}
+
+// Unit-tests
+#[cfg(test)]
+mod tests {
+
+    use crate::Matrix;
+    use crate::PerpetualBooster;
+    use crate::objective::Objective;
+    use std::error::Error;
+    use std::fs::File;
+    use std::io::BufReader;
+
+    fn read_data(path: &str) -> Result<(Vec<f64>, Vec<f64>), Box<dyn Error>> {
+        let feature_names = [
+            "MedInc",
+            "HouseAge",
+            "AveRooms",
+            "AveBedrms",
+            "Population",
+            "AveOccup",
+            "Latitude",
+            "Longitude",
+        ];
+        let target_name = "MedHouseVal";
+
+        let file = File::open(path)?;
+        let reader = BufReader::new(file);
+        let mut csv_reader = csv::ReaderBuilder::new().has_headers(true).from_reader(reader);
+
+        let headers = csv_reader.headers()?.clone();
+        let feature_indices: Vec<usize> = feature_names
+            .iter()
+            .map(|&name| headers.iter().position(|h| h == name).unwrap())
+            .collect();
+        let target_index = headers.iter().position(|h| h == target_name).unwrap();
+
+        let mut data_columns: Vec<Vec<f64>> = vec![Vec::new(); feature_names.len()];
+        let mut y = Vec::new();
+
+        for result in csv_reader.records() {
+            let record = result?;
+
+            // Parse target
+            let target_str = &record[target_index];
+            let target_val = if target_str.is_empty() {
+                f64::NAN
+            } else {
+                target_str.parse::<f64>().unwrap_or(f64::NAN)
+            };
+            y.push(target_val);
+
+            // Parse features
+            for (i, &idx) in feature_indices.iter().enumerate() {
+                let val_str = &record[idx];
+                let val = if val_str.is_empty() {
+                    f64::NAN
+                } else {
+                    val_str.parse::<f64>().unwrap_or(f64::NAN)
+                };
+                data_columns[i].push(val);
+            }
+        }
+
+        let data: Vec<f64> = data_columns.into_iter().flatten().collect();
+        Ok((data, y))
+    }
+
+    #[test]
+    fn test_cqr() -> Result<(), Box<dyn Error>> {
+        let (data_train, y_train) = read_data("resources/cal_housing_train.csv")?;
+        let (data_test, y_test) = read_data("resources/cal_housing_test.csv")?;
+
+        let _n_train_subset = 1000.min(y_train.len());
+        let _n_test_subset = 500.min(y_test.len());
+
+        let rows_full = y_train.len();
+        let limit_train = 1000.min(rows_full);
+        let mut data_train_sub = Vec::new();
+        // Extract 8 columns
+        for c in 0..8 {
+            let col_start = c * rows_full;
+            data_train_sub.extend_from_slice(&data_train[col_start..col_start + limit_train]);
+        }
+        let y_train_sub = y_train[0..limit_train].to_vec();
+
+        let rows_test_full = y_test.len();
+        let limit_test = 500.min(rows_test_full);
+        let mut data_test_sub = Vec::new();
+        for c in 0..8 {
+            let col_start = c * rows_test_full;
+            data_test_sub.extend_from_slice(&data_test[col_start..col_start + limit_test]);
+        }
+        let y_test_sub = y_test[0..limit_test].to_vec();
+
+        // Create Matrix from ndarray.
+        let matrix_train = Matrix::new(&data_train_sub, y_train_sub.len(), 8);
+        let matrix_test = Matrix::new(&data_test_sub, y_test_sub.len(), 8);
+
+        let mut model = PerpetualBooster::default()
+            .set_objective(Objective::SquaredLoss)
+            .set_max_bin(5)
+            .set_budget(0.1)
+            .set_iteration_limit(Some(3))
+            .set_memory_limit(Some(0.0001));
+
+        model.fit(&matrix_train, &y_train_sub, None, None)?;
+
+        let alpha = vec![0.2];
+        let data_cal = (&matrix_test, y_test_sub.as_slice(), alpha.as_slice());
+
+        model.calibrate_conformal(&matrix_train, &y_train_sub, None, None, data_cal)?;
+
+        let matrix_test_eval = Matrix::new(&data_test_sub, y_test_sub.len(), 8);
+        let _intervals = model.predict_intervals(&matrix_test_eval, true);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_cqr_columnar() -> Result<(), Box<dyn Error>> {
+        let (data_train, y_train) = read_data("resources/cal_housing_train.csv")?;
+        let (data_test, y_test) = read_data("resources/cal_housing_test.csv")?;
+
+        let rows_full = y_train.len();
+        let limit_train = 200.min(rows_full);
+        let mut data_train_sub = Vec::new();
+        for c in 0..8 {
+            let col_start = c * rows_full;
+            data_train_sub.extend_from_slice(&data_train[col_start..col_start + limit_train]);
+        }
+        let y_train_sub = y_train[0..limit_train].to_vec();
+
+        let rows_test_full = y_test.len();
+        let limit_test = 100.min(rows_test_full);
+        let mut data_test_sub = Vec::new();
+        for c in 0..8 {
+            let col_start = c * rows_test_full;
+            data_test_sub.extend_from_slice(&data_test[col_start..col_start + limit_test]);
+        }
+        let y_test_sub = y_test[0..limit_test].to_vec();
+
+        let matrix_train = Matrix::new(&data_train_sub, y_train_sub.len(), 8);
+        let columns_train: Vec<&[f64]> = (0..8).map(|j| matrix_train.get_col(j)).collect();
+        let col_matrix_train = crate::ColumnarMatrix::new(columns_train, None, y_train_sub.len());
+
+        let matrix_test = Matrix::new(&data_test_sub, y_test_sub.len(), 8);
+        let columns_test: Vec<&[f64]> = (0..8).map(|j| matrix_test.get_col(j)).collect();
+        let col_matrix_test = crate::ColumnarMatrix::new(columns_test, None, y_test_sub.len());
+
+        let mut model = PerpetualBooster::default()
+            .set_objective(Objective::SquaredLoss)
+            .set_max_bin(5)
+            .set_budget(0.1)
+            .set_iteration_limit(Some(2));
+
+        model.fit_columnar(&col_matrix_train, &y_train_sub, None, None)?;
+
+        let alpha = vec![0.1];
+        let data_cal = (&col_matrix_test, y_test_sub.as_slice(), alpha.as_slice());
+
+        model.calibrate_conformal_columnar(&col_matrix_train, &y_train_sub, None, None, data_cal)?;
+
+        let intervals = model.predict_intervals_columnar(&col_matrix_test, true);
+        assert!(intervals.contains_key("0.1"));
+        assert_eq!(intervals.get("0.1").unwrap().len(), y_test_sub.len());
+
+        Ok(())
+    }
+}

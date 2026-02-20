@@ -1,0 +1,76 @@
+TARGET = x86_64-pc-windows-gnu
+
+PKG_LIBS = -L. -lperpetual_r -lws2_32 -luserenv -lbcrypt -ladvapi32 -lntdll
+PKG_CFLAGS = -I./rust/target/$(TARGET)/release
+
+all: rust-target
+
+rust-target:
+	@echo "DEBUG: Starting rust-target"
+	@echo "DEBUG: Current directory: $$(pwd)"
+	@echo "DEBUG: PERPETUAL_ROOT: '$(PERPETUAL_ROOT)'"
+	@if [ ! -d "rust" ]; then \
+		echo "DEBUG: rust directory missing in build dir."; \
+		if [ -n "$(PERPETUAL_ROOT)" ]; then \
+			echo "DEBUG: Attempting to copy from $(PERPETUAL_ROOT)/package-r/src/rust..."; \
+			ls -ld "$(PERPETUAL_ROOT)/package-r/src/rust" || echo "DEBUG: Source directory not found!"; \
+			cp -r "$(PERPETUAL_ROOT)/package-r/src/rust" . || echo "DEBUG: Copy failed!"; \
+			ls -ld rust || echo "DEBUG: rust directory still missing after copy!"; \
+		else \
+			echo "DEBUG: PERPETUAL_ROOT is not set. Cannot recover."; \
+		fi \
+	else \
+		echo "DEBUG: rust directory exists."; \
+	fi
+	@echo "DEBUG: checking rust directory permissions and type"
+	ls -ld rust
+	ls -F
+	@echo "Attempting to add $(TARGET) target..."
+	-rustup target add $(TARGET)
+	@if rustup target list --installed 2>/dev/null | grep -q "$(TARGET)"; then \
+		echo "DEBUG: Target $(TARGET) found. Entering rust directory..."; \
+		ls -ld rust; \
+		if [ -d "rust" ]; then echo "DEBUG: rust is a dir"; else echo "DEBUG: rust is NOT a dir"; fi; \
+		if [ -d "../v" ]; then \
+			echo "Using vendored dependencies in src/v..."; \
+			find ../v -name "cargo-checksum.json" -exec sh -c 'mv "$$1" "$${1%cargo-checksum.json}.cargo-checksum.json"' _ {} \; ; \
+			cd ./rust && cargo build --release --lib --manifest-path Cargo.toml --target $(TARGET) --verbose --config 'source.crates-io.replace-with="vendored-sources"' --config 'source.vendored-sources.directory="../v"'; \
+		else \
+			echo "No vendored dependencies found in src/v, using crates.io..."; \
+			cd ./rust && cargo build --release --lib --manifest-path Cargo.toml --target $(TARGET) --verbose; \
+		fi \
+	else \
+		echo "Target $(TARGET) build failed or missing. Detailed log:"; \
+		cat rust/cargo_build.log || true; \
+		echo "Falling back to default host target..."; \
+		echo "DEBUG: Current dir in else: $$(pwd)"; \
+		ls -F; \
+		if [ -d "../v" ]; then \
+			echo "Using vendored dependencies in src/v (fallback)..."; \
+			find ../v -name "cargo-checksum.json" -exec sh -c 'mv "$$1" "$${1%cargo-checksum.json}.cargo-checksum.json"' _ {} \; ; \
+			cd ./rust && cargo build --release --lib --manifest-path Cargo.toml --verbose --config 'source.crates-io.replace-with="vendored-sources"' --config 'source.vendored-sources.directory="../v"'; \
+		else \
+			echo "No vendored dependencies found in src/v (fallback), using crates.io..."; \
+			cd ./rust && cargo build --release --lib --manifest-path Cargo.toml --verbose; \
+		fi \
+	fi
+	@if [ ! -f rust/target/$(TARGET)/release/libperpetual_r.a ] && [ ! -f rust/target/release/libperpetual_r.a ] && [ ! -f rust/target/release/perpetual_r.lib ]; then \
+		echo "ERROR: Detailed build log follow:"; \
+		cat rust/cargo_build.log || true; \
+	fi
+	@if [ -f rust/target/$(TARGET)/release/libperpetual_r.a ]; then \
+		echo "Found target artifact: rust/target/$(TARGET)/release/libperpetual_r.a"; \
+		cp rust/target/$(TARGET)/release/libperpetual_r.a .; \
+	elif [ -f rust/target/release/libperpetual_r.a ]; then \
+		echo "Found host artifact: rust/target/release/libperpetual_r.a"; \
+		cp rust/target/release/libperpetual_r.a .; \
+	elif [ -f rust/target/release/perpetual_r.lib ]; then \
+		echo "Found host artifact (MSVC): rust/target/release/perpetual_r.lib"; \
+		cp rust/target/release/perpetual_r.lib ./libperpetual_r.a; \
+	else \
+		echo "ERROR: libperpetual_r.a (or .lib) not found in expected locations!"; \
+		exit 1; \
+	fi
+
+clean:
+	rm -f libperpetual_r.a

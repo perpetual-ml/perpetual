@@ -1,0 +1,42 @@
+[package]
+name = "perpetual"
+version = "1.8.0"
+edition = "2024"
+authors = ["Mutlu Simsek <msimsek@perpetual-ml.com>", "Serkan Korkmaz <serkor1@duck.com>", "Pieter Pel <pelpieter@gmail.com>"]
+homepage = "https://perpetual-ml.com"
+description = "A self-generalizing gradient boosting machine that doesn't need hyperparameter optimization"
+# license = "Apache-2.0"
+# readme = "README.md"
+repository = "https://github.com/perpetual-ml/perpetual"
+
+keywords = ["machine-learning", "perpetual", "ai", "ml"]
+categories = ["algorithms", "mathematics", "science"]
+
+[profile.release]
+lto = "fat"
+codegen-units = 1
+panic = "abort"
+strip = true
+
+[profile.bench]
+debug = true
+opt-level = 3
+lto = "fat"
+
+[dependencies]
+rayon = "1.11.0"
+thiserror = "2.0.18"
+serde_json = { version = "1.0.149", features = ["float_roundtrip"] }
+serde = { version = "1.0.228", features = ["derive"] }
+approx = "0.5.1"
+log = "0.4.29"
+rand = "0.10.0"
+sysinfo = "0.38.2"
+
+[package.metadata.llvm-cov]
+ignore-filename = [
+    "package-python/.*",
+    "package-r/.*",
+    "package-python\\\\.*",
+    "package-r\\\\.*",
+]
