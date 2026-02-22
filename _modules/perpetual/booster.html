@@ -5,7 +5,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>perpetual.booster &mdash; Perpetual 1.8.0 documentation</title>
+  <title>perpetual.booster &mdash; Perpetual 1.9.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../../_static/custom.css?v=9cdd1368" />
@@ -13,7 +13,7 @@
   
       <script src="../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../_static/documentation_options.js?v=b51e6972"></script>
+      <script src="../../_static/documentation_options.js?v=c4cb232b"></script>
       <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
@@ -196,10 +196,21 @@
 <span class="sd">            Learning objective function to be used for optimization. Valid options are:</span>
 
 <span class="sd">            - &quot;LogLoss&quot;: logistic loss for binary classification.</span>
+<span class="sd">            - &quot;BrierLoss&quot;: Brier score loss for probabilistic binary classification.</span>
+<span class="sd">            - &quot;HingeLoss&quot;: hinge loss for binary classification.</span>
 <span class="sd">            - &quot;SquaredLoss&quot;: squared error for regression.</span>
 <span class="sd">            - &quot;QuantileLoss&quot;: quantile error for quantile regression.</span>
 <span class="sd">            - &quot;HuberLoss&quot;: Huber loss for robust regression.</span>
 <span class="sd">            - &quot;AdaptiveHuberLoss&quot;: adaptive Huber loss for robust regression.</span>
+<span class="sd">            - &quot;FairLoss&quot;: Fair loss for robust regression.</span>
+<span class="sd">            - &quot;AbsoluteLoss&quot;: absolute (L1) error for regression.</span>
+<span class="sd">            - &quot;SquaredLogLoss&quot;: squared log error for regression.</span>
+<span class="sd">            - &quot;MapeLoss&quot;: mean absolute percentage error for regression.</span>
+<span class="sd">            - &quot;PoissonLoss&quot;: Poisson regression for count data.</span>
+<span class="sd">            - &quot;GammaLoss&quot;: Gamma regression with log-link.</span>
+<span class="sd">            - &quot;TweedieLoss&quot;: Tweedie regression with log-link.</span>
+<span class="sd">            - &quot;CrossEntropyLoss&quot;: cross-entropy loss for targets in [0, 1].</span>
+<span class="sd">            - &quot;CrossEntropyLambdaLoss&quot;: alternative weighted cross-entropy.</span>
 <span class="sd">            - &quot;ListNetLoss&quot;: ListNet loss for ranking.</span>
 <span class="sd">            - custom objective: a tuple of (loss, gradient, initial_value) functions.</span>
 <span class="sd">              Each function should have the following signature:</span>
@@ -215,10 +226,11 @@
 <span class="sd">        num_threads : int, optional</span>
 <span class="sd">            Number of threads to be used during training and prediction.</span>
 <span class="sd">        monotone_constraints : dict, optional</span>
-<span class="sd">            Constraints to enforce a specific relationship between features and target.</span>
 <span class="sd">            Keys are feature indices or names, values are -1, 1, or 0.</span>
 <span class="sd">        force_children_to_bound_parent : bool, default=False</span>
 <span class="sd">            Whether to restrict children nodes to be within the parent&#39;s range.</span>
+<span class="sd">        save_node_stats : bool, default=False</span>
+<span class="sd">            Whether to save node statistics (required for calibration).</span>
 <span class="sd">        missing : float, default=np.nan</span>
 <span class="sd">            Value to consider as missing data.</span>
 <span class="sd">        allow_missing_splits : bool, default=True</span>
@@ -257,45 +269,6 @@
 <span class="sd">        interaction_constraints : list of list of int, optional</span>
 <span class="sd">            Interaction constraints.</span>
 <span class="sd">        save_node_stats : bool, default=False</span>
-<span class="sd">            Whether to save node statistics (gradients, hessians) for analysis.</span>
-
-<span class="sd">        Attributes</span>
-<span class="sd">        ----------</span>
-<span class="sd">        feature_names_in_ : list of str</span>
-<span class="sd">            Names of features seen during :meth:`fit`.</span>
-<span class="sd">        n_features_ : int</span>
-<span class="sd">            Number of features seen during :meth:`fit`.</span>
-<span class="sd">        classes_ : list</span>
-<span class="sd">            Class labels for classification tasks.</span>
-<span class="sd">        feature_importances_ : ndarray of shape (n_features,)</span>
-<span class="sd">            Feature importances calculated via ``feature_importance_method``.</span>
-
-<span class="sd">        See Also</span>
-<span class="sd">        --------</span>
-<span class="sd">        perpetual.sklearn.PerpetualClassifier : Scikit-learn compatible classifier.</span>
-<span class="sd">        perpetual.sklearn.PerpetualRegressor : Scikit-learn compatible regressor.</span>
-
-<span class="sd">        Examples</span>
-<span class="sd">        --------</span>
-<span class="sd">        Basic usage for binary classification:</span>
-
-<span class="sd">        &gt;&gt;&gt; from perpetual import PerpetualBooster</span>
-<span class="sd">        &gt;&gt;&gt; from sklearn.datasets import make_classification</span>
-<span class="sd">        &gt;&gt;&gt; X, y = make_classification(n_samples=1000, n_features=20)</span>
-<span class="sd">        &gt;&gt;&gt; model = PerpetualBooster(objective=&quot;LogLoss&quot;)</span>
-<span class="sd">        &gt;&gt;&gt; model.fit(X, y)</span>
-<span class="sd">        &gt;&gt;&gt; preds = model.predict(X[:5])</span>
-
-<span class="sd">        Custom objective example:</span>
-
-<span class="sd">        &gt;&gt;&gt; def loss(y, pred, weight, group):</span>
-<span class="sd">        ...     return (y - pred) ** 2</span>
-<span class="sd">        &gt;&gt;&gt; def gradient(y, pred, weight, group):</span>
-<span class="sd">        ...     return (pred - y), None</span>
-<span class="sd">        &gt;&gt;&gt; def initial_value(y, weight, group):</span>
-<span class="sd">        ...     return np.mean(y)</span>
-<span class="sd">        &gt;&gt;&gt; model = PerpetualBooster(objective=(loss, gradient, initial_value))</span>
-<span class="sd">        &gt;&gt;&gt; model.fit(X, y)</span>
 <span class="sd">        &quot;&quot;&quot;</span>
 
         <span class="n">terminate_missing_features_</span> <span class="o">=</span> <span class="p">(</span>
@@ -305,17 +278,44 @@
             <span class="p">{}</span> <span class="k">if</span> <span class="n">monotone_constraints</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">monotone_constraints</span>
         <span class="p">)</span>
 
-        <span class="bp">self</span><span class="o">.</span><span class="n">objective</span> <span class="o">=</span> <span class="n">objective</span>
+        <span class="n">VALID_OBJECTIVES</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s2">&quot;LogLoss&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;BrierLoss&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;SquaredLoss&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;QuantileLoss&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;HuberLoss&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;AdaptiveHuberLoss&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;ListNetLoss&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;PoissonLoss&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;GammaLoss&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;MapeLoss&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;FairLoss&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;TweedieLoss&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;SquaredLogLoss&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;CrossEntropyLoss&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;CrossEntropyLambdaLoss&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;AbsoluteLoss&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;HingeLoss&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;Custom&quot;</span><span class="p">,</span>
+        <span class="p">}</span>
+
         <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">objective</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+            <span class="k">if</span> <span class="n">objective</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">VALID_OBJECTIVES</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">objective</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;Custom&quot;</span><span class="p">):</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">&quot;unknown variant `</span><span class="si">{</span><span class="n">objective</span><span class="si">}</span><span class="s2">`, expected one of </span><span class="si">{</span><span class="s1">&#39;, &#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="nb">sorted</span><span class="p">(</span><span class="n">VALID_OBJECTIVES</span><span class="p">))</span><span class="si">}</span><span class="s2">, Custom&quot;</span>
+                <span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">objective</span> <span class="o">=</span> <span class="n">objective</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">loss</span> <span class="o">=</span> <span class="kc">None</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">grad</span> <span class="o">=</span> <span class="kc">None</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">init</span> <span class="o">=</span> <span class="kc">None</span>
         <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">objective</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">objective</span> <span class="o">=</span> <span class="n">objective</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">loss</span> <span class="o">=</span> <span class="n">objective</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">grad</span> <span class="o">=</span> <span class="n">objective</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">init</span> <span class="o">=</span> <span class="n">objective</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span>
         <span class="k">else</span><span class="p">:</span>
             <span class="c1"># Assume it is a PolicyObjective or similar object</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">objective</span> <span class="o">=</span> <span class="n">objective</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">loss</span> <span class="o">=</span> <span class="kc">None</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">grad</span> <span class="o">=</span> <span class="kc">None</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">init</span> <span class="o">=</span> <span class="kc">None</span>
@@ -342,8 +342,16 @@
         <span class="bp">self</span><span class="o">.</span><span class="n">interaction_constraints</span> <span class="o">=</span> <span class="n">interaction_constraints</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">save_node_stats</span> <span class="o">=</span> <span class="n">save_node_stats</span>
 
+        <span class="bp">self</span><span class="o">.</span><span class="n">feature_names_in_</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">n_features_</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">cat_mapping</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">classes_</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([])</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_is_fitted</span> <span class="o">=</span> <span class="kc">False</span>
+
         <span class="n">booster</span> <span class="o">=</span> <span class="n">CratePerpetualBooster</span><span class="p">(</span>
-            <span class="n">objective</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">objective</span> <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">objective</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">)</span> <span class="k">else</span> <span class="kc">None</span><span class="p">,</span>
+            <span class="n">objective</span><span class="o">=</span><span class="s2">&quot;SquaredLoss&quot;</span>
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">objective</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">objective</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;Custom&quot;</span><span class="p">)</span>
+            <span class="k">else</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">objective</span> <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">objective</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">)</span> <span class="k">else</span> <span class="kc">None</span><span class="p">),</span>
             <span class="n">budget</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">budget</span><span class="p">,</span>
             <span class="n">max_bin</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">max_bin</span><span class="p">,</span>
             <span class="n">num_threads</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">num_threads</span><span class="p">,</span>
@@ -435,6 +443,7 @@
         <span class="p">)</span>
 
         <span class="bp">self</span><span class="o">.</span><span class="n">classes_</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">classes_</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_is_fitted</span> <span class="o">=</span> <span class="kc">True</span>
 
         <span class="k">if</span> <span class="n">sample_weight</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
             <span class="n">sample_weight_</span> <span class="o">=</span> <span class="kc">None</span>
@@ -465,9 +474,12 @@
             <span class="nb">len</span><span class="p">(</span><span class="n">classes_</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">1</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">objective</span> <span class="o">==</span> <span class="s2">&quot;SquaredLoss&quot;</span>
         <span class="p">):</span>
             <span class="n">booster</span> <span class="o">=</span> <span class="n">CratePerpetualBooster</span><span class="p">(</span>
-                <span class="n">objective</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">objective</span>
-                <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">objective</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">)</span>
-                <span class="k">else</span> <span class="kc">None</span><span class="p">,</span>
+                <span class="n">objective</span><span class="o">=</span><span class="s2">&quot;Custom&quot;</span>
+                <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">objective</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span>
+                <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">objective</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;Custom&quot;</span><span class="p">)</span>
+                <span class="k">else</span> <span class="p">(</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">objective</span> <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">objective</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">)</span> <span class="k">else</span> <span class="kc">None</span>
+                <span class="p">),</span>
                 <span class="n">budget</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">budget</span><span class="p">,</span>
                 <span class="n">max_bin</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">max_bin</span><span class="p">,</span>
                 <span class="n">num_threads</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">num_threads</span><span class="p">,</span>
@@ -496,9 +508,12 @@
         <span class="k">else</span><span class="p">:</span>
             <span class="n">booster</span> <span class="o">=</span> <span class="n">CrateMultiOutputBooster</span><span class="p">(</span>
                 <span class="n">n_boosters</span><span class="o">=</span><span class="nb">len</span><span class="p">(</span><span class="n">classes_</span><span class="p">),</span>
-                <span class="n">objective</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">objective</span>
-                <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">objective</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">)</span>
-                <span class="k">else</span> <span class="kc">None</span><span class="p">,</span>
+                <span class="n">objective</span><span class="o">=</span><span class="s2">&quot;Custom&quot;</span>
+                <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">objective</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span>
+                <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">objective</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;Custom&quot;</span><span class="p">)</span>
+                <span class="k">else</span> <span class="p">(</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">objective</span> <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">objective</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">)</span> <span class="k">else</span> <span class="kc">None</span>
+                <span class="p">),</span>
                 <span class="n">budget</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">budget</span><span class="p">,</span>
                 <span class="n">max_bin</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">max_bin</span><span class="p">,</span>
                 <span class="n">num_threads</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">num_threads</span><span class="p">,</span>
@@ -555,6 +570,8 @@
                 <span class="n">sample_weight</span><span class="o">=</span><span class="n">sample_weight_</span><span class="p">,</span>  <span class="c1"># type: ignore</span>
                 <span class="n">group</span><span class="o">=</span><span class="n">group_</span><span class="p">,</span>
             <span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_is_fitted</span> <span class="o">=</span> <span class="kc">True</span>
 
         <span class="k">return</span> <span class="bp">self</span></div>
 
@@ -941,6 +958,8 @@
 <span class="sd">        predictions : ndarray of shape (n_samples,)</span>
 <span class="sd">            The predicted values (log-odds for classification, raw values for regression).</span>
 <span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">is_fitted</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;PerpetualBooster is not fitted yet&quot;</span><span class="p">)</span>
         <span class="n">is_polars</span> <span class="o">=</span> <span class="n">type_df</span><span class="p">(</span><span class="n">X</span><span class="p">)</span> <span class="o">==</span> <span class="s2">&quot;polars_df&quot;</span>
         <span class="k">if</span> <span class="n">is_polars</span><span class="p">:</span>
             <span class="n">features_</span><span class="p">,</span> <span class="n">columns</span><span class="p">,</span> <span class="n">masks</span><span class="p">,</span> <span class="n">rows</span><span class="p">,</span> <span class="n">cols</span> <span class="o">=</span> <span class="n">transform_input_frame_columnar</span><span class="p">(</span>
@@ -1018,6 +1037,8 @@
 <span class="sd">        probabilities : ndarray of shape (n_samples, n_classes)</span>
 <span class="sd">            The class probabilities.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">is_fitted</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;PerpetualBooster is not fitted yet&quot;</span><span class="p">)</span>
         <span class="n">is_polars</span> <span class="o">=</span> <span class="n">type_df</span><span class="p">(</span><span class="n">X</span><span class="p">)</span> <span class="o">==</span> <span class="s2">&quot;polars_df&quot;</span>
         <span class="k">if</span> <span class="n">is_polars</span><span class="p">:</span>
             <span class="n">features_</span><span class="p">,</span> <span class="n">columns</span><span class="p">,</span> <span class="n">masks</span><span class="p">,</span> <span class="n">rows</span><span class="p">,</span> <span class="n">cols</span> <span class="o">=</span> <span class="n">transform_input_frame_columnar</span><span class="p">(</span>
@@ -1523,6 +1544,7 @@
                         <span class="p">}</span>
             <span class="k">except</span> <span class="ne">KeyError</span><span class="p">:</span>
                 <span class="k">pass</span>
+        <span class="n">c</span><span class="o">.</span><span class="n">_is_fitted</span> <span class="o">=</span> <span class="kc">True</span>
         <span class="k">return</span> <span class="n">c</span></div>
 
 
@@ -1541,6 +1563,104 @@
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">booster</span><span class="o">.</span><span class="n">save_booster</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">path</span><span class="p">))</span></div>
 
+
+<div class="viewcode-block" id="PerpetualBooster.save_model">
+<a class="viewcode-back" href="../../api.html#perpetual.PerpetualBooster.save_model">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">save_model</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bytes</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Save the model to a bytes object.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        data : bytes</span>
+<span class="sd">            The serialized model data.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">json_dump</span><span class="p">()</span><span class="o">.</span><span class="n">encode</span><span class="p">(</span><span class="s2">&quot;utf-8&quot;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="PerpetualBooster.load_model">
+<a class="viewcode-back" href="../../api.html#perpetual.PerpetualBooster.load_model">[docs]</a>
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">load_model</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">data</span><span class="p">:</span> <span class="nb">bytes</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Self</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Load a model from a bytes object.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        data : bytes</span>
+<span class="sd">            The serialized model data.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        model : PerpetualBooster</span>
+<span class="sd">            The loaded booster object.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">cls</span><span class="o">.</span><span class="n">from_json</span><span class="p">(</span><span class="n">data</span><span class="o">.</span><span class="n">decode</span><span class="p">(</span><span class="s2">&quot;utf-8&quot;</span><span class="p">))</span></div>
+
+
+<div class="viewcode-block" id="PerpetualBooster.from_json">
+<a class="viewcode-back" href="../../api.html#perpetual.PerpetualBooster.from_json">[docs]</a>
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">from_json</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">json_str</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Self</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Load a booster model from a JSON string.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        json_str : str</span>
+<span class="sd">            The JSON representation of the model.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        model : PerpetualBooster</span>
+<span class="sd">            The loaded booster object.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">dump</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">json_str</span><span class="p">)</span>
+            <span class="k">if</span> <span class="s2">&quot;boosters&quot;</span> <span class="ow">in</span> <span class="n">dump</span> <span class="ow">or</span> <span class="s2">&quot;n_boosters&quot;</span> <span class="ow">in</span> <span class="n">dump</span><span class="p">:</span>
+                <span class="n">booster</span> <span class="o">=</span> <span class="n">CrateMultiOutputBooster</span><span class="o">.</span><span class="n">from_json</span><span class="p">(</span><span class="n">json_str</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">booster</span> <span class="o">=</span> <span class="n">CratePerpetualBooster</span><span class="o">.</span><span class="n">from_json</span><span class="p">(</span><span class="n">json_str</span><span class="p">)</span>
+        <span class="k">except</span> <span class="p">(</span><span class="ne">ValueError</span><span class="p">,</span> <span class="ne">KeyError</span><span class="p">,</span> <span class="n">json</span><span class="o">.</span><span class="n">JSONDecodeError</span><span class="p">):</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">booster</span> <span class="o">=</span> <span class="n">CratePerpetualBooster</span><span class="o">.</span><span class="n">from_json</span><span class="p">(</span><span class="n">json_str</span><span class="p">)</span>
+            <span class="k">except</span> <span class="ne">ValueError</span><span class="p">:</span>
+                <span class="n">booster</span> <span class="o">=</span> <span class="n">CrateMultiOutputBooster</span><span class="o">.</span><span class="n">from_json</span><span class="p">(</span><span class="n">json_str</span><span class="p">)</span>
+
+        <span class="n">params</span> <span class="o">=</span> <span class="n">booster</span><span class="o">.</span><span class="n">get_params</span><span class="p">()</span>
+        <span class="k">with</span> <span class="n">warnings</span><span class="o">.</span><span class="n">catch_warnings</span><span class="p">():</span>
+            <span class="n">warnings</span><span class="o">.</span><span class="n">simplefilter</span><span class="p">(</span><span class="s2">&quot;ignore&quot;</span><span class="p">)</span>
+            <span class="n">c</span> <span class="o">=</span> <span class="bp">cls</span><span class="p">(</span><span class="o">**</span><span class="n">params</span><span class="p">)</span>
+        <span class="n">c</span><span class="o">.</span><span class="n">booster</span> <span class="o">=</span> <span class="n">booster</span>
+        <span class="k">for</span> <span class="n">m</span> <span class="ow">in</span> <span class="n">c</span><span class="o">.</span><span class="n">metadata_attributes</span><span class="p">:</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">m_</span> <span class="o">=</span> <span class="n">c</span><span class="o">.</span><span class="n">_get_metadata_attributes</span><span class="p">(</span><span class="n">m</span><span class="p">)</span>
+                <span class="k">if</span> <span class="n">m</span> <span class="o">==</span> <span class="s2">&quot;classes_&quot;</span> <span class="ow">and</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">m_</span><span class="p">,</span> <span class="nb">list</span><span class="p">):</span>
+                    <span class="n">m_</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">m_</span><span class="p">)</span>
+                <span class="nb">setattr</span><span class="p">(</span><span class="n">c</span><span class="p">,</span> <span class="n">m</span><span class="p">,</span> <span class="n">m_</span><span class="p">)</span>
+                <span class="k">if</span> <span class="n">m</span> <span class="o">==</span> <span class="s2">&quot;feature_names_in_&quot;</span> <span class="ow">and</span> <span class="n">c</span><span class="o">.</span><span class="n">feature_names_in_</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">!=</span> <span class="s2">&quot;0&quot;</span><span class="p">:</span>
+                    <span class="k">if</span> <span class="n">c</span><span class="o">.</span><span class="n">monotone_constraints</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                        <span class="n">c</span><span class="o">.</span><span class="n">monotone_constraints</span> <span class="o">=</span> <span class="p">{</span>
+                            <span class="n">ft</span><span class="p">:</span> <span class="n">c</span><span class="o">.</span><span class="n">monotone_constraints</span><span class="p">[</span><span class="n">i</span><span class="p">]</span>
+                            <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">ft</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">c</span><span class="o">.</span><span class="n">feature_names_in_</span><span class="p">)</span>
+                        <span class="p">}</span>
+            <span class="k">except</span> <span class="ne">KeyError</span><span class="p">:</span>
+                <span class="k">pass</span>
+        <span class="n">c</span><span class="o">.</span><span class="n">_is_fitted</span> <span class="o">=</span> <span class="kc">True</span>
+        <span class="k">return</span> <span class="n">c</span></div>
+
+
+    <span class="nd">@property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">is_fitted</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Whether the booster has been fitted.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        fitted : bool</span>
+<span class="sd">            True if the booster is fitted, False otherwise.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_is_fitted</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">_standardize_monotonicity_map</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>

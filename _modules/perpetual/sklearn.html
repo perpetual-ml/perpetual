@@ -5,7 +5,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>perpetual.sklearn &mdash; Perpetual 1.8.0 documentation</title>
+  <title>perpetual.sklearn &mdash; Perpetual 1.9.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../../_static/custom.css?v=9cdd1368" />
@@ -13,7 +13,7 @@
   
       <script src="../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../_static/documentation_options.js?v=b51e6972"></script>
+      <script src="../../_static/documentation_options.js?v=c4cb232b"></script>
       <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
@@ -127,6 +127,7 @@
         <span class="c1"># ... other parameters ...</span>
         <span class="n">max_bin</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">256</span><span class="p">,</span>
         <span class="n">max_cat</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1000</span><span class="p">,</span>
+        <span class="n">save_node_stats</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
         <span class="c1"># Capture all parameters in a way that BaseEstimator can handle</span>
         <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
     <span class="p">):</span>
@@ -212,11 +213,12 @@
             <span class="n">budget</span><span class="o">=</span><span class="n">budget</span><span class="p">,</span>
             <span class="n">num_threads</span><span class="o">=</span><span class="n">num_threads</span><span class="p">,</span>
             <span class="n">monotone_constraints</span><span class="o">=</span><span class="n">monotone_constraints</span><span class="p">,</span>
-            <span class="c1"># ... pass all other parameters ...</span>
             <span class="n">max_bin</span><span class="o">=</span><span class="n">max_bin</span><span class="p">,</span>
             <span class="n">max_cat</span><span class="o">=</span><span class="n">max_cat</span><span class="p">,</span>
+            <span class="n">save_node_stats</span><span class="o">=</span><span class="n">save_node_stats</span><span class="p">,</span>
             <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>  <span class="c1"># Catch-all for any other parameters passed by user or set_params</span>
-        <span class="p">)</span></div>
+        <span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_is_fitted</span> <span class="o">=</span> <span class="kc">False</span></div>
 
 
     <span class="c1"># fit, predict, predict_proba, and predict_log_proba are inherited</span>
@@ -267,7 +269,11 @@
 <span class="sd">            Fitted estimator.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="c1"># Check if objective is appropriate for classification if it&#39;s a string</span>
-        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">objective</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">objective</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">[</span><span class="s2">&quot;LogLoss&quot;</span><span class="p">]:</span>
+        <span class="k">if</span> <span class="p">(</span>
+            <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">objective</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span>
+            <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">objective</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">[</span><span class="s2">&quot;LogLoss&quot;</span><span class="p">]</span>
+            <span class="ow">and</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">objective</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;Custom&quot;</span><span class="p">)</span>
+        <span class="p">):</span>
             <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span>
                 <span class="sa">f</span><span class="s2">&quot;Objective &#39;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">objective</span><span class="si">}</span><span class="s2">&#39; is typically for regression/ranking but used in PerpetualClassifier. Consider &#39;LogLoss&#39;.&quot;</span>
             <span class="p">)</span>
@@ -303,6 +309,7 @@
         <span class="c1"># ... other parameters ...</span>
         <span class="n">max_bin</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">256</span><span class="p">,</span>
         <span class="n">max_cat</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1000</span><span class="p">,</span>
+        <span class="n">save_node_stats</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
         <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
     <span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
@@ -374,6 +381,8 @@
 <span class="sd">            Maximum unique categories before a feature is treated as numerical.</span>
 <span class="sd">        interaction_constraints : list of list of int, optional</span>
 <span class="sd">            Interaction constraints.</span>
+<span class="sd">        save_node_stats : bool, default=False</span>
+<span class="sd">            Whether to save node statistics (required for calibration).</span>
 <span class="sd">        **kwargs</span>
 <span class="sd">            Arbitrary keyword arguments to be passed to the base class.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
@@ -395,8 +404,10 @@
             <span class="c1"># ... pass all other parameters ...</span>
             <span class="n">max_bin</span><span class="o">=</span><span class="n">max_bin</span><span class="p">,</span>
             <span class="n">max_cat</span><span class="o">=</span><span class="n">max_cat</span><span class="p">,</span>
+            <span class="n">save_node_stats</span><span class="o">=</span><span class="n">save_node_stats</span><span class="p">,</span>
             <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
-        <span class="p">)</span></div>
+        <span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_is_fitted</span> <span class="o">=</span> <span class="kc">False</span></div>
 
 
 <div class="viewcode-block" id="PerpetualRegressor.fit">
@@ -421,12 +432,17 @@
 <span class="sd">            Fitted estimator.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="c1"># For regression, we typically enforce len(self.classes_) == 0 after fit</span>
-        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">objective</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">objective</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">[</span>
-            <span class="s2">&quot;SquaredLoss&quot;</span><span class="p">,</span>
-            <span class="s2">&quot;QuantileLoss&quot;</span><span class="p">,</span>
-            <span class="s2">&quot;HuberLoss&quot;</span><span class="p">,</span>
-            <span class="s2">&quot;AdaptiveHuberLoss&quot;</span><span class="p">,</span>
-        <span class="p">]:</span>
+        <span class="k">if</span> <span class="p">(</span>
+            <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">objective</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span>
+            <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">objective</span>
+            <span class="ow">not</span> <span class="ow">in</span> <span class="p">[</span>
+                <span class="s2">&quot;SquaredLoss&quot;</span><span class="p">,</span>
+                <span class="s2">&quot;QuantileLoss&quot;</span><span class="p">,</span>
+                <span class="s2">&quot;HuberLoss&quot;</span><span class="p">,</span>
+                <span class="s2">&quot;AdaptiveHuberLoss&quot;</span><span class="p">,</span>
+            <span class="p">]</span>
+            <span class="ow">and</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">objective</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;Custom&quot;</span><span class="p">)</span>
+        <span class="p">):</span>
             <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span>
                 <span class="sa">f</span><span class="s2">&quot;Objective &#39;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">objective</span><span class="si">}</span><span class="s2">&#39; may not be suitable for PerpetualRegressor. Consider &#39;SquaredLoss&#39; or a quantile/huber loss.&quot;</span>
             <span class="p">)</span>

@@ -5,7 +5,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Index &mdash; Perpetual 1.8.0 documentation</title>
+  <title>Index &mdash; Perpetual 1.9.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="_static/custom.css?v=9cdd1368" />
@@ -13,7 +13,7 @@
   
       <script src="_static/jquery.js?v=5d32c60e"></script>
       <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="_static/documentation_options.js?v=b51e6972"></script>
+      <script src="_static/documentation_options.js?v=c4cb232b"></script>
       <script src="_static/doctools.js?v=fd6eb6e6"></script>
       <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
@@ -168,13 +168,11 @@
 </li>
       <li><a href="api.html#perpetual.PerpetualBooster.calculate_feature_importance">calculate_feature_importance() (perpetual.PerpetualBooster method)</a>
 </li>
-      <li><a href="api.html#perpetual.PerpetualBooster.calibrate">calibrate() (perpetual.PerpetualBooster method)</a>
-</li>
   </ul></td>
   <td style="width: 33%; vertical-align: top;"><ul>
-      <li><a href="api.html#perpetual.PerpetualBooster.calibrate_conformal">calibrate_conformal() (perpetual.PerpetualBooster method)</a>
+      <li><a href="api.html#perpetual.PerpetualBooster.calibrate">calibrate() (perpetual.PerpetualBooster method)</a>
 </li>
-      <li><a href="api.html#perpetual.PerpetualBooster.classes_">classes_ (perpetual.PerpetualBooster attribute)</a>
+      <li><a href="api.html#perpetual.PerpetualBooster.calibrate_conformal">calibrate_conformal() (perpetual.PerpetualBooster method)</a>
 </li>
       <li><a href="api.html#perpetual.causal_metrics.cumulative_gain_curve">cumulative_gain_curve() (in module perpetual.causal_metrics)</a>
 </li>
@@ -215,15 +213,11 @@
 </li>
         <li><a href="api.html#perpetual.meta_learners.XLearner.feature_importances_">(perpetual.meta_learners.XLearner property)</a>
 </li>
-        <li><a href="api.html#perpetual.PerpetualBooster.feature_importances_">(perpetual.PerpetualBooster attribute)</a>
-</li>
-        <li><a href="api.html#id0">(perpetual.PerpetualBooster property)</a>
+        <li><a href="api.html#perpetual.PerpetualBooster.feature_importances_">(perpetual.PerpetualBooster property)</a>
 </li>
         <li><a href="api.html#perpetual.policy.PolicyLearner.feature_importances_">(perpetual.policy.PolicyLearner attribute)</a>
 </li>
       </ul></li>
-      <li><a href="api.html#perpetual.PerpetualBooster.feature_names_in_">feature_names_in_ (perpetual.PerpetualBooster attribute)</a>
-</li>
       <li><a href="api.html#perpetual.dml.DMLEstimator.fit">fit() (perpetual.dml.DMLEstimator method)</a>
 
       <ul>
@@ -257,6 +251,8 @@
       <li><a href="api.html#perpetual.iv.BraidedBooster.from_json">from_json() (perpetual.iv.BraidedBooster class method)</a>
 
       <ul>
+        <li><a href="api.html#perpetual.PerpetualBooster.from_json">(perpetual.PerpetualBooster class method)</a>
+</li>
         <li><a href="api.html#perpetual.uplift.UpliftBooster.from_json">(perpetual.uplift.UpliftBooster class method)</a>
 </li>
       </ul></li>
@@ -285,6 +281,10 @@
       <li><a href="api.html#perpetual.PerpetualBooster.insert_metadata">insert_metadata() (perpetual.PerpetualBooster method)</a>
 </li>
   </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="api.html#perpetual.PerpetualBooster.is_fitted">is_fitted (perpetual.PerpetualBooster property)</a>
+</li>
+  </ul></td>
 </tr></table>
 
 <h2 id="J">J</h2>
@@ -301,6 +301,10 @@
       <li><a href="api.html#perpetual.PerpetualBooster.load_booster">load_booster() (perpetual.PerpetualBooster class method)</a>
 </li>
   </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="api.html#perpetual.PerpetualBooster.load_model">load_model() (perpetual.PerpetualBooster class method)</a>
+</li>
+  </ul></td>
 </tr></table>
 
 <h2 id="M">M</h2>
@@ -313,10 +317,6 @@
 
 <h2 id="N">N</h2>
 <table style="width: 100%" class="indextable genindextable"><tr>
-  <td style="width: 33%; vertical-align: top;"><ul>
-      <li><a href="api.html#perpetual.PerpetualBooster.n_features_">n_features_ (perpetual.PerpetualBooster attribute)</a>
-</li>
-  </ul></td>
   <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="api.html#perpetual.PerpetualBooster.number_of_trees">number_of_trees (perpetual.PerpetualBooster property)</a>
 </li>
@@ -413,6 +413,8 @@
       <li><a href="api.html#perpetual.PerpetualBooster.save_as_xgboost">save_as_xgboost() (perpetual.PerpetualBooster method)</a>
 </li>
       <li><a href="api.html#perpetual.PerpetualBooster.save_booster">save_booster() (perpetual.PerpetualBooster method)</a>
+</li>
+      <li><a href="api.html#perpetual.PerpetualBooster.save_model">save_model() (perpetual.PerpetualBooster method)</a>
 </li>
   </ul></td>
   <td style="width: 33%; vertical-align: top;"><ul>

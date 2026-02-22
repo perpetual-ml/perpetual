@@ -6,7 +6,7 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Architecture &mdash; Perpetual 1.8.0 documentation</title>
+  <title>Architecture &mdash; Perpetual 1.9.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="_static/custom.css?v=9cdd1368" />
@@ -14,7 +14,7 @@
   
       <script src="_static/jquery.js?v=5d32c60e"></script>
       <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="_static/documentation_options.js?v=b51e6972"></script>
+      <script src="_static/documentation_options.js?v=c4cb232b"></script>
       <script src="_static/doctools.js?v=fd6eb6e6"></script>
       <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
@@ -123,7 +123,7 @@
 <li><p><strong>PerpetualBooster</strong>: The central struct (<cite>src/booster/core.rs</cite>) that manages the ensemble of decision trees. It handles the training loop, including gradient calculation, tree growing, and prediction.</p></li>
 <li><p><strong>Histogram-Based Learning</strong>: Perpetual uses a histogram-based algorithm for finding optimal splits. Continuous features are discretized into bins (<cite>src/binning.rs</cite>), significantly reducing the computational complexity of finding splits.</p></li>
 <li><p><strong>Parallelism</strong>: The core heavily utilizes <cite>rayon</cite> for data parallelism. Operations like histogram building, partial dependence calculations, and predictions are multi-threaded.</p></li>
-<li><p><strong>Generic Objectives</strong>: The <cite>Objective</cite> trait (<cite>src/objective_functions/objective.rs</cite>) allows for a flexible implementation of loss functions. Perpetual supports standard objectives like LogLoss and SquaredLoss, as well as complex ones like QuantileLoss and custom user-defined objectives.</p></li>
+<li><p><strong>Generic Objectives</strong>: The <cite>Objective</cite> trait (<cite>src/objective/core.rs</cite>) allows for a flexible implementation of loss functions. Perpetual supports standard objectives like LogLoss, SquaredLoss, and AbsoluteLoss, as well as complex ones like QuantileLoss, PoissonLoss, and custom user-defined objectives.</p></li>
 </ul>
 </section>
 </section>

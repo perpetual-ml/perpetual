@@ -22,7 +22,7 @@ Key Components
 *   **PerpetualBooster**: The central struct (`src/booster/core.rs`) that manages the ensemble of decision trees. It handles the training loop, including gradient calculation, tree growing, and prediction.
 *   **Histogram-Based Learning**: Perpetual uses a histogram-based algorithm for finding optimal splits. Continuous features are discretized into bins (`src/binning.rs`), significantly reducing the computational complexity of finding splits.
 *   **Parallelism**: The core heavily utilizes `rayon` for data parallelism. Operations like histogram building, partial dependence calculations, and predictions are multi-threaded.
-*   **Generic Objectives**: The `Objective` trait (`src/objective_functions/objective.rs`) allows for a flexible implementation of loss functions. Perpetual supports standard objectives like LogLoss and SquaredLoss, as well as complex ones like QuantileLoss and custom user-defined objectives.
+*   **Generic Objectives**: The `Objective` trait (`src/objective/core.rs`) allows for a flexible implementation of loss functions. Perpetual supports standard objectives like LogLoss, SquaredLoss, and AbsoluteLoss, as well as complex ones like QuantileLoss, PoissonLoss, and custom user-defined objectives.
 
 Python Interface
 ----------------
