@@ -44,6 +44,8 @@ pub fn is_comparison_better(value: f64, comparison: f64, maximize: bool) -> bool
 pub enum Metric {
     /// Area Under the ROC Curve (classification).
     AUC,
+    /// Brier Score for probabilistic binary classification.
+    BrierLoss,
     /// Log Loss (binary cross-entropy).
     LogLoss,
     /// Root Mean Squared Logarithmic Error.
@@ -62,6 +64,7 @@ fn get_parse_error(s: &str) -> PerpetualError {
         "Metric".to_string(),
         items_to_strings(vec![
             "AUC",
+            "BrierLoss",
             "LogLoss",
             "RootMeanSquaredLogError",
             "RootMeanSquaredError",
@@ -78,6 +81,7 @@ impl FromStr for Metric {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
             "AUC" => Ok(Metric::AUC),
+            "BrierLoss" => Ok(Metric::BrierLoss),
             "LogLoss" => Ok(Metric::LogLoss),
             "RootMeanSquaredLogError" => Ok(Metric::RootMeanSquaredLogError),
             "RootMeanSquaredError" => Ok(Metric::RootMeanSquaredError),
@@ -107,6 +111,10 @@ pub fn metric_callables(metric_type: &Metric) -> (MetricFn, bool) {
         Metric::AUC => (
             classification::AUCMetric::calculate_metric,
             classification::AUCMetric::maximize(),
+        ),
+        Metric::BrierLoss => (
+            classification::BrierLossMetric::calculate_metric,
+            classification::BrierLossMetric::maximize(),
         ),
         Metric::LogLoss => (
             classification::LogLossMetric::calculate_metric,
@@ -341,6 +349,7 @@ mod tests {
     fn test_metric_callables_all() {
         let metrics = vec![
             Metric::AUC,
+            Metric::BrierLoss,
             Metric::LogLoss,
             Metric::RootMeanSquaredLogError,
             Metric::RootMeanSquaredError,
@@ -355,6 +364,7 @@ mod tests {
             // Just call them to ensure they work
             match m {
                 Metric::AUC => assert!(maximize),
+                Metric::BrierLoss => assert!(!maximize),
                 Metric::LogLoss => assert!(!maximize),
                 Metric::RootMeanSquaredLogError => assert!(!maximize),
                 Metric::RootMeanSquaredError => assert!(!maximize),
@@ -367,6 +377,7 @@ mod tests {
     #[test]
     fn test_metric_from_str_all() {
         assert!(Metric::from_str("AUC").is_ok());
+        assert!(Metric::from_str("BrierLoss").is_ok());
         assert!(Metric::from_str("LogLoss").is_ok());
         assert!(Metric::from_str("RootMeanSquaredLogError").is_ok());
         assert!(Metric::from_str("RootMeanSquaredError").is_ok());

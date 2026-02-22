@@ -287,3 +287,40 @@ impl ObjectiveFunction for FairnessObjective {
         Metric::LogLoss
     }
 }
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_fairness_dp() {
+        let sensitive = vec![1, 0, 1, 0];
+        let y = vec![1.0, 1.0, 0.0, 0.0];
+        let yhat = vec![0.0, 0.0, 0.0, 0.0]; // initial probs 0.5
+        let obj = FairnessObjective::new(sensitive, 1.0);
+
+        // Initial value test
+        assert!((obj.initial_value(&y, None::<&[f64]>, None::<&[u64]>) - 0.0).abs() < 1e-6);
+
+        let loss = obj.loss(&y, &yhat, None::<&[f64]>, None::<&[u64]>);
+        assert_eq!(loss.len(), 4);
+
+        let (g, h) = obj.gradient(&y, &yhat, None::<&[f64]>, None::<&[u64]>);
+        assert_eq!(g.len(), 4);
+        assert!(h.is_some());
+    }
+
+    #[test]
+    fn test_fairness_eo() {
+        let sensitive = vec![1, 0, 1, 0];
+        let y = vec![1.0, 1.0, 0.0, 0.0];
+        let yhat = vec![0.0, 0.0, 0.0, 0.0];
+        let obj = FairnessObjective::with_type(sensitive, 1.0, FairnessType::EqualizedOdds);
+
+        let loss = obj.loss(&y, &yhat, None::<&[f64]>, None::<&[u64]>);
+        assert_eq!(loss.len(), 4);
+
+        let (g, h) = obj.gradient(&y, &yhat, None::<&[f64]>, None::<&[u64]>);
+        assert_eq!(g.len(), 4);
+        assert!(h.is_some());
+    }
+}

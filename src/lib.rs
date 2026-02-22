@@ -18,7 +18,7 @@
 //! * **Self-Generalizing**: Minimizes the need for hyperparameter tuning. The `budget` parameter is often sufficient.
 //! * **High Performance**: Parallelized training and prediction using [Rayon](https://docs.rs/rayon).
 //! * **Zero-Copy Data**: Efficiently handles data layouts with `ColumnarMatrix`, ideal for use with arrow or polars.
-//! * **Versatile Objectives**: Supports Regression (Squared, Huber, Quantile), Classification (LogLoss), and Learning-to-Rank (ListNet).
+//! * **Versatile Objectives**: Supports Regression (Squared, Huber, Absolute, Quantile, Poisson, Gamma, Tweedie, Mape), Classification (LogLoss, BrierLoss, HingeLoss), and Learning-to-Rank (ListNet).
 //! * **Production Ready**: Handles missing values natively, supports monotonic constraints, and provides prediction intervals (conformal prediction).
 //!
 //! ## Quick Start

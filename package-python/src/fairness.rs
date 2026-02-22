@@ -2,7 +2,7 @@ use numpy::PyReadonlyArray1;
 use perpetual_rs::causal::fairness::{FairnessObjective as InnerFairnessObjective, FairnessType};
 use pyo3::prelude::*;
 
-#[pyclass(name = "FairnessObjective")]
+#[pyclass(name = "FairnessObjective", from_py_object)]
 #[derive(Clone)]
 pub struct PyFairnessObjective {
     pub inner: InnerFairnessObjective,

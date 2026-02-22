@@ -4,13 +4,14 @@ import numpy as np
 import pandas as pd
 import pytest
 from perpetual import PerpetualBooster
+from perpetual.booster import compute_calibration_curve, expected_calibration_error
 from sklearn.model_selection import train_test_split
 
 
 @pytest.fixture
 def data():
     # Use pre-generated resources to avoid external downloads in CI
-    resource_dir = os.path.join(os.path.dirname(__file__), "../../resources")
+    resource_dir = os.path.join(os.path.dirname(__file__), "../../../resources")
     train_df = pd.read_csv(os.path.join(resource_dir, "cal_housing_train.csv"))
     test_df = pd.read_csv(os.path.join(resource_dir, "cal_housing_test.csv"))
 
@@ -75,3 +76,32 @@ def test_calibration_min_max(data):
     # Without fix, MinMax width would also be inflated.
     # We expect verify tight intervals with MinMax usually, but checking upper bound to ensuring fix worked.
     assert width < 2.0
+
+
+def test_calibration_metrics():
+    y_true = np.random.randint(0, 2, 100)
+    y_prob = np.random.uniform(0, 1, 100)
+
+    # compute_calibration_curve
+    pt, pp = compute_calibration_curve(y_true, y_prob, n_bins=5, strategy="uniform")
+    assert len(pt) <= 5
+    pt_q, pp_q = compute_calibration_curve(
+        y_true, y_prob, n_bins=5, strategy="quantile"
+    )
+    assert len(pt_q) <= 5
+
+    try:
+        compute_calibration_curve(y_true, y_prob, strategy="invalid")
+    except ValueError:
+        pass
+
+    # expected_calibration_error
+    ece = expected_calibration_error(y_true, y_prob, strategy="uniform")
+    assert 0 <= ece <= 1
+    ece_q = expected_calibration_error(y_true, y_prob, strategy="quantile")
+    assert 0 <= ece_q <= 1
+
+    try:
+        expected_calibration_error(y_true, y_prob, strategy="invalid")
+    except ValueError:
+        pass

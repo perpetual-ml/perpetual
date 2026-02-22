@@ -16,7 +16,9 @@ from perpetual import PerpetualBooster
 
 @pytest.fixture(scope="module")
 def data_binary():
-    df = pd.read_csv("../resources/titanic.csv")
+    df = pd.read_csv(
+        os.path.join(os.path.dirname(__file__), "../../../resources", "titanic.csv")
+    )
     X = df.select_dtypes("number").drop(columns="survived").reset_index(drop=True)
     y = df["survived"]
     return X, y
@@ -24,7 +26,13 @@ def data_binary():
 
 @pytest.fixture(scope="module")
 def data_multiclass():
-    X = pd.read_csv("../resources/cover_types_train.csv", index_col=False, nrows=2000)
+    X = pd.read_csv(
+        os.path.join(
+            os.path.dirname(__file__), "../../../resources", "cover_types_train.csv"
+        ),
+        index_col=False,
+        nrows=2000,
+    )
     X = X.sample(n=200, random_state=0)
     y = np.array(X.pop("Cover_Type"))
     X = X.iloc[:, :10]
@@ -33,7 +41,13 @@ def data_multiclass():
 
 @pytest.fixture(scope="module")
 def data_regression():
-    X = pd.read_csv("../resources/cal_housing_train.csv", index_col=False, nrows=1000)
+    X = pd.read_csv(
+        os.path.join(
+            os.path.dirname(__file__), "../../../resources", "cal_housing_train.csv"
+        ),
+        index_col=False,
+        nrows=1000,
+    )
     X = X.sample(n=200, random_state=0)
     y = X.pop("MedHouseVal").to_numpy()
     X = X.iloc[:, :5]

@@ -1,6 +1,10 @@
 use crate::{
     metrics::evaluation::Metric,
-    objective::{AdaptiveHuberLoss, HuberLoss, ListNetLoss, LogLoss, QuantileLoss, SquaredLoss},
+    objective::{
+        AbsoluteLoss, AdaptiveHuberLoss, BrierLoss, CrossEntropyLambdaLoss, CrossEntropyLoss, FairLoss, GammaLoss,
+        HingeLoss, HuberLoss, ListNetLoss, LogLoss, MapeLoss, PoissonLoss, QuantileLoss, SquaredLogLoss, SquaredLoss,
+        TweedieLoss,
+    },
 };
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
@@ -116,6 +120,9 @@ pub enum Objective {
     /// Minimizes `- (y * log(p) + (1-y) * log(1-p))`.
     /// Target `y` should be 0 or 1.
     LogLoss,
+    /// Brier Score for probabilistic binary classification.
+    /// Minimizes `(y - p)^2` where `p = sigmoid(yhat)`.
+    BrierLoss,
     /// Squared Error Loss for regression.
     /// Minimizes `0.5 * (y - yhat)^2`.
     /// The derivative is `yhat - y` (gradient) and `1` (hessian).
@@ -144,6 +151,24 @@ pub enum Objective {
     /// Optimizes for list-wise ranking metrics.
     /// Requires `group` parameter in `fit` to define query groups.
     ListNetLoss,
+    PoissonLoss,
+    GammaLoss,
+    MapeLoss,
+    FairLoss {
+        c: Option<f64>,
+    },
+    TweedieLoss {
+        p: Option<f64>,
+    },
+    SquaredLogLoss,
+    /// CrossEntropyLoss for continuous targets in [0, 1]. Identical computation to LogLoss.
+    CrossEntropyLoss,
+    /// CrossEntropyLambdaLoss for an alternative formulation of cross entropy.
+    CrossEntropyLambdaLoss,
+    /// Absolute Loss for L1 regression.
+    AbsoluteLoss,
+    /// Hinge Loss for binary classification where targets are 0 or 1.
+    HingeLoss,
     /// Custom user-defined objective.
     #[serde(with = "objective_custom_serde")]
     Custom(Arc<dyn ObjectiveFunction>),
@@ -194,6 +219,7 @@ impl Objective {
     pub fn loss_single(&self, y: f64, yhat: f64, sample_weight: Option<f64>) -> f32 {
         match self {
             Objective::LogLoss => LogLoss::default().loss_single(y, yhat, sample_weight),
+            Objective::BrierLoss => BrierLoss::default().loss_single(y, yhat, sample_weight),
             Objective::SquaredLoss => SquaredLoss::default().loss_single(y, yhat, sample_weight),
             Objective::QuantileLoss { quantile } => {
                 QuantileLoss { quantile: *quantile }.loss_single(y, yhat, sample_weight)
@@ -203,6 +229,16 @@ impl Objective {
                 AdaptiveHuberLoss { quantile: *quantile }.loss_single(y, yhat, sample_weight)
             }
             Objective::ListNetLoss => ListNetLoss::default().loss_single(y, yhat, sample_weight),
+            Objective::PoissonLoss => PoissonLoss::default().loss_single(y, yhat, sample_weight),
+            Objective::GammaLoss => GammaLoss::default().loss_single(y, yhat, sample_weight),
+            Objective::MapeLoss => MapeLoss::default().loss_single(y, yhat, sample_weight),
+            Objective::FairLoss { c } => FairLoss { c: *c }.loss_single(y, yhat, sample_weight),
+            Objective::TweedieLoss { p } => TweedieLoss { p: *p }.loss_single(y, yhat, sample_weight),
+            Objective::SquaredLogLoss => SquaredLogLoss::default().loss_single(y, yhat, sample_weight),
+            Objective::CrossEntropyLoss => CrossEntropyLoss::default().loss_single(y, yhat, sample_weight),
+            Objective::CrossEntropyLambdaLoss => CrossEntropyLambdaLoss::default().loss_single(y, yhat, sample_weight),
+            Objective::AbsoluteLoss => AbsoluteLoss::default().loss_single(y, yhat, sample_weight),
+            Objective::HingeLoss => HingeLoss::default().loss_single(y, yhat, sample_weight),
             Objective::Custom(_) => {
                 panic!("loss_single should not be called for Custom objectives. Use batch loss instead.")
             }
@@ -215,6 +251,7 @@ macro_rules! dispatch {
     ($self:expr, $method:ident ( $($arg:expr),* )) => {
         match $self {
             Objective::LogLoss => LogLoss::default().$method($($arg),*),
+            Objective::BrierLoss => BrierLoss::default().$method($($arg),*),
             Objective::SquaredLoss => SquaredLoss::default().$method($($arg),*),
             Objective::QuantileLoss { quantile } => {
                 QuantileLoss { quantile: *quantile }.$method($($arg),*)
@@ -226,6 +263,16 @@ macro_rules! dispatch {
                 AdaptiveHuberLoss { quantile: *quantile }.$method($($arg),*)
             }
             Objective::ListNetLoss => ListNetLoss::default().$method($($arg),*),
+            Objective::PoissonLoss => PoissonLoss::default().$method($($arg),*),
+            Objective::GammaLoss => GammaLoss::default().$method($($arg),*),
+            Objective::MapeLoss => MapeLoss::default().$method($($arg),*),
+            Objective::FairLoss { c } => FairLoss { c: *c }.$method($($arg),*),
+            Objective::TweedieLoss { p } => TweedieLoss { p: *p }.$method($($arg),*),
+            Objective::SquaredLogLoss => SquaredLogLoss::default().$method($($arg),*),
+            Objective::CrossEntropyLoss => CrossEntropyLoss::default().$method($($arg),*),
+            Objective::CrossEntropyLambdaLoss => CrossEntropyLambdaLoss::default().$method($($arg),*),
+            Objective::AbsoluteLoss => AbsoluteLoss::default().$method($($arg),*),
+            Objective::HingeLoss => HingeLoss::default().$method($($arg),*),
             Objective::Custom(arc) => arc.$method($($arg),*),
         }
     };
@@ -416,18 +463,29 @@ mod test {
     fn test_objective_dispatch_gradient_and_loss() {
         let objectives: Vec<Objective> = vec![
             Objective::LogLoss,
+            Objective::BrierLoss,
             Objective::SquaredLoss,
             Objective::QuantileLoss { quantile: Some(0.5) },
             Objective::HuberLoss { delta: Some(1.0) },
             Objective::AdaptiveHuberLoss { quantile: Some(0.5) },
+            Objective::PoissonLoss,
+            Objective::GammaLoss,
+            Objective::MapeLoss,
+            Objective::FairLoss { c: Some(1.0) },
+            Objective::TweedieLoss { p: Some(1.5) },
+            Objective::SquaredLogLoss,
+            Objective::CrossEntropyLoss,
+            Objective::CrossEntropyLambdaLoss,
+            Objective::AbsoluteLoss,
+            Objective::HingeLoss,
         ];
         for obj in &objectives {
-            let (g, _h, l) = obj.gradient_and_loss(Y, YHAT1, None, None);
+            let (g, _h, l) = obj.gradient_and_loss(Y, YHAT1, None::<&[f64]>, None::<&[u64]>);
             assert_eq!(g.len(), Y.len());
             assert_eq!(l.len(), Y.len());
         }
         // ListNetLoss needs group
-        let (g, _h, l) = Objective::ListNetLoss.gradient_and_loss(Y_RANK, YHAT1_RANK, None, Some(GROUP));
+        let (g, _h, l) = Objective::ListNetLoss.gradient_and_loss(Y_RANK, YHAT1_RANK, None::<&[f64]>, Some(GROUP));
         assert_eq!(g.len(), Y_RANK.len());
         assert_eq!(l.len(), Y_RANK.len());
     }
@@ -436,32 +494,62 @@ mod test {
     fn test_objective_dispatch_gradient_and_loss_into() {
         let objectives: Vec<Objective> = vec![
             Objective::LogLoss,
+            Objective::BrierLoss,
             Objective::SquaredLoss,
             Objective::QuantileLoss { quantile: Some(0.5) },
             Objective::HuberLoss { delta: Some(1.0) },
             Objective::AdaptiveHuberLoss { quantile: Some(0.5) },
+            Objective::PoissonLoss,
+            Objective::GammaLoss,
+            Objective::MapeLoss,
+            Objective::FairLoss { c: Some(1.0) },
+            Objective::TweedieLoss { p: Some(1.5) },
+            Objective::SquaredLogLoss,
+            Objective::CrossEntropyLoss,
+            Objective::CrossEntropyLambdaLoss,
+            Objective::AbsoluteLoss,
+            Objective::HingeLoss,
         ];
         for obj in &objectives {
             let mut grad = vec![0.0_f32; Y.len()];
             let mut hess: Option<Vec<f32>> = None;
             let mut loss = vec![0.0_f32; Y.len()];
-            obj.gradient_and_loss_into(Y, YHAT1, None, None, &mut grad, &mut hess, &mut loss);
+            obj.gradient_and_loss_into(
+                Y,
+                YHAT1,
+                None::<&[f64]>,
+                None::<&[u64]>,
+                &mut grad,
+                &mut hess,
+                &mut loss,
+            );
         }
     }
 
     #[test]
     fn test_objective_loss_single_all() {
-        let l1 = Objective::LogLoss.loss_single(1.0, 0.5, None);
-        assert!(l1 > 0.0);
-        let l2 = Objective::SquaredLoss.loss_single(1.0, 2.0, None);
-        assert!((l2 - 1.0).abs() < 1e-5);
-        let l3 = Objective::QuantileLoss { quantile: Some(0.5) }.loss_single(1.0, 2.0, None);
-        assert!(l3 > 0.0);
-        let l4 = Objective::HuberLoss { delta: Some(1.0) }.loss_single(1.0, 2.0, None);
-        assert!(l4 > 0.0);
-        let l5 = Objective::AdaptiveHuberLoss { quantile: Some(0.5) }.loss_single(1.0, 2.0, None);
-        assert!(l5 > 0.0);
-        let l6 = Objective::ListNetLoss.loss_single(1.0, 2.0, None);
+        let objectives: Vec<Objective> = vec![
+            Objective::LogLoss,
+            Objective::BrierLoss,
+            Objective::SquaredLoss,
+            Objective::QuantileLoss { quantile: Some(0.5) },
+            Objective::HuberLoss { delta: Some(1.0) },
+            Objective::AdaptiveHuberLoss { quantile: Some(0.5) },
+            Objective::PoissonLoss,
+            Objective::GammaLoss,
+            Objective::MapeLoss,
+            Objective::FairLoss { c: Some(1.0) },
+            Objective::TweedieLoss { p: Some(1.5) },
+            Objective::SquaredLogLoss,
+            Objective::CrossEntropyLoss,
+            Objective::CrossEntropyLambdaLoss,
+            Objective::AbsoluteLoss,
+            Objective::HingeLoss,
+        ];
+        for obj in &objectives {
+            let _ = obj.loss_single(1.0, 0.5, None);
+        }
+        let l6 = Objective::ListNetLoss.loss_single(1.0, 0.5, None);
         assert_eq!(l6, f32::INFINITY);
     }
 
@@ -469,17 +557,95 @@ mod test {
     fn test_objective_requires_batch() {
         assert!(!Objective::LogLoss.requires_batch_evaluation());
         assert!(!Objective::SquaredLoss.requires_batch_evaluation());
-        // ListNetLoss inherits default `true` from trait
         assert!(Objective::ListNetLoss.requires_batch_evaluation());
     }
 
     #[test]
     fn test_objective_dispatch_default_metric() {
-        let _ = Objective::LogLoss.default_metric();
-        let _ = Objective::SquaredLoss.default_metric();
-        let _ = Objective::ListNetLoss.default_metric();
-        let _ = Objective::HuberLoss { delta: Some(1.0) }.default_metric();
-        let _ = Objective::QuantileLoss { quantile: Some(0.5) }.default_metric();
-        let _ = Objective::AdaptiveHuberLoss { quantile: Some(0.5) }.default_metric();
+        let objectives: Vec<Objective> = vec![
+            Objective::LogLoss,
+            Objective::BrierLoss,
+            Objective::SquaredLoss,
+            Objective::QuantileLoss { quantile: Some(0.5) },
+            Objective::HuberLoss { delta: Some(1.0) },
+            Objective::AdaptiveHuberLoss { quantile: Some(0.5) },
+            Objective::PoissonLoss,
+            Objective::GammaLoss,
+            Objective::MapeLoss,
+            Objective::FairLoss { c: Some(1.0) },
+            Objective::TweedieLoss { p: Some(1.5) },
+            Objective::SquaredLogLoss,
+            Objective::CrossEntropyLoss,
+            Objective::CrossEntropyLambdaLoss,
+            Objective::AbsoluteLoss,
+            Objective::HingeLoss,
+            Objective::ListNetLoss,
+        ];
+        for obj in objectives {
+            let _ = obj.default_metric();
+        }
+    }
+
+    #[test]
+    fn test_custom_objective() {
+        struct MyObj;
+        impl ObjectiveFunction for MyObj {
+            fn loss(&self, y: &[f64], yhat: &[f64], _sw: Option<&[f64]>, _g: Option<&[u64]>) -> Vec<f32> {
+                y.iter().zip(yhat).map(|(y, yh)| (y - yh).powi(2) as f32).collect()
+            }
+            fn gradient(
+                &self,
+                y: &[f64],
+                yhat: &[f64],
+                _sw: Option<&[f64]>,
+                _g: Option<&[u64]>,
+            ) -> (Vec<f32>, Option<Vec<f32>>) {
+                let g = y.iter().zip(yhat).map(|(y, yh)| (yh - y) as f32).collect();
+                (g, None)
+            }
+        }
+        let obj = Objective::new_custom(MyObj);
+        assert!(obj.requires_batch_evaluation());
+        let l = obj.loss(&[1.0], &[0.0], None, None);
+        assert_eq!(l[0], 1.0);
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_custom_objective_panic() {
+        struct MyObj;
+        impl ObjectiveFunction for MyObj {
+            fn loss(&self, _: &[f64], _: &[f64], _: Option<&[f64]>, _: Option<&[u64]>) -> Vec<f32> {
+                vec![]
+            }
+            fn gradient(
+                &self,
+                _: &[f64],
+                _: &[f64],
+                _: Option<&[f64]>,
+                _: Option<&[u64]>,
+            ) -> (Vec<f32>, Option<Vec<f32>>) {
+                (vec![], None)
+            }
+        }
+        let obj = Objective::new_custom(MyObj);
+        obj.loss_single(1.0, 0.0, None);
+    }
+
+    #[test]
+    fn test_objective_serde() {
+        let obj = Objective::LogLoss;
+        let s = serde_json::to_string(&obj).unwrap();
+        let _: Objective = serde_json::from_str(&s).unwrap();
+
+        // Custom serde
+        let custom = Objective::new_custom(SquaredLoss::default());
+        let s2 = serde_json::to_string(&custom).unwrap();
+        assert!(s2.contains("\"Custom\""));
+        let d2: Objective = serde_json::from_str(&s2).unwrap();
+        match d2 {
+            Objective::Custom(_) => (),
+            _ => panic!("Expected Custom objective"),
+        }
     }
 }

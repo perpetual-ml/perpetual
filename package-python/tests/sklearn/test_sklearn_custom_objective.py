@@ -10,7 +10,7 @@ from sklearn.model_selection import train_test_split
 @pytest.fixture
 def data():
     # Use pre-generated resources to avoid external downloads in CI
-    resource_dir = os.path.join(os.path.dirname(__file__), "../../resources")
+    resource_dir = os.path.join(os.path.dirname(__file__), "../../../resources")
     train_df = pd.read_csv(os.path.join(resource_dir, "cal_housing_train.csv"))
     test_df = pd.read_csv(os.path.join(resource_dir, "cal_housing_test.csv"))
 

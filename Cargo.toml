@@ -6,7 +6,7 @@ members = [
 
 [package]
 name = "perpetual"
-version = "1.8.0"
+version = "1.9.0"
 edition = "2024"
 authors = ["Mutlu Simsek <msimsek@perpetual-ml.com>", "Serkan Korkmaz <serkor1@duck.com>", "Pieter Pel <pelpieter@gmail.com>"]
 homepage = "https://perpetual-ml.com"
@@ -45,6 +45,7 @@ reqwest = { version = "0.13.2", features = ["blocking"] }
 csv = "1.4.0"
 chrono = "0.4.43"
 tempfile = "3.25.0"
+env_logger = "0.11.9"
 
 [[bench]]
 name = "training_benchmark"
@@ -57,3 +58,11 @@ ignore-filename = [
     "package-python\\\\.*",
     "package-r\\\\.*",
 ]
+
+[[example]]
+name = "march_machine_learning_mania_2026"
+path = "examples/kaggle/march_machine_learning_mania_2026/march_machine_learning_mania_2026.rs"
+
+[[example]]
+name = "predicting_heart_disease"
+path = "examples/kaggle/predicting_heart_disease/predicting_heart_disease.rs"

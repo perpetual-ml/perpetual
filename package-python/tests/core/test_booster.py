@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import itertools
 import json
+import os
 import random
 import warnings
 from typing import Tuple
@@ -21,7 +22,9 @@ def loggodds_to_odds(v):
 
 @pytest.fixture
 def X_y() -> Tuple[pd.DataFrame, pd.Series]:
-    df = pd.read_csv("../resources/titanic.csv")
+    df = pd.read_csv(
+        os.path.join(os.path.dirname(__file__), "../../../resources", "titanic.csv")
+    )
     X = df.select_dtypes("number").drop(columns="survived").reset_index(drop=True)
     y = df["survived"]
     return X, y
@@ -29,7 +32,9 @@ def X_y() -> Tuple[pd.DataFrame, pd.Series]:
 
 @pytest.fixture
 def X_y_g() -> Tuple[pd.DataFrame, pd.Series, pd.Series]:
-    df = pd.read_csv("../resources/goodreads.csv")
+    df = pd.read_csv(
+        os.path.join(os.path.dirname(__file__), "../../../resources", "goodreads.csv")
+    )
 
     df["group"] = df["year"].astype(str) + "_" + df["category"]
 
@@ -61,7 +66,9 @@ def X_y_g() -> Tuple[pd.DataFrame, pd.Series, pd.Series]:
 
 
 def test_booster_max_cat():
-    df = pd.read_csv("../resources/titanic.csv")
+    df = pd.read_csv(
+        os.path.join(os.path.dirname(__file__), "../../../resources", "titanic.csv")
+    )
     X = df.drop(columns="survived").reset_index(drop=True)
     y = df["survived"]
 
@@ -648,10 +655,19 @@ def test_set_params(X_y):
 
 
 def test_categorical():
-    X = pd.read_csv("../resources/titanic_test_df.csv", index_col=False)
+    X = pd.read_csv(
+        os.path.join(
+            os.path.dirname(__file__), "../../../resources", "titanic_test_df.csv"
+        ),
+        index_col=False,
+    )
     y = np.array(
         pd.read_csv(
-            "../resources/titanic_test_y.csv", index_col=False, header=None
+            os.path.join(
+                os.path.dirname(__file__), "../../../resources", "titanic_test_y.csv"
+            ),
+            index_col=False,
+            header=None,
         ).squeeze("columns")
     )
     cols = [
@@ -672,12 +688,24 @@ def test_categorical():
 def test_polars():
     import polars as pl
 
-    X_pl = pl.read_csv("../resources/titanic_test_df.csv")
-    X_pd = pd.read_csv("../resources/titanic_test_df.csv")
+    X_pl = pl.read_csv(
+        os.path.join(
+            os.path.dirname(__file__), "../../../resources", "titanic_test_df.csv"
+        )
+    )
+    X_pd = pd.read_csv(
+        os.path.join(
+            os.path.dirname(__file__), "../../../resources", "titanic_test_df.csv"
+        )
+    )
 
     y = np.array(
         pd.read_csv(
-            "../resources/titanic_test_y.csv", index_col=False, header=None
+            os.path.join(
+                os.path.dirname(__file__), "../../../resources", "titanic_test_y.csv"
+            ),
+            index_col=False,
+            header=None,
         ).squeeze("columns")
     )
     cols = [
@@ -729,9 +757,19 @@ def test_polars():
 
 
 def test_calibration():
-    X_train_full = pd.read_csv("../resources/cal_housing_train.csv", index_col=False)
+    X_train_full = pd.read_csv(
+        os.path.join(
+            os.path.dirname(__file__), "../../../resources", "cal_housing_train.csv"
+        ),
+        index_col=False,
+    )
     y_train_full = X_train_full.pop("MedHouseVal").to_numpy()
-    X_test = pd.read_csv("../resources/cal_housing_test.csv", index_col=False)
+    X_test = pd.read_csv(
+        os.path.join(
+            os.path.dirname(__file__), "../../../resources", "cal_housing_test.csv"
+        ),
+        index_col=False,
+    )
     y_test = X_test.pop("MedHouseVal").to_numpy()
     X_train, X_cal, y_train, y_cal = train_test_split(
         X_train_full, y_train_full, random_state=42, test_size=0.25
@@ -758,9 +796,19 @@ def test_calibration():
 
 
 def test_calibration_conformal():
-    X_train_full = pd.read_csv("../resources/cal_housing_train.csv", index_col=False)
+    X_train_full = pd.read_csv(
+        os.path.join(
+            os.path.dirname(__file__), "../../../resources", "cal_housing_train.csv"
+        ),
+        index_col=False,
+    )
     y_train_full = X_train_full.pop("MedHouseVal").to_numpy()
-    X_cal = pd.read_csv("../resources/cal_housing_test.csv", index_col=False)
+    X_cal = pd.read_csv(
+        os.path.join(
+            os.path.dirname(__file__), "../../../resources", "cal_housing_test.csv"
+        ),
+        index_col=False,
+    )
     y_cal = X_cal.pop("MedHouseVal").to_numpy()
     X_train, X_test, y_train, y_test = train_test_split(
         X_train_full, y_train_full, random_state=42
@@ -787,16 +835,34 @@ def test_calibration_conformal():
 
 
 def test_pruning():
-    X_train = pd.read_csv("../resources/titanic_test_df.csv", index_col=False)
+    X_train = pd.read_csv(
+        os.path.join(
+            os.path.dirname(__file__), "../../../resources", "titanic_test_df.csv"
+        ),
+        index_col=False,
+    )
     y_train = np.array(
         pd.read_csv(
-            "../resources/titanic_test_y.csv", index_col=False, header=None
+            os.path.join(
+                os.path.dirname(__file__), "../../../resources", "titanic_test_y.csv"
+            ),
+            index_col=False,
+            header=None,
         ).squeeze("columns")
     )
-    X_cal = pd.read_csv("../resources/titanic_test_df.csv", index_col=False)
+    X_cal = pd.read_csv(
+        os.path.join(
+            os.path.dirname(__file__), "../../../resources", "titanic_test_df.csv"
+        ),
+        index_col=False,
+    )
     y_cal = np.array(
         pd.read_csv(
-            "../resources/titanic_test_y.csv", index_col=False, header=None
+            os.path.join(
+                os.path.dirname(__file__), "../../../resources", "titanic_test_y.csv"
+            ),
+            index_col=False,
+            header=None,
         ).squeeze("columns")
     )
     cols = [
@@ -855,10 +921,20 @@ def test_ranking(X_y_g):
 
 
 def test_custom_objective():
-    X_train = pd.read_csv("../resources/cal_housing_train.csv", index_col=False)
+    X_train = pd.read_csv(
+        os.path.join(
+            os.path.dirname(__file__), "../../../resources", "cal_housing_train.csv"
+        ),
+        index_col=False,
+    )
     y_train = X_train.pop("MedHouseVal").to_numpy()
 
-    X_test = pd.read_csv("../resources/cal_housing_test.csv", index_col=False)
+    X_test = pd.read_csv(
+        os.path.join(
+            os.path.dirname(__file__), "../../../resources", "cal_housing_test.csv"
+        ),
+        index_col=False,
+    )
     X_test.pop("MedHouseVal").to_numpy()
 
     model_regular_loss = PerpetualBooster(objective="SquaredLoss")
@@ -900,3 +976,57 @@ def test_predict_distribution(X_y):
     dist_mean = np.mean(dist, axis=1)
     correlation = np.corrcoef(preds, dist_mean)[0, 1]
     assert correlation > 0.5
+
+
+def test_booster_helpers():
+    X = np.random.randn(20, 2)
+    y = np.random.randn(20)
+
+    # Regression model to test warning
+    model_reg = PerpetualBooster(budget=0.1, objective="SquaredLoss")
+    model_reg.fit(X, y)
+
+    # Check if classes_ is indeed empty
+    assert len(model_reg.classes_) == 0
+
+    # Classification model for other helpers
+    y_clf = np.random.randint(0, 2, 20).astype(float)
+    model = PerpetualBooster(budget=0.1, objective="LogLoss")
+    model.fit(X, y_clf)
+
+    # predict_nodes (returns list of lists or arrays)
+    nodes = model.predict_nodes(X)
+    # number_of_trees is a property
+    assert len(nodes) == model.number_of_trees
+    assert len(nodes[0]) == 20
+
+    # Partial dependence (returns array of shape (samples, 2))
+    pd_vals = model.partial_dependence(X, feature=0)
+    assert pd_vals.shape == (100, 2)
+
+    # trees_to_dataframe
+    df = model.trees_to_dataframe()
+    assert len(df) > 0
+
+    # get_node_lists (with names)
+    model.feature_names_in_ = ["a", "b"]
+    node_lists = model.get_node_lists(map_features_names=True)
+    assert len(node_lists) == model.number_of_trees
+
+
+def test_multiclass_extras():
+    X = np.random.randn(30, 2)
+    # Exactly 3 classes
+    y = np.array([0, 1, 2] * 10).astype(float)
+    model = PerpetualBooster(budget=0.1, objective="LogLoss")
+    model.fit(X, y)
+
+    # get_node_lists for multi-output returns sum of trees
+    nl = model.get_node_lists()
+    # number_of_trees for multi-output is an array
+    n_trees_array = np.atleast_1d(model.number_of_trees)
+    assert len(nl) == np.sum(n_trees_array)
+
+    # set_params
+    model.set_params(budget=0.2)
+    assert model.budget == 0.2

@@ -38,6 +38,7 @@ class PerpetualClassifier(PerpetualBooster, ClassifierMixin):
         # ... other parameters ...
         max_bin: int = 256,
         max_cat: int = 1000,
+        save_node_stats: bool = False,
         # Capture all parameters in a way that BaseEstimator can handle
         **kwargs,
     ):
@@ -123,11 +124,12 @@ class PerpetualClassifier(PerpetualBooster, ClassifierMixin):
             budget=budget,
             num_threads=num_threads,
             monotone_constraints=monotone_constraints,
-            # ... pass all other parameters ...
             max_bin=max_bin,
             max_cat=max_cat,
+            save_node_stats=save_node_stats,
             **kwargs,  # Catch-all for any other parameters passed by user or set_params
         )
+        self._is_fitted = False
 
     # fit, predict, predict_proba, and predict_log_proba are inherited
     # and properly adapted in PerpetualBooster.
@@ -172,7 +174,11 @@ class PerpetualClassifier(PerpetualBooster, ClassifierMixin):
             Fitted estimator.
         """
         # Check if objective is appropriate for classification if it's a string
-        if isinstance(self.objective, str) and self.objective not in ["LogLoss"]:
+        if (
+            isinstance(self.objective, str)
+            and self.objective not in ["LogLoss"]
+            and not self.objective.startswith("Custom")
+        ):
             warnings.warn(
                 f"Objective '{self.objective}' is typically for regression/ranking but used in PerpetualClassifier. Consider 'LogLoss'."
             )
@@ -202,6 +208,7 @@ class PerpetualRegressor(PerpetualBooster, RegressorMixin):
         # ... other parameters ...
         max_bin: int = 256,
         max_cat: int = 1000,
+        save_node_stats: bool = False,
         **kwargs,
     ):
         """
@@ -273,6 +280,8 @@ class PerpetualRegressor(PerpetualBooster, RegressorMixin):
             Maximum unique categories before a feature is treated as numerical.
         interaction_constraints : list of list of int, optional
             Interaction constraints.
+        save_node_stats : bool, default=False
+            Whether to save node statistics (required for calibration).
         **kwargs
             Arbitrary keyword arguments to be passed to the base class.
         """
@@ -294,8 +303,10 @@ class PerpetualRegressor(PerpetualBooster, RegressorMixin):
             # ... pass all other parameters ...
             max_bin=max_bin,
             max_cat=max_cat,
+            save_node_stats=save_node_stats,
             **kwargs,
         )
+        self._is_fitted = False
 
     def fit(self, X, y, sample_weight=None, **fit_params) -> Self:
         """Fit the regressor on training data.
@@ -317,12 +328,17 @@ class PerpetualRegressor(PerpetualBooster, RegressorMixin):
             Fitted estimator.
         """
         # For regression, we typically enforce len(self.classes_) == 0 after fit
-        if isinstance(self.objective, str) and self.objective not in [
-            "SquaredLoss",
-            "QuantileLoss",
-            "HuberLoss",
-            "AdaptiveHuberLoss",
-        ]:
+        if (
+            isinstance(self.objective, str)
+            and self.objective
+            not in [
+                "SquaredLoss",
+                "QuantileLoss",
+                "HuberLoss",
+                "AdaptiveHuberLoss",
+            ]
+            and not self.objective.startswith("Custom")
+        ):
             warnings.warn(
                 f"Objective '{self.objective}' may not be suitable for PerpetualRegressor. Consider 'SquaredLoss' or a quantile/huber loss."
             )

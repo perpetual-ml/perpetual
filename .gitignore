@@ -63,3 +63,6 @@ package-r/inst/c/
 *.pyd.*
 
 *.profraw
+
+# Environment variables
+.env

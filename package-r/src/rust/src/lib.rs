@@ -799,13 +799,24 @@ pub unsafe extern "C" fn PerpetualBooster_get_classes(ptr: SEXP) -> SEXP {
 pub unsafe extern "C" fn PerpetualBooster_get_objective(ptr: SEXP) -> SEXP {
     r_safe!(unsafe {
         let booster = &*(R_ExternalPtrAddr(ptr) as *const PerpetualBoosterWrapper);
-        let obj_str = match booster.config.objective {
+        let obj_str = match &booster.config.objective {
             Objective::LogLoss => "LogLoss",
+            Objective::BrierLoss => "BrierLoss",
             Objective::SquaredLoss => "SquaredLoss",
             Objective::QuantileLoss { .. } => "QuantileLoss",
             Objective::HuberLoss { .. } => "HuberLoss",
             Objective::AdaptiveHuberLoss { .. } => "AdaptiveHuberLoss",
             Objective::ListNetLoss => "ListNetLoss",
+            Objective::PoissonLoss => "PoissonLoss",
+            Objective::GammaLoss => "GammaLoss",
+            Objective::MapeLoss => "MapeLoss",
+            Objective::FairLoss { .. } => "FairLoss",
+            Objective::TweedieLoss { .. } => "TweedieLoss",
+            Objective::SquaredLogLoss => "SquaredLogLoss",
+            Objective::CrossEntropyLoss => "CrossEntropyLoss",
+            Objective::CrossEntropyLambdaLoss => "CrossEntropyLambdaLoss",
+            Objective::AbsoluteLoss => "AbsoluteLoss",
+            Objective::HingeLoss => "HingeLoss",
             Objective::Custom(_) => "Custom",
         };
         let result = Rf_protect(Rf_mkString(CString::new(obj_str).unwrap().as_ptr()));

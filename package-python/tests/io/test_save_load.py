@@ -1,3 +1,4 @@
+import os
 import pickle
 
 import numpy as np
@@ -8,14 +9,21 @@ from perpetual import PerpetualBooster
 
 
 def X_y_so():
-    df = pd.read_csv("../resources/titanic.csv")
+    df = pd.read_csv(
+        os.path.join(os.path.dirname(__file__), "../../../resources", "titanic.csv")
+    )
     X = df.select_dtypes("number").drop(columns="survived").reset_index(drop=True)
     y = df["survived"]
     return X, y
 
 
 def X_y_mo():
-    X = pd.read_csv("../resources/cover_types_train.csv", index_col=False)
+    X = pd.read_csv(
+        os.path.join(
+            os.path.dirname(__file__), "../../../resources", "cover_types_train.csv"
+        ),
+        index_col=False,
+    )
     X = X.sample(n=1000, random_state=0)
     X.dropna(inplace=True)
     X = X.loc[:, (X != X.iloc[0]).any()]

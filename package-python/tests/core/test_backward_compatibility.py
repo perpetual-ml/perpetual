@@ -8,11 +8,11 @@ from sklearn.model_selection import train_test_split
 
 
 def test_load_v0_10_0_model():
-    resource_dir = Path(__file__).parent.parent.parent / "resources"
+    resource_dir = Path(__file__).parent.parent.parent.parent / "resources"
     model_path = resource_dir / "model_v0.10.0.json"
 
     if not model_path.exists():
-        pytest.skip(
+        pytest.fail(
             f"Model artifact not found at {model_path}. Run scripts/make_resources.py to generate it."
         )
 

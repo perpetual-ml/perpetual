@@ -138,4 +138,73 @@ mod tests {
         let drift = calculate_drift(&booster, &data, "data", false);
         assert!(drift >= 0.0);
     }
+
+    #[test]
+    fn test_calculate_drift_types() {
+        use crate::booster::core::PerpetualBooster;
+        use crate::objective::Objective;
+        let mut booster = PerpetualBooster::default();
+        booster.cfg.objective = Objective::SquaredLoss;
+        booster.cfg.save_node_stats = true;
+
+        let data_vec = vec![1.0, 2.0, 3.0, 4.0];
+        let data = Matrix::new(&data_vec, 4, 1);
+        let target = vec![0.0, 1.0, 0.0, 1.0];
+
+        booster.fit(&data, &target, None, None).unwrap();
+
+        let drift_data = calculate_drift(&booster, &data, "data", false);
+        assert!(drift_data >= 0.0);
+
+        let drift_concept = calculate_drift(&booster, &data, "concept", false);
+        assert!(drift_concept >= 0.0);
+
+        let drift_invalid = calculate_drift(&booster, &data, "invalid", false);
+        assert_eq!(drift_invalid, 0.0);
+    }
+
+    #[test]
+    fn test_calculate_drift_empty() {
+        let booster = PerpetualBooster::default();
+        let data_vec = vec![1.0, 2.0];
+        let data = Matrix::new(&data_vec, 2, 1);
+        let drift = calculate_drift(&booster, &data, "data", false);
+        assert_eq!(drift, 0.0);
+    }
+
+    #[test]
+    fn test_calculate_drift_columnar() {
+        use crate::booster::core::PerpetualBooster;
+        use crate::data::ColumnarMatrix;
+        use crate::objective::Objective;
+        let mut booster = PerpetualBooster::default();
+        booster.cfg.objective = Objective::SquaredLoss;
+        booster.cfg.save_node_stats = true;
+
+        let data_vec = vec![1.0, 2.0, 3.0, 4.0];
+        let data = Matrix::new(&data_vec, 4, 1);
+        let target = vec![0.0, 1.0, 0.0, 1.0];
+        booster.fit(&data, &target, None, None).unwrap();
+
+        let columnar_data = ColumnarMatrix::new(vec![&data_vec], None, 4);
+        let drift = calculate_drift_columnar(&booster, &columnar_data, "data", false);
+        assert!(drift >= 0.0);
+    }
+
+    #[test]
+    fn test_calculate_drift_no_stats() {
+        use crate::booster::core::PerpetualBooster;
+        use crate::objective::Objective;
+        let mut booster = PerpetualBooster::default();
+        booster.cfg.objective = Objective::SquaredLoss;
+        booster.cfg.save_node_stats = false; // Missing stats
+
+        let data_vec = vec![1.0, 2.0, 3.0, 4.0];
+        let data = Matrix::new(&data_vec, 4, 1);
+        let target = vec![0.0, 1.0, 1.0, 0.0];
+        booster.fit(&data, &target, None, None).unwrap();
+
+        let drift = calculate_drift(&booster, &data, "data", false);
+        assert_eq!(drift, 0.0);
+    }
 }

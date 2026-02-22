@@ -2,7 +2,7 @@ use numpy::PyReadonlyArray1;
 use perpetual_rs::causal::policy::{PolicyMode, PolicyObjective as InnerPolicyObjective};
 use pyo3::prelude::*;
 
-#[pyclass(name = "PolicyObjective")]
+#[pyclass(name = "PolicyObjective", from_py_object)]
 #[derive(Clone)]
 pub struct PyPolicyObjective {
     pub inner: InnerPolicyObjective,

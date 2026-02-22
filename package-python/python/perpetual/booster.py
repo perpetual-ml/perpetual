@@ -107,10 +107,21 @@ class PerpetualBooster:
             Learning objective function to be used for optimization. Valid options are:
 
             - "LogLoss": logistic loss for binary classification.
+            - "BrierLoss": Brier score loss for probabilistic binary classification.
+            - "HingeLoss": hinge loss for binary classification.
             - "SquaredLoss": squared error for regression.
             - "QuantileLoss": quantile error for quantile regression.
             - "HuberLoss": Huber loss for robust regression.
             - "AdaptiveHuberLoss": adaptive Huber loss for robust regression.
+            - "FairLoss": Fair loss for robust regression.
+            - "AbsoluteLoss": absolute (L1) error for regression.
+            - "SquaredLogLoss": squared log error for regression.
+            - "MapeLoss": mean absolute percentage error for regression.
+            - "PoissonLoss": Poisson regression for count data.
+            - "GammaLoss": Gamma regression with log-link.
+            - "TweedieLoss": Tweedie regression with log-link.
+            - "CrossEntropyLoss": cross-entropy loss for targets in [0, 1].
+            - "CrossEntropyLambdaLoss": alternative weighted cross-entropy.
             - "ListNetLoss": ListNet loss for ranking.
             - custom objective: a tuple of (loss, gradient, initial_value) functions.
               Each function should have the following signature:
@@ -126,10 +137,11 @@ class PerpetualBooster:
         num_threads : int, optional
             Number of threads to be used during training and prediction.
         monotone_constraints : dict, optional
-            Constraints to enforce a specific relationship between features and target.
             Keys are feature indices or names, values are -1, 1, or 0.
         force_children_to_bound_parent : bool, default=False
             Whether to restrict children nodes to be within the parent's range.
+        save_node_stats : bool, default=False
+            Whether to save node statistics (required for calibration).
         missing : float, default=np.nan
             Value to consider as missing data.
         allow_missing_splits : bool, default=True
@@ -168,45 +180,6 @@ class PerpetualBooster:
         interaction_constraints : list of list of int, optional
             Interaction constraints.
         save_node_stats : bool, default=False
-            Whether to save node statistics (gradients, hessians) for analysis.
-
-        Attributes
-        ----------
-        feature_names_in_ : list of str
-            Names of features seen during :meth:`fit`.
-        n_features_ : int
-            Number of features seen during :meth:`fit`.
-        classes_ : list
-            Class labels for classification tasks.
-        feature_importances_ : ndarray of shape (n_features,)
-            Feature importances calculated via ``feature_importance_method``.
-
-        See Also
-        --------
-        perpetual.sklearn.PerpetualClassifier : Scikit-learn compatible classifier.
-        perpetual.sklearn.PerpetualRegressor : Scikit-learn compatible regressor.
-
-        Examples
-        --------
-        Basic usage for binary classification:
-
-        >>> from perpetual import PerpetualBooster
-        >>> from sklearn.datasets import make_classification
-        >>> X, y = make_classification(n_samples=1000, n_features=20)
-        >>> model = PerpetualBooster(objective="LogLoss")
-        >>> model.fit(X, y)
-        >>> preds = model.predict(X[:5])
-
-        Custom objective example:
-
-        >>> def loss(y, pred, weight, group):
-        ...     return (y - pred) ** 2
-        >>> def gradient(y, pred, weight, group):
-        ...     return (pred - y), None
-        >>> def initial_value(y, weight, group):
-        ...     return np.mean(y)
-        >>> model = PerpetualBooster(objective=(loss, gradient, initial_value))
-        >>> model.fit(X, y)
         """
 
         terminate_missing_features_ = (
@@ -216,17 +189,44 @@ class PerpetualBooster:
             {} if monotone_constraints is None else monotone_constraints
         )
 
-        self.objective = objective
+        VALID_OBJECTIVES = {
+            "LogLoss",
+            "BrierLoss",
+            "SquaredLoss",
+            "QuantileLoss",
+            "HuberLoss",
+            "AdaptiveHuberLoss",
+            "ListNetLoss",
+            "PoissonLoss",
+            "GammaLoss",
+            "MapeLoss",
+            "FairLoss",
+            "TweedieLoss",
+            "SquaredLogLoss",
+            "CrossEntropyLoss",
+            "CrossEntropyLambdaLoss",
+            "AbsoluteLoss",
+            "HingeLoss",
+            "Custom",
+        }
+
         if isinstance(objective, str):
+            if objective not in VALID_OBJECTIVES and not objective.startswith("Custom"):
+                raise ValueError(
+                    f"unknown variant `{objective}`, expected one of {', '.join(sorted(VALID_OBJECTIVES))}, Custom"
+                )
+            self.objective = objective
             self.loss = None
             self.grad = None
             self.init = None
         elif isinstance(objective, tuple):
+            self.objective = objective
             self.loss = objective[0]
             self.grad = objective[1]
             self.init = objective[2]
         else:
             # Assume it is a PolicyObjective or similar object
+            self.objective = objective
             self.loss = None
             self.grad = None
             self.init = None
@@ -253,8 +253,16 @@ class PerpetualBooster:
         self.interaction_constraints = interaction_constraints
         self.save_node_stats = save_node_stats
 
+        self.feature_names_in_ = None
+        self.n_features_ = 0
+        self.cat_mapping = {}
+        self.classes_ = np.array([])
+        self._is_fitted = False
+
         booster = CratePerpetualBooster(
-            objective=self.objective if not isinstance(self.objective, tuple) else None,
+            objective="SquaredLoss"
+            if isinstance(self.objective, str) and self.objective.startswith("Custom")
+            else (self.objective if not isinstance(self.objective, tuple) else None),
             budget=self.budget,
             max_bin=self.max_bin,
             num_threads=self.num_threads,
@@ -343,6 +351,7 @@ class PerpetualBooster:
         )
 
         self.classes_ = np.array(classes_)
+        self._is_fitted = True
 
         if sample_weight is None:
             sample_weight_ = None
@@ -373,9 +382,12 @@ class PerpetualBooster:
             len(classes_) > 1 and self.objective == "SquaredLoss"
         ):
             booster = CratePerpetualBooster(
-                objective=self.objective
-                if not isinstance(self.objective, tuple)
-                else None,
+                objective="Custom"
+                if isinstance(self.objective, str)
+                and self.objective.startswith("Custom")
+                else (
+                    self.objective if not isinstance(self.objective, tuple) else None
+                ),
                 budget=self.budget,
                 max_bin=self.max_bin,
                 num_threads=self.num_threads,
@@ -404,9 +416,12 @@ class PerpetualBooster:
         else:
             booster = CrateMultiOutputBooster(
                 n_boosters=len(classes_),
-                objective=self.objective
-                if not isinstance(self.objective, tuple)
-                else None,
+                objective="Custom"
+                if isinstance(self.objective, str)
+                and self.objective.startswith("Custom")
+                else (
+                    self.objective if not isinstance(self.objective, tuple) else None
+                ),
                 budget=self.budget,
                 max_bin=self.max_bin,
                 num_threads=self.num_threads,
@@ -463,6 +478,8 @@ class PerpetualBooster:
                 sample_weight=sample_weight_,  # type: ignore
                 group=group_,
             )
+
+        self._is_fitted = True
 
         return self
 
@@ -828,6 +845,8 @@ class PerpetualBooster:
         predictions : ndarray of shape (n_samples,)
             The predicted values (log-odds for classification, raw values for regression).
         """
+        if not self.is_fitted:
+            raise ValueError("PerpetualBooster is not fitted yet")
         is_polars = type_df(X) == "polars_df"
         if is_polars:
             features_, columns, masks, rows, cols = transform_input_frame_columnar(
@@ -902,6 +921,8 @@ class PerpetualBooster:
         probabilities : ndarray of shape (n_samples, n_classes)
             The class probabilities.
         """
+        if not self.is_fitted:
+            raise ValueError("PerpetualBooster is not fitted yet")
         is_polars = type_df(X) == "polars_df"
         if is_polars:
             features_, columns, masks, rows, cols = transform_input_frame_columnar(
@@ -1380,6 +1401,7 @@ class PerpetualBooster:
                         }
             except KeyError:
                 pass
+        c._is_fitted = True
         return c
 
     def save_booster(self, path: str):
@@ -1394,6 +1416,95 @@ class PerpetualBooster:
             Path where the model will be saved.
         """
         self.booster.save_booster(str(path))
+
+    def save_model(self) -> bytes:
+        """
+        Save the model to a bytes object.
+
+        Returns
+        -------
+        data : bytes
+            The serialized model data.
+        """
+        return self.json_dump().encode("utf-8")
+
+    @classmethod
+    def load_model(cls, data: bytes) -> Self:
+        """
+        Load a model from a bytes object.
+
+        Parameters
+        ----------
+        data : bytes
+            The serialized model data.
+
+        Returns
+        -------
+        model : PerpetualBooster
+            The loaded booster object.
+        """
+        return cls.from_json(data.decode("utf-8"))
+
+    @classmethod
+    def from_json(cls, json_str: str) -> Self:
+        """
+        Load a booster model from a JSON string.
+
+        Parameters
+        ----------
+        json_str : str
+            The JSON representation of the model.
+
+        Returns
+        -------
+        model : PerpetualBooster
+            The loaded booster object.
+        """
+        try:
+            dump = json.loads(json_str)
+            if "boosters" in dump or "n_boosters" in dump:
+                booster = CrateMultiOutputBooster.from_json(json_str)
+            else:
+                booster = CratePerpetualBooster.from_json(json_str)
+        except (ValueError, KeyError, json.JSONDecodeError):
+            try:
+                booster = CratePerpetualBooster.from_json(json_str)
+            except ValueError:
+                booster = CrateMultiOutputBooster.from_json(json_str)
+
+        params = booster.get_params()
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            c = cls(**params)
+        c.booster = booster
+        for m in c.metadata_attributes:
+            try:
+                m_ = c._get_metadata_attributes(m)
+                if m == "classes_" and isinstance(m_, list):
+                    m_ = np.array(m_)
+                setattr(c, m, m_)
+                if m == "feature_names_in_" and c.feature_names_in_[0] != "0":
+                    if c.monotone_constraints is not None:
+                        c.monotone_constraints = {
+                            ft: c.monotone_constraints[i]
+                            for i, ft in enumerate(c.feature_names_in_)
+                        }
+            except KeyError:
+                pass
+        c._is_fitted = True
+        return c
+
+    @property
+    def is_fitted(self) -> bool:
+        """
+        Whether the booster has been fitted.
+
+        Returns
+        -------
+        fitted : bool
+            True if the booster is fitted, False otherwise.
+        """
+        return self._is_fitted
 
     def _standardize_monotonicity_map(
         self,
