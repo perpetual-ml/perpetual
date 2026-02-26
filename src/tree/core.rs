@@ -721,7 +721,7 @@ mod tests {
         );
 
         let mut pred_data_vec = data.get_col(0).to_owned();
-        pred_data_vec.sort_by(|a, b| a.partial_cmp(b).unwrap());
+        pred_data_vec.sort_by(|a, b| a.total_cmp(b));
         pred_data_vec.dedup();
         let pred_data = Matrix::new(&pred_data_vec, pred_data_vec.len(), 1);
 

@@ -19,7 +19,7 @@ where
     T: FloatData<T>,
 {
     let mut v_u = v.to_owned();
-    v_u.sort_unstable_by(|a, b| a.partial_cmp(b).unwrap());
+    v_u.sort_unstable_by(|a, b| a.total_cmp(b));
     v_u.dedup();
     if v_u.len() <= pcts.len() + 1 {
         v_u
@@ -167,7 +167,7 @@ pub fn bin_matrix(
             // There will be number of bins as many as number of categories. Number of bins for categorical features is not limited currently.
             let col_categories: HashSet<u16> = HashSet::from_iter(no_miss.iter().map(|&e| e as u16));
             let mut col_cuts: Vec<f64> = col_categories.iter().map(|&e| e as f64).collect();
-            col_cuts.sort_unstable_by(|a, b| a.partial_cmp(b).unwrap());
+            col_cuts.sort_unstable_by(|a, b| a.total_cmp(b));
             col_cuts.push(f64::MAX);
             nunique.push(col_cuts.len());
             let l = col_cuts.len();
@@ -254,7 +254,7 @@ pub fn bin_columnar_matrix(
         } else {
             let col_categories: HashSet<u16> = HashSet::from_iter(no_miss.iter().map(|&e| e as u16));
             let mut col_cuts: Vec<f64> = col_categories.iter().map(|&e| e as f64).collect();
-            col_cuts.sort_unstable_by(|a, b| a.partial_cmp(b).unwrap());
+            col_cuts.sort_unstable_by(|a, b| a.total_cmp(b));
             col_cuts.push(f64::MAX);
             nunique.push(col_cuts.len());
             let l = col_cuts.len();

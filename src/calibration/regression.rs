@@ -32,7 +32,7 @@ impl PerpetualBooster {
     /// from the distribution of fold predictions.
     pub(crate) fn compute_score_grp(&self, log_odds: &[f64; 5], stat_q: &[f64; 5]) -> f64 {
         let mut fold_probs: Vec<f64> = log_odds.iter().map(|&z| 1.0 / (1.0 + (-z).exp())).collect();
-        fold_probs.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+        fold_probs.sort_by(|a, b| a.total_cmp(b));
         let fold_probs_arr: [f64; 5] = fold_probs.clone().try_into().unwrap();
         let p_low = self.grp_interp(0.0, &fold_probs_arr, stat_q);
         let p_high = self.grp_interp(1.0, &fold_probs_arr, stat_q);
@@ -140,7 +140,7 @@ impl PerpetualBooster {
                     *v = self.base_score;
                 }
             }
-            vals.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+            vals.sort_by(|a, b| a.total_cmp(b));
             let y = y_cal[i];
 
             let mut pos = if y <= vals[0] {
@@ -208,7 +208,7 @@ impl PerpetualBooster {
         let stat_q = [0.0, 0.25, 0.5, 0.75, 1.0];
         for (i, row) in fold_weights.iter().enumerate() {
             let mut vals = *row;
-            vals.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+            vals.sort_by(|a, b| a.total_cmp(b));
             let y = y_cal[i];
             let mut pos = if y <= vals[0] {
                 let delta = vals[1] - vals[0];
@@ -396,7 +396,7 @@ impl PerpetualBooster {
             let mut sample_intervals = Vec::with_capacity(data.rows);
             for row in &fold_weights {
                 let mut vals = *row;
-                vals.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+                vals.sort_by(|a, b| a.total_cmp(b));
                 let lower = self.grp_interp(p_low, &vals, &stat_q);
                 let upper = self.grp_interp(p_high, &vals, &stat_q);
                 sample_intervals.push(vec![lower, upper]);
@@ -421,7 +421,7 @@ impl PerpetualBooster {
             let mut sample_intervals = Vec::with_capacity(n_samples);
             for row in &fold_weights {
                 let mut vals = *row;
-                vals.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+                vals.sort_by(|a, b| a.total_cmp(b));
                 let lower = self.grp_interp(p_low, &vals, &stat_q);
                 let upper = self.grp_interp(p_high, &vals, &stat_q);
                 sample_intervals.push(vec![lower, upper]);

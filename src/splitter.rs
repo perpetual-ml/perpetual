@@ -92,7 +92,7 @@ impl<'a> SplitInfoSlice<'a> {
                 .max_by(|s1, s2| {
                     let g1 = s1.get().as_ref().unwrap().split_gain;
                     let g2 = s2.get().as_ref().unwrap().split_gain;
-                    g1.partial_cmp(&g2).expect("Tried to compare a NaN")
+                    g1.total_cmp(&g2)
                 })
                 .unwrap()
                 .get()

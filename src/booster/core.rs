@@ -913,7 +913,7 @@ impl PerpetualBooster {
             // floating point error was creeping in.
             let mut values: Vec<f32> = importance.values().copied().collect();
             // We are OK to unwrap because we know we will never have missing.
-            values.sort_by(|a, b| a.partial_cmp(b).unwrap());
+            values.sort_by(|a, b| a.total_cmp(b));
             let total: f32 = values.iter().sum();
             importance.iter().map(|(k, v)| (*k, v / total)).collect()
         } else {

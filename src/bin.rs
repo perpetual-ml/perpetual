@@ -126,7 +126,7 @@ pub fn sort_cat_bins_by_stat(histogram: &mut [&UnsafeCell<Bin>], is_const_hess: 
                 }
                 let div1: f32 = b1.g_folded.iter().sum::<f32>() / b1.counts.iter().sum::<u32>() as f32;
                 let div2: f32 = b2.g_folded.iter().sum::<f32>() / b2.counts.iter().sum::<u32>() as f32;
-                div2.partial_cmp(&div1).unwrap_or(Ordering::Less)
+                div2.total_cmp(&div1)
             });
         } else {
             histogram.sort_unstable_by(|bin1, bin2| {
@@ -139,7 +139,7 @@ pub fn sort_cat_bins_by_stat(histogram: &mut [&UnsafeCell<Bin>], is_const_hess: 
                 }
                 let div1: f32 = b1.g_folded.iter().sum::<f32>() / b1.h_folded.iter().sum::<f32>();
                 let div2: f32 = b2.g_folded.iter().sum::<f32>() / b2.h_folded.iter().sum::<f32>();
-                div2.partial_cmp(&div1).unwrap_or(Ordering::Less)
+                div2.total_cmp(&div1)
             });
         }
     }

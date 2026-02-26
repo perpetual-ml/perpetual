@@ -314,7 +314,7 @@ where
         return vec![T::ZERO; percentiles.len()];
     }
     let mut idx: Vec<usize> = (0..v.len()).collect();
-    idx.sort_unstable_by(|a, b| v[*a].partial_cmp(&v[*b]).unwrap());
+    idx.sort_unstable_by(|a, b| v[*a].total_cmp(&v[*b]));
 
     // Setup percentiles
     let mut pcts = VecDeque::from_iter(percentiles.iter());

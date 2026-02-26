@@ -95,7 +95,7 @@ impl ObjectiveFunction for AbsoluteLoss {
             None => y.iter().map(|yi| (*yi, 1.0)).collect(),
         };
 
-        cloned1.sort_unstable_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
+        cloned1.sort_unstable_by(|a, b| a.0.total_cmp(&b.0));
 
         let total_w: f64 = cloned1.iter().map(|(_, w)| w).sum();
         let half_w = total_w / 2.0;

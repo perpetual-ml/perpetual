@@ -3,6 +3,7 @@
 //! Definition of core data structures used throughout the crate, including efficient
 //! matrix representations and support for zero-copy data from Arrow/Polars.
 use serde::{Deserialize, Serialize};
+use std::cmp::Ordering;
 use std::fmt::{self, Debug, Display};
 use std::iter::Sum;
 use std::ops::{Add, AddAssign, Div, Mul, Neg, Sub, SubAssign};
@@ -49,6 +50,8 @@ pub trait FloatData<T>:
     fn ln(self) -> T;
     /// Exponential function.
     fn exp(self) -> T;
+    /// Total comparison that handles NaN values correctly.
+    fn total_cmp(&self, other: &T) -> Ordering;
 }
 impl FloatData<f64> for f64 {
     const ZERO: f64 = 0.0;
@@ -72,6 +75,9 @@ impl FloatData<f64> for f64 {
     }
     fn exp(self) -> f64 {
         self.exp()
+    }
+    fn total_cmp(&self, other: &f64) -> Ordering {
+        f64::total_cmp(self, other)
     }
 }
 
@@ -97,6 +103,9 @@ impl FloatData<f32> for f32 {
     }
     fn exp(self) -> f32 {
         self.exp()
+    }
+    fn total_cmp(&self, other: &f32) -> Ordering {
+        f32::total_cmp(self, other)
     }
 }
 

@@ -103,7 +103,7 @@ fn compute_group_ndcg(
         .collect();
 
     // Sort by predictions (descending) to get predicted ranking
-    items.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+    items.sort_by(|a, b| b.1.total_cmp(&a.1));
 
     // Extract relevance scores and weights in predicted order
     let predicted_relevance: Vec<f64> = items.iter().map(|(y, _, _, _)| *y).collect();
@@ -113,7 +113,7 @@ fn compute_group_ndcg(
     let dcg = compute_group_dcg(&predicted_relevance, k, &predicted_weights, scheme);
 
     // Compute IDCG (Ideal DCG) by sorting by true relevance
-    items.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap_or(std::cmp::Ordering::Equal));
+    items.sort_by(|a, b| b.0.total_cmp(&a.0));
     let ideal_relevance: Vec<f64> = items.iter().map(|(y, _, _, _)| *y).collect();
     let ideal_weights: Vec<f64> = items.iter().map(|(_, _, weight, _)| *weight).collect();
 

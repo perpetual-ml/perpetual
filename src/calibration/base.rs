@@ -90,7 +90,7 @@ impl PerpetualBooster {
             let tree_weights = tree.predict_weights(data, parallel, &self.cfg.missing);
             for (i, row_weights) in tree_weights.iter().enumerate() {
                 let mut sorted_weights = *row_weights;
-                sorted_weights.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+                sorted_weights.sort_by(|a, b| a.total_cmp(b));
                 for k in 0..5 {
                     results[i][k] += sorted_weights[k] as f64;
                 }
@@ -121,7 +121,7 @@ impl PerpetualBooster {
             let tree_weights = tree.predict_weights_columnar(data, parallel, &self.cfg.missing);
             for (i, row_weights) in tree_weights.iter().enumerate() {
                 let mut sorted_weights = *row_weights;
-                sorted_weights.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+                sorted_weights.sort_by(|a, b| a.total_cmp(b));
                 for k in 0..5 {
                     results[i][k] += sorted_weights[k] as f64;
                 }

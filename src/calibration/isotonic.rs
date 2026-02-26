@@ -32,11 +32,7 @@ impl IsotonicCalibrator {
         // Pair up (prediction, truth) and sort by prediction
         let mut data: Vec<(f64, f64)> = y_pred.iter().zip(y_true.iter()).map(|(&p, &t)| (p, t)).collect();
         // Sort by prediction primarily, then by truth
-        data.sort_by(|a, b| {
-            a.0.partial_cmp(&b.0)
-                .unwrap_or(std::cmp::Ordering::Equal)
-                .then(a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal))
-        });
+        data.sort_by(|a, b| a.0.total_cmp(&b.0).then(a.1.total_cmp(&b.1)));
 
         // PAVA algorithm
         // We use the "pool adjacent violators" algorithm to find the monotonic function
@@ -112,7 +108,7 @@ impl IsotonicCalibrator {
                 calibrated.push(*self.values.last().unwrap());
             } else {
                 // Binary search for the interval
-                let idx = match self.thresholds.binary_search_by(|t| t.partial_cmp(&p).unwrap()) {
+                let idx = match self.thresholds.binary_search_by(|t| t.total_cmp(&p)) {
                     Ok(i) => i,
                     Err(i) => i - 1,
                 };

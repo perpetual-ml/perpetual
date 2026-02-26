@@ -260,7 +260,7 @@ impl PerpetualBooster {
             let log_odds: Vec<f64> = row.to_vec();
             // Convert fold log-odds to probabilities
             let mut fold_probs: Vec<f64> = log_odds.iter().map(|&z| 1.0 / (1.0 + (-z).exp())).collect();
-            fold_probs.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+            fold_probs.sort_by(|a, b| a.total_cmp(b));
 
             // Calculate spread using GRP interpolation
             // We use spread between effectively min and max (or high/low quantiles)
@@ -298,7 +298,7 @@ impl PerpetualBooster {
         for (i, row) in fold_weights.iter().enumerate() {
             let log_odds: Vec<f64> = row.to_vec();
             let mut fold_probs: Vec<f64> = log_odds.iter().map(|&z| 1.0 / (1.0 + (-z).exp())).collect();
-            fold_probs.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+            fold_probs.sort_by(|a, b| a.total_cmp(b));
 
             let fold_probs_arr: [f64; 5] = fold_probs.clone().try_into().unwrap();
             let p_low = self.grp_interp(0.0, &fold_probs_arr, &stat_q);
@@ -357,7 +357,7 @@ impl PerpetualBooster {
                     CalibrationMethod::GRP => {
                         // Calculate spread
                         let mut sorted_fold_probs = fold_probs.clone();
-                        sorted_fold_probs.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+                        sorted_fold_probs.sort_by(|a, b| a.total_cmp(b));
                         let stat_q = [0.0, 0.25, 0.5, 0.75, 1.0];
                         let sorted_probs_arr: [f64; 5] = sorted_fold_probs.clone().try_into().unwrap();
                         let p_low = self.grp_interp(0.0, &sorted_probs_arr, &stat_q);
@@ -439,7 +439,7 @@ impl PerpetualBooster {
                     CalibrationMethod::GRP => {
                         // Calculate spread
                         let mut sorted_fold_probs = fold_probs.clone();
-                        sorted_fold_probs.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+                        sorted_fold_probs.sort_by(|a, b| a.total_cmp(b));
                         let stat_q = [0.0, 0.25, 0.5, 0.75, 1.0];
                         let sorted_probs_arr: [f64; 5] = sorted_fold_probs.clone().try_into().unwrap();
                         let p_low = self.grp_interp(0.0, &sorted_probs_arr, &stat_q);
