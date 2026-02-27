@@ -93,9 +93,12 @@ impl<'a> FeatureHistogram<'a> {
             let n_bins = self.data.len();
             let n = index.len();
 
-            // For very small nodes, accumulate directly into Bin structs.
-            // The overhead of zeroing a 6 KB+ stack array dominates for < ~64 samples.
-            if n < 64 {
+            // For very small nodes or large bin counts (e.g. high-cardinality
+            // categorical features), accumulate directly into Bin structs.
+            // The flat-buffer fast path below is stack-allocated for up to 300 bins;
+            // features with more bins must use this direct path to avoid overflow.
+            const MAX_FLAT_BINS: usize = 300;
+            if n < 64 || n_bins > MAX_FLAT_BINS {
                 match sorted_hess {
                     Some(sorted_hess) => {
                         self.data.iter().for_each(|b| {
