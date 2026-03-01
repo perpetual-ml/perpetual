@@ -34,8 +34,14 @@
     "import numpy as np\n",
     "import pandas as pd\n",
     "import seaborn as sns\n",
+    "from lightgbm import LGBMClassifier\n",
     "from mapie.classification import CrossConformalClassifier, SplitConformalClassifier\n",
-    "from perpetual import PerpetualBooster\n",
+    "from perpetual import (\n",
+    "    PerpetualBooster,\n",
+    "    compute_calibration_curve,\n",
+    "    expected_calibration_error,\n",
+    ")\n",
+    "from sklearn.calibration import CalibratedClassifierCV\n",
     "from sklearn.datasets import fetch_covtype\n",
     "from sklearn.ensemble import HistGradientBoostingClassifier\n",
     "from sklearn.metrics import accuracy_score\n",
@@ -104,6 +110,7 @@
    "metadata": {},
    "outputs": [],
    "source": [
+    "# Note: PerpetualBooster is deterministic; no random_state parameter needed.\n",
     "model = PerpetualBooster(objective=\"LogLoss\", budget=1.0, save_node_stats=True)\n",
     "model.fit(X_train, y_train)\n",
     "\n",
@@ -119,11 +126,12 @@
    "source": [
     "## 4. Calibrating Prediction Sets\n",
     "\n",
-    "We will now calibrate the model to produce prediction sets with 90% coverage ($\\\\alpha = 0.1$).\n",
+    "We will now calibrate the model to produce prediction sets at three coverage levels: $\\alpha = 0.1$ (90%), $\\alpha = 0.05$ (95%), and $\\alpha = 0.01$ (99%).\n",
     "\n",
     "Perpetual offers:\n",
     "- **Conformal**: Standard split-conformal prediction (sets based on probability thresholds).\n",
-    "- **WeightVariance / MinMax**: Adaptive methods that leverage the internal variance of the ensemble to scale uncertainty."
+    "- **WeightVariance / MinMax**: Adaptive methods that leverage the internal variance of the ensemble to scale uncertainty.\n",
+    "- **GRP**: Adaptive method using Generalized Residual Prediction (log-odds percentiles) to scale uncertainty."
    ]
   },
   {
@@ -133,7 +141,7 @@
    "metadata": {},
    "outputs": [],
    "source": [
-    "methods = [\"Conformal\", \"WeightVariance\", \"MinMax\"]\n",
+    "methods = [\"Conformal\", \"WeightVariance\", \"MinMax\", \"GRP\"]\n",
     "alphas = [0.1, 0.05, 0.01]\n",
     "results = []\n",
     "\n",
@@ -177,7 +185,7 @@
    "id": "8",
    "metadata": {},
    "source": [
-    "## 4b. Probability Calibration\n",
+    "## 5. Probability Calibration\n",
     "\n",
     "In addition to prediction sets, PerpetualBooster supports calibrating the predicted probabilities themselves. This ensures that the predicted probability reflects the true frequency of the positive class.\n",
     "\n",
@@ -191,8 +199,6 @@
    "metadata": {},
    "outputs": [],
    "source": [
-    "from perpetual import compute_calibration_curve, expected_calibration_error\n",
-    "\n",
     "# Ensure the model is calibrated (method='Conformal' is sufficient as it triggers internal calibration)\n",
     "model.calibrate(X_cal, y_cal, method=\"Conformal\", alpha=0.1)\n",
     "\n",
@@ -228,7 +234,7 @@
    "id": "10",
    "metadata": {},
    "source": [
-    "## 4d. Comparison with Scikit-Learn and LightGBM\n",
+    "## 6. Comparison with Scikit-Learn and LightGBM\n",
     "\n",
     "We compare the calibration of PerpetualBooster against scikit-learn's `HistGradientBoostingClassifier` and LightGBM's `LGBMClassifier`.\n",
     "For both competitors, we evaluate both the **uncalibrated** model and a **calibrated** version using Isotonic Regression (via `CalibratedClassifierCV`)."
@@ -241,9 +247,6 @@
    "metadata": {},
    "outputs": [],
    "source": [
-    "from lightgbm import LGBMClassifier\n",
-    "from sklearn.calibration import CalibratedClassifierCV\n",
-    "\n",
     "# 1. Scikit-Learn HistGradientBoosting\n",
     "hgb = HistGradientBoostingClassifier(random_state=42)\n",
     "hgb.fit(X_train, y_train)\n",
@@ -355,7 +358,7 @@
    "id": "12",
    "metadata": {},
    "source": [
-    "## 5. Comparison with MAPIE\n",
+    "## 7. Comparison with MAPIE\n",
     "\n",
     "We compare against MAPIE's `SplitConformalClassifier` (standard split-conformal) and `CrossConformalClassifier` (cross-validation based).\n",
     "\n",
@@ -452,7 +455,7 @@
    "id": "14",
    "metadata": {},
    "source": [
-    "## 6. Results Analysis\n",
+    "## 8. Results Analysis\n",
     "\n",
     "We visualize the performance. Ideally, observed coverage should meet or slightly exceed the target, with the smallest possible average set size."
    ]
@@ -476,6 +479,7 @@
     "    \"Perpetual: Conformal\": \"#1f77b4\",  # Blue\n",
     "    \"Perpetual: WeightVariance\": \"#aec7e8\",  # Light Blue\n",
     "    \"Perpetual: MinMax\": \"#ff7f0e\",  # Orange\n",
+    "    \"Perpetual: GRP\": \"#2ca02c\",  # Green\n",
     "    \"MAPIE: Split (LAC)\": \"#d62728\",  # Red\n",
     "    \"MAPIE: Cross (LAC)\": \"#9467bd\",  # Purple\n",
     "}\n",
@@ -500,7 +504,7 @@
    "id": "16",
    "metadata": {},
    "source": [
-    "## 5. Summary and Conclusion\n",
+    "## 9. Summary and Conclusion\n",
     "\n",
     "In this tutorial, we have explored several advanced calibration techniques provided by **PerpetualBooster** for both probability calibration and set-valued predictions.\n",
     "\n",
@@ -508,7 +512,7 @@
     "\n",
     "1. **Superior Probability Calibration (ECE)**:\n",
     "   - As demonstrated in our comparison against Scikit-Learn's `HistGradientBoostingClassifier` and LightGBM, `PerpetualBooster` consistently achieves a lower **Expected Calibration Error (ECE)**.\n",
-    "   - Even without explicit calibration, Perpetual's raw probabilities are often more reliable. When calibrated using Perpetual's internal Isotonic method, it provides state-of-the-art results that are crucial for high-stakes decision-making.\n",
+    "   - Even without explicit calibration, Perpetual's raw probabilities are often more reliable. When calibrated using Perpetual's built-in `calibrate()` method, it provides state-of-the-art results that are crucial for high-stakes decision-making.\n",
     "\n",
     "2. **Efficient Uncertainty Quantification (Prediction Sets)**:\n",
     "   - Perpetual offers native support for generating **prediction sets** (for classification) and **prediction intervals** (for regression).\n",
@@ -526,7 +530,7 @@
  ],
  "metadata": {
   "kernelspec": {
-   "display_name": "Python 3",
+   "display_name": ".venv",
    "language": "python",
    "name": "python3"
   },
@@ -540,7 +544,7 @@
    "name": "python",
    "nbconvert_exporter": "python",
    "pygments_lexer": "ipython3",
-   "version": "3.8.10"
+   "version": "3.13.7"
   }
  },
  "nbformat": 4,

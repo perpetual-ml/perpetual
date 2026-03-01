@@ -68,11 +68,11 @@
 <li class="toctree-l3"><a class="reference internal" href="#2.-Dataset-Preparation">2. Dataset Preparation</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#3.-Training-the-Base-Model">3. Training the Base Model</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#4.-Calibrating-Prediction-Sets">4. Calibrating Prediction Sets</a></li>
-<li class="toctree-l3"><a class="reference internal" href="#4b.-Probability-Calibration">4b. Probability Calibration</a></li>
-<li class="toctree-l3"><a class="reference internal" href="#4d.-Comparison-with-Scikit-Learn-and-LightGBM">4d. Comparison with Scikit-Learn and LightGBM</a></li>
-<li class="toctree-l3"><a class="reference internal" href="#5.-Comparison-with-MAPIE">5. Comparison with MAPIE</a></li>
-<li class="toctree-l3"><a class="reference internal" href="#6.-Results-Analysis">6. Results Analysis</a></li>
-<li class="toctree-l3"><a class="reference internal" href="#5.-Summary-and-Conclusion">5. Summary and Conclusion</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#5.-Probability-Calibration">5. Probability Calibration</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#6.-Comparison-with-Scikit-Learn-and-LightGBM">6. Comparison with Scikit-Learn and LightGBM</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#7.-Comparison-with-MAPIE">7. Comparison with MAPIE</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#8.-Results-Analysis">8. Results Analysis</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#9.-Summary-and-Conclusion">9. Summary and Conclusion</a><ul>
 <li class="toctree-l4"><a class="reference internal" href="#Key-Advantages-of-PerpetualBooster">Key Advantages of PerpetualBooster</a></li>
 <li class="toctree-l4"><a class="reference internal" href="#Conclusion">Conclusion</a></li>
 </ul>
@@ -143,8 +143,14 @@
 <span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pd</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">seaborn</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">sns</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">lightgbm</span><span class="w"> </span><span class="kn">import</span> <span class="n">LGBMClassifier</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">mapie.classification</span><span class="w"> </span><span class="kn">import</span> <span class="n">CrossConformalClassifier</span><span class="p">,</span> <span class="n">SplitConformalClassifier</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">perpetual</span><span class="w"> </span><span class="kn">import</span> <span class="n">PerpetualBooster</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">perpetual</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">PerpetualBooster</span><span class="p">,</span>
+    <span class="n">compute_calibration_curve</span><span class="p">,</span>
+    <span class="n">expected_calibration_error</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">sklearn.calibration</span><span class="w"> </span><span class="kn">import</span> <span class="n">CalibratedClassifierCV</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">sklearn.datasets</span><span class="w"> </span><span class="kn">import</span> <span class="n">fetch_covtype</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">sklearn.ensemble</span><span class="w"> </span><span class="kn">import</span> <span class="n">HistGradientBoostingClassifier</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">sklearn.metrics</span><span class="w"> </span><span class="kn">import</span> <span class="n">accuracy_score</span>
@@ -197,7 +203,8 @@
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
-<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">model</span> <span class="o">=</span> <span class="n">PerpetualBooster</span><span class="p">(</span><span class="n">objective</span><span class="o">=</span><span class="s2">&quot;LogLoss&quot;</span><span class="p">,</span> <span class="n">budget</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span> <span class="n">save_node_stats</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># Note: PerpetualBooster is deterministic; no random_state parameter needed.</span>
+<span class="n">model</span> <span class="o">=</span> <span class="n">PerpetualBooster</span><span class="p">(</span><span class="n">objective</span><span class="o">=</span><span class="s2">&quot;LogLoss&quot;</span><span class="p">,</span> <span class="n">budget</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span> <span class="n">save_node_stats</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="n">model</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">X_train</span><span class="p">,</span> <span class="n">y_train</span><span class="p">)</span>
 
 <span class="n">preds</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="n">X_test</span><span class="p">)</span>
@@ -209,17 +216,18 @@
 </section>
 <section id="4.-Calibrating-Prediction-Sets">
 <h2>4. Calibrating Prediction Sets<a class="headerlink" href="#4.-Calibrating-Prediction-Sets" title="Link to this heading"></a></h2>
-<p>We will now calibrate the model to produce prediction sets with 90% coverage (<span class="math notranslate nohighlight">\(\\alpha = 0.1\)</span>).</p>
+<p>We will now calibrate the model to produce prediction sets at three coverage levels: <span class="math notranslate nohighlight">\(\alpha = 0.1\)</span> (90%), <span class="math notranslate nohighlight">\(\alpha = 0.05\)</span> (95%), and <span class="math notranslate nohighlight">\(\alpha = 0.01\)</span> (99%).</p>
 <p>Perpetual offers:</p>
 <ul class="simple">
 <li><p><strong>Conformal</strong>: Standard split-conformal prediction (sets based on probability thresholds).</p></li>
 <li><p><strong>WeightVariance / MinMax</strong>: Adaptive methods that leverage the internal variance of the ensemble to scale uncertainty.</p></li>
+<li><p><strong>GRP</strong>: Adaptive method using Generalized Residual Prediction (log-odds percentiles) to scale uncertainty.</p></li>
 </ul>
 <div class="nbinput nblast docutils container">
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
-<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">methods</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;Conformal&quot;</span><span class="p">,</span> <span class="s2">&quot;WeightVariance&quot;</span><span class="p">,</span> <span class="s2">&quot;MinMax&quot;</span><span class="p">]</span>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">methods</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;Conformal&quot;</span><span class="p">,</span> <span class="s2">&quot;WeightVariance&quot;</span><span class="p">,</span> <span class="s2">&quot;MinMax&quot;</span><span class="p">,</span> <span class="s2">&quot;GRP&quot;</span><span class="p">]</span>
 <span class="n">alphas</span> <span class="o">=</span> <span class="p">[</span><span class="mf">0.1</span><span class="p">,</span> <span class="mf">0.05</span><span class="p">,</span> <span class="mf">0.01</span><span class="p">]</span>
 <span class="n">results</span> <span class="o">=</span> <span class="p">[]</span>
 
@@ -260,17 +268,15 @@
 </div>
 </div>
 </section>
-<section id="4b.-Probability-Calibration">
-<h2>4b. Probability Calibration<a class="headerlink" href="#4b.-Probability-Calibration" title="Link to this heading"></a></h2>
+<section id="5.-Probability-Calibration">
+<h2>5. Probability Calibration<a class="headerlink" href="#5.-Probability-Calibration" title="Link to this heading"></a></h2>
 <p>In addition to prediction sets, PerpetualBooster supports calibrating the predicted probabilities themselves. This ensures that the predicted probability reflects the true frequency of the positive class.</p>
 <p>Probability calibration is performed automatically during <code class="docutils literal notranslate"><span class="pre">calibrate</span></code>. You can access calibrated probabilities by setting <code class="docutils literal notranslate"><span class="pre">calibrated=True</span></code> in <code class="docutils literal notranslate"><span class="pre">predict_proba</span></code>.</p>
 <div class="nbinput nblast docutils container">
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
-<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">perpetual</span><span class="w"> </span><span class="kn">import</span> <span class="n">compute_calibration_curve</span><span class="p">,</span> <span class="n">expected_calibration_error</span>
-
-<span class="c1"># Ensure the model is calibrated (method=&#39;Conformal&#39; is sufficient as it triggers internal calibration)</span>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># Ensure the model is calibrated (method=&#39;Conformal&#39; is sufficient as it triggers internal calibration)</span>
 <span class="n">model</span><span class="o">.</span><span class="n">calibrate</span><span class="p">(</span><span class="n">X_cal</span><span class="p">,</span> <span class="n">y_cal</span><span class="p">,</span> <span class="n">method</span><span class="o">=</span><span class="s2">&quot;Conformal&quot;</span><span class="p">,</span> <span class="n">alpha</span><span class="o">=</span><span class="mf">0.1</span><span class="p">)</span>
 
 <span class="c1"># Get uncalibrated and calibrated probabilities</span>
@@ -302,17 +308,14 @@
 </div>
 </div>
 </section>
-<section id="4d.-Comparison-with-Scikit-Learn-and-LightGBM">
-<h2>4d. Comparison with Scikit-Learn and LightGBM<a class="headerlink" href="#4d.-Comparison-with-Scikit-Learn-and-LightGBM" title="Link to this heading"></a></h2>
+<section id="6.-Comparison-with-Scikit-Learn-and-LightGBM">
+<h2>6. Comparison with Scikit-Learn and LightGBM<a class="headerlink" href="#6.-Comparison-with-Scikit-Learn-and-LightGBM" title="Link to this heading"></a></h2>
 <p>We compare the calibration of PerpetualBooster against scikit-learn’s <code class="docutils literal notranslate"><span class="pre">HistGradientBoostingClassifier</span></code> and LightGBM’s <code class="docutils literal notranslate"><span class="pre">LGBMClassifier</span></code>. For both competitors, we evaluate both the <strong>uncalibrated</strong> model and a <strong>calibrated</strong> version using Isotonic Regression (via <code class="docutils literal notranslate"><span class="pre">CalibratedClassifierCV</span></code>).</p>
 <div class="nbinput nblast docutils container">
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
-<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">lightgbm</span><span class="w"> </span><span class="kn">import</span> <span class="n">LGBMClassifier</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">sklearn.calibration</span><span class="w"> </span><span class="kn">import</span> <span class="n">CalibratedClassifierCV</span>
-
-<span class="c1"># 1. Scikit-Learn HistGradientBoosting</span>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># 1. Scikit-Learn HistGradientBoosting</span>
 <span class="n">hgb</span> <span class="o">=</span> <span class="n">HistGradientBoostingClassifier</span><span class="p">(</span><span class="n">random_state</span><span class="o">=</span><span class="mi">42</span><span class="p">)</span>
 <span class="n">hgb</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">X_train</span><span class="p">,</span> <span class="n">y_train</span><span class="p">)</span>
 <span class="n">hgb_cal</span> <span class="o">=</span> <span class="n">CalibratedClassifierCV</span><span class="p">(</span><span class="n">hgb</span><span class="p">,</span> <span class="n">method</span><span class="o">=</span><span class="s2">&quot;isotonic&quot;</span><span class="p">,</span> <span class="n">cv</span><span class="o">=</span><span class="s2">&quot;prefit&quot;</span><span class="p">)</span>
@@ -420,8 +423,8 @@
 </div>
 </div>
 </section>
-<section id="5.-Comparison-with-MAPIE">
-<h2>5. Comparison with MAPIE<a class="headerlink" href="#5.-Comparison-with-MAPIE" title="Link to this heading"></a></h2>
+<section id="7.-Comparison-with-MAPIE">
+<h2>7. Comparison with MAPIE<a class="headerlink" href="#7.-Comparison-with-MAPIE" title="Link to this heading"></a></h2>
 <p>We compare against MAPIE’s <code class="docutils literal notranslate"><span class="pre">SplitConformalClassifier</span></code> (standard split-conformal) and <code class="docutils literal notranslate"><span class="pre">CrossConformalClassifier</span></code> (cross-validation based).</p>
 <p>Both methods use the “lac” (Least Ambiguous Set-valued Classifiers) conformity score, as it is the primary method supported for binary classification in MAPIE.</p>
 <div class="nbinput nblast docutils container">
@@ -508,8 +511,8 @@
 </div>
 </div>
 </section>
-<section id="6.-Results-Analysis">
-<h2>6. Results Analysis<a class="headerlink" href="#6.-Results-Analysis" title="Link to this heading"></a></h2>
+<section id="8.-Results-Analysis">
+<h2>8. Results Analysis<a class="headerlink" href="#8.-Results-Analysis" title="Link to this heading"></a></h2>
 <p>We visualize the performance. Ideally, observed coverage should meet or slightly exceed the target, with the smallest possible average set size.</p>
 <div class="nbinput nblast docutils container">
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
@@ -527,6 +530,7 @@
     <span class="s2">&quot;Perpetual: Conformal&quot;</span><span class="p">:</span> <span class="s2">&quot;#1f77b4&quot;</span><span class="p">,</span>  <span class="c1"># Blue</span>
     <span class="s2">&quot;Perpetual: WeightVariance&quot;</span><span class="p">:</span> <span class="s2">&quot;#aec7e8&quot;</span><span class="p">,</span>  <span class="c1"># Light Blue</span>
     <span class="s2">&quot;Perpetual: MinMax&quot;</span><span class="p">:</span> <span class="s2">&quot;#ff7f0e&quot;</span><span class="p">,</span>  <span class="c1"># Orange</span>
+    <span class="s2">&quot;Perpetual: GRP&quot;</span><span class="p">:</span> <span class="s2">&quot;#2ca02c&quot;</span><span class="p">,</span>  <span class="c1"># Green</span>
     <span class="s2">&quot;MAPIE: Split (LAC)&quot;</span><span class="p">:</span> <span class="s2">&quot;#d62728&quot;</span><span class="p">,</span>  <span class="c1"># Red</span>
     <span class="s2">&quot;MAPIE: Cross (LAC)&quot;</span><span class="p">:</span> <span class="s2">&quot;#9467bd&quot;</span><span class="p">,</span>  <span class="c1"># Purple</span>
 <span class="p">}</span>
@@ -548,8 +552,8 @@
 </div>
 </div>
 </section>
-<section id="5.-Summary-and-Conclusion">
-<h2>5. Summary and Conclusion<a class="headerlink" href="#5.-Summary-and-Conclusion" title="Link to this heading"></a></h2>
+<section id="9.-Summary-and-Conclusion">
+<h2>9. Summary and Conclusion<a class="headerlink" href="#9.-Summary-and-Conclusion" title="Link to this heading"></a></h2>
 <p>In this tutorial, we have explored several advanced calibration techniques provided by <strong>PerpetualBooster</strong> for both probability calibration and set-valued predictions.</p>
 <section id="Key-Advantages-of-PerpetualBooster">
 <h3>Key Advantages of PerpetualBooster<a class="headerlink" href="#Key-Advantages-of-PerpetualBooster" title="Link to this heading"></a></h3>
@@ -557,7 +561,7 @@
 <li><p><strong>Superior Probability Calibration (ECE)</strong>:</p>
 <ul class="simple">
 <li><p>As demonstrated in our comparison against Scikit-Learn’s <code class="docutils literal notranslate"><span class="pre">HistGradientBoostingClassifier</span></code> and LightGBM, <code class="docutils literal notranslate"><span class="pre">PerpetualBooster</span></code> consistently achieves a lower <strong>Expected Calibration Error (ECE)</strong>.</p></li>
-<li><p>Even without explicit calibration, Perpetual’s raw probabilities are often more reliable. When calibrated using Perpetual’s internal Isotonic method, it provides state-of-the-art results that are crucial for high-stakes decision-making.</p></li>
+<li><p>Even without explicit calibration, Perpetual’s raw probabilities are often more reliable. When calibrated using Perpetual’s built-in <code class="docutils literal notranslate"><span class="pre">calibrate()</span></code> method, it provides state-of-the-art results that are crucial for high-stakes decision-making.</p></li>
 </ul>
 </li>
 <li><p><strong>Efficient Uncertainty Quantification (Prediction Sets)</strong>:</p>
