@@ -411,6 +411,8 @@ impl PerpetualBooster {
         let col_index: Vec<usize> = (0..data.cols).collect();
         let mut stopping = 0;
         let mut n_low_loss_rounds = 0;
+        let mut best_loss_avg = loss.iter().sum::<f32>() / loss.len() as f32;
+        let mut no_improvement_rounds: usize = 0;
 
         let mut rng = StdRng::seed_from_u64(self.cfg.seed);
 
@@ -541,6 +543,14 @@ impl PerpetualBooster {
 
             objective_fn.gradient_and_loss_into(y, &yhat, sample_weight, group, &mut grad, &mut hess, &mut loss);
 
+            let current_loss_avg = loss.iter().sum::<f32>() / loss.len() as f32;
+            if current_loss_avg < best_loss_avg {
+                best_loss_avg = current_loss_avg;
+                no_improvement_rounds = 0;
+            } else {
+                no_improvement_rounds += 1;
+            }
+
             if verbose {
                 info!(
                     "round {:0?}, tree.nodes: {:1?}, tree.depth: {:2?}, tree.stopper: {:3?}, loss: {:4?}",
@@ -548,7 +558,7 @@ impl PerpetualBooster {
                     tree.nodes.len(),
                     tree.depth,
                     tree.stopper,
-                    loss.iter().sum::<f32>() / loss.len() as f32,
+                    current_loss_avg,
                 );
             }
 
@@ -559,6 +569,14 @@ impl PerpetualBooster {
 
             if stopping >= self.cfg.stopping_rounds.unwrap_or(STOPPING_ROUNDS) {
                 info!("Auto stopping since stopping round limit reached.");
+                break;
+            }
+
+            if no_improvement_rounds >= self.cfg.stopping_rounds.unwrap_or(STOPPING_ROUNDS) {
+                info!(
+                    "Auto stopping since training loss did not improve for {} consecutive rounds.",
+                    no_improvement_rounds
+                );
                 break;
             }
 
@@ -649,6 +667,8 @@ impl PerpetualBooster {
         let col_index: Vec<usize> = (0..data.cols).collect();
         let mut stopping = 0;
         let mut n_low_loss_rounds = 0;
+        let mut best_loss_avg = loss.iter().sum::<f32>() / loss.len() as f32;
+        let mut no_improvement_rounds: usize = 0;
 
         let mut rng = StdRng::seed_from_u64(self.cfg.seed);
 
@@ -775,6 +795,14 @@ impl PerpetualBooster {
 
             objective_fn.gradient_and_loss_into(y, &yhat, sample_weight, group, &mut grad, &mut hess, &mut loss);
 
+            let current_loss_avg = loss.iter().sum::<f32>() / loss.len() as f32;
+            if current_loss_avg < best_loss_avg {
+                best_loss_avg = current_loss_avg;
+                no_improvement_rounds = 0;
+            } else {
+                no_improvement_rounds += 1;
+            }
+
             if verbose {
                 info!(
                     "round {:0?}, tree.nodes: {:1?}, tree.depth: {:2?}, tree.stopper: {:3?}, loss: {:4?}",
@@ -782,7 +810,7 @@ impl PerpetualBooster {
                     tree.nodes.len(),
                     tree.depth,
                     tree.stopper,
-                    loss.iter().sum::<f32>() / loss.len() as f32,
+                    current_loss_avg,
                 );
             }
 
@@ -793,6 +821,14 @@ impl PerpetualBooster {
 
             if stopping >= self.cfg.stopping_rounds.unwrap_or(STOPPING_ROUNDS) {
                 info!("Auto stopping since stopping round limit reached.");
+                break;
+            }
+
+            if no_improvement_rounds >= self.cfg.stopping_rounds.unwrap_or(STOPPING_ROUNDS) {
+                info!(
+                    "Auto stopping since training loss did not improve for {} consecutive rounds.",
+                    no_improvement_rounds
+                );
                 break;
             }
 
@@ -1390,7 +1426,7 @@ mod perpetual_booster_test {
 
         let trees = model.get_prediction_trees();
         println!("trees = {}", trees.len());
-        assert_eq!(trees.len(), 9);
+        assert_eq!(trees.len(), 3);
 
         Ok(())
     }

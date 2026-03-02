@@ -131,7 +131,7 @@ impl MultiOutputBooster {
             quantile,
             reset,
             categorical_features: categorical_features.clone(),
-            timeout,
+            timeout: timeout.map(|t| t / n_boosters.max(1) as f32),
             iteration_limit,
             memory_limit,
             stopping_rounds,
@@ -516,8 +516,12 @@ impl MultiOutputBooster {
     /// Set the timeout on the booster.
     /// * `timeout` - fit timeout limit in seconds.
     pub fn set_timeout(mut self, timeout: Option<f32>) -> Self {
-        self.cfg.timeout = timeout;
-        self.boosters = self.boosters.iter().map(|b| b.clone().set_timeout(timeout)).collect();
+        self.cfg.timeout = timeout.map(|t| t / self.n_boosters.max(1) as f32);
+        self.boosters = self
+            .boosters
+            .iter()
+            .map(|b| b.clone().set_timeout(self.cfg.timeout))
+            .collect();
         self
     }
 
