@@ -6,7 +6,7 @@ members = [
 
 [package]
 name = "perpetual"
-version = "1.9.3"
+version = "1.9.4"
 edition = "2024"
 authors = ["Mutlu Simsek <msimsek@perpetual-ml.com>", "Serkan Korkmaz <serkor1@duck.com>", "Pieter Pel <pelpieter@gmail.com>"]
 homepage = "https://perpetual-ml.com"
@@ -37,14 +37,14 @@ serde = { version = "1.0.228", features = ["derive"] }
 approx = "0.5.1"
 log = "0.4.29"
 rand = "0.10.0"
-sysinfo = "0.38.2"
+sysinfo = "0.38.3"
 
 [dev-dependencies]
 criterion = "0.8.2"
 reqwest = { version = "0.13.2", features = ["blocking"] }
 csv = "1.4.0"
-chrono = "0.4.43"
-tempfile = "3.25.0"
+chrono = "0.4.44"
+tempfile = "3.26.0"
 env_logger = "0.11.9"
 
 [[bench]]

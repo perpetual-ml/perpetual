@@ -427,10 +427,24 @@ impl PerpetualBooster {
             .clamp(usize::min(MIN_COL_AMOUNT, col_index.len()), col_index.len());
 
         let mem_bin = mem::size_of::<Bin>();
+        // When column sampling is active, categorical features may have more bins
+        // than max_bin. Use the actual maximum across all features to size the
+        // fixed histogram, preventing out-of-bounds access.
+        let effective_max_bin = if col_amount == col_index.len() {
+            self.cfg.max_bin
+        } else {
+            let max_nunique = *binned_data
+                .nunique
+                .iter()
+                .max()
+                .unwrap_or(&(self.cfg.max_bin as usize + 2));
+            // from_fixed creates max_bin + 2 bins, so we need max_bin + 2 >= max_nunique
+            (max_nunique.saturating_sub(2) as u16).max(self.cfg.max_bin)
+        };
         let mem_hist: usize = if col_amount == col_index.len() {
             mem_bin * binned_data.nunique.iter().sum::<usize>()
         } else {
-            mem_bin * self.cfg.max_bin as usize * col_amount
+            mem_bin * (effective_max_bin as usize + 2) * col_amount
         };
         let sys = System::new_with_specifics(RefreshKind::nothing().with_memory(MemoryRefreshKind::everything()));
         let n_nodes_alloc = match self.cfg.memory_limit {
@@ -447,7 +461,7 @@ impl PerpetualBooster {
         let mut hist_arena = if col_amount == col_index.len() {
             HistogramArena::from_cuts(&binned_data.cuts, &col_index, is_const_hess, n_nodes_alloc)
         } else {
-            HistogramArena::from_fixed(self.cfg.max_bin, col_amount, is_const_hess, n_nodes_alloc)
+            HistogramArena::from_fixed(effective_max_bin, col_amount, is_const_hess, n_nodes_alloc)
         };
         let mut hist_tree: Vec<NodeHistogram> = hist_arena.as_node_histograms();
 
@@ -679,10 +693,23 @@ impl PerpetualBooster {
             .clamp(usize::min(MIN_COL_AMOUNT, col_index.len()), col_index.len());
 
         let mem_bin = mem::size_of::<Bin>();
+        // When column sampling is active, categorical features may have more bins
+        // than max_bin. Use the actual maximum across all features to size the
+        // fixed histogram, preventing out-of-bounds access.
+        let effective_max_bin = if col_amount == col_index.len() {
+            self.cfg.max_bin
+        } else {
+            let max_nunique = *binned_data
+                .nunique
+                .iter()
+                .max()
+                .unwrap_or(&(self.cfg.max_bin as usize + 2));
+            (max_nunique.saturating_sub(2) as u16).max(self.cfg.max_bin)
+        };
         let mem_hist: usize = if col_amount == col_index.len() {
             mem_bin * binned_data.nunique.iter().sum::<usize>()
         } else {
-            mem_bin * self.cfg.max_bin as usize * col_amount
+            mem_bin * (effective_max_bin as usize + 2) * col_amount
         };
         let sys = System::new_with_specifics(RefreshKind::nothing().with_memory(MemoryRefreshKind::everything()));
         let n_nodes_alloc = match self.cfg.memory_limit {
@@ -700,7 +727,7 @@ impl PerpetualBooster {
         let mut hist_arena = if col_amount == col_index.len() {
             HistogramArena::from_cuts(&binned_data.cuts, &col_index, is_const_hess, n_nodes_alloc)
         } else {
-            HistogramArena::from_fixed(self.cfg.max_bin, col_amount, is_const_hess, n_nodes_alloc)
+            HistogramArena::from_fixed(effective_max_bin, col_amount, is_const_hess, n_nodes_alloc)
         };
         let mut hist_tree: Vec<NodeHistogram> = hist_arena.as_node_histograms();
         let mut split_info_vec: Vec<SplitInfo> = (0..col_amount).map(|_| SplitInfo::default()).collect();

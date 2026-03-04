@@ -15,6 +15,8 @@ DOWNLOAD_URLS = {
     "tabarena_cat_y.csv": "https://github.com/user-attachments/files/25600228/y.csv",
     "tabarena_wide_x.csv": "https://github.com/user-attachments/files/25682565/X.csv",
     "tabarena_wide_y.csv": "https://github.com/user-attachments/files/25682566/y.csv",
+    "tabarena_var_x.csv": "https://github.com/user-attachments/files/25739177/X.csv",
+    "tabarena_var_y.csv": "https://github.com/user-attachments/files/25739178/y.csv",
 }
 
 
@@ -180,3 +182,46 @@ def test_tabarena_wide():
 
     print(f"Trees: {model.number_of_trees}")
     print(f"Fit time: {end_time - start_time}")
+
+
+def test_tabarena_var():
+    X = _get_csv("tabarena_var_x.csv")
+    y = _get_csv("tabarena_var_y.csv")
+
+    categorical_features = [
+        "Var192",
+        "Var193",
+        "Var194",
+        "Var195",
+        "Var196",
+        "Var197",
+        "Var198",
+        "Var199",
+        "Var200",
+        "Var201",
+        "Var202",
+        "Var203",
+        "Var204",
+        "Var205",
+        "Var206",
+        "Var207",
+        "Var208",
+        "Var210",
+        "Var212",
+        "Var216",
+        "Var217",
+        "Var218",
+        "Var219",
+        "Var221",
+        "Var223",
+        "Var225",
+        "Var226",
+        "Var227",
+        "Var228",
+        "Var229",
+    ]
+
+    model = PerpetualBooster(
+        categorical_features=categorical_features, iteration_limit=3, memory_limit=1
+    )
+    model.fit(X, y)
