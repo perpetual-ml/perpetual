@@ -6,7 +6,7 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Double Machine Learning: Estimating the Gender Wage Gap &mdash; Perpetual 1.9.4 documentation</title>
+  <title>Double Machine Learning: Estimating the Gender Wage Gap &mdash; Perpetual 2.0.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../../_static/nbsphinx-code-cells.css?v=2aa19091" />
@@ -15,7 +15,7 @@
   
       <script src="../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../_static/documentation_options.js?v=38ba398c"></script>
+      <script src="../../_static/documentation_options.js?v=51b770b3"></script>
       <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
@@ -73,9 +73,10 @@
 <li class="toctree-l3"><a class="reference internal" href="#3.-Train/Test-Split">3. Train/Test Split</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#4.-Fit-the-DML-Estimator">4. Fit the DML Estimator</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#5.-Estimate-Heterogeneous-Treatment-Effects">5. Estimate Heterogeneous Treatment Effects</a></li>
-<li class="toctree-l3"><a class="reference internal" href="#6.-Feature-Importance">6. Feature Importance</a></li>
-<li class="toctree-l3"><a class="reference internal" href="#7.-Compare-with-Naive-Estimate">7. Compare with Naive Estimate</a></li>
-<li class="toctree-l3"><a class="reference internal" href="#8.-Subgroup-Analysis">8. Subgroup Analysis</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#6.-Statistical-Inference-on-the-ATE">6. Statistical Inference on the ATE</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#7.-Feature-Importance">7. Feature Importance</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#8.-Compare-with-Naive-Estimate">8. Compare with Naive Estimate</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#9.-Subgroup-Analysis">9. Subgroup Analysis</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#Comparison-to-Linear-Regression-and-DML-Advantages">Comparison to Linear Regression and DML Advantages</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#Summary-and-References">Summary and References</a></li>
 </ul>
@@ -87,6 +88,7 @@
 <li class="toctree-l2"><a class="reference internal" href="fair_classification.html">Fairness-Aware Classification with FairClassifier</a></li>
 <li class="toctree-l2"><a class="reference internal" href="customer_retention_uplift.html">Customer Retention: Uplift Modeling for Churn Prevention</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../drift_tutorial.html">Advanced Drift Detection in Perpetual</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../objectives_tutorial.html">PerpetualBooster Objectives Tutorial</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="../../architecture.html">Architecture</a></li>
@@ -249,8 +251,25 @@
 </div>
 </div>
 </section>
-<section id="6.-Feature-Importance">
-<h2>6. Feature Importance<a class="headerlink" href="#6.-Feature-Importance" title="Link to this heading"></a></h2>
+<section id="6.-Statistical-Inference-on-the-ATE">
+<h2>6. Statistical Inference on the ATE<a class="headerlink" href="#6.-Statistical-Inference-on-the-ATE" title="Link to this heading"></a></h2>
+<p>With Perpetual’s native DML estimator, we can compute valid statistical inference for the Average Treatment Effect (ATE). This provides theoretical standard errors and 95% confidence intervals.</p>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">inference</span> <span class="o">=</span> <span class="n">dml</span><span class="o">.</span><span class="n">ate_inference</span><span class="p">()</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;DML Statistical Inference on ATE:&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  ATE:        </span><span class="si">{</span><span class="n">inference</span><span class="p">[</span><span class="s1">&#39;ate&#39;</span><span class="p">]</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  Std Error:  </span><span class="si">{</span><span class="n">inference</span><span class="p">[</span><span class="s1">&#39;std_err&#39;</span><span class="p">]</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  95% CI:     [</span><span class="si">{</span><span class="n">inference</span><span class="p">[</span><span class="s1">&#39;ci_lower&#39;</span><span class="p">]</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2">, </span><span class="si">{</span><span class="n">inference</span><span class="p">[</span><span class="s1">&#39;ci_upper&#39;</span><span class="p">]</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2">]&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</section>
+<section id="7.-Feature-Importance">
+<h2>7. Feature Importance<a class="headerlink" href="#7.-Feature-Importance" title="Link to this heading"></a></h2>
 <p>Which features drive heterogeneity in the gender wage gap?</p>
 <div class="nbinput nblast docutils container">
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
@@ -267,8 +286,8 @@
 </div>
 </div>
 </section>
-<section id="7.-Compare-with-Naive-Estimate">
-<h2>7. Compare with Naive Estimate<a class="headerlink" href="#7.-Compare-with-Naive-Estimate" title="Link to this heading"></a></h2>
+<section id="8.-Compare-with-Naive-Estimate">
+<h2>8. Compare with Naive Estimate<a class="headerlink" href="#8.-Compare-with-Naive-Estimate" title="Link to this heading"></a></h2>
 <p>A naive comparison of means ignores confounders. DML accounts for differences in education, experience, sector, etc.</p>
 <div class="nbinput nblast docutils container">
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
@@ -284,8 +303,8 @@
 </div>
 </div>
 </section>
-<section id="8.-Subgroup-Analysis">
-<h2>8. Subgroup Analysis<a class="headerlink" href="#8.-Subgroup-Analysis" title="Link to this heading"></a></h2>
+<section id="9.-Subgroup-Analysis">
+<h2>9. Subgroup Analysis<a class="headerlink" href="#9.-Subgroup-Analysis" title="Link to this heading"></a></h2>
 <p>Examine how the treatment effect varies across subgroups.</p>
 <div class="nbinput nblast docutils container">
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:

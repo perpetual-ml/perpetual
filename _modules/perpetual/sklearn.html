@@ -5,7 +5,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>perpetual.sklearn &mdash; Perpetual 1.9.4 documentation</title>
+  <title>perpetual.sklearn &mdash; Perpetual 2.0.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../../_static/custom.css?v=9cdd1368" />
@@ -13,7 +13,7 @@
   
       <script src="../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../_static/documentation_options.js?v=38ba398c"></script>
+      <script src="../../_static/documentation_options.js?v=51b770b3"></script>
       <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
@@ -128,6 +128,7 @@
         <span class="n">max_bin</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">256</span><span class="p">,</span>
         <span class="n">max_cat</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1000</span><span class="p">,</span>
         <span class="n">save_node_stats</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+        <span class="n">seed</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span>
         <span class="c1"># Capture all parameters in a way that BaseEstimator can handle</span>
         <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
     <span class="p">):</span>
@@ -177,8 +178,15 @@
 <span class="sd">        feature_importance_method : str, default=&quot;Gain&quot;</span>
 <span class="sd">            Method for calculating feature importance. Options: &quot;Gain&quot;, &quot;Weight&quot;, &quot;Cover&quot;,</span>
 <span class="sd">            &quot;TotalGain&quot;, &quot;TotalCover&quot;.</span>
-<span class="sd">        quantile : float, optional</span>
-<span class="sd">            Target quantile for quantile regression (objective=&quot;QuantileLoss&quot;).</span>
+<span class="sd">        **kwargs</span>
+<span class="sd">            Objective-specific parameters passed to the booster core:</span>
+
+<span class="sd">            - **quantile** (float): The target quantile for ``&quot;QuantileLoss&quot;`` and</span>
+<span class="sd">              ``&quot;AdaptiveHuberLoss&quot;``. Must be between 0 and 1. Default is 0.5.</span>
+<span class="sd">            - **delta** (float): The threshold parameter for ``&quot;HuberLoss&quot;``. Default is 1.0.</span>
+<span class="sd">            - **c** (float): The scale parameter for ``&quot;FairLoss&quot;``. Default is 1.0.</span>
+<span class="sd">            - **p** (float): The power parameter for ``&quot;TweedieLoss&quot;``. Must be between 1 and 2.</span>
+<span class="sd">              Default is 1.5.</span>
 <span class="sd">        reset : bool, optional</span>
 <span class="sd">            Whether to reset the model or continue training on subsequent calls to fit.</span>
 <span class="sd">        categorical_features : str or iterable, default=&quot;auto&quot;</span>
@@ -216,6 +224,7 @@
             <span class="n">max_bin</span><span class="o">=</span><span class="n">max_bin</span><span class="p">,</span>
             <span class="n">max_cat</span><span class="o">=</span><span class="n">max_cat</span><span class="p">,</span>
             <span class="n">save_node_stats</span><span class="o">=</span><span class="n">save_node_stats</span><span class="p">,</span>
+            <span class="n">seed</span><span class="o">=</span><span class="n">seed</span><span class="p">,</span>
             <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>  <span class="c1"># Catch-all for any other parameters passed by user or set_params</span>
         <span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_is_fitted</span> <span class="o">=</span> <span class="kc">False</span></div>
@@ -310,6 +319,7 @@
         <span class="n">max_bin</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">256</span><span class="p">,</span>
         <span class="n">max_cat</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1000</span><span class="p">,</span>
         <span class="n">save_node_stats</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+        <span class="n">seed</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span>
         <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
     <span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
@@ -361,8 +371,15 @@
 <span class="sd">        feature_importance_method : str, default=&quot;Gain&quot;</span>
 <span class="sd">            Method for calculating feature importance. Options: &quot;Gain&quot;, &quot;Weight&quot;, &quot;Cover&quot;,</span>
 <span class="sd">            &quot;TotalGain&quot;, &quot;TotalCover&quot;.</span>
-<span class="sd">        quantile : float, optional</span>
-<span class="sd">            Target quantile for quantile regression (objective=&quot;QuantileLoss&quot;).</span>
+<span class="sd">        **kwargs</span>
+<span class="sd">            Objective-specific parameters passed to the booster core:</span>
+
+<span class="sd">            - **quantile** (float): The target quantile for ``&quot;QuantileLoss&quot;`` and</span>
+<span class="sd">              ``&quot;AdaptiveHuberLoss&quot;``. Must be between 0 and 1. Default is 0.5.</span>
+<span class="sd">            - **delta** (float): The threshold parameter for ``&quot;HuberLoss&quot;``. Default is 1.0.</span>
+<span class="sd">            - **c** (float): The scale parameter for ``&quot;FairLoss&quot;``. Default is 1.0.</span>
+<span class="sd">            - **p** (float): The power parameter for ``&quot;TweedieLoss&quot;``. Must be between 1 and 2.</span>
+<span class="sd">              Default is 1.5.</span>
 <span class="sd">        reset : bool, optional</span>
 <span class="sd">            Whether to reset the model or continue training on subsequent calls to fit.</span>
 <span class="sd">        categorical_features : str or iterable, default=&quot;auto&quot;</span>
@@ -405,6 +422,7 @@
             <span class="n">max_bin</span><span class="o">=</span><span class="n">max_bin</span><span class="p">,</span>
             <span class="n">max_cat</span><span class="o">=</span><span class="n">max_cat</span><span class="p">,</span>
             <span class="n">save_node_stats</span><span class="o">=</span><span class="n">save_node_stats</span><span class="p">,</span>
+            <span class="n">seed</span><span class="o">=</span><span class="n">seed</span><span class="p">,</span>
             <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
         <span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_is_fitted</span> <span class="o">=</span> <span class="kc">False</span></div>
@@ -500,6 +518,8 @@
         <span class="c1"># ... other parameters ...</span>
         <span class="n">max_bin</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">256</span><span class="p">,</span>
         <span class="n">max_cat</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1000</span><span class="p">,</span>
+        <span class="n">save_node_stats</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+        <span class="n">seed</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span>
         <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
     <span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
@@ -548,8 +568,15 @@
 <span class="sd">        feature_importance_method : str, default=&quot;Gain&quot;</span>
 <span class="sd">            Method for calculating feature importance. Options: &quot;Gain&quot;, &quot;Weight&quot;, &quot;Cover&quot;,</span>
 <span class="sd">            &quot;TotalGain&quot;, &quot;TotalCover&quot;.</span>
-<span class="sd">        quantile : float, optional</span>
-<span class="sd">            Target quantile for quantile regression (objective=&quot;QuantileLoss&quot;).</span>
+<span class="sd">        **kwargs</span>
+<span class="sd">            Objective-specific parameters passed to the booster core:</span>
+
+<span class="sd">            - **quantile** (float): The target quantile for ``&quot;QuantileLoss&quot;`` and</span>
+<span class="sd">              ``&quot;AdaptiveHuberLoss&quot;``. Must be between 0 and 1. Default is 0.5.</span>
+<span class="sd">            - **delta** (float): The threshold parameter for ``&quot;HuberLoss&quot;``. Default is 1.0.</span>
+<span class="sd">            - **c** (float): The scale parameter for ``&quot;FairLoss&quot;``. Default is 1.0.</span>
+<span class="sd">            - **p** (float): The power parameter for ``&quot;TweedieLoss&quot;``. Must be between 1 and 2.</span>
+<span class="sd">              Default is 1.5.</span>
 <span class="sd">        reset : bool, optional</span>
 <span class="sd">            Whether to reset the model or continue training on subsequent calls to fit.</span>
 <span class="sd">        categorical_features : str or iterable, default=&quot;auto&quot;</span>
@@ -568,6 +595,10 @@
 <span class="sd">            Maximum unique categories before a feature is treated as numerical.</span>
 <span class="sd">        interaction_constraints : list of list of int, optional</span>
 <span class="sd">            Interaction constraints.</span>
+<span class="sd">        save_node_stats : bool, default=False</span>
+<span class="sd">            Whether to save node statistics (required for calibration).</span>
+<span class="sd">        seed : int, default=0</span>
+<span class="sd">            Random seed for reproducibility.</span>
 <span class="sd">        **kwargs</span>
 <span class="sd">            Arbitrary keyword arguments to be passed to the base class.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
@@ -584,6 +615,8 @@
             <span class="c1"># ... pass all other parameters ...</span>
             <span class="n">max_bin</span><span class="o">=</span><span class="n">max_bin</span><span class="p">,</span>
             <span class="n">max_cat</span><span class="o">=</span><span class="n">max_cat</span><span class="p">,</span>
+            <span class="n">save_node_stats</span><span class="o">=</span><span class="n">save_node_stats</span><span class="p">,</span>
+            <span class="n">seed</span><span class="o">=</span><span class="n">seed</span><span class="p">,</span>
             <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
         <span class="p">)</span></div>
 

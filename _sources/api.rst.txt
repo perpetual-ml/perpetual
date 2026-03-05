@@ -30,7 +30,7 @@ Sklearn Interface
 Causal ML
 ---------
 
-.. autoclass:: perpetual.iv.BraidedBooster
+.. autoclass:: perpetual.iv.IVBooster
    :members:
    :show-inheritance:
 

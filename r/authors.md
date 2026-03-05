@@ -11,12 +11,12 @@
 ## Citation
 
 Simsek M, Korkmaz S, Pel P (2026). *perpetual: PerpetualBooster*. R
-package version 1.9.4, <https://perpetual-ml.github.io/perpetual/r/>.
+package version 2.0.0, <https://perpetual-ml.github.io/perpetual/r/>.
 
     @Manual{,
       title = {perpetual: PerpetualBooster},
       author = {Mutlu Simsek and Serkan Korkmaz and Pieter Pel},
       year = {2026},
-      note = {R package version 1.9.4},
+      note = {R package version 2.0.0},
       url = {https://perpetual-ml.github.io/perpetual/r/},
     }

@@ -6,7 +6,7 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Instrumental Variables (Boosted IV) &mdash; Perpetual 1.9.4 documentation</title>
+  <title>Instrumental Variables (Boosted IV) &mdash; Perpetual 2.0.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../../_static/nbsphinx-code-cells.css?v=2aa19091" />
@@ -15,7 +15,7 @@
   
       <script src="../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../_static/documentation_options.js?v=38ba398c"></script>
+      <script src="../../_static/documentation_options.js?v=51b770b3"></script>
       <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
@@ -69,7 +69,7 @@
 <li class="toctree-l2 current"><a class="current reference internal" href="#">Instrumental Variables (Boosted IV)</a><ul>
 <li class="toctree-l3"><a class="reference internal" href="#1.-Load-the-Dataset">1. Load the Dataset</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#2.-Naive-Model-vs.-IV-Model">2. Naive Model vs. IV Model</a></li>
-<li class="toctree-l3"><a class="reference internal" href="#3.-BraidedBooster-(IV)">3. BraidedBooster (IV)</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#3.-IVBooster-(IV)">3. IVBooster (IV)</a><ul>
 <li class="toctree-l4"><a class="reference internal" href="#3.1-Advanced:-Interaction-Constraints">3.1 Advanced: Interaction Constraints</a></li>
 <li class="toctree-l4"><a class="reference internal" href="#Interpretation">Interpretation</a></li>
 </ul>
@@ -84,6 +84,7 @@
 <li class="toctree-l2"><a class="reference internal" href="fair_classification.html">Fairness-Aware Classification with FairClassifier</a></li>
 <li class="toctree-l2"><a class="reference internal" href="customer_retention_uplift.html">Customer Retention: Uplift Modeling for Churn Prevention</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../drift_tutorial.html">Advanced Drift Detection in Perpetual</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../objectives_tutorial.html">PerpetualBooster Objectives Tutorial</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="../../architecture.html">Architecture</a></li>
@@ -120,14 +121,14 @@
 <h1>Instrumental Variables (Boosted IV)<a class="headerlink" href="#Instrumental-Variables-(Boosted-IV)" title="Link to this heading"></a></h1>
 <p>In this tutorial, we will use the <strong>Wine Quality</strong> dataset to estimate the causal effect of alcohol content on wine quality. The problem is that factors like “grape quality” are unobserved and affect both alcohol levels and wine quality (confounding). We will treat “sulphates” as an <strong>instrument</strong> (<span class="math notranslate nohighlight">\(Z\)</span>), assuming it affects alcohol content but has no direct effect on quality other than through alcohol, purely for demonstration purposes.</p>
 <p>In this tutorial, we will use the <strong>Card (1995)</strong> dataset to estimate the causal effect of education on earnings. The problem is that factors like “ability” are unobserved and affect both education levels and earnings (confounding). Card proposed using “proximity to college” as an <strong>instrument</strong> (<span class="math notranslate nohighlight">\(Z\)</span>), assuming it affects education but has no direct effect on earnings.</p>
-<p>Perpetual’s <code class="docutils literal notranslate"><span class="pre">BraidedBooster</span></code> implements a boosted <strong>Control Function</strong> approach, which avoids the biased “Forbidden Regression” often found in naive boosted IV implementations.</p>
+<p>Perpetual’s <code class="docutils literal notranslate"><span class="pre">IVBooster</span></code> implements a boosted <strong>Control Function</strong> approach, which avoids the biased “Forbidden Regression” often found in naive boosted IV implementations.</p>
 <div class="nbinput nblast docutils container">
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">perpetual</span><span class="w"> </span><span class="kn">import</span> <span class="n">PerpetualBooster</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">perpetual.iv</span><span class="w"> </span><span class="kn">import</span> <span class="n">BraidedBooster</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">perpetual.iv</span><span class="w"> </span><span class="kn">import</span> <span class="n">IVBooster</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">sklearn.datasets</span><span class="w"> </span><span class="kn">import</span> <span class="n">fetch_openml</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">sklearn.model_selection</span><span class="w"> </span><span class="kn">import</span> <span class="n">train_test_split</span>
 </pre></div>
@@ -207,15 +208,15 @@
 </div>
 </div>
 </section>
-<section id="3.-BraidedBooster-(IV)">
-<h2>3. BraidedBooster (IV)<a class="headerlink" href="#3.-BraidedBooster-(IV)" title="Link to this heading"></a></h2>
-<p>The <code class="docutils literal notranslate"><span class="pre">BraidedBooster</span></code> uses the instrument to find the variation in education that is uncorrelated with the unobserved confounders.</p>
+<section id="3.-IVBooster-(IV)">
+<h2>3. IVBooster (IV)<a class="headerlink" href="#3.-IVBooster-(IV)" title="Link to this heading"></a></h2>
+<p>The <code class="docutils literal notranslate"><span class="pre">IVBooster</span></code> uses the instrument to find the variation in education that is uncorrelated with the unobserved confounders.</p>
 <div class="nbinput nblast docutils container">
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># Initialize and fit IV model</span>
-<span class="n">iv_model</span> <span class="o">=</span> <span class="n">BraidedBooster</span><span class="p">(</span><span class="n">stage1_budget</span><span class="o">=</span><span class="mf">0.1</span><span class="p">,</span> <span class="n">stage2_budget</span><span class="o">=</span><span class="mf">0.1</span><span class="p">)</span>
+<span class="n">iv_model</span> <span class="o">=</span> <span class="n">IVBooster</span><span class="p">(</span><span class="n">stage1_budget</span><span class="o">=</span><span class="mf">0.1</span><span class="p">,</span> <span class="n">stage2_budget</span><span class="o">=</span><span class="mf">0.1</span><span class="p">)</span>
 
 <span class="c1"># X: covariates, Z: instruments, y: outcome, w: treatment</span>
 <span class="c1"># Z can be a matrix if you have multiple instruments</span>
@@ -236,14 +237,14 @@
 </div>
 <section id="3.1-Advanced:-Interaction-Constraints">
 <h3>3.1 Advanced: Interaction Constraints<a class="headerlink" href="#3.1-Advanced:-Interaction-Constraints" title="Link to this heading"></a></h3>
-<p>Just like the base booster, <code class="docutils literal notranslate"><span class="pre">BraidedBooster</span></code> supports interaction constraints. This can be crucial in IV models to prevent the stage 2 model from leveraging spurious interactions between covariates and the predicted treatment.</p>
+<p>Just like the base booster, <code class="docutils literal notranslate"><span class="pre">IVBooster</span></code> supports interaction constraints. This can be crucial in IV models to prevent the stage 2 model from leveraging spurious interactions between covariates and the predicted treatment.</p>
 <div class="nbinput nblast docutils container">
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># Example: Allow only &#39;exper&#39; (0) and &#39;black&#39; (2) to interact</span>
 <span class="n">interaction_constraints</span> <span class="o">=</span> <span class="p">[[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">2</span><span class="p">]]</span>
-<span class="n">iv_constrained</span> <span class="o">=</span> <span class="n">BraidedBooster</span><span class="p">(</span>
+<span class="n">iv_constrained</span> <span class="o">=</span> <span class="n">IVBooster</span><span class="p">(</span>
     <span class="n">stage1_budget</span><span class="o">=</span><span class="mf">0.1</span><span class="p">,</span>
     <span class="n">stage2_budget</span><span class="o">=</span><span class="mf">0.1</span><span class="p">,</span>
     <span class="n">interaction_constraints</span><span class="o">=</span><span class="n">interaction_constraints</span><span class="p">,</span>

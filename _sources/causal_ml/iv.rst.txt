@@ -9,7 +9,7 @@ Unobserved confounding violates the consistency of standard estimators (like Ord
 Boosted Instrumental Variables
 ------------------------------
 
-The :class:`iv.BraidedBooster` implements a **Control Function** approach using Gradient Boosting. This method avoids the biased "Forbidden Regression" by explicitly modeling the first-stage residuals to account for endogeneity.
+The :class:`iv.IVBooster` implements a **Control Function** approach using Gradient Boosting. This method avoids the biased "Forbidden Regression" by explicitly modeling the first-stage residuals to account for endogeneity.
 
 1. **Stage 1 (Treatment Model)**: Model the treatment :math:`W` as a function of covariates :math:`X` and instruments :math:`Z`: :math:`\hat{W} = f(X, Z)`. Then compute residuals :math:`V = W - \hat{W}`.
 2. **Stage 2 (Outcome Model)**: Model the outcome :math:`Y` as a function of covariates :math:`X`, predicted treatment :math:`\hat{W}`, and the residuals :math:`V`: :math:`\hat{Y} = g(X, \hat{W}, V)`.
@@ -18,10 +18,10 @@ Example:
 
 .. code-block:: python
 
-   from perpetual.iv import BraidedBooster
+   from perpetual.iv import IVBooster
 
    # X: covariates, Z: instruments, y: outcome, w: treatment
-   model = BraidedBooster(
+   model = IVBooster(
        treatment_objective="SquaredLoss", 
        outcome_objective="SquaredLoss",
        stage1_budget=0.5,

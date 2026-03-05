@@ -21,3 +21,4 @@ Tutorials
    causal/fair_classification.ipynb
    causal/customer_retention_uplift.ipynb
    drift_tutorial.ipynb
+   objectives_tutorial.ipynb

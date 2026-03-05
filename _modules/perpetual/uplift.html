@@ -5,7 +5,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>perpetual.uplift &mdash; Perpetual 1.9.4 documentation</title>
+  <title>perpetual.uplift &mdash; Perpetual 2.0.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../../_static/custom.css?v=9cdd1368" />
@@ -13,7 +13,7 @@
   
       <script src="../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../_static/documentation_options.js?v=38ba398c"></script>
+      <script src="../../_static/documentation_options.js?v=51b770b3"></script>
       <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
@@ -125,7 +125,6 @@
         <span class="n">terminate_missing_features</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Iterable</span><span class="p">[</span><span class="n">Any</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">missing_node_treatment</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;None&quot;</span><span class="p">,</span>
         <span class="n">log_iterations</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span>
-        <span class="n">quantile</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">reset</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">bool</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">categorical_features</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">Iterable</span><span class="p">[</span><span class="nb">int</span><span class="p">],</span> <span class="n">Iterable</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span> <span class="nb">str</span><span class="p">,</span> <span class="kc">None</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;auto&quot;</span><span class="p">,</span>
         <span class="n">timeout</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -135,6 +134,8 @@
         <span class="n">max_bin</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">256</span><span class="p">,</span>
         <span class="n">max_cat</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1000</span><span class="p">,</span>
         <span class="n">interaction_constraints</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">list</span><span class="p">[</span><span class="nb">list</span><span class="p">[</span><span class="nb">int</span><span class="p">]]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">seed</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span>
+        <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
     <span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Uplift Boosting Machine (R-Learner).</span>
@@ -172,8 +173,15 @@
 <span class="sd">            ``&quot;AssignToParent&quot;``, ``&quot;AverageLeafWeight&quot;``, ``&quot;AverageNodeWeight&quot;``.</span>
 <span class="sd">        log_iterations : int, default=0</span>
 <span class="sd">            Logging frequency (every N iterations). 0 disables logging.</span>
-<span class="sd">        quantile : float, optional</span>
-<span class="sd">            Target quantile when using ``&quot;QuantileLoss&quot;``.</span>
+<span class="sd">        **kwargs</span>
+<span class="sd">            Objective-specific parameters passed to the booster core:</span>
+
+<span class="sd">            - **quantile** (float): The target quantile for ``&quot;QuantileLoss&quot;`` and</span>
+<span class="sd">              ``&quot;AdaptiveHuberLoss&quot;``. Must be between 0 and 1. Default is 0.5.</span>
+<span class="sd">            - **delta** (float): The threshold parameter for ``&quot;HuberLoss&quot;``. Default is 1.0.</span>
+<span class="sd">            - **c** (float): The scale parameter for ``&quot;FairLoss&quot;``. Default is 1.0.</span>
+<span class="sd">            - **p** (float): The power parameter for ``&quot;TweedieLoss&quot;``. Must be between 1 and 2.</span>
+<span class="sd">              Default is 1.5.</span>
 <span class="sd">        reset : bool, optional</span>
 <span class="sd">            Whether to reset the model or continue training on subsequent fits.</span>
 <span class="sd">        categorical_features : iterable or str, default=&quot;auto&quot;</span>
@@ -205,7 +213,6 @@
         <span class="bp">self</span><span class="o">.</span><span class="n">terminate_missing_features</span> <span class="o">=</span> <span class="n">terminate_missing_features</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">missing_node_treatment</span> <span class="o">=</span> <span class="n">missing_node_treatment</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">log_iterations</span> <span class="o">=</span> <span class="n">log_iterations</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">quantile</span> <span class="o">=</span> <span class="n">quantile</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">reset</span> <span class="o">=</span> <span class="n">reset</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">categorical_features</span> <span class="o">=</span> <span class="n">categorical_features</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">timeout</span> <span class="o">=</span> <span class="n">timeout</span>
@@ -215,6 +222,7 @@
         <span class="bp">self</span><span class="o">.</span><span class="n">max_bin</span> <span class="o">=</span> <span class="n">max_bin</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">max_cat</span> <span class="o">=</span> <span class="n">max_cat</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">interaction_constraints</span> <span class="o">=</span> <span class="n">interaction_constraints</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">seed</span> <span class="o">=</span> <span class="n">seed</span>
 
         <span class="bp">self</span><span class="o">.</span><span class="n">booster</span> <span class="o">=</span> <span class="n">CrateUpliftBooster</span><span class="p">(</span>
             <span class="n">outcome_budget</span><span class="o">=</span><span class="n">outcome_budget</span><span class="p">,</span>
@@ -231,7 +239,7 @@
             <span class="n">terminate_missing_features</span><span class="o">=</span><span class="nb">set</span><span class="p">(),</span>
             <span class="n">missing_node_treatment</span><span class="o">=</span><span class="n">missing_node_treatment</span><span class="p">,</span>
             <span class="n">log_iterations</span><span class="o">=</span><span class="n">log_iterations</span><span class="p">,</span>
-            <span class="n">quantile</span><span class="o">=</span><span class="n">quantile</span><span class="p">,</span>
+            <span class="n">seed</span><span class="o">=</span><span class="n">seed</span><span class="p">,</span>
             <span class="n">reset</span><span class="o">=</span><span class="n">reset</span><span class="p">,</span>
             <span class="n">categorical_features</span><span class="o">=</span><span class="nb">set</span><span class="p">(),</span>
             <span class="n">timeout</span><span class="o">=</span><span class="n">timeout</span><span class="p">,</span>

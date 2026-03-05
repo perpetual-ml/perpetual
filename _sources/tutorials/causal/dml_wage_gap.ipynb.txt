@@ -193,7 +193,32 @@
    "id": "12",
    "metadata": {},
    "source": [
-    "## 6. Feature Importance\n",
+    "## 6. Statistical Inference on the ATE\n",
+    "\n",
+    "With Perpetual's native DML estimator, we can compute valid statistical inference for the Average Treatment Effect (ATE). This provides theoretical standard errors and 95% confidence intervals."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "13",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "inference = dml.ate_inference()\n",
+    "\n",
+    "print(\"DML Statistical Inference on ATE:\")\n",
+    "print(f\"  ATE:        {inference['ate']:.4f}\")\n",
+    "print(f\"  Std Error:  {inference['std_err']:.4f}\")\n",
+    "print(f\"  95% CI:     [{inference['ci_lower']:.4f}, {inference['ci_upper']:.4f}]\")"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "14",
+   "metadata": {},
+   "source": [
+    "## 7. Feature Importance\n",
     "\n",
     "Which features drive heterogeneity in the gender wage gap?"
    ]
@@ -201,7 +226,7 @@
   {
    "cell_type": "code",
    "execution_count": null,
-   "id": "13",
+   "id": "15",
    "metadata": {},
    "outputs": [],
    "source": [
@@ -216,10 +241,10 @@
   },
   {
    "cell_type": "markdown",
-   "id": "14",
+   "id": "16",
    "metadata": {},
    "source": [
-    "## 7. Compare with Naive Estimate\n",
+    "## 8. Compare with Naive Estimate\n",
     "\n",
     "A naive comparison of means ignores confounders. DML accounts for\n",
     "differences in education, experience, sector, etc."
@@ -228,7 +253,7 @@
   {
    "cell_type": "code",
    "execution_count": null,
-   "id": "15",
+   "id": "17",
    "metadata": {},
    "outputs": [],
    "source": [
@@ -242,10 +267,10 @@
   },
   {
    "cell_type": "markdown",
-   "id": "16",
+   "id": "18",
    "metadata": {},
    "source": [
-    "## 8. Subgroup Analysis\n",
+    "## 9. Subgroup Analysis\n",
     "\n",
     "Examine how the treatment effect varies across subgroups."
    ]
@@ -253,7 +278,7 @@
   {
    "cell_type": "code",
    "execution_count": null,
-   "id": "17",
+   "id": "19",
    "metadata": {},
    "outputs": [],
    "source": [
@@ -271,7 +296,7 @@
   {
    "cell_type": "code",
    "execution_count": null,
-   "id": "18",
+   "id": "20",
    "metadata": {},
    "outputs": [],
    "source": [
@@ -291,7 +316,7 @@
   },
   {
    "cell_type": "markdown",
-   "id": "19",
+   "id": "21",
    "metadata": {},
    "source": [
     "## Comparison to Linear Regression and DML Advantages\n",
@@ -310,7 +335,7 @@
   },
   {
    "cell_type": "markdown",
-   "id": "20",
+   "id": "22",
    "metadata": {},
    "source": [
     "## Summary and References\n",

@@ -5,7 +5,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>perpetual.booster &mdash; Perpetual 1.9.4 documentation</title>
+  <title>perpetual.booster &mdash; Perpetual 2.0.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../../_static/custom.css?v=9cdd1368" />
@@ -13,7 +13,7 @@
   
       <script src="../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../_static/documentation_options.js?v=38ba398c"></script>
+      <script src="../../_static/documentation_options.js?v=51b770b3"></script>
       <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
@@ -114,6 +114,8 @@
     <span class="n">type_df</span><span class="p">,</span>
 <span class="p">)</span>
 
+<span class="n">MultiOutputBooster</span> <span class="o">=</span> <span class="n">CrateMultiOutputBooster</span>
+
 
 <span class="k">class</span><span class="w"> </span><span class="nc">CalibrationMethod</span><span class="p">(</span><span class="nb">str</span><span class="p">,</span> <span class="n">Enum</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Calibration methods for prediction intervals.&quot;&quot;&quot;</span>
@@ -169,7 +171,6 @@
         <span class="n">missing_node_treatment</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;None&quot;</span><span class="p">,</span>
         <span class="n">log_iterations</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span>
         <span class="n">feature_importance_method</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;Gain&quot;</span><span class="p">,</span>
-        <span class="n">quantile</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">reset</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">bool</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">categorical_features</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">Iterable</span><span class="p">[</span><span class="nb">int</span><span class="p">],</span> <span class="n">Iterable</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span> <span class="nb">str</span><span class="p">,</span> <span class="kc">None</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;auto&quot;</span><span class="p">,</span>
         <span class="n">timeout</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -180,6 +181,8 @@
         <span class="n">max_cat</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1000</span><span class="p">,</span>
         <span class="n">interaction_constraints</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="nb">int</span><span class="p">]]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">save_node_stats</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+        <span class="n">seed</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span>
+        <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
     <span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Gradient Boosting Machine with Perpetual Learning.</span>
@@ -248,8 +251,15 @@
 <span class="sd">        feature_importance_method : str, default=&quot;Gain&quot;</span>
 <span class="sd">            Method for calculating feature importance. Options: &quot;Gain&quot;, &quot;Weight&quot;, &quot;Cover&quot;,</span>
 <span class="sd">            &quot;TotalGain&quot;, &quot;TotalCover&quot;.</span>
-<span class="sd">        quantile : float, optional</span>
-<span class="sd">            Target quantile for quantile regression (objective=&quot;QuantileLoss&quot;).</span>
+<span class="sd">        **kwargs</span>
+<span class="sd">            Objective-specific parameters passed to the booster core:</span>
+
+<span class="sd">            - **quantile** (float): The target quantile for ``&quot;QuantileLoss&quot;`` and</span>
+<span class="sd">              ``&quot;AdaptiveHuberLoss&quot;``. Must be between 0 and 1. Default is 0.5.</span>
+<span class="sd">            - **delta** (float): The threshold parameter for ``&quot;HuberLoss&quot;``. Default is 1.0.</span>
+<span class="sd">            - **c** (float): The scale parameter for ``&quot;FairLoss&quot;``. Default is 1.0.</span>
+<span class="sd">            - **p** (float): The power parameter for ``&quot;TweedieLoss&quot;``. Must be between 1 and 2.</span>
+<span class="sd">              Default is 1.5.</span>
 <span class="sd">        reset : bool, optional</span>
 <span class="sd">            Whether to reset the model or continue training on subsequent calls to fit.</span>
 <span class="sd">        categorical_features : str or iterable, default=&quot;auto&quot;</span>
@@ -330,7 +340,6 @@
         <span class="bp">self</span><span class="o">.</span><span class="n">missing_node_treatment</span> <span class="o">=</span> <span class="n">missing_node_treatment</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">log_iterations</span> <span class="o">=</span> <span class="n">log_iterations</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">feature_importance_method</span> <span class="o">=</span> <span class="n">feature_importance_method</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">quantile</span> <span class="o">=</span> <span class="n">quantile</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">reset</span> <span class="o">=</span> <span class="n">reset</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">categorical_features</span> <span class="o">=</span> <span class="n">categorical_features</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">timeout</span> <span class="o">=</span> <span class="n">timeout</span>
@@ -341,6 +350,23 @@
         <span class="bp">self</span><span class="o">.</span><span class="n">max_cat</span> <span class="o">=</span> <span class="n">max_cat</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">interaction_constraints</span> <span class="o">=</span> <span class="n">interaction_constraints</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">save_node_stats</span> <span class="o">=</span> <span class="n">save_node_stats</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">seed</span> <span class="o">=</span> <span class="n">seed</span>
+        <span class="n">OBJECTIVE_PARAMS</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s2">&quot;QuantileLoss&quot;</span><span class="p">:</span> <span class="s2">&quot;quantile&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;AdaptiveHuberLoss&quot;</span><span class="p">:</span> <span class="s2">&quot;quantile&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;HuberLoss&quot;</span><span class="p">:</span> <span class="s2">&quot;delta&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;FairLoss&quot;</span><span class="p">:</span> <span class="s2">&quot;c&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;TweedieLoss&quot;</span><span class="p">:</span> <span class="s2">&quot;p&quot;</span><span class="p">,</span>
+        <span class="p">}</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">objective_parameter</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">&quot;objective_parameter&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">objective</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">objective</span> <span class="ow">in</span> <span class="n">OBJECTIVE_PARAMS</span><span class="p">:</span>
+            <span class="n">param_name</span> <span class="o">=</span> <span class="n">OBJECTIVE_PARAMS</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">objective</span><span class="p">]</span>
+            <span class="k">if</span> <span class="n">param_name</span> <span class="ow">in</span> <span class="n">kwargs</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">objective_parameter</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="n">param_name</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">kwargs</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Unknown keyword arguments: </span><span class="si">{</span><span class="n">kwargs</span><span class="o">.</span><span class="n">keys</span><span class="p">()</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 
         <span class="bp">self</span><span class="o">.</span><span class="n">feature_names_in_</span> <span class="o">=</span> <span class="kc">None</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">n_features_</span> <span class="o">=</span> <span class="mi">0</span>
@@ -364,7 +390,8 @@
             <span class="n">terminate_missing_features</span><span class="o">=</span><span class="nb">set</span><span class="p">(),</span>
             <span class="n">missing_node_treatment</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">missing_node_treatment</span><span class="p">,</span>
             <span class="n">log_iterations</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">log_iterations</span><span class="p">,</span>
-            <span class="n">quantile</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">quantile</span><span class="p">,</span>
+            <span class="n">seed</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">seed</span><span class="p">,</span>
+            <span class="n">objective_parameter</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">objective_parameter</span><span class="p">,</span>
             <span class="n">reset</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">reset</span><span class="p">,</span>
             <span class="n">categorical_features</span><span class="o">=</span><span class="nb">set</span><span class="p">(),</span>
             <span class="n">timeout</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">timeout</span><span class="p">,</span>
@@ -491,7 +518,7 @@
                 <span class="n">terminate_missing_features</span><span class="o">=</span><span class="n">crate_tmf</span><span class="p">,</span>
                 <span class="n">missing_node_treatment</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">missing_node_treatment</span><span class="p">,</span>
                 <span class="n">log_iterations</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">log_iterations</span><span class="p">,</span>
-                <span class="n">quantile</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">quantile</span><span class="p">,</span>
+                <span class="n">objective_parameter</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">objective_parameter</span><span class="p">,</span>
                 <span class="n">reset</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">reset</span><span class="p">,</span>
                 <span class="n">categorical_features</span><span class="o">=</span><span class="n">categorical_features_</span><span class="p">,</span>
                 <span class="n">timeout</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">timeout</span><span class="p">,</span>
@@ -525,7 +552,7 @@
                 <span class="n">terminate_missing_features</span><span class="o">=</span><span class="n">crate_tmf</span><span class="p">,</span>
                 <span class="n">missing_node_treatment</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">missing_node_treatment</span><span class="p">,</span>
                 <span class="n">log_iterations</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">log_iterations</span><span class="p">,</span>
-                <span class="n">quantile</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">quantile</span><span class="p">,</span>
+                <span class="n">objective_parameter</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">objective_parameter</span><span class="p">,</span>
                 <span class="n">reset</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">reset</span><span class="p">,</span>
                 <span class="n">categorical_features</span><span class="o">=</span><span class="n">categorical_features_</span><span class="p">,</span>
                 <span class="n">timeout</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">timeout</span><span class="p">,</span>
