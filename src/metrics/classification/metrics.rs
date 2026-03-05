@@ -163,13 +163,13 @@ mod tests {
         let w = vec![1.0, 1.0];
         let g: Vec<u64> = vec![0, 0];
 
-        assert_eq!(LogLossMetric::maximize(), false);
+        assert!(!LogLossMetric::maximize());
         assert!(LogLossMetric::calculate_metric(&y, &yhat, &w, &g, None::<f32>) > 0.0);
 
-        assert_eq!(BrierLossMetric::maximize(), false);
+        assert!(!BrierLossMetric::maximize());
         assert_eq!(BrierLossMetric::calculate_metric(&y, &yhat, &w, &g, None::<f32>), 0.25);
 
-        assert_eq!(AUCMetric::maximize(), true);
+        assert!(AUCMetric::maximize());
         assert_eq!(AUCMetric::calculate_metric(&y, &yhat, &w, &g, None::<f32>), 0.5);
     }
 }

@@ -5,7 +5,7 @@ Provides:
   - :class:`PerpetualClassifier`, :class:`PerpetualRegressor`, :class:`PerpetualRanker` — scikit-learn wrappers.
   - :class:`MultiOutputBooster` — multi-target booster (via internal import).
   - :class:`UpliftBooster` — R-Learner uplift estimator.
-  - :class:`BraidedBooster` — Instrumental Variable (BoostIV) estimator.
+  - :class:`IVBooster` — Instrumental Variable (BoostIV) estimator.
   - :class:`SLearner`, :class:`TLearner`, :class:`XLearner`, :class:`DRLearner` — meta-learner CATE estimators.
   - :class:`DMLEstimator` — Double Machine Learning (DML) estimator with cross-fitting.
   - :class:`FairClassifier` — fairness-aware classifier (Demographic Parity / Equalized Odds).
@@ -17,6 +17,8 @@ Provides:
 from __future__ import annotations
 
 from perpetual.booster import (
+    CalibrationMethod,
+    MultiOutputBooster,
     PerpetualBooster,
     compute_calibration_curve,
     expected_calibration_error,
@@ -29,7 +31,7 @@ from perpetual.causal_metrics import (
 )
 from perpetual.dml import DMLEstimator
 from perpetual.fairness import FairClassifier
-from perpetual.iv import BraidedBooster
+from perpetual.iv import IVBooster
 from perpetual.meta_learners import DRLearner, SLearner, TLearner, XLearner
 from perpetual.policy import PolicyLearner
 from perpetual.risk import PerpetualRiskEngine
@@ -38,13 +40,15 @@ from perpetual.uplift import UpliftBooster
 
 __all__ = [
     "PerpetualBooster",
+    "MultiOutputBooster",
+    "CalibrationMethod",
     "compute_calibration_curve",
     "expected_calibration_error",
     "PerpetualClassifier",
     "PerpetualRegressor",
     "PerpetualRanker",
     "UpliftBooster",
-    "BraidedBooster",
+    "IVBooster",
     "PerpetualRiskEngine",
     "SLearner",
     "TLearner",

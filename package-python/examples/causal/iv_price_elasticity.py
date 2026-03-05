@@ -1,5 +1,5 @@
 import numpy as np
-from perpetual.iv import BraidedBooster
+from perpetual.iv import IVBooster
 from sklearn.model_selection import train_test_split
 
 
@@ -31,8 +31,8 @@ if __name__ == "__main__":
         train_test_split(X, Z, y, w, test_size=0.2)
     )
 
-    print("Fitting BraidedBooster (BoostIV)...")
-    model = BraidedBooster(stage1_budget=0.1, stage2_budget=0.1)
+    print("Fitting IVBooster (BoostIV)...")
+    model = IVBooster(stage1_budget=0.1, stage2_budget=0.1)
     model.fit(X_train, Z_train, y_train, w_train)
 
     print("Estimating causal effect (Counterfactual Prediction)...")

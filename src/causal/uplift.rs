@@ -2,7 +2,7 @@
 //!
 //! Estimates the Conditional Average Treatment Effect (CATE) using the
 //! R-Learner meta-algorithm backed by gradient boosting.
-use crate::booster::config::{CalibrationMethod, MissingNodeTreatment};
+use crate::booster::config::MissingNodeTreatment;
 use crate::booster::core::PerpetualBooster;
 use crate::causal::objective::RLearnerObjective;
 use crate::constraints::ConstraintMap;
@@ -51,7 +51,6 @@ impl UpliftBooster {
     /// * `missing_node_treatment` - Strategy for handling missing value splits.
     /// * `log_iterations` - Logging frequency.
     /// * `seed` - Random seed.
-    /// * `quantile` - Target quantile for quantile regression.
     /// * `reset` - Whether to reset or continue training on fit.
     /// * `categorical_features` - Features to treat as categorical.
     /// * `timeout` - Hard limit for fitting time in seconds.
@@ -75,7 +74,6 @@ impl UpliftBooster {
         missing_node_treatment: MissingNodeTreatment,
         log_iterations: usize,
         seed: u64,
-        quantile: Option<f64>,
         reset: Option<bool>,
         categorical_features: Option<HashSet<usize>>,
         timeout: Option<f32>,
@@ -101,7 +99,6 @@ impl UpliftBooster {
                 missing_node_treatment,
                 log_iterations,
                 seed,
-                quantile,
                 reset,
                 categorical_features.clone(),
                 timeout,
@@ -109,7 +106,6 @@ impl UpliftBooster {
                 memory_limit,
                 stopping_rounds,
                 false,
-                CalibrationMethod::default(),
             )
         };
 

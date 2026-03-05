@@ -41,7 +41,6 @@ mod causal_tests {
             None,
             None,
             None,
-            None,
         )
         .unwrap();
 
@@ -85,7 +84,6 @@ mod causal_tests {
             crate::booster::config::MissingNodeTreatment::AssignToParent,
             0,
             42,
-            None,
             None,
             None,
             None,
@@ -136,7 +134,6 @@ mod causal_tests {
             crate::booster::config::MissingNodeTreatment::AssignToParent,
             0,
             42,
-            None,
             None,
             None,
             None,
@@ -246,7 +243,6 @@ mod causal_tests {
             None,
             None,
             None,
-            None,
         )
         .unwrap();
 
@@ -282,7 +278,6 @@ mod causal_tests {
             crate::booster::config::MissingNodeTreatment::AssignToParent,
             0,
             42,
-            None,
             None,
             None,
             None,
@@ -330,7 +325,6 @@ mod causal_tests {
             None,
             None,
             None,
-            None,
         )
         .unwrap();
 
@@ -366,7 +360,6 @@ mod causal_tests {
             crate::booster::config::MissingNodeTreatment::AssignToParent,
             0,
             42,
-            None,
             None,
             None,
             None,

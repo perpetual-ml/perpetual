@@ -2,96 +2,52 @@ r"""Double / Debiased Machine Learning (DML) estimator.
 
 Implements the Chernozhukov et al. (2018) partial-linear model for
 heterogeneous treatment effect estimation using cross-fitting and
-Perpetual's self-generalizing gradient boosting.
+Perpetual's self-generalizing gradient boosting natively in Rust.
 
 Partial-linear model
 --------------------
 
 .. math::
 
-    Y = \\theta(X) \\cdot W + g(X) + \\epsilon
+    Y = \theta(X) \cdot W + g(X) + \epsilon
 
-where :math:`\\theta(X)` is the heterogeneous treatment effect.
+where :math:`\theta(X)` is the heterogeneous treatment effect.
 
 The DML approach orthogonalizes both the treatment and outcome:
 
 .. math::
 
-    \\tilde{Y} = Y - \\hat{g}(X), \\quad \\tilde{W} = W - \\hat{m}(X)
+    \tilde{Y} = Y - \hat{g}(X), \quad \tilde{W} = W - \hat{m}(X)
 
 and the effect model minimizes the R-Learner / DML objective:
 
 .. math::
 
-    L = \\bigl(\\tilde{Y} - \\theta(X) \\cdot \\tilde{W}\\bigr)^2
+    L = \bigl(\tilde{Y} - \theta(X) \cdot \tilde{W}\bigr)^2
 """
 
-from typing import Optional
+from typing import Dict, Optional
 
 import numpy as np
 from typing_extensions import Self
 
-from perpetual.booster import PerpetualBooster
-
-# ---------------------------------------------------------------------------
-# Custom objective helpers  (mirror Rust DMLObjective)
-# ---------------------------------------------------------------------------
-
-_HESSIAN_FLOOR = 1e-6
-
-
-def _dml_loss(y_residual, w_residual):
-    """Return a loss callable for the DML objective."""
-
-    def loss(y, yhat, sample_weight, group):
-        diff = y_residual - yhat * w_residual
-        return (diff * diff).tolist()
-
-    return loss
-
-
-def _dml_gradient(y_residual, w_residual):
-    """Return a gradient callable for the DML objective."""
-
-    def gradient(y, yhat, sample_weight, group):
-        # g = -w_res * y_res + theta * w_res^2
-        grad = -w_residual * y_residual + yhat * w_residual * w_residual
-        hess = np.maximum(w_residual * w_residual, _HESSIAN_FLOOR)
-        return grad.tolist(), hess.tolist()
-
-    return gradient
-
-
-def _dml_initial_value(y_residual, w_residual):
-    """Return an initial-value callable for the DML objective."""
-
-    def initial_value(y, sample_weight, group):
-        num = float(np.sum(y_residual * w_residual))
-        den = float(np.sum(w_residual * w_residual))
-        if abs(den) < _HESSIAN_FLOOR:
-            return 0.0
-        return num / den
-
-    return initial_value
-
-
-# ---------------------------------------------------------------------------
-# DMLEstimator
-# ---------------------------------------------------------------------------
+from perpetual.meta_learners import _prepare_params
+from perpetual.perpetual import DMLEstimator as RustDMLEstimator
 
 
 class DMLEstimator:
     r"""Double Machine Learning (DML) estimator for heterogeneous treatment effects.
 
     Uses three gradient boosting stages with K-fold cross-fitting to learn
-    :math:`\\theta(X)` — the Conditional Average Treatment Effect (CATE).
+    :math:`\theta(X)` — the Conditional Average Treatment Effect (CATE).
+    Computation is fully native in Rust to eliminate crossover overhead.
 
     Stages
     ------
-    1. **Outcome nuisance** — fit :math:`g(X) \\approx E[Y|X]` via cross-fitting.
-    2. **Treatment nuisance** — fit :math:`m(X) \\approx E[W|X]` via cross-fitting.
-    3. **Effect model** — regress :math:`\\tilde{Y}` on :math:`X` using a
-       custom DML objective weighted by :math:`\\tilde{W}`.
+    1. **Outcome nuisance** — fit :math:`g(X) \approx E[Y|X]` via cross-fitting.
+    2. **Treatment nuisance** — fit :math:`m(X) \approx E[W|X]` via cross-fitting.
+    3. **Effect model** — regress :math:`\tilde{Y}` on :math:`X` using a
+       custom DML objective weighted by :math:`\tilde{W}`.
 
     Parameters
     ----------
@@ -120,6 +76,7 @@ class DMLEstimator:
     >>> dml = DMLEstimator(budget=0.3, n_folds=2)
     >>> dml.fit(X, w, y)  # doctest: +SKIP
     >>> cate = dml.predict(X)  # doctest: +SKIP
+    >>> inference = dml.ate_inference()  # doctest: +SKIP
 
     References
     ----------
@@ -140,11 +97,14 @@ class DMLEstimator:
         self.budget = budget
         self.n_folds = n_folds
         self.clip = clip
-        self._kwargs = kwargs
-        self.feature_importances_: Optional[np.ndarray] = None
+        self._params = _prepare_params(budget, kwargs)
+        self._params["n_folds"] = n_folds
+        self._params["clip"] = clip
+        self.learner = RustDMLEstimator(**self._params)
+        self._n_features: Optional[int] = None
 
     def fit(self, X, w, y) -> Self:
-        """Fit the DML estimator with cross-fitting.
+        """Fit the DML estimator natively with cross-fitting.
 
         Parameters
         ----------
@@ -160,57 +120,24 @@ class DMLEstimator:
         self
             Fitted estimator.
         """
-        X_arr = np.asarray(X, dtype=float)
-        w_arr = np.asarray(w, dtype=float)
-        y_arr = np.asarray(y, dtype=float)
-        n = X_arr.shape[0]
-
-        # ---- Cross-fitted residuals ----
-        y_residual = np.zeros(n)
-        w_residual = np.zeros(n)
-
-        indices = np.arange(n)
-        np.random.shuffle(indices)
-        folds = np.array_split(indices, self.n_folds)
-
-        for fold_idx in range(self.n_folds):
-            test_idx = folds[fold_idx]
-            train_idx = np.concatenate(
-                [folds[j] for j in range(self.n_folds) if j != fold_idx]
-            )
-
-            # Outcome nuisance g(X) = E[Y|X]
-            g_model = PerpetualBooster(
-                budget=self.budget, objective="SquaredLoss", **self._kwargs
-            )
-            g_model.fit(X_arr[train_idx], y_arr[train_idx])
-            y_residual[test_idx] = y_arr[test_idx] - g_model.predict(X_arr[test_idx])
-
-            # Treatment nuisance m(X) = E[W|X]
-            m_model = PerpetualBooster(
-                budget=self.budget, objective="SquaredLoss", **self._kwargs
-            )
-            m_model.fit(X_arr[train_idx], w_arr[train_idx])
-            w_residual[test_idx] = w_arr[test_idx] - m_model.predict(X_arr[test_idx])
-
-        # Clip treatment residuals for numerical stability.
-        w_residual = np.clip(w_residual, -1.0 / self.clip, 1.0 / self.clip)
-
-        # ---- Effect model with DML objective ----
-        objective = (
-            _dml_loss(y_residual, w_residual),
-            _dml_gradient(y_residual, w_residual),
-            _dml_initial_value(y_residual, w_residual),
+        x_arr = np.asarray(X, dtype=float, order="F")
+        self._n_features = x_arr.shape[1]
+        self.learner.fit(
+            x_arr.ravel(),
+            x_arr.shape[0],
+            x_arr.shape[1],
+            np.asarray(w, dtype=float),
+            np.asarray(y, dtype=float),
         )
-
-        self._effect_model = PerpetualBooster(
-            budget=self.budget, objective=objective, **self._kwargs
-        )
-        # The "y" passed to the booster is unused by the custom objective;
-        # pass y_residual as a placeholder.
-        self._effect_model.fit(X_arr, y_residual)
-        self.feature_importances_ = self._effect_model.feature_importances_
         return self
+
+    @property
+    def feature_importances_(self) -> np.ndarray:
+        """Feature importance of the final effect model."""
+        importances_map = self.learner.calculate_feature_importance("Gain", True)
+        if self._n_features is None:
+            return np.zeros(0)
+        return np.array([importances_map.get(i, 0.0) for i in range(self._n_features)])
 
     def predict(self, X) -> np.ndarray:
         """Predict CATE (heterogeneous treatment effect).
@@ -223,6 +150,22 @@ class DMLEstimator:
         Returns
         -------
         ndarray of shape (n_samples,)
-            Estimated :math:`\\theta(X)` for each sample.
+            Estimated :math:`\theta(X)` for each sample.
         """
-        return self._effect_model.predict(X)
+        x_arr = np.asarray(X, dtype=float, order="F")
+        return self.learner.predict(x_arr.ravel(), x_arr.shape[0], x_arr.shape[1])
+
+    def ate_inference(self) -> Dict[str, float]:
+        """Compute the Average Treatment Effect (ATE) and statistical inference.
+
+        Returns
+        -------
+        dict
+            Contains 'ate', 'std_err', 'ci_lower', and 'ci_upper'.
+        """
+        return {
+            "ate": self.learner.ate,
+            "std_err": self.learner.ate_se,
+            "ci_lower": self.learner.ate_ci_lower,
+            "ci_upper": self.learner.ate_ci_upper,
+        }

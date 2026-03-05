@@ -2,6 +2,7 @@
 use crate::utils::{int_map_to_constraint_map, to_value_error};
 use numpy::{IntoPyArray, PyArray1, PyReadonlyArray1};
 use perpetual_rs::booster::config::ImportanceMethod;
+use perpetual_rs::causal::dml::DMLEstimator as CrateDMLEstimator;
 use perpetual_rs::causal::metalearners::{
     DRLearner as CrateDRLearner, SLearner as CrateSLearner, TLearner as CrateTLearner, XLearner as CrateXLearner,
 };
@@ -32,7 +33,6 @@ impl SLearner {
         missing_node_treatment: &str,
         log_iterations: usize,
         seed: u64,
-        quantile: Option<f64>,
         reset: Option<bool>,
         categorical_features: Option<HashSet<usize>>,
         timeout: Option<f32>,
@@ -56,7 +56,6 @@ impl SLearner {
             mnt,
             log_iterations,
             seed,
-            quantile,
             reset,
             categorical_features,
             timeout,
@@ -125,7 +124,6 @@ impl TLearner {
         missing_node_treatment: &str,
         log_iterations: usize,
         seed: u64,
-        quantile: Option<f64>,
         reset: Option<bool>,
         categorical_features: Option<HashSet<usize>>,
         timeout: Option<f32>,
@@ -149,7 +147,6 @@ impl TLearner {
             mnt,
             log_iterations,
             seed,
-            quantile,
             reset,
             categorical_features,
             timeout,
@@ -237,7 +234,6 @@ impl XLearner {
         missing_node_treatment: &str,
         log_iterations: usize,
         seed: u64,
-        quantile: Option<f64>,
         reset: Option<bool>,
         categorical_features: Option<HashSet<usize>>,
         timeout: Option<f32>,
@@ -262,7 +258,6 @@ impl XLearner {
             mnt,
             log_iterations,
             seed,
-            quantile,
             reset,
             categorical_features,
             timeout,
@@ -351,7 +346,6 @@ impl DRLearner {
         missing_node_treatment: &str,
         log_iterations: usize,
         seed: u64,
-        quantile: Option<f64>,
         reset: Option<bool>,
         categorical_features: Option<HashSet<usize>>,
         timeout: Option<f32>,
@@ -376,7 +370,6 @@ impl DRLearner {
             mnt,
             log_iterations,
             seed,
-            quantile,
             reset,
             categorical_features,
             timeout,
@@ -419,5 +412,120 @@ impl DRLearner {
     pub fn calculate_feature_importance(&self, method: &str, normalize: bool) -> PyResult<HashMap<usize, f32>> {
         let method_: ImportanceMethod = to_value_error(serde_plain::from_str(method))?;
         Ok(self.inner.effect.calculate_feature_importance(method_, normalize))
+    }
+}
+
+#[pyclass]
+pub struct DMLEstimator {
+    pub inner: CrateDMLEstimator,
+}
+
+#[pymethods]
+impl DMLEstimator {
+    #[new]
+    #[allow(clippy::too_many_arguments)]
+    pub fn new(
+        budget: f32,
+        n_folds: usize,
+        clip: f64,
+        max_bin: u16,
+        num_threads: Option<usize>,
+        monotone_constraints: HashMap<usize, i8>,
+        interaction_constraints: Option<Vec<Vec<usize>>>,
+        force_children_to_bound_parent: bool,
+        missing: f64,
+        allow_missing_splits: bool,
+        create_missing_branch: bool,
+        terminate_missing_features: HashSet<usize>,
+        missing_node_treatment: &str,
+        log_iterations: usize,
+        seed: u64,
+        reset: Option<bool>,
+        categorical_features: Option<HashSet<usize>>,
+        timeout: Option<f32>,
+        iteration_limit: Option<usize>,
+        memory_limit: Option<f32>,
+        stopping_rounds: Option<usize>,
+    ) -> PyResult<Self> {
+        let mnt = to_value_error(serde_plain::from_str(missing_node_treatment))?;
+        let mc = int_map_to_constraint_map(monotone_constraints)?;
+        let inner = to_value_error(CrateDMLEstimator::new(
+            budget,
+            n_folds,
+            clip,
+            max_bin,
+            num_threads,
+            Some(mc),
+            interaction_constraints,
+            force_children_to_bound_parent,
+            missing,
+            allow_missing_splits,
+            create_missing_branch,
+            terminate_missing_features,
+            mnt,
+            log_iterations,
+            seed,
+            reset,
+            categorical_features,
+            timeout,
+            iteration_limit,
+            memory_limit,
+            stopping_rounds,
+        ))?;
+        Ok(Self { inner })
+    }
+
+    pub fn fit(
+        &mut self,
+        flat_x: PyReadonlyArray1<f64>,
+        x_rows: usize,
+        x_cols: usize,
+        w: PyReadonlyArray1<f64>,
+        y: PyReadonlyArray1<f64>,
+    ) -> PyResult<()> {
+        let flat_x_slice = flat_x.as_slice()?;
+        let x = Matrix::new(flat_x_slice, x_rows, x_cols);
+        let w_slice = w.as_slice()?;
+        let y_slice = y.as_slice()?;
+        to_value_error(self.inner.fit(&x, w_slice, y_slice))?;
+        Ok(())
+    }
+
+    pub fn predict<'py>(
+        &self,
+        py: Python<'py>,
+        flat_x: PyReadonlyArray1<f64>,
+        x_rows: usize,
+        x_cols: usize,
+    ) -> PyResult<Bound<'py, PyArray1<f64>>> {
+        let flat_x_slice = flat_x.as_slice()?;
+        let x = Matrix::new(flat_x_slice, x_rows, x_cols);
+        let preds = self.inner.predict(&x);
+        Ok(preds.into_pyarray(py))
+    }
+
+    pub fn calculate_feature_importance(&self, method: &str, normalize: bool) -> PyResult<HashMap<usize, f32>> {
+        let method_: ImportanceMethod = to_value_error(serde_plain::from_str(method))?;
+        Ok(self.inner.effect_model.calculate_feature_importance(method_, normalize))
+    }
+
+    #[getter]
+    pub fn get_ate(&self) -> PyResult<f64> {
+        Ok(self.inner.ate)
+    }
+
+    #[getter]
+    pub fn get_ate_se(&self) -> PyResult<f64> {
+        Ok(self.inner.ate_se)
+    }
+
+    #[getter]
+    pub fn get_ate_ci_lower(&self) -> PyResult<f64> {
+        Ok(self.inner.ate_ci_lower)
+    }
+
+    #[getter]
+    pub fn get_ate_ci_upper(&self) -> PyResult<f64> {
+        Ok(self.inner.ate_ci_upper)
     }
 }

@@ -500,7 +500,8 @@ mod tests {
     use std::error::Error;
     use std::fs;
 
-    fn make_fitted_booster() -> Result<(PerpetualBooster, Vec<f64>, Vec<f64>), Box<dyn Error>> {
+    type BoosterTestData = (PerpetualBooster, Vec<f64>, Vec<f64>);
+    fn make_fitted_booster() -> Result<BoosterTestData, Box<dyn Error>> {
         let file = fs::read_to_string("resources/contiguous_with_missing.csv")?;
         let data_vec: Vec<f64> = file.lines().map(|x| x.parse::<f64>().unwrap_or(f64::NAN)).collect();
         let file = fs::read_to_string("resources/performance.csv")?;
@@ -553,7 +554,7 @@ mod tests {
         // Verify intervals can be predicted
         let intervals = booster.predict_intervals_min_max(&data, false);
         assert!(!intervals.is_empty());
-        for (_alpha, sample_intervals) in &intervals {
+        for sample_intervals in intervals.values() {
             assert_eq!(sample_intervals.len(), y.len());
             for si in sample_intervals {
                 assert_eq!(si.len(), 2); // [lower, upper]
@@ -591,7 +592,7 @@ mod tests {
         assert!(!booster.cal_params.is_empty());
         let intervals = booster.predict_intervals_grp(&data, false);
         assert!(!intervals.is_empty());
-        for (_alpha, sample_intervals) in &intervals {
+        for sample_intervals in intervals.values() {
             assert_eq!(sample_intervals.len(), y.len());
             for si in sample_intervals {
                 assert_eq!(si.len(), 2);
@@ -628,7 +629,7 @@ mod tests {
         assert!(!booster.cal_params.is_empty());
         let intervals = booster.predict_intervals_weight_variance(&data, false);
         assert!(!intervals.is_empty());
-        for (_alpha, sample_intervals) in &intervals {
+        for sample_intervals in intervals.values() {
             assert_eq!(sample_intervals.len(), y.len());
             for si in sample_intervals {
                 assert_eq!(si.len(), 2);

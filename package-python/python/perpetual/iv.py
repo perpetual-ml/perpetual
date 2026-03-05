@@ -13,7 +13,7 @@ from perpetual.perpetual import IVBooster as CrateIVBooster
 from perpetual.utils import convert_input_array, convert_input_frame
 
 
-class BraidedBooster:
+class IVBooster:
     """Two-stage instrumental-variable estimator powered by gradient boosting.
 
     Stage 1 regresses the treatment on the instruments, and Stage 2 regresses
@@ -36,7 +36,6 @@ class BraidedBooster:
         terminate_missing_features: Optional[Iterable[Any]] = None,
         missing_node_treatment: str = "None",
         log_iterations: int = 0,
-        quantile: Optional[float] = None,
         reset: Optional[bool] = None,
         categorical_features: Union[Iterable[int], Iterable[str], str, None] = "auto",
         timeout: Optional[float] = None,
@@ -46,6 +45,8 @@ class BraidedBooster:
         max_bin: int = 256,
         max_cat: int = 1000,
         interaction_constraints: Optional[list[list[int]]] = None,
+        seed: int = 0,
+        **kwargs,
     ):
         """
         Boosted Instrumental Variable (BoostIV) Estimator.
@@ -82,8 +83,15 @@ class BraidedBooster:
             ``"AssignToParent"``, ``"AverageLeafWeight"``, ``"AverageNodeWeight"``.
         log_iterations : int, default=0
             Logging frequency (every N iterations). 0 disables logging.
-        quantile : float, optional
-            Target quantile when using ``"QuantileLoss"``.
+        **kwargs
+            Objective-specific parameters passed to the booster core:
+
+            - **quantile** (float): The target quantile for ``"QuantileLoss"`` and
+              ``"AdaptiveHuberLoss"``. Must be between 0 and 1. Default is 0.5.
+            - **delta** (float): The threshold parameter for ``"HuberLoss"``. Default is 1.0.
+            - **c** (float): The scale parameter for ``"FairLoss"``. Default is 1.0.
+            - **p** (float): The power parameter for ``"TweedieLoss"``. Must be between 1 and 2.
+              Default is 1.5.
         reset : bool, optional
             Whether to reset the model or continue training on subsequent fits.
         categorical_features : iterable or str, default="auto"
@@ -116,7 +124,6 @@ class BraidedBooster:
         self.terminate_missing_features = terminate_missing_features
         self.missing_node_treatment = missing_node_treatment
         self.log_iterations = log_iterations
-        self.quantile = quantile
         self.reset = reset
         self.categorical_features = categorical_features
         self.timeout = timeout
@@ -126,6 +133,7 @@ class BraidedBooster:
         self.max_bin = max_bin
         self.max_cat = max_cat
         self.interaction_constraints = interaction_constraints
+        self.seed = seed
 
         # Placeholder for standardized constraints and categorical features.
         # These are usually calculated in fit(), but we need to pass something to __init__
@@ -148,7 +156,7 @@ class BraidedBooster:
             terminate_missing_features=set(),
             missing_node_treatment=missing_node_treatment,
             log_iterations=log_iterations,
-            quantile=quantile,
+            seed=seed,
             reset=reset,
             categorical_features=set(),
             timeout=timeout,
@@ -221,7 +229,7 @@ class BraidedBooster:
         return self.booster.json_dump()
 
     @classmethod
-    def from_json(cls, json_str: str) -> "BraidedBooster":
+    def from_json(cls, json_str: str) -> "IVBooster":
         """Deserialize model from JSON string."""
         obj = cls.__new__(cls)
         obj.booster = CrateIVBooster.from_json(json_str)

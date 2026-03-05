@@ -143,7 +143,6 @@ impl PerpetualBooster {
     /// * `log_iterations` - Logging frequency.
     ///   * `0` disables logging. `100` checks/logs every 100 iterations.
     /// * `seed` - Random seed for reproducibility of column sampling and other stochastic processes.
-    /// * `quantile` - Required ONLY for `Objective::QuantileLoss`. Specifies the target quantile (e.g., `0.5` for median).
     /// * `reset` - If `true` (default), calling `fit` clears previous trees. If `false`, `fit` continues training from existing trees (warm start).
     /// * `categorical_features` - Optional set of feature indices to treat as categorical.
     ///   * The algorithm handles categorical features using specialized split finding.
@@ -176,7 +175,6 @@ impl PerpetualBooster {
         missing_node_treatment: MissingNodeTreatment,
         log_iterations: usize,
         seed: u64,
-        quantile: Option<f64>,
         reset: Option<bool>,
         categorical_features: Option<HashSet<usize>>,
         timeout: Option<f32>,
@@ -184,7 +182,6 @@ impl PerpetualBooster {
         memory_limit: Option<f32>,
         stopping_rounds: Option<usize>,
         save_node_stats: bool,
-        calibration_method: CalibrationMethod,
     ) -> Result<Self, PerpetualError> {
         let cfg = BoosterConfig {
             objective,
@@ -201,7 +198,6 @@ impl PerpetualBooster {
             missing_node_treatment,
             log_iterations,
             seed,
-            quantile,
             reset,
             categorical_features,
             timeout,
@@ -209,7 +205,7 @@ impl PerpetualBooster {
             memory_limit,
             stopping_rounds,
             save_node_stats,
-            calibration_method,
+            calibration_method: CalibrationMethod::default(),
         };
 
         let booster = PerpetualBooster {

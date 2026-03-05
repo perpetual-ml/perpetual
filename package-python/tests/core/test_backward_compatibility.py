@@ -7,9 +7,9 @@ from perpetual import PerpetualBooster
 from sklearn.model_selection import train_test_split
 
 
-def test_load_v0_10_0_model():
+def test_load_v2_0_0_model():
     resource_dir = Path(__file__).parent.parent.parent.parent / "resources"
-    model_path = resource_dir / "model_v0.10.0.json"
+    model_path = resource_dir / "model_v2.0.0.json"
 
     if not model_path.exists():
         pytest.fail(
@@ -63,8 +63,8 @@ def test_load_v0_10_0_model():
     # Check objective
     assert model.objective == "LogLoss"
 
-    # Compare with saved predictions from v0.10.0
-    preds_path = resource_dir / "model_v0.10.0_preds.csv"
+    # Compare with saved predictions from v2.0.0
+    preds_path = resource_dir / "model_v2.0.0_preds.csv"
     if preds_path.exists():
         expected_preds = (
             pd.read_csv(preds_path, header=None).squeeze("columns").to_numpy()
@@ -73,7 +73,7 @@ def test_load_v0_10_0_model():
             np.testing.assert_array_equal(np.rint(preds), np.rint(expected_preds))
 
             # Compare probabilities
-            probs_path = resource_dir / "model_v0.10.0_probs.csv"
+            probs_path = resource_dir / "model_v2.0.0_probs.csv"
             expected_probs = pd.read_csv(probs_path, header=None).to_numpy()
             preds_probs = model.predict_proba(data_test)
             np.testing.assert_allclose(preds_probs, expected_probs, rtol=1e-5)

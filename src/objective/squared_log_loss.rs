@@ -183,14 +183,14 @@ mod tests {
         // diff = yhat_log - y_log = -ln(2)
         // yhat_plus_1 = 1.0
         // g = diff / 1.0 = -ln(2) approx -0.693147
-        assert!((g[0] - (-0.6931472)).abs() < 1e-6);
+        assert!((g[0] as f64 - (-std::f64::consts::LN_2)).abs() < 1e-6);
         // h = (1 - diff) / 1.0 = 1 + ln(2) approx 1.693147
         assert!((h[0] - 1.6931472).abs() < 1e-6);
 
         // Weighted
         let w = vec![2.0, 0.5];
         let (gw, hw) = loss_fn.gradient(&y, &yhat, Some(&w), None);
-        assert!((gw[0] - (-0.6931472 * 2.0)).abs() < 1e-6);
+        assert!((gw[0] as f64 - (-std::f64::consts::LN_2 * 2.0)).abs() < 1e-6);
         assert!((hw.unwrap()[0] - 1.6931472 * 2.0).abs() < 1e-6);
     }
 
@@ -212,7 +212,7 @@ mod tests {
         let yhat = vec![0.0, 0.0];
         let loss_fn = SquaredLogLoss::default();
         let (g, h, l) = loss_fn.gradient_and_loss(&y, &yhat, None, None);
-        assert!((g[0] - (-0.6931472)).abs() < 1e-6);
+        assert!((g[0] as f64 - (-std::f64::consts::LN_2)).abs() < 1e-6);
         assert!((h.unwrap()[0] - 1.6931472).abs() < 1e-6);
         assert!((l[0] - 0.2402265).abs() < 1e-6);
     }
@@ -226,7 +226,7 @@ mod tests {
         let mut hess = Some(vec![0.0; 2]);
         let mut loss = vec![0.0; 2];
         loss_fn.gradient_and_loss_into(&y, &yhat, None, None, &mut grad, &mut hess, &mut loss);
-        assert!((grad[0] - (-0.6931472)).abs() < 1e-6);
+        assert!((grad[0] as f64 - (-std::f64::consts::LN_2)).abs() < 1e-6);
         assert!((hess.unwrap()[0] - 1.6931472).abs() < 1e-6);
         assert!((loss[0] - 0.2402265).abs() < 1e-6);
     }

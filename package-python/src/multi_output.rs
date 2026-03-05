@@ -45,7 +45,7 @@ impl MultiOutputBooster {
         terminate_missing_features,
         missing_node_treatment,
         log_iterations,
-        quantile,
+        objective_parameter,
         reset,
         categorical_features,
         timeout,
@@ -55,7 +55,8 @@ impl MultiOutputBooster {
         loss,
         grad,
         init,
-        save_node_stats=None,
+        save_node_stats=false,
+        seed=0,
     ))]
     pub fn new<'py>(
         n_boosters: usize,
@@ -72,7 +73,7 @@ impl MultiOutputBooster {
         terminate_missing_features: HashSet<usize>,
         missing_node_treatment: &str,
         log_iterations: usize,
-        quantile: Option<f64>,
+        objective_parameter: Option<f64>,
         reset: Option<bool>,
         categorical_features: Option<HashSet<usize>>,
         timeout: Option<f32>,
@@ -82,12 +83,26 @@ impl MultiOutputBooster {
         loss: Option<Bound<'py, PyAny>>,
         grad: Option<Bound<'py, PyAny>>,
         init: Option<Bound<'py, PyAny>>,
-        save_node_stats: Option<bool>,
+        save_node_stats: bool,
+        seed: u64,
     ) -> PyResult<Self> {
         let objective_ = match objective {
             Some(obj) => {
                 if let Ok(s) = obj.extract::<String>() {
-                    to_value_error(serde_plain::from_str(&s))?
+                    match s.as_str() {
+                        "QuantileLoss" => Objective::QuantileLoss {
+                            quantile: objective_parameter,
+                        },
+                        "HuberLoss" => Objective::HuberLoss {
+                            delta: objective_parameter,
+                        },
+                        "AdaptiveHuberLoss" => Objective::AdaptiveHuberLoss {
+                            quantile: objective_parameter,
+                        },
+                        "FairLoss" => Objective::FairLoss { c: objective_parameter },
+                        "TweedieLoss" => Objective::TweedieLoss { p: objective_parameter },
+                        _ => to_value_error(serde_plain::from_str(&s))?,
+                    }
                 } else if let Ok(fairness) = obj.extract::<PyFairnessObjective>() {
                     Objective::Custom(Arc::new(fairness.inner))
                 } else if let Ok(policy) = obj.extract::<PyPolicyObjective>() {
@@ -129,15 +144,15 @@ impl MultiOutputBooster {
             .set_terminate_missing_features(terminate_missing_features)
             .set_missing_node_treatment(missing_node_treatment_)
             .set_log_iterations(log_iterations)
+            .set_seed(seed)
             .set_n_boosters(n_boosters)
-            .set_quantile(quantile)
             .set_reset(reset)
             .set_categorical_features(categorical_features)
             .set_timeout(timeout)
             .set_iteration_limit(iteration_limit)
             .set_memory_limit(memory_limit)
             .set_stopping_rounds(stopping_rounds)
-            .set_save_node_stats(save_node_stats.unwrap_or(false));
+            .set_save_node_stats(save_node_stats);
 
         Ok(MultiOutputBooster { booster })
     }
@@ -149,7 +164,26 @@ impl MultiOutputBooster {
     }
     #[setter]
     fn set_objective(&mut self, value: &str) -> PyResult<()> {
-        let objective_ = to_value_error(serde_plain::from_str(value))?;
+        let current_param = match &self.booster.cfg.objective {
+            Objective::QuantileLoss { quantile } => *quantile,
+            Objective::HuberLoss { delta } => *delta,
+            Objective::AdaptiveHuberLoss { quantile } => *quantile,
+            Objective::FairLoss { c } => *c,
+            Objective::TweedieLoss { p } => *p,
+            _ => None,
+        };
+        let objective_ = match value {
+            "QuantileLoss" => Objective::QuantileLoss {
+                quantile: current_param,
+            },
+            "HuberLoss" => Objective::HuberLoss { delta: current_param },
+            "AdaptiveHuberLoss" => Objective::AdaptiveHuberLoss {
+                quantile: current_param,
+            },
+            "FairLoss" => Objective::FairLoss { c: current_param },
+            "TweedieLoss" => Objective::TweedieLoss { p: current_param },
+            _ => to_value_error(serde_plain::from_str(value))?,
+        };
         self.booster = self.booster.clone().set_objective(objective_);
         Ok(())
     }
@@ -216,8 +250,19 @@ impl MultiOutputBooster {
         Ok(())
     }
     #[setter]
-    fn set_quantile(&mut self, value: Option<f64>) -> PyResult<()> {
-        self.booster = self.booster.clone().set_quantile(value);
+    fn set_objective_parameter(&mut self, value: Option<f64>) -> PyResult<()> {
+        let new_obj = match &self.booster.cfg.objective {
+            Objective::QuantileLoss { .. } => Objective::QuantileLoss { quantile: value },
+            Objective::HuberLoss { .. } => Objective::HuberLoss { delta: value },
+            Objective::AdaptiveHuberLoss { .. } => Objective::AdaptiveHuberLoss { quantile: value },
+            Objective::FairLoss { .. } => Objective::FairLoss { c: value },
+            Objective::TweedieLoss { .. } => Objective::TweedieLoss { p: value },
+            other => other.clone(),
+        };
+        self.booster.cfg.objective = new_obj.clone();
+        for b in &mut self.booster.boosters {
+            b.cfg.objective = new_obj.clone();
+        }
         Ok(())
     }
     #[setter]
@@ -1094,7 +1139,19 @@ impl MultiOutputBooster {
                 "force_children_to_bound_parent",
                 self.booster.cfg.force_children_to_bound_parent.into_py_any(py).unwrap(),
             ),
-            ("quantile", self.booster.cfg.quantile.into_py_any(py).unwrap()),
+            (
+                "objective_parameter",
+                match &self.booster.cfg.objective {
+                    Objective::QuantileLoss { quantile } => *quantile,
+                    Objective::HuberLoss { delta } => *delta,
+                    Objective::AdaptiveHuberLoss { quantile } => *quantile,
+                    Objective::FairLoss { c } => *c,
+                    Objective::TweedieLoss { p } => *p,
+                    _ => None,
+                }
+                .into_py_any(py)
+                .unwrap(),
+            ),
             ("reset", self.booster.cfg.reset.into_py_any(py).unwrap()),
             (
                 "categorical_features",

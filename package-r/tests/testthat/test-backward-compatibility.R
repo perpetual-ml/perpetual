@@ -1,13 +1,13 @@
 # Backward compatibility tests using XGBoost/LightGBM style API
 # Replicating Python test_backward_compatibility.py
-# Tests loading pre-saved model from v0.10.0
+# Tests loading pre-saved model from v2.0.0
 
-test_that("Load v0.10.0 model and verify predictions", {
+test_that("Load v2.0.0 model and verify predictions", {
   skip_if_no_resources()
   resources_dir <- get_resources_dir()
-  model_path <- file.path(resources_dir, "model_v0.10.0.json")
-  preds_path <- file.path(resources_dir, "model_v0.10.0_preds.csv")
-  probs_path <- file.path(resources_dir, "model_v0.10.0_probs.csv")
+  model_path <- file.path(resources_dir, "model_v2.0.0.json")
+  preds_path <- file.path(resources_dir, "model_v2.0.0_preds.csv")
+  probs_path <- file.path(resources_dir, "model_v2.0.0_probs.csv")
   
   skip_if_not(file.exists(model_path), "Model artifact not found. Run scripts/make_resources.py to generate it.")
   skip_if_not(file.exists(preds_path), "Predictions artifact not found.")
@@ -24,10 +24,10 @@ test_that("Load v0.10.0 model and verify predictions", {
   expect_true(is.numeric(base))
 })
 
-test_that("V0.10.0 model JSON is valid", {
+test_that("V2.0.0 model JSON is valid", {
   skip_if_no_resources()
   resources_dir <- get_resources_dir()
-  model_path <- file.path(resources_dir, "model_v0.10.0.json")
+  model_path <- file.path(resources_dir, "model_v2.0.0.json")
   
   skip_if_not(file.exists(model_path), "Model artifact not found.")
   
@@ -45,7 +45,7 @@ test_that("V0.10.0 model JSON is valid", {
 test_that("Loaded model can make predictions with new API", {
   skip_if_no_resources()
   resources_dir <- get_resources_dir()
-  model_path <- file.path(resources_dir, "model_v0.10.0.json")
+  model_path <- file.path(resources_dir, "model_v2.0.0.json")
   
   skip_if_not(file.exists(model_path), "Model artifact not found.")
   
@@ -61,6 +61,6 @@ test_that("Loaded model can make predictions with new API", {
     expect_true(!any(is.na(preds)))
   }, error = function(e) {
     # If feature count doesn't match, that's expected
-    skip("Model feature count doesn't match test data - expected for v0.10.0 model")
+    skip("Model feature count doesn't match test data - expected for v2.0.0 model")
   })
 })

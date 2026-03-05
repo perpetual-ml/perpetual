@@ -242,7 +242,11 @@ pub unsafe extern "C" fn PerpetualBooster_new(
             config.log_iterations = val as usize;
         }
         if let Some(val) = opt_f64(quantile) {
-            config.quantile = Some(val);
+            match &mut config.objective {
+                Objective::QuantileLoss { quantile: q } => *q = Some(val),
+                Objective::AdaptiveHuberLoss { quantile: q } => *q = Some(val),
+                _ => {}
+            }
         }
         if let Some(val) = opt_bool(reset) {
             config.reset = Some(val);
@@ -326,7 +330,6 @@ pub unsafe extern "C" fn PerpetualBooster_fit(ptr: SEXP, flat_data: SEXP, rows: 
                 booster.config.missing_node_treatment,
                 booster.config.log_iterations,
                 booster.config.seed,
-                booster.config.quantile,
                 booster.config.reset,
                 booster.config.categorical_features.clone(),
                 booster.config.timeout,
@@ -334,9 +337,10 @@ pub unsafe extern "C" fn PerpetualBooster_fit(ptr: SEXP, flat_data: SEXP, rows: 
                 booster.config.memory_limit,
                 booster.config.stopping_rounds,
                 booster.config.save_node_stats,
-                booster.config.calibration_method.clone(),
             )
             .or_r_error("Failed to create MultiOutputBooster");
+
+            multi_booster = multi_booster.set_calibration_method(booster.config.calibration_method.clone());
 
             multi_booster
                 .fit(&matrix, &y_matrix, None, None)
@@ -370,7 +374,6 @@ pub unsafe extern "C" fn PerpetualBooster_fit(ptr: SEXP, flat_data: SEXP, rows: 
                 booster.config.missing_node_treatment,
                 booster.config.log_iterations,
                 booster.config.seed,
-                booster.config.quantile,
                 booster.config.reset,
                 booster.config.categorical_features.clone(),
                 booster.config.timeout,
@@ -378,9 +381,10 @@ pub unsafe extern "C" fn PerpetualBooster_fit(ptr: SEXP, flat_data: SEXP, rows: 
                 booster.config.memory_limit,
                 booster.config.stopping_rounds,
                 booster.config.save_node_stats,
-                booster.config.calibration_method.clone(),
             )
             .or_r_error("Failed to create PerpetualBooster");
+
+            single_booster.cfg.calibration_method = booster.config.calibration_method.clone();
 
             single_booster
                 .fit(&matrix, &y_slice.to_vec(), None, None::<&[u64]>)

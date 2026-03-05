@@ -610,13 +610,7 @@ fn main() {
             for bf in boldness_factors {
                 let mut brier_sum = 0.0;
                 for i in 0..val_preds_raw.len() {
-                    let mut p_raw = val_preds_raw[i];
-                    if p_raw > 1.0 - 1e-7 {
-                        p_raw = 1.0 - 1e-7;
-                    }
-                    if p_raw < 1e-7 {
-                        p_raw = 1e-7;
-                    }
+                    let p_raw = val_preds_raw[i].clamp(1e-7, 1.0 - 1e-7);
                     let logit = -(1.0 / p_raw - 1.0).ln() * bf;
                     let prob = 1.0 / (1.0 + (-logit).exp());
                     let error = y_val[i] - prob;
@@ -738,22 +732,9 @@ fn main() {
             let test_matrix = ColumnarMatrix::new(test_matrix_refs, None, 1);
 
             let pred_raw = final_model.predict_proba_columnar(&test_matrix, true, true);
-            let mut p_raw = pred_raw[0];
-            if p_raw > 1.0 - 1e-7 {
-                p_raw = 1.0 - 1e-7;
-            }
-            if p_raw < 1e-7 {
-                p_raw = 1e-7;
-            }
+            let p_raw = pred_raw[0].clamp(1e-7, 1.0 - 1e-7);
             let logit = -(1.0 / p_raw - 1.0).ln() * best_boldness;
-            let mut prob = 1.0 / (1.0 + (-logit).exp());
-
-            if prob > 0.98 {
-                prob = 0.975;
-            }
-            if prob < 0.02 {
-                prob = 0.025;
-            }
+            let prob = (1.0 / (1.0 + (-logit).exp())).clamp(0.025, 0.975);
 
             writeln!(&mut file, "{},{:.6}", id_str, prob).unwrap();
         } else {

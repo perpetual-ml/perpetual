@@ -54,7 +54,6 @@ def _prepare_params(budget: float, kwargs: Dict[str, Any]) -> Dict[str, Any]:
         "missing_node_treatment": "AssignToParent",
         "log_iterations": 0,
         "seed": 42,
-        "quantile": None,
         "reset": None,
         "categorical_features": None,
         "timeout": None,

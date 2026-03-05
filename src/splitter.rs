@@ -3498,16 +3498,6 @@ mod tests {
         );
         assert!(!splitter.get_force_children_to_bound_parent());
         assert!(splitter.get_interaction_constraints().is_none());
-
-        // Test Importance calculations would normally go here on a Tree, not a Splitter.
-
-        // Test predict_row_from_row_slice
-        let _row = vec![1.0, 2.0];
-        let _missing = f64::NAN;
-        // This will panic if we don't have nodes, but let's see if we can mock it or if there's a better way.
-        // Actually, MissingBranchSplitter doesn't have a 'nodes' field in its struct, but Splitter trait methods might use them.
-        // Wait, predict_row_from_row_slice is a method on Tree or Splitter?
-        // Checking... line 142163 in splitter.rs? No, let me check the struct.
     }
 
     #[test]
@@ -3525,8 +3515,8 @@ mod tests {
         let data = Matrix::new(&data_vec, 2, 2);
         let b = bin_matrix(&data, None, nbins, f64::NAN, None).unwrap();
         let _bdata = Matrix::new(&b.binned_data, data.rows, data.cols);
-        let col_index = vec![0, 1];
-        let mut hist_tree_owned = vec![NodeHistogramOwned::empty_from_cuts(&b.cuts, &col_index, false, false)];
+        let col_index = [0, 1];
+        let mut hist_tree_owned = [NodeHistogramOwned::empty_from_cuts(&b.cuts, &col_index, false, false)];
         let hist_tree = hist_tree_owned
             .iter_mut()
             .map(NodeHistogram::from_owned)
@@ -3675,10 +3665,10 @@ mod tests {
         let data_vec = vec![0.0, 1.0, 2.0, 3.0, 4.0, 5.0];
         let data = Matrix::new(&data_vec, 3, 2);
         let b = bin_matrix(&data, None, nbins, f64::NAN, None).unwrap();
-        let col_index = vec![0, 1];
+        let col_index = [0, 1];
         // Use true for is_const_hess in NodeHistogramOwned::empty_from_cuts to avoid issues?
         // Wait, the splitter trait methods handle is_const_hess.
-        let mut hist_tree_owned = vec![NodeHistogramOwned::empty_from_cuts(&b.cuts, &col_index, false, false)];
+        let mut hist_tree_owned = [NodeHistogramOwned::empty_from_cuts(&b.cuts, &col_index, false, false)];
         let hist_tree = hist_tree_owned
             .iter_mut()
             .map(NodeHistogram::from_owned)
@@ -3903,21 +3893,21 @@ mod tests {
             // Fill feature 0 with values to create missing, left, right groups
             // In column-major Matrix, col 0 is data_vec[0..n_total]
             // bin 0: missing, bin 1: left, bin 2: right
-            for i in 0..n_missing {
-                data_vec[i] = 0;
+            for item in data_vec.iter_mut().take(n_missing) {
+                *item = 0;
             }
-            for i in n_missing..(n_missing + n_left) {
-                data_vec[i] = 1;
+            for item in data_vec.iter_mut().skip(n_missing).take(n_left) {
+                *item = 1;
             }
-            for i in (n_missing + n_left)..n_total {
-                data_vec[i] = 2;
+            for item in data_vec.iter_mut().skip(n_missing + n_left).take(n_right) {
+                *item = 2;
             }
             // feature 1 remains all 0s
 
             let data = Matrix::new(&data_vec, n_total, 2);
-            let col_index = vec![0, 1];
-            let cuts = crate::data::JaggedMatrix::from_vecs(&vec![vec![1.5, 5.5, f64::MAX], vec![1.5, 5.5, f64::MAX]]);
-            let mut hist_tree_owned = vec![
+            let col_index = [0, 1];
+            let cuts = crate::data::JaggedMatrix::from_vecs(&[vec![1.5, 5.5, f64::MAX], vec![1.5, 5.5, f64::MAX]]);
+            let mut hist_tree_owned = [
                 NodeHistogramOwned::empty_from_cuts(&cuts, &col_index, false, false),
                 NodeHistogramOwned::empty_from_cuts(&cuts, &col_index, false, false),
                 NodeHistogramOwned::empty_from_cuts(&cuts, &col_index, false, false),
@@ -4046,7 +4036,7 @@ mod tests {
             false,
         );
         assert_eq!(splitter.get_eta(), 0.1);
-        assert_eq!(splitter.get_force_children_to_bound_parent(), false);
+        assert!(!splitter.get_force_children_to_bound_parent());
         assert_eq!(splitter.get_constraint_map().len(), 0);
         assert!(splitter.get_create_missing_branch());
         assert!(splitter.get_allow_missing_splits());
@@ -4055,19 +4045,19 @@ mod tests {
 
         let n_total = 20;
         let mut data_vec = vec![0; n_total * 2];
-        for i in 0..10 {
-            data_vec[i] = 0;
+        for item in data_vec.iter_mut().take(10) {
+            *item = 0;
         } // Missing (bin 0)
-        for i in 10..15 {
-            data_vec[i] = 1;
+        for item in data_vec.iter_mut().skip(10).take(5) {
+            *item = 1;
         } // Left (bin 1)
-        for i in 15..20 {
-            data_vec[i] = 2;
+        for item in data_vec.iter_mut().skip(15).take(5) {
+            *item = 2;
         } // Right (bin 2)
         let data = Matrix::new(&data_vec, n_total, 2);
-        let col_index = vec![0, 1];
-        let cuts = crate::data::JaggedMatrix::from_vecs(&vec![vec![1.5, 5.5, f64::MAX], vec![1.5, 5.5, f64::MAX]]);
-        let mut hist_tree_owned = vec![
+        let col_index = [0, 1];
+        let cuts = crate::data::JaggedMatrix::from_vecs(&[vec![1.5, 5.5, f64::MAX], vec![1.5, 5.5, f64::MAX]]);
+        let mut hist_tree_owned = [
             NodeHistogramOwned::empty_from_cuts(&cuts, &col_index, true, false),
             NodeHistogramOwned::empty_from_cuts(&cuts, &col_index, true, false),
             NodeHistogramOwned::empty_from_cuts(&cuts, &col_index, true, false),
@@ -4161,7 +4151,7 @@ mod tests {
         let long_data_vec = vec![0; n_total * 17];
         let _long_data = Matrix::new(&long_data_vec, n_total, 17);
         let long_cuts = crate::data::JaggedMatrix::from_vecs(&vec![vec![1.5, f64::MAX]; 17]);
-        let mut long_hist_tree_owned = vec![NodeHistogramOwned::empty_from_cuts(&long_cuts, &many_cols, true, false)];
+        let mut long_hist_tree_owned = [NodeHistogramOwned::empty_from_cuts(&long_cuts, &many_cols, true, false)];
         let long_hist_tree = long_hist_tree_owned
             .iter_mut()
             .map(NodeHistogram::from_owned)
@@ -4198,7 +4188,7 @@ mod tests {
         );
 
         // 5. Categorical and Numerical Branch Split (Var Hess)
-        let mut hist_tree_owned_var = vec![NodeHistogramOwned::empty_from_cuts(&cuts, &col_index, false, false)];
+        let mut hist_tree_owned_var = [NodeHistogramOwned::empty_from_cuts(&cuts, &col_index, false, false)];
         let hist_tree_var = hist_tree_owned_var
             .iter_mut()
             .map(NodeHistogram::from_owned)

@@ -29,6 +29,8 @@ from perpetual.utils import (
     type_df,
 )
 
+MultiOutputBooster = CrateMultiOutputBooster
+
 
 class CalibrationMethod(str, Enum):
     """Calibration methods for prediction intervals."""
@@ -80,7 +82,6 @@ class PerpetualBooster:
         missing_node_treatment: str = "None",
         log_iterations: int = 0,
         feature_importance_method: str = "Gain",
-        quantile: Optional[float] = None,
         reset: Optional[bool] = None,
         categorical_features: Union[Iterable[int], Iterable[str], str, None] = "auto",
         timeout: Optional[float] = None,
@@ -91,6 +92,8 @@ class PerpetualBooster:
         max_cat: int = 1000,
         interaction_constraints: Optional[List[List[int]]] = None,
         save_node_stats: bool = False,
+        seed: int = 0,
+        **kwargs,
     ):
         """
         Gradient Boosting Machine with Perpetual Learning.
@@ -159,8 +162,15 @@ class PerpetualBooster:
         feature_importance_method : str, default="Gain"
             Method for calculating feature importance. Options: "Gain", "Weight", "Cover",
             "TotalGain", "TotalCover".
-        quantile : float, optional
-            Target quantile for quantile regression (objective="QuantileLoss").
+        **kwargs
+            Objective-specific parameters passed to the booster core:
+
+            - **quantile** (float): The target quantile for ``"QuantileLoss"`` and
+              ``"AdaptiveHuberLoss"``. Must be between 0 and 1. Default is 0.5.
+            - **delta** (float): The threshold parameter for ``"HuberLoss"``. Default is 1.0.
+            - **c** (float): The scale parameter for ``"FairLoss"``. Default is 1.0.
+            - **p** (float): The power parameter for ``"TweedieLoss"``. Must be between 1 and 2.
+              Default is 1.5.
         reset : bool, optional
             Whether to reset the model or continue training on subsequent calls to fit.
         categorical_features : str or iterable, default="auto"
@@ -241,7 +251,6 @@ class PerpetualBooster:
         self.missing_node_treatment = missing_node_treatment
         self.log_iterations = log_iterations
         self.feature_importance_method = feature_importance_method
-        self.quantile = quantile
         self.reset = reset
         self.categorical_features = categorical_features
         self.timeout = timeout
@@ -252,6 +261,23 @@ class PerpetualBooster:
         self.max_cat = max_cat
         self.interaction_constraints = interaction_constraints
         self.save_node_stats = save_node_stats
+        self.seed = seed
+        OBJECTIVE_PARAMS = {
+            "QuantileLoss": "quantile",
+            "AdaptiveHuberLoss": "quantile",
+            "HuberLoss": "delta",
+            "FairLoss": "c",
+            "TweedieLoss": "p",
+        }
+
+        self.objective_parameter = kwargs.pop("objective_parameter", None)
+        if isinstance(self.objective, str) and self.objective in OBJECTIVE_PARAMS:
+            param_name = OBJECTIVE_PARAMS[self.objective]
+            if param_name in kwargs:
+                self.objective_parameter = kwargs.pop(param_name)
+
+        if kwargs:
+            raise ValueError(f"Unknown keyword arguments: {kwargs.keys()}")
 
         self.feature_names_in_ = None
         self.n_features_ = 0
@@ -275,7 +301,8 @@ class PerpetualBooster:
             terminate_missing_features=set(),
             missing_node_treatment=self.missing_node_treatment,
             log_iterations=self.log_iterations,
-            quantile=self.quantile,
+            seed=self.seed,
+            objective_parameter=self.objective_parameter,
             reset=self.reset,
             categorical_features=set(),
             timeout=self.timeout,
@@ -399,7 +426,7 @@ class PerpetualBooster:
                 terminate_missing_features=crate_tmf,
                 missing_node_treatment=self.missing_node_treatment,
                 log_iterations=self.log_iterations,
-                quantile=self.quantile,
+                objective_parameter=self.objective_parameter,
                 reset=self.reset,
                 categorical_features=categorical_features_,
                 timeout=self.timeout,
@@ -433,7 +460,7 @@ class PerpetualBooster:
                 terminate_missing_features=crate_tmf,
                 missing_node_treatment=self.missing_node_treatment,
                 log_iterations=self.log_iterations,
-                quantile=self.quantile,
+                objective_parameter=self.objective_parameter,
                 reset=self.reset,
                 categorical_features=categorical_features_,
                 timeout=self.timeout,

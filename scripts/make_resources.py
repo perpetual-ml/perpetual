@@ -147,9 +147,9 @@ if __name__ == "__main__":
     data.to_csv("resources/goodreads.csv", index=False, header=True)
 
     # ---------------------------------------------------------
-    # Generate v0.10.0 Model Artifact for Backward Compatibility
+    # Generate v2.0.0 Model Artifact for Backward Compatibility
     # ---------------------------------------------------------
-    print("Generating v0.10.0 model artifact...")
+    print("Generating v2.0.0 model artifact...")
 
     gen_script = """
 import pandas as pd
@@ -172,14 +172,14 @@ data_train, data_test, y_train, _ = train_test_split(X, y, test_size=0.2, random
 
 model = PerpetualBooster(objective="LogLoss")
 model.fit(data_train, y_train)
-model.save_booster("resources/model_v0.10.0.json")
+model.save_booster("resources/model_v2.0.0.json")
 
 # Save predictions for verification
 preds = model.predict(data_test)
-pd.Series(preds).to_csv("resources/model_v0.10.0_preds.csv", index=False, header=False)
+pd.Series(preds).to_csv("resources/model_v2.0.0_preds.csv", index=False, header=False)
 probs = model.predict_proba(data_test)
-pd.DataFrame(probs).to_csv("resources/model_v0.10.0_probs.csv", index=False, header=False)
-print("Successfully generated resources/model_v0.10.0.json and predictions")
+pd.DataFrame(probs).to_csv("resources/model_v2.0.0_probs.csv", index=False, header=False)
+print("Successfully generated resources/model_v2.0.0.json and predictions")
 """
     with open("temp_gen_model.py", "w") as f:
         f.write(gen_script)
@@ -190,7 +190,7 @@ print("Successfully generated resources/model_v0.10.0.json and predictions")
                 "uv",
                 "run",
                 "--with",
-                "perpetual==0.10.0",
+                "./package-python",  # "./package-python" or "perpetual==2.0.0"
                 "--with",
                 "pandas",
                 "--with",

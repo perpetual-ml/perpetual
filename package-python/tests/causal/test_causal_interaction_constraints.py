@@ -1,5 +1,5 @@
 import numpy as np
-from perpetual import BraidedBooster, UpliftBooster
+from perpetual import IVBooster, UpliftBooster
 
 
 def test_braided_interaction_constraints():
@@ -10,7 +10,7 @@ def test_braided_interaction_constraints():
 
     interaction_constraints = [[0, 1], [2, 3, 4]]
 
-    model = BraidedBooster(
+    model = IVBooster(
         stage1_budget=0.1,
         stage2_budget=0.1,
         interaction_constraints=interaction_constraints,

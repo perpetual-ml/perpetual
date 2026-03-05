@@ -159,7 +159,7 @@ mod tests {
         assert!((loss_fn.initial_value(&y, Some(&w), None) - 1.75_f64.ln()).abs() < 1e-6);
 
         // Edge case: mean_y <= 0
-        assert_eq!(loss_fn.initial_value(&vec![0.0], None, None), 0.0);
+        assert_eq!(loss_fn.initial_value(&[0.0], None, None), 0.0);
     }
 
     #[test]

@@ -39,6 +39,7 @@ class PerpetualClassifier(PerpetualBooster, ClassifierMixin):
         max_bin: int = 256,
         max_cat: int = 1000,
         save_node_stats: bool = False,
+        seed: int = 0,
         # Capture all parameters in a way that BaseEstimator can handle
         **kwargs,
     ):
@@ -88,8 +89,15 @@ class PerpetualClassifier(PerpetualBooster, ClassifierMixin):
         feature_importance_method : str, default="Gain"
             Method for calculating feature importance. Options: "Gain", "Weight", "Cover",
             "TotalGain", "TotalCover".
-        quantile : float, optional
-            Target quantile for quantile regression (objective="QuantileLoss").
+        **kwargs
+            Objective-specific parameters passed to the booster core:
+
+            - **quantile** (float): The target quantile for ``"QuantileLoss"`` and
+              ``"AdaptiveHuberLoss"``. Must be between 0 and 1. Default is 0.5.
+            - **delta** (float): The threshold parameter for ``"HuberLoss"``. Default is 1.0.
+            - **c** (float): The scale parameter for ``"FairLoss"``. Default is 1.0.
+            - **p** (float): The power parameter for ``"TweedieLoss"``. Must be between 1 and 2.
+              Default is 1.5.
         reset : bool, optional
             Whether to reset the model or continue training on subsequent calls to fit.
         categorical_features : str or iterable, default="auto"
@@ -127,6 +135,7 @@ class PerpetualClassifier(PerpetualBooster, ClassifierMixin):
             max_bin=max_bin,
             max_cat=max_cat,
             save_node_stats=save_node_stats,
+            seed=seed,
             **kwargs,  # Catch-all for any other parameters passed by user or set_params
         )
         self._is_fitted = False
@@ -209,6 +218,7 @@ class PerpetualRegressor(PerpetualBooster, RegressorMixin):
         max_bin: int = 256,
         max_cat: int = 1000,
         save_node_stats: bool = False,
+        seed: int = 0,
         **kwargs,
     ):
         """
@@ -260,8 +270,15 @@ class PerpetualRegressor(PerpetualBooster, RegressorMixin):
         feature_importance_method : str, default="Gain"
             Method for calculating feature importance. Options: "Gain", "Weight", "Cover",
             "TotalGain", "TotalCover".
-        quantile : float, optional
-            Target quantile for quantile regression (objective="QuantileLoss").
+        **kwargs
+            Objective-specific parameters passed to the booster core:
+
+            - **quantile** (float): The target quantile for ``"QuantileLoss"`` and
+              ``"AdaptiveHuberLoss"``. Must be between 0 and 1. Default is 0.5.
+            - **delta** (float): The threshold parameter for ``"HuberLoss"``. Default is 1.0.
+            - **c** (float): The scale parameter for ``"FairLoss"``. Default is 1.0.
+            - **p** (float): The power parameter for ``"TweedieLoss"``. Must be between 1 and 2.
+              Default is 1.5.
         reset : bool, optional
             Whether to reset the model or continue training on subsequent calls to fit.
         categorical_features : str or iterable, default="auto"
@@ -304,6 +321,7 @@ class PerpetualRegressor(PerpetualBooster, RegressorMixin):
             max_bin=max_bin,
             max_cat=max_cat,
             save_node_stats=save_node_stats,
+            seed=seed,
             **kwargs,
         )
         self._is_fitted = False
@@ -387,6 +405,8 @@ class PerpetualRanker(
         # ... other parameters ...
         max_bin: int = 256,
         max_cat: int = 1000,
+        save_node_stats: bool = False,
+        seed: int = 0,
         **kwargs,
     ):
         """
@@ -435,8 +455,15 @@ class PerpetualRanker(
         feature_importance_method : str, default="Gain"
             Method for calculating feature importance. Options: "Gain", "Weight", "Cover",
             "TotalGain", "TotalCover".
-        quantile : float, optional
-            Target quantile for quantile regression (objective="QuantileLoss").
+        **kwargs
+            Objective-specific parameters passed to the booster core:
+
+            - **quantile** (float): The target quantile for ``"QuantileLoss"`` and
+              ``"AdaptiveHuberLoss"``. Must be between 0 and 1. Default is 0.5.
+            - **delta** (float): The threshold parameter for ``"HuberLoss"``. Default is 1.0.
+            - **c** (float): The scale parameter for ``"FairLoss"``. Default is 1.0.
+            - **p** (float): The power parameter for ``"TweedieLoss"``. Must be between 1 and 2.
+              Default is 1.5.
         reset : bool, optional
             Whether to reset the model or continue training on subsequent calls to fit.
         categorical_features : str or iterable, default="auto"
@@ -455,6 +482,10 @@ class PerpetualRanker(
             Maximum unique categories before a feature is treated as numerical.
         interaction_constraints : list of list of int, optional
             Interaction constraints.
+        save_node_stats : bool, default=False
+            Whether to save node statistics (required for calibration).
+        seed : int, default=0
+            Random seed for reproducibility.
         **kwargs
             Arbitrary keyword arguments to be passed to the base class.
         """
@@ -471,6 +502,8 @@ class PerpetualRanker(
             # ... pass all other parameters ...
             max_bin=max_bin,
             max_cat=max_cat,
+            save_node_stats=save_node_stats,
+            seed=seed,
             **kwargs,
         )
 

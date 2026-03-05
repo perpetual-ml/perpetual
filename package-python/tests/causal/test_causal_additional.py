@@ -1,6 +1,6 @@
 import numpy as np
 from perpetual.booster import PerpetualBooster
-from perpetual.iv import BraidedBooster
+from perpetual.iv import IVBooster
 from perpetual.meta_learners import DRLearner, SLearner, TLearner, XLearner
 from perpetual.uplift import UpliftBooster
 
@@ -12,13 +12,13 @@ def test_braided_booster():
     w = 0.5 * Z[:, 0] + 0.5 * X[:, 0] + np.random.randn(n) * 0.1
     y = 2.0 * w + 1.0 * X[:, 1] + np.random.randn(n) * 0.1
 
-    iv = BraidedBooster(stage1_budget=0.1, stage2_budget=0.1)
+    iv = IVBooster(stage1_budget=0.1, stage2_budget=0.1)
     iv.fit(X, Z, y, w)
     preds = iv.predict(X, w_counterfactual=np.ones(n))
     assert preds.shape == (n,)
 
     js = iv.to_json()
-    iv2 = BraidedBooster.from_json(js)
+    iv2 = IVBooster.from_json(js)
     # Restored budgets are floats, so check approximately
     assert np.isclose(iv2.stage1_budget, 0.1, atol=1e-5)
 

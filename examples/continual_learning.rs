@@ -153,7 +153,9 @@ fn calculate_mse(preds: &[f64], y: &[f64]) -> f64 {
     preds.iter().zip(y.iter()).map(|(p, t)| (p - t).powi(2)).sum::<f64>() / preds.len() as f64
 }
 
-fn read_data(path: &str) -> Result<(Vec<Vec<f64>>, Vec<f64>), Box<dyn Error>> {
+type DataResult = (Vec<Vec<f64>>, Vec<f64>);
+
+fn read_data(path: &str) -> Result<DataResult, Box<dyn Error>> {
     let file = fs::read_to_string(path)?;
     let mut y = Vec::new();
     let mut data_columns: Vec<Vec<f64>> = Vec::new();

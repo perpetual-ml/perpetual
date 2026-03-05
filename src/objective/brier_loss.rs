@@ -228,8 +228,8 @@ mod tests {
         assert!((loss_fn.initial_value(&y, None, None) - 2.0_f64.ln()).abs() < 1e-6);
 
         // Edge cases
-        assert_eq!(loss_fn.initial_value(&vec![1.0], None, None), 0.0);
-        assert_eq!(loss_fn.initial_value(&vec![0.0], None, None), 0.0);
+        assert_eq!(loss_fn.initial_value(&[1.0], None, None), 0.0);
+        assert_eq!(loss_fn.initial_value(&[0.0], None, None), 0.0);
     }
 
     #[test]
@@ -241,8 +241,8 @@ mod tests {
         assert!((loss_fn.initial_value(&y, Some(&w), None) - 2.0_f64.ln()).abs() < 1e-6);
 
         // Edge case mean=0 or mean=1 weighted
-        assert_eq!(loss_fn.initial_value(&vec![1.0], Some(&vec![2.0]), None), 0.0);
-        assert_eq!(loss_fn.initial_value(&vec![0.0], Some(&vec![2.0]), None), 0.0);
+        assert_eq!(loss_fn.initial_value(&[1.0], Some(&[2.0]), None), 0.0);
+        assert_eq!(loss_fn.initial_value(&[0.0], Some(&[2.0]), None), 0.0);
     }
 
     #[test]

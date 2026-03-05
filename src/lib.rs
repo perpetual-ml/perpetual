@@ -60,7 +60,6 @@
 //!     MissingNodeTreatment::AverageNodeWeight,
 //!     10,         // log_iterations
 //!     42,         // seed
-//!     None,       // quantile (for QuantileLoss)
 //!     None,       // reset
 //!     None,       // categorical_features
 //!     None,       // timeout
@@ -68,7 +67,6 @@
 //!     None,       // memory_limit
 //!     None,       // stopping_rounds
 //!     false,      // save_node_stats
-//!     perpetual::booster::config::CalibrationMethod::MinMax,
 //! ).expect("Failed to initialize booster");
 //!
 //! // 3. Fit the Model

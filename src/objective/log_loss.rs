@@ -224,7 +224,7 @@ mod tests {
         let y = vec![1.0, 1.0, 0.0]; // 2 ones, 1 zero
         let loss_fn = LogLoss::default();
         // log(2/1) = ln(2) = 0.693147
-        assert!((loss_fn.initial_value(&y, None, None) - 0.693147).abs() < 1e-6);
+        assert!((loss_fn.initial_value(&y, None, None) - std::f64::consts::LN_2).abs() < 1e-6);
     }
 
     #[test]

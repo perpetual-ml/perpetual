@@ -188,7 +188,7 @@ mod tests {
         let loss_fn = CrossEntropyLambdaLoss::default();
         let l = loss_fn.loss(&y, &yhat, None, None);
         // Defaults to standard CE: ln(2) approx 0.693147
-        assert!((l[0] - 0.69314718).abs() < 1e-6);
+        assert!((l[0] as f64 - std::f64::consts::LN_2).abs() < 1e-6);
     }
 
     #[test]
@@ -243,14 +243,14 @@ mod tests {
         let (g, h, l) = loss_fn.gradient_and_loss(&y, &yhat, None, None);
         assert_eq!(g, vec![-0.5, 0.5]);
         assert_eq!(h.unwrap(), vec![0.25, 0.25]);
-        assert!((l[0] - 0.69314718).abs() < 1e-6);
+        assert!((l[0] as f64 - std::f64::consts::LN_2).abs() < 1e-6);
     }
 
     #[test]
     fn test_ce_lambda_loss_single() {
         let loss_fn = CrossEntropyLambdaLoss::default();
         // Unweighted
-        assert!((loss_fn.loss_single(1.0, 0.0, None) - 0.69314718).abs() < 1e-6);
+        assert!((loss_fn.loss_single(1.0, 0.0, None) as f64 - std::f64::consts::LN_2).abs() < 1e-6);
         // Weighted (z=0.75)
         assert!((loss_fn.loss_single(1.0, 0.0, Some(2.0)) - 0.287682).abs() < 1e-5);
         // Fallback single

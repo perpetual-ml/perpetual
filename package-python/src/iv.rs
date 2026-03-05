@@ -36,13 +36,13 @@ impl IVBooster {
         terminate_missing_features,
         missing_node_treatment,
         log_iterations,
-        quantile,
         reset,
         categorical_features,
         timeout,
         iteration_limit,
         memory_limit,
         stopping_rounds,
+        seed=0,
     ))]
     pub fn new(
         treatment_objective: &str,
@@ -60,13 +60,13 @@ impl IVBooster {
         terminate_missing_features: HashSet<usize>,
         missing_node_treatment: &str,
         log_iterations: usize,
-        quantile: Option<f64>,
         reset: Option<bool>,
         categorical_features: Option<HashSet<usize>>,
         timeout: Option<f32>,
         iteration_limit: Option<usize>,
         memory_limit: Option<f32>,
         stopping_rounds: Option<usize>,
+        seed: u64,
     ) -> PyResult<Self> {
         let treatment_obj = to_value_error(serde_plain::from_str(treatment_objective))?;
         let outcome_obj = to_value_error(serde_plain::from_str(outcome_objective))?;
@@ -89,8 +89,7 @@ impl IVBooster {
             terminate_missing_features,
             missing_node_treatment_,
             log_iterations,
-            42, // seed - TODO: pass this?
-            quantile,
+            seed,
             reset,
             categorical_features,
             timeout,

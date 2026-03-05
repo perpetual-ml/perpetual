@@ -3,7 +3,6 @@
 //! Implements standard meta-algorithms (S-Learner, T-Learner, X-Learner, DR-Learner)
 //! wrapping `PerpetualBooster`.
 
-use crate::booster::config::CalibrationMethod;
 use crate::booster::core::PerpetualBooster;
 use crate::constraints::ConstraintMap;
 use crate::data::Matrix;
@@ -29,7 +28,6 @@ fn create_booster(
     missing_node_treatment: crate::booster::config::MissingNodeTreatment,
     log_iterations: usize,
     seed: u64,
-    quantile: Option<f64>,
     reset: Option<bool>,
     categorical_features: Option<HashSet<usize>>,
     timeout: Option<f32>,
@@ -53,7 +51,6 @@ fn create_booster(
         missing_node_treatment,
         log_iterations,
         seed,
-        quantile,
         reset,
         categorical_features,
         timeout,
@@ -61,7 +58,6 @@ fn create_booster(
         memory_limit,
         stopping_rounds,
         false,
-        CalibrationMethod::default(),
     )
 }
 
@@ -130,7 +126,6 @@ impl SLearner {
         missing_node_treatment: crate::booster::config::MissingNodeTreatment,
         log_iterations: usize,
         seed: u64,
-        quantile: Option<f64>,
         reset: Option<bool>,
         categorical_features: Option<HashSet<usize>>,
         timeout: Option<f32>,
@@ -153,7 +148,6 @@ impl SLearner {
             missing_node_treatment,
             log_iterations,
             seed,
-            quantile,
             reset,
             categorical_features,
             timeout,
@@ -229,7 +223,6 @@ impl TLearner {
         missing_node_treatment: crate::booster::config::MissingNodeTreatment,
         log_iterations: usize,
         seed: u64,
-        quantile: Option<f64>,
         reset: Option<bool>,
         categorical_features: Option<HashSet<usize>>,
         timeout: Option<f32>,
@@ -252,7 +245,6 @@ impl TLearner {
             missing_node_treatment,
             log_iterations,
             seed + 1,
-            quantile,
             reset,
             categorical_features.clone(),
             timeout,
@@ -275,7 +267,6 @@ impl TLearner {
             missing_node_treatment,
             log_iterations,
             seed + 1, // slight seed variation
-            quantile,
             reset,
             categorical_features,
             timeout,
@@ -338,7 +329,6 @@ impl XLearner {
         missing_node_treatment: crate::booster::config::MissingNodeTreatment,
         log_iterations: usize,
         seed: u64,
-        quantile: Option<f64>,
         reset: Option<bool>,
         categorical_features: Option<HashSet<usize>>,
         timeout: Option<f32>,
@@ -365,7 +355,6 @@ impl XLearner {
                 missing_node_treatment,
                 log_iterations,
                 s,
-                quantile,
                 reset,
                 categorical_features.clone(),
                 timeout,
@@ -461,7 +450,6 @@ impl DRLearner {
         missing_node_treatment: crate::booster::config::MissingNodeTreatment,
         log_iterations: usize,
         seed: u64,
-        quantile: Option<f64>,
         reset: Option<bool>,
         categorical_features: Option<HashSet<usize>>,
         timeout: Option<f32>,
@@ -488,7 +476,6 @@ impl DRLearner {
                 missing_node_treatment,
                 log_iterations,
                 s,
-                quantile,
                 reset,
                 categorical_features.clone(),
                 timeout,

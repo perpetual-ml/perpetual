@@ -292,8 +292,7 @@ mod tests {
         let b = bin_matrix(&data, None, 10, f64::NAN, None).unwrap();
         let bdata = Matrix::new(&b.binned_data, data.rows, data.cols);
         for column in 0..data.cols {
-            let mut b_compare = 1;
-            for cuts in b.cuts.get_col(column).windows(2) {
+            for (b_compare, cuts) in (1..).zip(b.cuts.get_col(column).windows(2)) {
                 let c1 = cuts[0];
                 let c2 = cuts[1];
                 let mut n_v = 0;
@@ -307,7 +306,6 @@ mod tests {
                     }
                 }
                 assert_eq!(n_v, n_b);
-                b_compare += 1;
             }
         }
         println!("{:?}", b);
@@ -335,8 +333,7 @@ mod tests {
         println!("{:?}", b.nunique);
 
         for column in 0..data.cols {
-            let mut b_compare = 1;
-            for cuts in b.cuts.get_col(column).windows(2) {
+            for (b_compare, cuts) in (1..).zip(b.cuts.get_col(column).windows(2)) {
                 let c1 = cuts[0];
                 let c2 = cuts[1];
                 let mut n_v = 0;
@@ -350,7 +347,6 @@ mod tests {
                     }
                 }
                 assert_eq!(n_v, n_b);
-                b_compare += 1;
             }
         }
     }

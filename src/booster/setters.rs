@@ -123,13 +123,6 @@ impl PerpetualBooster {
         self
     }
 
-    /// Set the quantile on the booster.
-    /// * `quantile` - used only in quantile regression.
-    pub fn set_quantile(mut self, quantile: Option<f64>) -> Self {
-        self.cfg.quantile = quantile;
-        self
-    }
-
     /// Set the reset on the booster.
     /// * `reset` - Reset the model or continue training.
     pub fn set_reset(mut self, reset: Option<bool>) -> Self {
@@ -214,7 +207,6 @@ mod tests {
             .set_log_iterations(10)
             .set_ref_log_iterations(20)
             .set_seed(42)
-            .set_quantile(Some(0.5))
             .set_reset(Some(true))
             .set_categorical_features(Some(HashSet::from([1])))
             .set_timeout(Some(100.0))
@@ -242,7 +234,6 @@ mod tests {
         );
         assert_eq!(booster.cfg.log_iterations, 20);
         assert_eq!(booster.cfg.seed, 42);
-        assert_eq!(booster.cfg.quantile, Some(0.5));
         assert_eq!(booster.cfg.reset, Some(true));
         assert!(booster.cfg.categorical_features.as_ref().unwrap().contains(&1));
         assert_eq!(booster.cfg.timeout, Some(100.0));

@@ -186,12 +186,9 @@ mod tests {
         assert_eq!(hw.unwrap(), vec![2e-6, 0.5e-6]);
 
         // Initial value weighted
-        assert_eq!(loss_fn.initial_value(&vec![1.0, 0.0], Some(&vec![3.0, 1.0]), None), 1.0);
-        assert_eq!(
-            loss_fn.initial_value(&vec![1.0, 0.0], Some(&vec![1.0, 3.0]), None),
-            -1.0
-        );
-        assert_eq!(loss_fn.initial_value(&vec![1.0, 0.0], Some(&vec![1.0, 1.0]), None), 0.0);
+        assert_eq!(loss_fn.initial_value(&[1.0, 0.0], Some(&[3.0, 1.0]), None), 1.0);
+        assert_eq!(loss_fn.initial_value(&[1.0, 0.0], Some(&[1.0, 3.0]), None), -1.0);
+        assert_eq!(loss_fn.initial_value(&[1.0, 0.0], Some(&[1.0, 1.0]), None), 0.0);
     }
 
     #[test]

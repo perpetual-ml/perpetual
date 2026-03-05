@@ -223,8 +223,8 @@ mod tests {
         // Mean y = 1.0 / 3.0. Logit(1/3) = ln(1/3 / 2/3) = ln(1/2) = -ln(2)
         assert!((loss_fn.initial_value(&y, None, None) - (-2.0_f64.ln())).abs() < 1e-6);
 
-        assert_eq!(loss_fn.initial_value(&vec![1.0], None, None), f64::INFINITY);
-        assert_eq!(loss_fn.initial_value(&vec![0.0], None, None), f64::NEG_INFINITY);
+        assert_eq!(loss_fn.initial_value(&[1.0], None, None), f64::INFINITY);
+        assert_eq!(loss_fn.initial_value(&[0.0], None, None), f64::NEG_INFINITY);
     }
 
     #[test]
@@ -244,18 +244,15 @@ mod tests {
 
         let l = loss_fn.loss(&y, &yhat, None, None);
         // - (1 * ln(0.5) + 0 * ln(0.5)) = -ln(0.5) = ln(2) approx 0.693147
-        assert!((l[0] - 0.69314718).abs() < 1e-6);
+        assert!((l[0] as f64 - std::f64::consts::LN_2).abs() < 1e-6);
 
         let w = vec![2.0, 0.5];
         let lw = loss_fn.loss(&y, &yhat, Some(&w), None);
-        assert!((lw[0] - 0.69314718 * 2.0).abs() < 1e-6);
+        assert!((lw[0] as f64 - std::f64::consts::LN_2 * 2.0).abs() < 1e-6);
 
         // Edge case init weighted
-        assert_eq!(loss_fn.initial_value(&vec![1.0], Some(&vec![2.0]), None), f64::INFINITY);
-        assert_eq!(
-            loss_fn.initial_value(&vec![0.0], Some(&vec![2.0]), None),
-            f64::NEG_INFINITY
-        );
+        assert_eq!(loss_fn.initial_value(&[1.0], Some(&[2.0]), None), f64::INFINITY);
+        assert_eq!(loss_fn.initial_value(&[0.0], Some(&[2.0]), None), f64::NEG_INFINITY);
     }
 
     #[test]
@@ -284,7 +281,7 @@ mod tests {
         // Hess: 0.25 * 2 = 0.5, 0.25 * 0.5 = 0.125
         assert_eq!(h.unwrap(), vec![0.5, 0.125]);
         // Loss: ln(2) * 2, ln(2) * 0.5
-        assert!((l[0] - 0.69314718 * 2.0).abs() < 1e-6);
+        assert!((l[0] as f64 - std::f64::consts::LN_2 * 2.0).abs() < 1e-6);
     }
 
     #[test]
@@ -298,7 +295,7 @@ mod tests {
         loss_fn.gradient_and_loss_into(&y, &yhat, None, None, &mut grad, &mut hess, &mut loss);
         assert_eq!(grad, vec![-0.5, 0.5]);
         assert_eq!(hess.unwrap(), vec![0.25, 0.25]);
-        assert!((loss[0] - 0.69314718).abs() < 1e-6);
+        assert!((loss[0] as f64 - std::f64::consts::LN_2).abs() < 1e-6);
 
         let w = vec![2.0, 0.5];
         let mut gradw = vec![0.0; 2];
@@ -307,12 +304,12 @@ mod tests {
         loss_fn.gradient_and_loss_into(&y, &yhat, Some(&w), None, &mut gradw, &mut hessw, &mut lossw);
         assert_eq!(gradw, vec![-1.0, 0.25]);
         assert_eq!(hessw.unwrap(), vec![0.5, 0.125]);
-        assert!((lossw[0] - 0.69314718 * 2.0).abs() < 1e-6);
+        assert!((lossw[0] as f64 - std::f64::consts::LN_2 * 2.0).abs() < 1e-6);
     }
 
     #[test]
     fn test_ce_loss_single() {
         let loss_fn = CrossEntropyLoss::default();
-        assert!((loss_fn.loss_single(1.0, 0.0, None) - 0.69314718).abs() < 1e-6);
+        assert!((loss_fn.loss_single(1.0, 0.0, None) as f64 - std::f64::consts::LN_2).abs() < 1e-6);
     }
 }

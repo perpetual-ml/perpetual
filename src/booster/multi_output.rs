@@ -77,7 +77,6 @@ impl MultiOutputBooster {
     /// * `missing_node_treatment` - specify how missing nodes should be handled during training.
     /// * `log_iterations` - Setting to a value (N) other than zero will result in information being logged about ever N iterations.
     /// * `seed` - Integer value used to seed any randomness used in the algorithm.
-    /// * `quantile` - used only in quantile regression.
     /// * `reset` - Reset the model or continue training.
     /// * `categorical_features` - categorical features.
     /// * `timeout` - fit timeout limit in seconds.
@@ -102,7 +101,6 @@ impl MultiOutputBooster {
         missing_node_treatment: MissingNodeTreatment,
         log_iterations: usize,
         seed: u64,
-        quantile: Option<f64>,
         reset: Option<bool>,
         categorical_features: Option<HashSet<usize>>,
         timeout: Option<f32>,
@@ -110,7 +108,6 @@ impl MultiOutputBooster {
         memory_limit: Option<f32>,
         stopping_rounds: Option<usize>,
         save_node_stats: bool,
-        calibration_method: CalibrationMethod,
     ) -> Result<Self, PerpetualError> {
         // Build the common configuration object.
         let cfg = BoosterConfig {
@@ -128,7 +125,6 @@ impl MultiOutputBooster {
             missing_node_treatment,
             log_iterations,
             seed,
-            quantile,
             reset,
             categorical_features: categorical_features.clone(),
             timeout: timeout.map(|t| t / n_boosters.max(1) as f32),
@@ -136,7 +132,7 @@ impl MultiOutputBooster {
             memory_limit,
             stopping_rounds,
             save_node_stats,
-            calibration_method,
+            calibration_method: CalibrationMethod::default(),
         };
 
         // Base booster template that child boosters will clone.
@@ -485,14 +481,6 @@ impl MultiOutputBooster {
         self
     }
 
-    /// Set the quantile on the booster.
-    /// * `quantile` - used only in quantile regression.
-    pub fn set_quantile(mut self, quantile: Option<f64>) -> Self {
-        self.cfg.quantile = quantile;
-        self.boosters = self.boosters.iter().map(|b| b.clone().set_quantile(quantile)).collect();
-        self
-    }
-
     /// Set the reset on the booster.
     /// * `reset` - Reset the model or continue training.
     pub fn set_reset(mut self, reset: Option<bool>) -> Self {
@@ -816,9 +804,7 @@ mod tests {
             None,
             None,
             None,
-            None,
             false,
-            CalibrationMethod::WeightVariance,
         )
         .unwrap();
         assert_eq!(booster.n_boosters, 2);
@@ -853,9 +839,11 @@ mod tests {
 
     #[test]
     fn test_multi_output_serialization() {
-        let mut booster = MultiOutputBooster::default();
-        booster.n_boosters = 1;
-        booster.boosters = vec![PerpetualBooster::default()];
+        let booster = MultiOutputBooster {
+            n_boosters: 1,
+            boosters: vec![PerpetualBooster::default()],
+            ..Default::default()
+        };
         let json = booster.json_dump().unwrap();
         let booster2 = MultiOutputBooster::from_json(&json).unwrap();
         assert_eq!(booster2.n_boosters, 1);
@@ -925,7 +913,7 @@ mod tests {
         booster = booster.set_n_boosters(2);
         booster = booster.set_budget(0.1);
 
-        let data_vec = vec![1.0, 2.0, 3.0, 4.0];
+        let data_vec = [1.0, 2.0, 3.0, 4.0];
         let col0 = &data_vec[0..2];
         let col1 = &data_vec[2..4];
         let data = ColumnarMatrix::new(vec![col0, col1], None, 2);
@@ -955,7 +943,7 @@ mod tests {
         booster = booster.set_save_node_stats(true);
         booster = booster.set_budget(0.1);
 
-        let data_vec = vec![1.0, 2.0, 3.0, 4.0];
+        let data_vec = [1.0, 2.0, 3.0, 4.0];
         let col0 = &data_vec[0..2];
         let col1 = &data_vec[2..4];
         let data = ColumnarMatrix::new(vec![col0, col1], None, 2);
@@ -1015,7 +1003,6 @@ mod tests {
             .set_missing_node_treatment(MissingNodeTreatment::None)
             .set_log_iterations(0)
             .set_seed(123)
-            .set_quantile(None)
             .set_reset(None)
             .set_categorical_features(None)
             .set_timeout(None)

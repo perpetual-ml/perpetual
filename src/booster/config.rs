@@ -74,9 +74,7 @@ pub enum CalibrationMethod {
 fn default_budget() -> f32 {
     0.5
 }
-fn default_quantile() -> Option<f64> {
-    None
-}
+
 fn default_reset() -> Option<bool> {
     None
 }
@@ -165,9 +163,7 @@ pub struct BoosterConfig {
     pub log_iterations: usize,
     /// Seed for random number generation.
     pub seed: u64,
-    /// Quantile for quantile regression.
-    #[serde(default = "default_quantile")]
-    pub quantile: Option<f64>,
+
     /// Whether to reset or continue training on fit.
     #[serde(default = "default_reset")]
     pub reset: Option<bool>,
@@ -212,7 +208,6 @@ impl Default for BoosterConfig {
             missing_node_treatment: MissingNodeTreatment::AssignToParent,
             log_iterations: 0,
             seed: 0,
-            quantile: None,
             reset: None,
             categorical_features: None,
             timeout: None,

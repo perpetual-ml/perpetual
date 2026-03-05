@@ -703,10 +703,11 @@ mod tests {
     }
 
     fn create_mock_multi_booster() -> MultiOutputBooster {
-        let mut booster = MultiOutputBooster::default();
-        booster.boosters = vec![create_mock_booster(), create_mock_booster()];
-        booster.n_boosters = 2;
-        booster
+        MultiOutputBooster {
+            boosters: vec![create_mock_booster(), create_mock_booster()],
+            n_boosters: 2,
+            ..Default::default()
+        }
     }
 
     #[test]
@@ -730,7 +731,7 @@ mod tests {
     #[test]
     fn test_predict_columnar() {
         let booster = create_mock_booster();
-        let data_vec = vec![1.0, 2.0, 3.0, 4.0];
+        let data_vec = [1.0, 2.0, 3.0, 4.0];
         let col0 = &data_vec[0..2];
         let col1 = &data_vec[2..4];
         let data = ColumnarMatrix::new(vec![col0, col1], None, 2);
@@ -760,9 +761,11 @@ mod tests {
 
         // base_score (0.5) + leaf weight_value (0.1) = 0.6
         // Since stats is None, it defaults to weight_value repeated 5 times
-        for i in 0..n {
-            assert_relative_eq!(dist[0][i], 0.6, epsilon = 1e-7);
-            assert_relative_eq!(dist[1][i], 0.6, epsilon = 1e-7);
+        for d in dist[0].iter().take(n) {
+            assert_relative_eq!(*d, 0.6, epsilon = 1e-7);
+        }
+        for d in dist[1].iter().take(n) {
+            assert_relative_eq!(*d, 0.6, epsilon = 1e-7);
         }
     }
 
@@ -846,7 +849,7 @@ mod tests {
     #[test]
     fn test_multi_output_predict_intervals_columnar() {
         let booster = create_mock_multi_booster();
-        let data_vec = vec![1.0, 2.0, 3.0, 4.0];
+        let data_vec = [1.0, 2.0, 3.0, 4.0];
         let col0 = &data_vec[0..2];
         let col1 = &data_vec[2..4];
         let data = ColumnarMatrix::new(vec![col0, col1], None, 2);
@@ -857,7 +860,7 @@ mod tests {
     #[test]
     fn test_predict_contributions_columnar() {
         let booster = create_mock_booster();
-        let data_vec = vec![1.0, 2.0, 3.0, 4.0];
+        let data_vec = [1.0, 2.0, 3.0, 4.0];
         let col0 = &data_vec[0..2];
         let col1 = &data_vec[2..4];
         let data = ColumnarMatrix::new(vec![col0, col1], None, 2);
@@ -868,7 +871,7 @@ mod tests {
     #[test]
     fn test_multi_output_predict_contributions_columnar() {
         let booster = create_mock_multi_booster();
-        let data_vec = vec![1.0, 2.0, 3.0, 4.0];
+        let data_vec = [1.0, 2.0, 3.0, 4.0];
         let col0 = &data_vec[0..2];
         let col1 = &data_vec[2..4];
         let data = ColumnarMatrix::new(vec![col0, col1], None, 2);
@@ -883,7 +886,7 @@ mod tests {
         let mut booster = create_mock_booster();
         booster.cfg.objective = Objective::LogLoss;
         booster.base_score = 0.0;
-        let data_vec = vec![1.0, 2.0, 3.0, 4.0];
+        let data_vec = [1.0, 2.0, 3.0, 4.0];
         let col0 = &data_vec[0..2];
         let col1 = &data_vec[2..4];
         let data = ColumnarMatrix::new(vec![col0, col1], None, 2);
@@ -899,7 +902,7 @@ mod tests {
         let mut booster = create_mock_booster();
         booster.cfg.objective = Objective::LogLoss;
         booster.base_score = 0.0;
-        let data_vec = vec![1.0, 2.0, 3.0, 4.0];
+        let data_vec = [1.0, 2.0, 3.0, 4.0];
         let col0 = &data_vec[0..2];
         let col1 = &data_vec[2..4];
         let data = ColumnarMatrix::new(vec![col0, col1], None, 2);
@@ -910,7 +913,7 @@ mod tests {
     #[test]
     fn test_predict_nodes_columnar() {
         let booster = create_mock_booster();
-        let data_vec = vec![1.0, 2.0, 3.0, 4.0];
+        let data_vec = [1.0, 2.0, 3.0, 4.0];
         let col0 = &data_vec[0..2];
         let col1 = &data_vec[2..4];
         let data = ColumnarMatrix::new(vec![col0, col1], None, 2);
@@ -938,7 +941,7 @@ mod tests {
     #[test]
     fn test_predict_contributions_columnar_average() {
         let booster = create_mock_booster();
-        let data_vec = vec![1.0, 2.0, 3.0, 4.0];
+        let data_vec = [1.0, 2.0, 3.0, 4.0];
         let col0 = &data_vec[0..2];
         let col1 = &data_vec[2..4];
         let data = ColumnarMatrix::new(vec![col0, col1], None, 2);
@@ -949,7 +952,7 @@ mod tests {
     #[test]
     fn test_predict_contributions_columnar_average_parallel() {
         let booster = create_mock_booster();
-        let data_vec = vec![1.0, 2.0, 3.0, 4.0];
+        let data_vec = [1.0, 2.0, 3.0, 4.0];
         let col0 = &data_vec[0..2];
         let col1 = &data_vec[2..4];
         let data = ColumnarMatrix::new(vec![col0, col1], None, 2);
@@ -960,7 +963,7 @@ mod tests {
     #[test]
     fn test_predict_contributions_columnar_all_methods() {
         let booster = create_mock_booster();
-        let data_vec = vec![1.0, 2.0, 3.0, 4.0];
+        let data_vec = [1.0, 2.0, 3.0, 4.0];
         let col0 = &data_vec[0..2];
         let col1 = &data_vec[2..4];
         let data = ColumnarMatrix::new(vec![col0, col1], None, 2);
@@ -981,7 +984,7 @@ mod tests {
     fn test_predict_contributions_columnar_probability_change() {
         let mut booster = create_mock_booster();
         booster.cfg.objective = Objective::LogLoss;
-        let data_vec = vec![1.0, 2.0, 3.0, 4.0];
+        let data_vec = [1.0, 2.0, 3.0, 4.0];
         let col0 = &data_vec[0..2];
         let col1 = &data_vec[2..4];
         let data = ColumnarMatrix::new(vec![col0, col1], None, 2);
@@ -993,7 +996,7 @@ mod tests {
     fn test_predict_contributions_columnar_probability_change_parallel() {
         let mut booster = create_mock_booster();
         booster.cfg.objective = Objective::LogLoss;
-        let data_vec = vec![1.0, 2.0, 3.0, 4.0];
+        let data_vec = [1.0, 2.0, 3.0, 4.0];
         let col0 = &data_vec[0..2];
         let col1 = &data_vec[2..4];
         let data = ColumnarMatrix::new(vec![col0, col1], None, 2);
@@ -1004,7 +1007,7 @@ mod tests {
     #[test]
     fn test_predict_contributions_tree_alone_columnar_parallel() {
         let booster = create_mock_booster();
-        let data_vec = vec![1.0, 2.0, 3.0, 4.0];
+        let data_vec = [1.0, 2.0, 3.0, 4.0];
         let col0 = &data_vec[0..2];
         let col1 = &data_vec[2..4];
         let data = ColumnarMatrix::new(vec![col0, col1], None, 2);
@@ -1015,7 +1018,7 @@ mod tests {
     #[test]
     fn test_multi_output_predict_columnar() {
         let booster = create_mock_multi_booster();
-        let data_vec = vec![1.0, 2.0, 3.0, 4.0];
+        let data_vec = [1.0, 2.0, 3.0, 4.0];
         let col0 = &data_vec[0..2];
         let col1 = &data_vec[2..4];
         let data = ColumnarMatrix::new(vec![col0, col1], None, 2);
@@ -1026,7 +1029,7 @@ mod tests {
     #[test]
     fn test_multi_output_predict_proba_columnar() {
         let booster = create_mock_multi_booster();
-        let data_vec = vec![1.0, 2.0, 3.0, 4.0];
+        let data_vec = [1.0, 2.0, 3.0, 4.0];
         let col0 = &data_vec[0..2];
         let col1 = &data_vec[2..4];
         let data = ColumnarMatrix::new(vec![col0, col1], None, 2);
@@ -1046,7 +1049,7 @@ mod tests {
     #[test]
     fn test_multi_output_predict_nodes_columnar() {
         let booster = create_mock_multi_booster();
-        let data_vec = vec![1.0, 2.0, 3.0, 4.0];
+        let data_vec = [1.0, 2.0, 3.0, 4.0];
         let col0 = &data_vec[0..2];
         let col1 = &data_vec[2..4];
         let data = ColumnarMatrix::new(vec![col0, col1], None, 2);

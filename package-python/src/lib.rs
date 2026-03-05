@@ -14,7 +14,7 @@ mod utils;
 
 use crate::booster::PerpetualBooster;
 use crate::iv::IVBooster;
-use crate::metalearners::{DRLearner, SLearner, TLearner, XLearner};
+use crate::metalearners::{DMLEstimator, DRLearner, SLearner, TLearner, XLearner};
 use crate::multi_output::MultiOutputBooster;
 use crate::uplift::UpliftBooster;
 use crate::utils::percentiles;
@@ -39,6 +39,7 @@ fn perpetual(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<TLearner>()?;
     m.add_class::<XLearner>()?;
     m.add_class::<DRLearner>()?;
+    m.add_class::<DMLEstimator>()?;
 
     Ok(())
 }
