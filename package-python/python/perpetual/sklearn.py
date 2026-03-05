@@ -116,6 +116,8 @@ class PerpetualClassifier(PerpetualBooster, ClassifierMixin):
             Maximum unique categories before a feature is treated as numerical.
         interaction_constraints : list of list of int, optional
             Interaction constraints.
+        save_node_stats : bool, default=False
+            Whether to save node statistics (required for calibration).
         **kwargs
             Arbitrary keyword arguments to be passed to the base class.
         """

@@ -189,7 +189,6 @@ class PerpetualBooster:
             Maximum unique categories before a feature is treated as numerical.
         interaction_constraints : list of list of int, optional
             Interaction constraints.
-        save_node_stats : bool, default=False
         """
 
         terminate_missing_features_ = (
