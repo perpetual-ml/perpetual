@@ -188,7 +188,7 @@ impl Tree {
         growable.add_node(root_node);
         while !growable.is_empty() {
             // If this will push us over the number of allocated nodes, break.
-            if self.nodes.len() > (n_nodes_alloc - 3) {
+            if self.nodes.len() + 2 > n_nodes_alloc {
                 self.stopper = TreeStopper::MaxNodes;
                 break;
             }

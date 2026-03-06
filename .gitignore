@@ -66,3 +66,6 @@ package-r/inst/c/
 
 # Environment variables
 .env
+
+# Temp folder
+tmp/

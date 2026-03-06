@@ -1693,8 +1693,10 @@ fn best_feature_split_const_hess(
         if all_cats.is_empty() {
             split_info.left_cats = None;
         } else {
-            if split_info.left_cats.is_none() {
-                split_info.left_cats = Some(vec![0u8; 8192].into_boxed_slice());
+            let max_cat = all_cats.iter().max().copied().unwrap_or(0);
+            let needed_bytes = (max_cat >> 3) + 1;
+            if split_info.left_cats.as_ref().is_none_or(|c| c.len() < needed_bytes) {
+                split_info.left_cats = Some(vec![0u8; needed_bytes].into_boxed_slice());
             }
             let left_cats_vec = split_info.left_cats.as_mut().unwrap();
             left_cats_vec.fill(0);
@@ -1704,7 +1706,7 @@ fn best_feature_split_const_hess(
                 }
                 let byte_idx = c >> 3;
                 let bit_idx = c & 7;
-                left_cats_vec[byte_idx] |= 1 << bit_idx;
+                left_cats_vec[byte_idx] |= (1 << bit_idx) as u8;
             }
         }
     }
@@ -2587,8 +2589,10 @@ fn best_feature_split_var_hess(
         if all_cats.is_empty() {
             split_info.left_cats = None;
         } else {
-            if split_info.left_cats.is_none() {
-                split_info.left_cats = Some(vec![0u8; 8192].into_boxed_slice());
+            let max_cat = all_cats.iter().max().copied().unwrap_or(0);
+            let needed_bytes = (max_cat >> 3) + 1;
+            if split_info.left_cats.as_ref().is_none_or(|c| c.len() < needed_bytes) {
+                split_info.left_cats = Some(vec![0u8; needed_bytes].into_boxed_slice());
             }
             let left_cats_vec = split_info.left_cats.as_mut().unwrap();
             left_cats_vec.fill(0);
@@ -2598,7 +2602,7 @@ fn best_feature_split_var_hess(
                 }
                 let byte_idx = c >> 3;
                 let bit_idx = c & 7;
-                left_cats_vec[byte_idx] |= 1 << bit_idx;
+                left_cats_vec[byte_idx] |= (1 << bit_idx) as u8;
             }
         }
     }

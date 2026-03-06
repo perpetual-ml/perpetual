@@ -91,7 +91,7 @@
 //!     .set_seed(42);
 //! ```
 
-mod node;
+pub mod node;
 mod partial_dependence;
 mod shapley;
 

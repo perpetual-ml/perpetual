@@ -190,7 +190,7 @@ print("Successfully generated resources/model_v2.0.0.json and predictions")
                 "uv",
                 "run",
                 "--with",
-                "./package-python",  # "./package-python" or "perpetual==2.0.0"
+                "perpetual==2.0.0",  # "./package-python" or "perpetual==2.0.0"
                 "--with",
                 "pandas",
                 "--with",

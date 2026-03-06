@@ -5,9 +5,10 @@
 use crate::data::FloatData;
 use crate::splitter::{MissingInfo, NodeInfo, SplitInfo};
 use crate::utils::is_missing;
-use serde::{Deserialize, Serialize};
+use serde::de::{self, Visitor};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::cmp::Ordering;
-use std::fmt::{self, Debug};
+use std::fmt::{self, Debug, Write};
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct SplittableNode {
@@ -30,6 +31,7 @@ pub struct SplittableNode {
     pub is_missing_leaf: bool,
     pub parent_node: usize,
     #[allow(clippy::box_collection)]
+    #[serde(serialize_with = "serialize_left_cats", deserialize_with = "deserialize_left_cats")]
     pub left_cats: Option<Box<[u8]>>,
     pub stats: Option<Box<NodeStats>>,
 }
@@ -58,6 +60,7 @@ pub struct Node {
     pub is_leaf: bool,
     pub parent_node: usize,
     #[allow(clippy::box_collection)]
+    #[serde(serialize_with = "serialize_left_cats", deserialize_with = "deserialize_left_cats")]
     pub left_cats: Option<Box<[u8]>>,
     pub stats: Option<Box<NodeStats>>,
 }
@@ -251,7 +254,15 @@ impl SplittableNode {
         self.split_value = split_info.split_value;
         self.missing_node = missing_child;
         self.is_leaf = false;
-        self.left_cats = split_info.left_cats.clone();
+        self.left_cats = split_info.left_cats.as_ref().map(|bitset| {
+            let mut max_byte = 0;
+            for (i, &b) in bitset.iter().enumerate() {
+                if b != 0 {
+                    max_byte = i;
+                }
+            }
+            bitset[..=max_byte].to_vec().into_boxed_slice()
+        });
     }
 
     pub fn get_split_gain(
@@ -316,4 +327,76 @@ impl fmt::Display for Node {
             )
         }
     }
+}
+
+pub fn serialize_left_cats<S>(left_cats: &Option<Box<[u8]>>, serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    match left_cats {
+        Some(bytes) => {
+            let mut s = String::with_capacity(bytes.len() * 2);
+            for &b in bytes.as_ref() {
+                write!(&mut s, "{:02x}", b).map_err(serde::ser::Error::custom)?;
+            }
+            serializer.serialize_str(&s)
+        }
+        None => serializer.serialize_none(),
+    }
+}
+
+pub fn deserialize_left_cats<'de, D>(deserializer: D) -> Result<Option<Box<[u8]>>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    struct LeftCatsVisitor;
+
+    impl<'de> Visitor<'de> for LeftCatsVisitor {
+        type Value = Option<Box<[u8]>>;
+
+        fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+            formatter.write_str("a hex string, an array of bytes, or null")
+        }
+
+        fn visit_none<E>(self) -> Result<Self::Value, E>
+        where
+            E: de::Error,
+        {
+            Ok(None)
+        }
+
+        fn visit_unit<E>(self) -> Result<Self::Value, E>
+        where
+            E: de::Error,
+        {
+            Ok(None)
+        }
+
+        fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+        where
+            E: de::Error,
+        {
+            if !v.len().is_multiple_of(2) {
+                return Err(de::Error::custom("hex string must have even length"));
+            }
+            let bytes = (0..v.len())
+                .step_by(2)
+                .map(|i| u8::from_str_radix(&v[i..i + 2], 16).map_err(|e| de::Error::custom(e.to_string())))
+                .collect::<Result<Vec<u8>, E>>()?;
+            Ok(Some(bytes.into_boxed_slice()))
+        }
+
+        fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
+        where
+            A: de::SeqAccess<'de>,
+        {
+            let mut bytes = Vec::new();
+            while let Some(byte) = seq.next_element()? {
+                bytes.push(byte);
+            }
+            Ok(Some(bytes.into_boxed_slice()))
+        }
+    }
+
+    deserializer.deserialize_any(LeftCatsVisitor)
 }

@@ -1,4 +1,5 @@
 import os
+import pickle
 import time
 import urllib.request
 
@@ -17,22 +18,29 @@ DOWNLOAD_URLS = {
     "tabarena_wide_y.csv": "https://github.com/user-attachments/files/25682566/y.csv",
     "tabarena_var_x.csv": "https://github.com/user-attachments/files/25739177/X.csv",
     "tabarena_var_y.csv": "https://github.com/user-attachments/files/25739178/y.csv",
+    "tabarena_load_x.csv": "https://github.com/user-attachments/files/25764663/X.csv",
+    "tabarena_load_y.csv": "https://github.com/user-attachments/files/25764665/y.csv",
 }
 
 
 def _get_csv(filename):
     """Try to read a CSV from resources dir, then download, or skip the test."""
+    print(f"Loading {filename}...")
     local_path = os.path.join(RESOURCES_DIR, filename)
     if os.path.isfile(local_path):
-        return pd.read_csv(local_path)
+        res = pd.read_csv(local_path)
+        print(f"Loaded {filename} from resources.")
+        return res
 
     # Try downloading to the resources folder
     url = DOWNLOAD_URLS.get(filename)
     if url is None:
         pytest.skip(f"No download URL configured for {filename}")
     try:
+        print(f"Downloading {filename} from {url}...")
         os.makedirs(RESOURCES_DIR, exist_ok=True)
         urllib.request.urlretrieve(url, local_path)
+        print(f"Downloaded {filename}.")
     except Exception as exc:
         pytest.skip(f"Could not download {filename}: {exc}")
 
@@ -171,8 +179,8 @@ def test_tabarena_wide():
         objective="LogLoss",
         budget=2.0,
         categorical_features=categorical_features,
-        memory_limit=1,  # 30
-        iteration_limit=3,  # 10000
+        memory_limit=1,
+        iteration_limit=3,
         timeout=60 * 15,
     )
 
@@ -225,3 +233,104 @@ def test_tabarena_var():
         categorical_features=categorical_features, iteration_limit=3, memory_limit=1
     )
     model.fit(X, y)
+
+
+def test_tabarena_save_load():
+    print("test_tabarena_save_load started.")
+    X = _get_csv("tabarena_load_x.csv")
+    y = _get_csv("tabarena_load_y.csv")
+
+    categorical_features = [
+        "position_-30",
+        "position_-29",
+        "position_-28",
+        "position_-27",
+        "position_-26",
+        "position_-25",
+        "position_-24",
+        "position_-23",
+        "position_-22",
+        "position_-21",
+        "position_-20",
+        "position_-19",
+        "position_-18",
+        "position_-17",
+        "position_-16",
+        "position_-15",
+        "position_-14",
+        "position_-13",
+        "position_-12",
+        "position_-11",
+        "position_-10",
+        "position_-9",
+        "position_-8",
+        "position_-7",
+        "position_-6",
+        "position_-5",
+        "position_-4",
+        "position_-3",
+        "position_-2",
+        "position_-1",
+        "position_1",
+        "position_2",
+        "position_3",
+        "position_4",
+        "position_5",
+        "position_6",
+        "position_7",
+        "position_8",
+        "position_9",
+        "position_10",
+        "position_11",
+        "position_12",
+        "position_13",
+        "position_14",
+        "position_15",
+        "position_16",
+        "position_17",
+        "position_18",
+        "position_19",
+        "position_20",
+        "position_21",
+        "position_22",
+        "position_23",
+        "position_24",
+        "position_25",
+        "position_26",
+        "position_27",
+        "position_28",
+        "position_29",
+        "position_30",
+    ]
+
+    model = PerpetualBooster(
+        categorical_features=categorical_features,
+        memory_limit=3,
+        num_threads=8,
+        objective="LogLoss",
+        iteration_limit=10,
+        budget=2.0,
+    )
+
+    print(f"Starting fit... memory_limit={model.memory_limit}")
+    model.fit(X, y)
+    print("Fit completed.")
+    print(f"Number of trees: {model.number_of_trees}")
+
+    model_path = os.path.join(RESOURCES_DIR, "model.pkl")
+
+    print(f"Saving model to {model_path}...")
+    with open(model_path, "wb") as f:
+        pickle.dump(model, f)
+    print("Model saved.")
+
+    print("Loading model...")
+    with open(model_path, "rb") as f:
+        loaded_model = pickle.load(f)
+    print("Model loaded.")
+
+    del loaded_model
+    try:
+        os.remove(model_path)
+    except OSError:
+        pass

@@ -437,21 +437,59 @@ impl PerpetualBooster {
             // from_fixed creates max_bin + 2 bins, so we need max_bin + 2 >= max_nunique
             (max_nunique.saturating_sub(2) as u16).max(self.cfg.max_bin)
         };
-        let mem_hist: usize = if col_amount == col_index.len() {
-            mem_bin * binned_data.nunique.iter().sum::<usize>()
+        let mem_hist: f32 = if col_amount == col_index.len() {
+            (mem_bin * binned_data.nunique.iter().sum::<usize>()) as f32
         } else {
-            mem_bin * (effective_max_bin as usize + 2) * col_amount
+            (mem_bin * (effective_max_bin as usize + 2) * col_amount) as f32
         };
+        // Add metadata overhead: NodeHistogram + col_amount * FeatureHistogram
+        let mem_hist = mem_hist
+            + mem::size_of::<crate::histogram::NodeHistogram>() as f32
+            + (mem::size_of::<crate::histogram::FeatureHistogram>() * col_amount) as f32;
+
+        // Estimate baseline memory: bdata (u16), yhat (f64), grad (f32), loss (f32), hess (f32)
+        let base_memory_bytes = ((data.rows * data.cols * 2)
+            + (data.rows * 8)
+            + (data.rows * 4)
+            + (data.rows * 4)
+            + if is_const_hess { 0 } else { data.rows * 4 }) as f32;
+
         let sys = System::new_with_specifics(RefreshKind::nothing().with_memory(MemoryRefreshKind::everything()));
+
+        let mem_available = match sys.cgroup_limits() {
+            Some(limits) => limits.free_memory as f32,
+            None => sys.available_memory() as f32,
+        };
+
+        // Ensemble Memory Estimation (Average Case)
+        let ensemble_node_size = (mem::size_of::<crate::node::Node>() as f32 * 1.3) // 1.3x for HashMap overhead
+            + if self.cfg.save_node_stats { 48.0 } else { 0.0 };
+
+        let iteration_limit = self.cfg.iteration_limit.unwrap_or(ITER_LIMIT) as f32;
+        let avg_nodes_per_tree = 256.0_f32; // Assuming average tree size
+
         let n_nodes_alloc = match self.cfg.memory_limit {
-            Some(mem_limit) => (FREE_MEM_ALLOC_FACTOR * (mem_limit * 1e9_f32 / mem_hist as f32)) as usize,
+            Some(mem_limit) => {
+                let mem_limit_bytes = mem_limit * 1e9_f32;
+                // 10% safety buffer for pickle/overhead
+                let mem_limit_safe = mem_limit_bytes * 0.9;
+
+                let total_predicted_ensemble_mem = iteration_limit * avg_nodes_per_tree * ensemble_node_size;
+                let available_for_arena = (mem_limit_safe - base_memory_bytes - total_predicted_ensemble_mem).max(0.0);
+
+                // Hard ceiling is actual available memory so we don't crash the OS
+                let usable_memory = available_for_arena.min(mem_available);
+                let n = (FREE_MEM_ALLOC_FACTOR * (usable_memory / mem_hist)) as usize;
+
+                // Double-capping: memory-limit based vs data-rows based
+                let data_rows_cap = (data.rows * 2).max(N_NODES_ALLOC_MIN);
+                n.max(3).min(data_rows_cap).min(N_NODES_ALLOC_MAX)
+            }
             None => {
-                let mem_available = match sys.cgroup_limits() {
-                    Some(limits) => limits.free_memory as f32,
-                    None => sys.available_memory() as f32,
-                };
-                let n = (FREE_MEM_ALLOC_FACTOR * (mem_available / mem_hist as f32)) as usize;
-                n.clamp(N_NODES_ALLOC_MIN, N_NODES_ALLOC_MAX)
+                let actual_available = (mem_available - base_memory_bytes).max(0.0);
+                let n = (FREE_MEM_ALLOC_FACTOR * (actual_available / mem_hist)) as usize;
+                let data_rows_cap = (data.rows * 2).max(N_NODES_ALLOC_MIN);
+                n.min(data_rows_cap).clamp(N_NODES_ALLOC_MIN, N_NODES_ALLOC_MAX)
             }
         };
         let mut hist_arena = if col_amount == col_index.len() {
@@ -466,6 +504,8 @@ impl PerpetualBooster {
 
         // Pre-allocate index buffer, reused across iterations
         let mut index_buf = data.index.to_owned();
+
+        let mut total_ensemble_bytes = 0_usize;
 
         for i in 0..self.cfg.iteration_limit.unwrap_or(ITER_LIMIT) {
             let verbose = if self.cfg.log_iterations == 0 {
@@ -573,9 +613,33 @@ impl PerpetualBooster {
             }
 
             // Free training-only data before storing the tree
-            tree.leaf_bounds.clear();
-            tree.train_index.clear();
+            tree.leaf_bounds = Vec::new();
+            tree.train_index = Vec::new();
+
+            let cat_bytes: usize = tree
+                .nodes
+                .values()
+                .map(|n| n.left_cats.as_ref().map_or(0, |c| c.len()))
+                .sum();
+            let tree_bytes = (tree.nodes.capacity() as f32 * ensemble_node_size) as usize
+                + tree.leaf_bounds.capacity() * std::mem::size_of::<(f64, usize, usize)>()
+                + cat_bytes;
+            total_ensemble_bytes += tree_bytes;
+
             self.trees.push(tree);
+
+            if let Some(mem_limit) = self.cfg.memory_limit {
+                let mem_limit_safe = mem_limit * 1e9_f32 * 0.9;
+                let current_total_bytes =
+                    base_memory_bytes + (n_nodes_alloc as f32 * mem_hist) + (total_ensemble_bytes as f32);
+                if current_total_bytes > mem_limit_safe {
+                    warn!(
+                        "Reached memory limit before auto stopping. Stopped at iteration {}. Try to increase memory_limit.",
+                        i
+                    );
+                    break;
+                }
+            }
 
             if stopping >= self.cfg.stopping_rounds.unwrap_or(STOPPING_ROUNDS) {
                 info!("Auto stopping since stopping round limit reached.");
@@ -702,21 +766,59 @@ impl PerpetualBooster {
                 .unwrap_or(&(self.cfg.max_bin as usize + 2));
             (max_nunique.saturating_sub(2) as u16).max(self.cfg.max_bin)
         };
-        let mem_hist: usize = if col_amount == col_index.len() {
-            mem_bin * binned_data.nunique.iter().sum::<usize>()
+        let mem_hist: f32 = if col_amount == col_index.len() {
+            (mem_bin * binned_data.nunique.iter().sum::<usize>()) as f32
         } else {
-            mem_bin * (effective_max_bin as usize + 2) * col_amount
+            (mem_bin * (effective_max_bin as usize + 2) * col_amount) as f32
         };
+        // Add metadata overhead: NodeHistogram + col_amount * FeatureHistogram
+        let mem_hist = mem_hist
+            + mem::size_of::<crate::histogram::NodeHistogram>() as f32
+            + (mem::size_of::<crate::histogram::FeatureHistogram>() * col_amount) as f32;
+
+        // Estimate baseline memory: bdata (u16), yhat (f64), grad (f32), loss (f32), hess (f32)
+        let base_memory_bytes = ((data.rows * data.cols * 2)
+            + (data.rows * 8)
+            + (data.rows * 4)
+            + (data.rows * 4)
+            + if is_const_hess { 0 } else { data.rows * 4 }) as f32;
+
         let sys = System::new_with_specifics(RefreshKind::nothing().with_memory(MemoryRefreshKind::everything()));
+
+        let mem_available = match sys.cgroup_limits() {
+            Some(limits) => limits.free_memory as f32,
+            None => sys.available_memory() as f32,
+        };
+
+        // Ensemble Memory Estimation (Average Case)
+        let ensemble_node_size = (mem::size_of::<crate::node::Node>() as f32 * 1.3) // 1.3x for HashMap overhead
+            + if self.cfg.save_node_stats { 48.0 } else { 0.0 };
+
+        let iteration_limit = self.cfg.iteration_limit.unwrap_or(ITER_LIMIT) as f32;
+        let avg_nodes_per_tree = 256.0_f32; // Assuming average tree size
+
         let n_nodes_alloc = match self.cfg.memory_limit {
-            Some(mem_limit) => (FREE_MEM_ALLOC_FACTOR * (mem_limit * 1e9_f32 / mem_hist as f32)) as usize,
+            Some(mem_limit) => {
+                let mem_limit_bytes = mem_limit * 1e9_f32;
+                // 10% safety buffer for pickle/overhead
+                let mem_limit_safe = mem_limit_bytes * 0.9;
+
+                let total_predicted_ensemble_mem = iteration_limit * avg_nodes_per_tree * ensemble_node_size;
+                let available_for_arena = (mem_limit_safe - base_memory_bytes - total_predicted_ensemble_mem).max(0.0);
+
+                // Hard ceiling is actual available memory so we don't crash the OS
+                let usable_memory = available_for_arena.min(mem_available);
+                let n = (FREE_MEM_ALLOC_FACTOR * (usable_memory / mem_hist)) as usize;
+
+                // Double-capping: memory-limit based vs data-rows based
+                let data_rows_cap = (data.rows * 2).max(N_NODES_ALLOC_MIN);
+                n.max(3).min(data_rows_cap).min(N_NODES_ALLOC_MAX)
+            }
             None => {
-                let mem_available = match sys.cgroup_limits() {
-                    Some(limits) => limits.free_memory as f32,
-                    None => sys.available_memory() as f32,
-                };
-                let n = (FREE_MEM_ALLOC_FACTOR * (mem_available / mem_hist as f32)) as usize;
-                n.clamp(N_NODES_ALLOC_MIN, N_NODES_ALLOC_MAX)
+                let actual_available = (mem_available - base_memory_bytes).max(0.0);
+                let n = (FREE_MEM_ALLOC_FACTOR * (actual_available / mem_hist)) as usize;
+                let data_rows_cap = (data.rows * 2).max(N_NODES_ALLOC_MIN);
+                n.min(data_rows_cap).clamp(N_NODES_ALLOC_MIN, N_NODES_ALLOC_MAX)
             }
         };
 
@@ -731,6 +833,8 @@ impl PerpetualBooster {
 
         // Pre-allocate index buffer, reused across iterations
         let mut index_buf = data.index.to_owned();
+
+        let mut total_ensemble_bytes = 0_usize;
 
         for i in 0..self.cfg.iteration_limit.unwrap_or(ITER_LIMIT) {
             let verbose = if self.cfg.log_iterations == 0 {
@@ -838,9 +942,33 @@ impl PerpetualBooster {
             }
 
             // Free training-only data before storing the tree
-            tree.leaf_bounds.clear();
-            tree.train_index.clear();
+            tree.leaf_bounds = Vec::new();
+            tree.train_index = Vec::new();
+
+            let cat_bytes: usize = tree
+                .nodes
+                .values()
+                .map(|n| n.left_cats.as_ref().map_or(0, |c| c.len()))
+                .sum();
+            let tree_bytes = (tree.nodes.capacity() as f32 * ensemble_node_size) as usize
+                + tree.leaf_bounds.capacity() * std::mem::size_of::<(f64, usize, usize)>()
+                + cat_bytes;
+            total_ensemble_bytes += tree_bytes;
+
             self.trees.push(tree);
+
+            if let Some(mem_limit) = self.cfg.memory_limit {
+                let mem_limit_safe = mem_limit * 1e9_f32 * 0.9;
+                let current_total_bytes =
+                    base_memory_bytes + (n_nodes_alloc as f32 * mem_hist) + (total_ensemble_bytes as f32);
+                if current_total_bytes > mem_limit_safe {
+                    warn!(
+                        "Reached memory limit before auto stopping. Stopped at iteration {}. Try to increase memory_limit.",
+                        i
+                    );
+                    break;
+                }
+            }
 
             if stopping >= self.cfg.stopping_rounds.unwrap_or(STOPPING_ROUNDS) {
                 info!("Auto stopping since stopping round limit reached.");
@@ -1350,7 +1478,7 @@ mod perpetual_booster_test {
             // Memory limit is set to a very small value to force small trees (stumps/single splits).
             // Reduced from 0.00003 to 0.00002 because the Bin struct became smaller after refactoring,
             // which increased the number of nodes allocated (n_nodes_alloc) for the same memory limit.
-            .set_memory_limit(Some(0.00002))
+            .set_memory_limit(Some(0.0001))
             .set_save_node_stats(true)
             .set_budget(1.0);
 
@@ -1358,15 +1486,12 @@ mod perpetual_booster_test {
 
         let split_features_test = vec![6, 6, 6, 1, 6, 1, 6, 9, 1, 6];
         let split_gains_test = vec![
-            31.172_1, 25.249_4, 20.452, 17.503_5, 16.566_1, 14.345_2, 13.418_6, 12.505_2, 12.232_7, 10.869,
+            31.172, 25.249, 20.452, 17.503, 16.566, 14.345, 13.418, 12.505, 12.232, 10.869,
         ];
         for (i, tree) in booster.get_prediction_trees().iter().enumerate() {
             let nodes = &tree.nodes;
             let root_node = nodes.get(&0).unwrap();
-            println!("i: {}", i);
-            println!("nodes.len: {}", nodes.len());
-            println!("root_node.split_feature: {}", root_node.split_feature);
-            println!("root_node.split_gain: {}", root_node.split_gain);
+            println!("Tree {}: nodes.len = {}", i, nodes.len());
             assert_eq!(3, nodes.len());
             assert_eq!(root_node.split_feature, split_features_test[i]);
             assert_relative_eq!(root_node.split_gain, split_gains_test[i], max_relative = 0.99);

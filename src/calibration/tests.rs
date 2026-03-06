@@ -94,7 +94,7 @@ fn test_calibration_min_max() {
         .set_max_bin(5)
         .set_budget(0.1)
         .set_iteration_limit(Some(5))
-        .set_memory_limit(Some(0.0001));
+        .set_memory_limit(Some(0.01));
     booster.fit(&train_data, &y_train, None, None).unwrap();
 
     booster
@@ -154,7 +154,7 @@ fn test_calibration_grp() {
         .set_max_bin(5)
         .set_budget(0.1)
         .set_iteration_limit(Some(5))
-        .set_memory_limit(Some(0.0001));
+        .set_memory_limit(Some(0.01));
     booster.fit(&train_data, &y_train, None, None).unwrap();
 
     booster
@@ -212,7 +212,7 @@ fn test_calibration_weight_variance() {
         .set_max_bin(5)
         .set_budget(0.1)
         .set_iteration_limit(Some(5))
-        .set_memory_limit(Some(0.0001));
+        .set_memory_limit(Some(0.01));
     booster.fit(&train_data, &y_train, None, None).unwrap();
 
     booster
@@ -266,7 +266,7 @@ fn test_calibrate_without_save_node_stats() {
         .set_max_bin(5)
         .set_budget(0.1)
         .set_iteration_limit(Some(5))
-        .set_memory_limit(Some(0.0001));
+        .set_memory_limit(Some(0.01));
 
     booster.fit(&train_data, &y_train, None, None).unwrap();
 

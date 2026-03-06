@@ -248,7 +248,7 @@ mod tests {
             .set_max_bin(5)
             .set_budget(0.1)
             .set_iteration_limit(Some(3))
-            .set_memory_limit(Some(0.0001));
+            .set_memory_limit(Some(0.01));
 
         model.fit(&matrix_train, &y_train_sub, None, None)?;
 

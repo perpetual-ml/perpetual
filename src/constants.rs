@@ -4,7 +4,7 @@
 /// The number of rounds to look back for auto stopping.
 pub const STOPPING_ROUNDS: usize = 3;
 /// Factor to use when allocating memory for free nodes.
-pub const FREE_MEM_ALLOC_FACTOR: f32 = 0.9;
+pub const FREE_MEM_ALLOC_FACTOR: f32 = 0.7;
 /// Minimum number of nodes to allocate.
 pub const N_NODES_ALLOC_MIN: usize = 100;
 /// Maximum number of nodes to allocate.
