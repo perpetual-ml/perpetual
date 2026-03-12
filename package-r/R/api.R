@@ -1,7 +1,7 @@
 #' Train a PerpetualBooster model
 #'
-#' Perpetual is a self-generalizing gradient boosting machine that doesn't need 
-#' hyperparameter optimization. It automatically finds the best configuration 
+#' Perpetual is a self-generalizing gradient boosting machine that doesn't need
+#' hyperparameter optimization. It automatically finds the best configuration
 #' based on the provided budget.
 #'
 #' @param x A matrix or data.frame of features.
@@ -28,25 +28,26 @@
 #'
 #' @return A \code{PerpetualBooster} object.
 #' @export
-perpetual <- function(x, y, objective = "LogLoss", budget = NULL, 
-                      iteration_limit = NULL, stopping_rounds = NULL, 
+perpetual <- function(x, y, objective = "LogLoss", budget = NULL,
+                      iteration_limit = NULL, stopping_rounds = NULL,
                       max_bin = NULL, num_threads = NULL, missing = NULL,
                       allow_missing_splits = NULL, create_missing_branch = NULL,
                       missing_node_treatment = NULL, log_iterations = NULL,
                       quantile = NULL, reset = NULL, timeout = NULL,
-                      memory_limit = NULL, seed = NULL, calibration_method = NULL, 
+                      memory_limit = NULL, seed = NULL, calibration_method = NULL,
                       save_node_stats = NULL, ...) {
   if (is.data.frame(x)) {
     x <- as.matrix(x)
   }
-  
+
   # Flatten and types for Rust
   storage.mode(x) <- "double"
   flat_data <- as.vector(x)
   rows <- nrow(x)
   cols <- ncol(x)
-  y <- as.numeric(y)
-  
+  # y <- as.numeric(y)
+  y <- if (is.factor(y) || is.character(y)) as.numeric(as.character(y)) else as.numeric(y)
+
   # Ensure integer types for optional parameters
   if (!is.null(iteration_limit)) iteration_limit <- as.integer(iteration_limit)
   if (!is.null(stopping_rounds)) stopping_rounds <- as.integer(stopping_rounds)
@@ -55,10 +56,10 @@ perpetual <- function(x, y, objective = "LogLoss", budget = NULL,
   if (!is.null(log_iterations)) log_iterations <- as.integer(log_iterations)
   if (!is.null(seed)) seed <- as.integer(seed)
   if (!is.null(save_node_stats)) save_node_stats <- as.logical(save_node_stats)
-  
+
   # Detect classes for classification objectives
   classes <- sort(unique(y[!is.na(y)]))
-  
+
   ptr <- .Call("PerpetualBooster_new",
         objective,
         budget,
@@ -80,17 +81,17 @@ perpetual <- function(x, y, objective = "LogLoss", budget = NULL,
         save_node_stats,
         PACKAGE = "perpetual"
   )
-  
+
   # Create a lightweight R6-like object (just a list with class)
   model <- structure(list(.ptr = ptr), class = "PerpetualBooster")
-  
+
   # Fit
   .Call("PerpetualBooster_fit", ptr, flat_data, as.integer(rows), as.integer(cols), y, PACKAGE = "perpetual")
-  
+
   # Store classes and objective
   attr(model, "classes") <- classes
   attr(model, "objective") <- objective
-  
+
   return(model)
 }
 
@@ -103,10 +104,12 @@ perpetual <- function(x, y, objective = "LogLoss", budget = NULL,
 #' @param ... Additional arguments.
 #'
 #' @return A vector or matrix of predictions.
+#'
+#' @importFrom stats predict
 #' @export
 predict.PerpetualBooster <- function(object, newdata, type = c("class", "prob", "raw", "contribution", "interval"), method = "average", ...) {
   type <- match.arg(type)
-  
+
   if (is.data.frame(newdata)) {
     newdata <- as.matrix(newdata)
   }
@@ -114,27 +117,27 @@ predict.PerpetualBooster <- function(object, newdata, type = c("class", "prob", 
   flat_data <- as.vector(newdata)
   rows <- nrow(newdata)
   cols <- ncol(newdata)
-  
+
   raw_preds <- .Call("PerpetualBooster_predict", object$.ptr, flat_data, as.integer(rows), as.integer(cols), PACKAGE = "perpetual")
-  
+
   classes <- attr(object, "classes")
   objective <- attr(object, "objective")
-  
+
   if (type == "raw") {
     return(raw_preds)
   }
-  
+
   if (type == "contribution") {
     contribs <- .Call("PerpetualBooster_predict_contributions", object$.ptr, flat_data, as.integer(rows), as.integer(cols), method, PACKAGE = "perpetual")
     contrib_mat <- matrix(contribs, nrow = rows, ncol = cols + 1, byrow = FALSE)
     return(contrib_mat)
   }
-  
+
   if (type == "interval") {
     intervals <- .Call("PerpetualBooster_predict_intervals", object$.ptr, flat_data, as.integer(rows), as.integer(cols), PACKAGE = "perpetual")
     return(intervals)
   }
-  
+
   if (is.null(classes) || length(classes) == 0) {
     if (type == "prob") {
       probs <- 1 / (1 + exp(-raw_preds))
@@ -143,7 +146,7 @@ predict.PerpetualBooster <- function(object, newdata, type = c("class", "prob", 
       return(raw_preds)
     }
   }
-  
+
   if (length(classes) <= 2) {
     if (length(classes) == 2 && !is.null(objective) && objective == "LogLoss") {
       probs <- 1 / (1 + exp(-raw_preds))
@@ -214,20 +217,20 @@ perpetual_load <- function(path) {
   if (!file.exists(path)) {
     stop("File not found: ", path)
   }
-  
+
   ptr <- .Call("PerpetualBooster_load_booster", path, PACKAGE = "perpetual")
   model <- structure(list(.ptr = ptr), class = "PerpetualBooster")
-  
+
   classes <- .Call("PerpetualBooster_get_classes", model$.ptr, PACKAGE = "perpetual")
   if (length(classes) > 0) {
     attr(model, "classes") <- classes
   }
-  
+
   objective <- .Call("PerpetualBooster_get_objective", model$.ptr, PACKAGE = "perpetual")
   if (!is.null(objective) && nzchar(objective)) {
     attr(model, "objective") <- objective
   }
-  
+
   return(model)
 }
 
@@ -247,8 +250,8 @@ perpetual_calibrate <- function(model, x, y, x_cal, y_cal, alpha, method = NULL)
   if (is.data.frame(x_cal)) x_cal <- as.matrix(x_cal)
   storage.mode(x) <- "double"
   storage.mode(x_cal) <- "double"
-  
-  .Call("PerpetualBooster_calibrate", model$.ptr, 
+
+  .Call("PerpetualBooster_calibrate", model$.ptr,
         as.vector(x), as.integer(nrow(x)), as.integer(ncol(x)), as.numeric(y),
         as.vector(x_cal), as.integer(nrow(x_cal)), as.integer(ncol(x_cal)), as.numeric(y_cal),
         as.numeric(alpha), method, PACKAGE = "perpetual")
