@@ -4,7 +4,7 @@
 \alias{perpetual_calibrate}
 \title{Calibrate a PerpetualBooster model}
 \usage{
-perpetual_calibrate(model, x, y, x_cal, y_cal, alpha)
+perpetual_calibrate(model, x, y, x_cal, y_cal, alpha, method = NULL)
 }
 \arguments{
 \item{model}{A \code{PerpetualBooster} object.}
@@ -18,6 +18,8 @@ perpetual_calibrate(model, x, y, x_cal, y_cal, alpha)
 \item{y_cal}{Calibration targets.}
 
 \item{alpha}{Calibration parameter.}
+
+\item{method}{String specifying the calibration method to use. If NULL, uses the method configured in the model.}
 }
 \description{
 Calibrate a PerpetualBooster model
