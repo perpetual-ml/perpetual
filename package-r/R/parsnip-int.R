@@ -152,20 +152,51 @@ update.perpsnip <- function(
 
 #' @keywords internal
 #' @noRd
+#' @export
+perpetual_fit <- function(x, y, objective = "LogLoss", ...) {
+  y_input <- y
+
+  y <- if (is.factor(y_input)) {
+    lvls <- levels(y_input)
+    if (all(!is.na(suppressWarnings(as.numeric(lvls))))) {
+      as.numeric(as.character(y_input))
+    } else {
+      as.numeric(y_input) - 1L
+    }
+  } else {
+    as.numeric(y_input)
+  }
+
+  model <- perpetual(x = x, y = y, objective = objective, ...)
+
+  # override classes with original factor levels if applicable
+  if (is.factor(y_input)) {
+    attr(model, "classes") <- levels(y_input)
+  }
+
+  model
+}
+
+#' @keywords internal
+#' @noRd
 perpetual_prob_convert <- function(out, object) {
-  classes <- attr(object$fit, "classes")
+  classes <- as.character(attr(object$fit, "classes"))
 
   if (is.null(classes) || length(classes) == 0) {
     classes <- c("0", "1")
-    out <- data.frame(`0` = 1 - out, `1` = out, check.names = FALSE)
-  } else if (is.matrix(out)) {
-    out <- as.data.frame(out)
-    colnames(out) <- as.character(classes)
-  } else {
-    cls <- as.character(classes)
-    out <- data.frame(a = 1 - out, b = out, check.names = FALSE)
-    colnames(out) <- cls
   }
 
-  tibble::as_tibble(out)
+  res <- if (is.matrix(out)) {
+    as.data.frame(out)
+  } else {
+    data.frame(
+      p0 = 1 - out,
+      p1 = out,
+      check.names = FALSE
+    )
+  }
+  colnames(res) <- classes
+
+  tibble::as_tibble(res)
 }
+

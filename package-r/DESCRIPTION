@@ -19,6 +19,7 @@ Suggests:
     rlang (>= 1.0.0),
     dplyr, 
     tune,
+    yardstick, 
     jsonlite,
     testthat (>= 3.0.0)
 Config/testthat/edition: 3
