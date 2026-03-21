@@ -45,8 +45,8 @@ perpetual <- function(x, y, objective = "LogLoss", budget = NULL,
   flat_data <- as.vector(x)
   rows <- nrow(x)
   cols <- ncol(x)
-  # y <- as.numeric(y)
-  y <- if (is.factor(y) || is.character(y)) as.numeric(as.character(y)) else as.numeric(y)
+  y <- as.numeric(y)
+  # y <- if (is.factor(y) || is.character(y)) as.numeric(as.character(y)) else as.numeric(y)
 
   # Ensure integer types for optional parameters
   if (!is.null(iteration_limit)) iteration_limit <- as.integer(iteration_limit)

@@ -32,7 +32,7 @@ register_perpsnip <- function() {
     value = list(
       interface = "matrix",
       protect = c("x", "y"),
-      func = c(pkg = "perpetual", fun = "perpetual_fit"),
+      func = c(pkg = "perpetual", fun = "perpetual_class"),
       defaults = list(objective = "LogLoss")
     )
   )
@@ -111,7 +111,7 @@ register_perpsnip <- function() {
     value = list(
       interface = "matrix",
       protect = c("x", "y"),
-      func = c(pkg = "perpetual", fun = "perpetual_fit"),
+      func = c(pkg = "perpetual", fun = "perpetual"),
       defaults = list(objective = "SquaredLoss")
     )
   )
@@ -157,7 +157,7 @@ register_perpsnip <- function() {
       value = list(
         interface = "matrix",
         protect = c("x", "y"),
-        func = c(pkg = "perpetual", fun = "perpetual_fit"),
+        func = c(pkg = "perpetual", fun = "perpetual"),
         defaults = list(objective = "SurvivalLogLikelihood")
       )
     )

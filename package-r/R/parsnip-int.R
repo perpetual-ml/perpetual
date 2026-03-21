@@ -153,27 +153,18 @@ update.perpsnip <- function(
 #' @keywords internal
 #' @noRd
 #' @export
-perpetual_fit <- function(x, y, objective = "LogLoss", ...) {
+perpetual_class <- function(x, y, objective = "LogLoss", ...) {
+  if (!is.factor(y) ) {
+    stop("`y` must be a factor for classification.", call. = FALSE)
+  }
   y_input <- y
 
-  y <- if (is.factor(y_input)) {
-    lvls <- levels(y_input)
-    if (all(!is.na(suppressWarnings(as.numeric(lvls))))) {
-      as.numeric(as.character(y_input))
-    } else {
-      as.numeric(y_input) - 1L
-    }
-  } else {
-    as.numeric(y_input)
-  }
+  lvls <- levels(y)
+  y_num <- as.integer(y) - 1L
 
-  model <- perpetual(x = x, y = y, objective = objective, ...)
+  model <- perpetual(x = x, y = y_num, objective = objective, ...)
 
-  # override classes with original factor levels if applicable
-  if (is.factor(y_input)) {
-    attr(model, "classes") <- levels(y_input)
-  }
-
+  attr(model, "classes") <- lvls
   model
 }
 
