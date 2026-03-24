@@ -5,7 +5,12 @@ from pathlib import Path
 
 # python scripts/increment_version.py 3.0.0
 # python scripts/increment_version.py 3.0.0 --dry-run
-# python scripts/increment_version.py 3.0.0-rc.0 --dry-run
+# python scripts/increment_version.py 3.0.0-rc.1 --dry-run
+
+
+SEMVER_CORE_PATTERN = re.compile(
+    r"^(?P<core>\d+\.\d+\.\d+)(?:-(?P<prerelease>[0-9A-Za-z.-]+))?$"
+)
 
 
 def update_file(file_path, pattern, replacement, dry_run=False):
@@ -60,6 +65,17 @@ def update_conf_py(file_path, new_version, dry_run=False):
     update_file(file_path, pattern, replacement, dry_run)
 
 
+def normalize_r_version(new_version):
+    match = SEMVER_CORE_PATTERN.fullmatch(new_version)
+    if match is None:
+        raise SystemExit(
+            "Invalid version: "
+            f"{new_version}. Expected a semantic version like 3.0.0 or 3.0.0-rc.1."
+        )
+
+    return match.group("core")
+
+
 def update_python_cargo_toml(file_path, new_version, dry_run=False):
     path = Path(file_path)
     if not path.exists():
@@ -98,6 +114,7 @@ def main():
     dry_run = args.dry_run
 
     root_dir = Path(__file__).parent.parent
+    r_version = normalize_r_version(new_version)
 
     # Files to update
     cargo_toml = root_dir / "Cargo.toml"
@@ -108,12 +125,14 @@ def main():
     conf_py = root_dir / "package-python" / "docs" / "source" / "conf.py"
 
     print(f"Setting version to: {new_version}")
+    if r_version != new_version:
+        print(f"Using R package version: {r_version}")
 
     update_cargo_toml(cargo_toml, new_version, dry_run)
     update_pyproject_toml(pyproject_toml, new_version, dry_run)
     update_python_cargo_toml(python_cargo_toml, new_version, dry_run)  # Special handler
     update_cargo_toml(r_rust_cargo_toml, new_version, dry_run)  # Standard structure
-    update_r_description(r_description, new_version, dry_run)
+    update_r_description(r_description, r_version, dry_run)
     update_conf_py(conf_py, new_version, dry_run)
 
     # Handle uv.lock

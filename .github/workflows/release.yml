@@ -152,6 +152,7 @@ jobs:
           retention-days: 1
 
   r-release:
+    if: ${{ github.event_name != 'release' || !github.event.release.prerelease }}
     runs-on: ubuntu-22.04
     env:
       GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
@@ -182,7 +183,6 @@ jobs:
       - uses: r-lib/actions/setup-r-dependencies@v2
         with:
           working-directory: package-r
-          use-public-rspm: true
           extra-packages: any::roxygen2
           cache: true
 
@@ -244,7 +244,7 @@ jobs:
 
   pypi-publish:
     runs-on: ubuntu-latest
-    needs: ["windows-build", "macos-build", "linux-build", "linux-arm-build", "r-release"]
+    needs: ["windows-build", "macos-build", "linux-build", "linux-arm-build"]
     environment:
       name: Test and Deploy
       url: https://pypi.org/p/perpetual
