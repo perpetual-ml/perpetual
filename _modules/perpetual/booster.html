@@ -5,7 +5,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>perpetual.booster &mdash; Perpetual 2.1.0 documentation</title>
+  <title>perpetual.booster &mdash; Perpetual 3.0.0-rc.1 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../../_static/custom.css?v=9cdd1368" />
@@ -13,7 +13,7 @@
   
       <script src="../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../_static/documentation_options.js?v=20623aea"></script>
+      <script src="../../_static/documentation_options.js?v=844c15b5"></script>
       <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
@@ -88,6 +88,7 @@
 <span class="kn">import</span><span class="w"> </span><span class="nn">inspect</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">json</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">warnings</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">dataclasses</span><span class="w"> </span><span class="kn">import</span> <span class="n">fields</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">enum</span><span class="w"> </span><span class="kn">import</span> <span class="n">Enum</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">types</span><span class="w"> </span><span class="kn">import</span> <span class="n">FunctionType</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Dict</span><span class="p">,</span> <span class="n">Iterable</span><span class="p">,</span> <span class="n">List</span><span class="p">,</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">Set</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">,</span> <span class="n">Union</span><span class="p">,</span> <span class="n">cast</span>
@@ -115,6 +116,17 @@
 <span class="p">)</span>
 
 <span class="n">MultiOutputBooster</span> <span class="o">=</span> <span class="n">CrateMultiOutputBooster</span>
+<span class="n">NODE_FIELDS</span> <span class="o">=</span> <span class="p">{</span><span class="n">field</span><span class="o">.</span><span class="n">name</span> <span class="k">for</span> <span class="n">field</span> <span class="ow">in</span> <span class="n">fields</span><span class="p">(</span><span class="n">Node</span><span class="p">)}</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_native_multiclass_export_temperature</span><span class="p">(</span><span class="n">n_classes</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
+    <span class="k">if</span> <span class="n">n_classes</span> <span class="o">&lt;=</span> <span class="mi">4</span><span class="p">:</span>
+        <span class="k">return</span> <span class="mf">1.0</span>
+    <span class="k">if</span> <span class="n">n_classes</span> <span class="o">==</span> <span class="mi">5</span><span class="p">:</span>
+        <span class="k">return</span> <span class="mf">1.5</span>
+    <span class="k">if</span> <span class="mi">6</span> <span class="o">&lt;=</span> <span class="n">n_classes</span> <span class="o">&lt;=</span> <span class="mi">8</span><span class="p">:</span>
+        <span class="k">return</span> <span class="mf">2.0</span>
+    <span class="k">return</span> <span class="mf">1.75</span>
 
 
 <span class="k">class</span><span class="w"> </span><span class="nc">CalibrationMethod</span><span class="p">(</span><span class="nb">str</span><span class="p">,</span> <span class="n">Enum</span><span class="p">):</span>
@@ -374,9 +386,12 @@
         <span class="bp">self</span><span class="o">.</span><span class="n">_is_fitted</span> <span class="o">=</span> <span class="kc">False</span>
 
         <span class="n">booster</span> <span class="o">=</span> <span class="n">CratePerpetualBooster</span><span class="p">(</span>
-            <span class="n">objective</span><span class="o">=</span><span class="s2">&quot;SquaredLoss&quot;</span>
-            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">objective</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">objective</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;Custom&quot;</span><span class="p">)</span>
-            <span class="k">else</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">objective</span> <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">objective</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">)</span> <span class="k">else</span> <span class="kc">None</span><span class="p">),</span>
+            <span class="n">objective</span><span class="o">=</span><span class="p">(</span>
+                <span class="s2">&quot;SquaredLoss&quot;</span>
+                <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">objective</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span>
+                <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">objective</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;Custom&quot;</span><span class="p">)</span>
+                <span class="k">else</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">objective</span> <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">objective</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">)</span> <span class="k">else</span> <span class="kc">None</span><span class="p">)</span>
+            <span class="p">),</span>
             <span class="n">budget</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">budget</span><span class="p">,</span>
             <span class="n">max_bin</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">max_bin</span><span class="p">,</span>
             <span class="n">num_threads</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">num_threads</span><span class="p">,</span>
@@ -500,11 +515,15 @@
             <span class="nb">len</span><span class="p">(</span><span class="n">classes_</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">1</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">objective</span> <span class="o">==</span> <span class="s2">&quot;SquaredLoss&quot;</span>
         <span class="p">):</span>
             <span class="n">booster</span> <span class="o">=</span> <span class="n">CratePerpetualBooster</span><span class="p">(</span>
-                <span class="n">objective</span><span class="o">=</span><span class="s2">&quot;Custom&quot;</span>
-                <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">objective</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span>
-                <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">objective</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;Custom&quot;</span><span class="p">)</span>
-                <span class="k">else</span> <span class="p">(</span>
-                    <span class="bp">self</span><span class="o">.</span><span class="n">objective</span> <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">objective</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">)</span> <span class="k">else</span> <span class="kc">None</span>
+                <span class="n">objective</span><span class="o">=</span><span class="p">(</span>
+                    <span class="s2">&quot;Custom&quot;</span>
+                    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">objective</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span>
+                    <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">objective</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;Custom&quot;</span><span class="p">)</span>
+                    <span class="k">else</span> <span class="p">(</span>
+                        <span class="bp">self</span><span class="o">.</span><span class="n">objective</span>
+                        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">objective</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">)</span>
+                        <span class="k">else</span> <span class="kc">None</span>
+                    <span class="p">)</span>
                 <span class="p">),</span>
                 <span class="n">budget</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">budget</span><span class="p">,</span>
                 <span class="n">max_bin</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">max_bin</span><span class="p">,</span>
@@ -534,11 +553,15 @@
         <span class="k">else</span><span class="p">:</span>
             <span class="n">booster</span> <span class="o">=</span> <span class="n">CrateMultiOutputBooster</span><span class="p">(</span>
                 <span class="n">n_boosters</span><span class="o">=</span><span class="nb">len</span><span class="p">(</span><span class="n">classes_</span><span class="p">),</span>
-                <span class="n">objective</span><span class="o">=</span><span class="s2">&quot;Custom&quot;</span>
-                <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">objective</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span>
-                <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">objective</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;Custom&quot;</span><span class="p">)</span>
-                <span class="k">else</span> <span class="p">(</span>
-                    <span class="bp">self</span><span class="o">.</span><span class="n">objective</span> <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">objective</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">)</span> <span class="k">else</span> <span class="kc">None</span>
+                <span class="n">objective</span><span class="o">=</span><span class="p">(</span>
+                    <span class="s2">&quot;Custom&quot;</span>
+                    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">objective</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span>
+                    <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">objective</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;Custom&quot;</span><span class="p">)</span>
+                    <span class="k">else</span> <span class="p">(</span>
+                        <span class="bp">self</span><span class="o">.</span><span class="n">objective</span>
+                        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">objective</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">)</span>
+                        <span class="k">else</span> <span class="kc">None</span>
+                    <span class="p">)</span>
                 <span class="p">),</span>
                 <span class="n">budget</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">budget</span><span class="p">,</span>
                 <span class="n">max_bin</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">max_bin</span><span class="p">,</span>
@@ -1903,7 +1926,15 @@
                         <span class="n">node</span><span class="p">[</span><span class="s2">&quot;split_feature&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">feature_map</span><span class="p">[</span><span class="n">node</span><span class="p">[</span><span class="s2">&quot;split_feature&quot;</span><span class="p">]]</span>
                     <span class="k">else</span><span class="p">:</span>
                         <span class="n">node</span><span class="p">[</span><span class="s2">&quot;split_feature&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">leaf_split_feature</span>
-                    <span class="n">nodes</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">Node</span><span class="p">(</span><span class="o">**</span><span class="n">node</span><span class="p">))</span>
+                    <span class="n">nodes</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+                        <span class="n">Node</span><span class="p">(</span>
+                            <span class="o">**</span><span class="p">{</span>
+                                <span class="n">key</span><span class="p">:</span> <span class="n">value</span>
+                                <span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">node</span><span class="o">.</span><span class="n">items</span><span class="p">()</span>
+                                <span class="k">if</span> <span class="n">key</span> <span class="ow">in</span> <span class="n">NODE_FIELDS</span>
+                            <span class="p">}</span>
+                        <span class="p">)</span>
+                    <span class="p">)</span>
                 <span class="n">trees</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">nodes</span><span class="p">)</span>
         <span class="k">return</span> <span class="n">trees</span></div>
 
@@ -1971,6 +2002,13 @@
 
         <span class="c1"># Get raw dump</span>
         <span class="n">raw_dump</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">json_dump</span><span class="p">())</span>
+        <span class="n">native_multiclass</span> <span class="o">=</span> <span class="nb">bool</span><span class="p">(</span><span class="n">raw_dump</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;native_multiclass&quot;</span><span class="p">,</span> <span class="kc">False</span><span class="p">))</span>
+        <span class="n">multiclass_temperature</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="n">_native_multiclass_export_temperature</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">classes_</span><span class="p">))</span>
+            <span class="k">if</span> <span class="n">is_multi</span> <span class="ow">and</span> <span class="n">native_multiclass</span>
+            <span class="k">else</span> <span class="mf">1.0</span>
+        <span class="p">)</span>
+        <span class="n">multiclass_leaf_scale</span> <span class="o">=</span> <span class="mf">1.0</span> <span class="o">/</span> <span class="n">multiclass_temperature</span>
 
         <span class="c1"># Initialize XGBoost structure</span>
         <span class="n">xgb_json</span> <span class="o">=</span> <span class="p">{</span>
@@ -2026,9 +2064,9 @@
             <span class="n">xgb_json</span><span class="p">[</span><span class="s2">&quot;learner&quot;</span><span class="p">][</span><span class="s2">&quot;learner_model_param&quot;</span><span class="p">][</span><span class="s2">&quot;num_class&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">n_classes</span><span class="p">)</span>
             <span class="n">xgb_json</span><span class="p">[</span><span class="s2">&quot;learner&quot;</span><span class="p">][</span><span class="s2">&quot;learner_model_param&quot;</span><span class="p">][</span><span class="s2">&quot;num_target&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;1&quot;</span>
 
-            <span class="c1"># Base score vector [0.5, 0.5, ...]</span>
-            <span class="c1"># 5.0E-1</span>
-            <span class="n">base_score_str</span> <span class="o">=</span> <span class="s2">&quot;,&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">([</span><span class="s2">&quot;5.0E-1&quot;</span><span class="p">]</span> <span class="o">*</span> <span class="n">n_classes</span><span class="p">)</span>
+            <span class="c1"># Keep the model base score neutral and inject class-specific biases</span>
+            <span class="c1"># into the first tree of each class so exported logits match inference.</span>
+            <span class="n">base_score_str</span> <span class="o">=</span> <span class="s2">&quot;,&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">([</span><span class="s2">&quot;0.0E+0&quot;</span><span class="p">]</span> <span class="o">*</span> <span class="n">n_classes</span><span class="p">)</span>
             <span class="n">xgb_json</span><span class="p">[</span><span class="s2">&quot;learner&quot;</span><span class="p">][</span><span class="s2">&quot;learner_model_param&quot;</span><span class="p">][</span><span class="s2">&quot;base_score&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span>
                 <span class="sa">f</span><span class="s2">&quot;[</span><span class="si">{</span><span class="n">base_score_str</span><span class="si">}</span><span class="s2">]&quot;</span>
             <span class="p">)</span>
@@ -2066,9 +2104,11 @@
                     <span class="n">booster_trees</span> <span class="o">=</span> <span class="n">booster_dump</span><span class="p">[</span><span class="s2">&quot;trees&quot;</span><span class="p">]</span>
                     <span class="k">if</span> <span class="n">round_idx</span> <span class="o">&lt;</span> <span class="nb">len</span><span class="p">(</span><span class="n">booster_trees</span><span class="p">):</span>
                         <span class="n">tree</span> <span class="o">=</span> <span class="n">booster_trees</span><span class="p">[</span><span class="n">round_idx</span><span class="p">]</span>
-                        <span class="n">base_score</span> <span class="o">=</span> <span class="n">booster_dump</span><span class="p">[</span><span class="s2">&quot;base_score&quot;</span><span class="p">]</span>
+                        <span class="n">base_score</span> <span class="o">=</span> <span class="n">booster_dump</span><span class="p">[</span><span class="s2">&quot;base_score&quot;</span><span class="p">]</span> <span class="o">*</span> <span class="n">multiclass_leaf_scale</span>
 
-                        <span class="n">xgb_tree</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_convert_tree</span><span class="p">(</span><span class="n">tree</span><span class="p">,</span> <span class="n">current_ptr</span><span class="p">)</span>
+                        <span class="n">xgb_tree</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_convert_tree</span><span class="p">(</span>
+                            <span class="n">tree</span><span class="p">,</span> <span class="n">current_ptr</span><span class="p">,</span> <span class="n">leaf_scale</span><span class="o">=</span><span class="n">multiclass_leaf_scale</span>
+                        <span class="p">)</span>
 
                         <span class="k">if</span> <span class="n">round_idx</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
                             <span class="bp">self</span><span class="o">.</span><span class="n">_adjust_tree_leaves</span><span class="p">(</span><span class="n">xgb_tree</span><span class="p">,</span> <span class="n">base_score</span><span class="p">)</span>
@@ -2148,7 +2188,9 @@
 
         <span class="k">return</span> <span class="n">xgb_json</span>
 
-    <span class="k">def</span><span class="w"> </span><span class="nf">_convert_tree</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">tree</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span> <span class="n">group_id</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_convert_tree</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">tree</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span> <span class="n">group_id</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">leaf_scale</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1.0</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Convert a single Perpetual tree to XGBoost dictionary format.&quot;&quot;&quot;</span>
 
         <span class="n">nodes_dict</span> <span class="o">=</span> <span class="n">tree</span><span class="p">[</span><span class="s2">&quot;nodes&quot;</span><span class="p">]</span>
@@ -2182,14 +2224,14 @@
             <span class="n">idx</span> <span class="o">=</span> <span class="n">node_map</span><span class="p">[</span><span class="n">nid</span><span class="p">]</span>
 
             <span class="n">sum_hessian</span><span class="p">[</span><span class="n">idx</span><span class="p">]</span> <span class="o">=</span> <span class="n">node</span><span class="p">[</span><span class="s2">&quot;hessian_sum&quot;</span><span class="p">]</span>
-            <span class="n">base_weights</span><span class="p">[</span><span class="n">idx</span><span class="p">]</span> <span class="o">=</span> <span class="n">node</span><span class="p">[</span><span class="s2">&quot;weight_value&quot;</span><span class="p">]</span>
+            <span class="n">base_weights</span><span class="p">[</span><span class="n">idx</span><span class="p">]</span> <span class="o">=</span> <span class="n">node</span><span class="p">[</span><span class="s2">&quot;weight_value&quot;</span><span class="p">]</span> <span class="o">*</span> <span class="n">leaf_scale</span>
             <span class="n">loss_changes</span><span class="p">[</span><span class="n">idx</span><span class="p">]</span> <span class="o">=</span> <span class="n">node</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;split_gain&quot;</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">)</span>
 
             <span class="k">if</span> <span class="n">node</span><span class="p">[</span><span class="s2">&quot;is_leaf&quot;</span><span class="p">]:</span>
                 <span class="n">left_children</span><span class="p">[</span><span class="n">idx</span><span class="p">]</span> <span class="o">=</span> <span class="o">-</span><span class="mi">1</span>
                 <span class="n">right_children</span><span class="p">[</span><span class="n">idx</span><span class="p">]</span> <span class="o">=</span> <span class="o">-</span><span class="mi">1</span>
                 <span class="n">split_indices</span><span class="p">[</span><span class="n">idx</span><span class="p">]</span> <span class="o">=</span> <span class="mi">0</span>
-                <span class="n">split_conditions</span><span class="p">[</span><span class="n">idx</span><span class="p">]</span> <span class="o">=</span> <span class="n">node</span><span class="p">[</span><span class="s2">&quot;weight_value&quot;</span><span class="p">]</span>
+                <span class="n">split_conditions</span><span class="p">[</span><span class="n">idx</span><span class="p">]</span> <span class="o">=</span> <span class="n">node</span><span class="p">[</span><span class="s2">&quot;weight_value&quot;</span><span class="p">]</span> <span class="o">*</span> <span class="n">leaf_scale</span>
             <span class="k">else</span><span class="p">:</span>
                 <span class="n">left_id</span> <span class="o">=</span> <span class="n">node</span><span class="p">[</span><span class="s2">&quot;left_child&quot;</span><span class="p">]</span>
                 <span class="n">right_id</span> <span class="o">=</span> <span class="n">node</span><span class="p">[</span><span class="s2">&quot;right_child&quot;</span><span class="p">]</span>
@@ -2357,6 +2399,16 @@
         <span class="k">else</span><span class="p">:</span>
             <span class="n">base_values</span> <span class="o">=</span> <span class="p">[</span><span class="nb">float</span><span class="p">(</span><span class="n">base_score</span><span class="p">)]</span>
 
+        <span class="n">native_multiclass</span> <span class="o">=</span> <span class="nb">bool</span><span class="p">(</span><span class="n">raw_dump</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;native_multiclass&quot;</span><span class="p">,</span> <span class="kc">False</span><span class="p">))</span>
+        <span class="n">multiclass_temperature</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="n">_native_multiclass_export_temperature</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">classes_</span><span class="p">))</span>
+            <span class="k">if</span> <span class="n">is_multi</span> <span class="ow">and</span> <span class="n">native_multiclass</span>
+            <span class="k">else</span> <span class="mf">1.0</span>
+        <span class="p">)</span>
+        <span class="n">multiclass_leaf_scale</span> <span class="o">=</span> <span class="mf">1.0</span> <span class="o">/</span> <span class="n">multiclass_temperature</span>
+        <span class="k">if</span> <span class="n">is_multi</span> <span class="ow">and</span> <span class="n">native_multiclass</span><span class="p">:</span>
+            <span class="n">base_values</span> <span class="o">=</span> <span class="p">[</span><span class="n">value</span> <span class="o">*</span> <span class="n">multiclass_leaf_scale</span> <span class="k">for</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">base_values</span><span class="p">]</span>
+
         <span class="n">global_tree_idx</span> <span class="o">=</span> <span class="mi">0</span>
         <span class="k">for</span> <span class="n">b_idx</span><span class="p">,</span> <span class="n">booster</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">booster_data</span><span class="p">):</span>
             <span class="k">for</span> <span class="n">tree_data</span> <span class="ow">in</span> <span class="n">booster</span><span class="p">[</span><span class="s2">&quot;trees&quot;</span><span class="p">]:</span>
@@ -2386,7 +2438,9 @@
                         <span class="n">target_treeids</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">global_tree_idx</span><span class="p">)</span>
                         <span class="n">target_nodeids</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">idx_for_onnx</span><span class="p">)</span>
                         <span class="n">target_ids</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">b_idx</span> <span class="k">if</span> <span class="n">is_multi</span> <span class="k">else</span> <span class="mi">0</span><span class="p">)</span>
-                        <span class="n">target_weights</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="nb">float</span><span class="p">(</span><span class="n">node_dict</span><span class="p">[</span><span class="s2">&quot;weight_value&quot;</span><span class="p">]))</span>
+                        <span class="n">target_weights</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+                            <span class="nb">float</span><span class="p">(</span><span class="n">node_dict</span><span class="p">[</span><span class="s2">&quot;weight_value&quot;</span><span class="p">])</span> <span class="o">*</span> <span class="n">multiclass_leaf_scale</span>
+                        <span class="p">)</span>
                     <span class="k">else</span><span class="p">:</span>
                         <span class="n">nodes_modes</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">&quot;BRANCH_LT&quot;</span><span class="p">)</span>
                         <span class="n">feat_val</span> <span class="o">=</span> <span class="n">node_dict</span><span class="p">[</span><span class="s2">&quot;split_feature&quot;</span><span class="p">]</span>
