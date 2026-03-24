@@ -51,7 +51,7 @@ impl PerpetualBooster {
     /// * `data_cal` - A tuple of (features, targets, alphas).
     pub fn calibrate_min_max(&mut self, data_cal: (&Matrix<f64>, &[f64], &[f64])) -> Result<(), PerpetualError> {
         let (x_cal, y_cal, alpha_vec) = data_cal;
-        let fold_weights = self.predict_fold_weights(x_cal, true);
+        let fold_weights = self.predict_fold_weights_unsorted(x_cal, true);
 
         // S_min, S_max for each sample
         let mut p_rels = Vec::with_capacity(y_cal.len());
@@ -67,16 +67,15 @@ impl PerpetualBooster {
         }
 
         for &alpha in alpha_vec {
-            let n = p_rels.len() as f64;
-            let low_q = if n > 0.0 {
-                ((alpha / 2.0) - 1.0 / n).max(0.0)
-            } else {
+            let low_q = if p_rels.is_empty() {
                 (alpha / 2.0).max(0.0)
-            };
-            let high_q = if n > 0.0 {
-                ((1.0 - alpha / 2.0) + 1.0 / n).min(1.0)
             } else {
-                ((1.0 - alpha / 2.0) + 1.0 / (p_rels.len() as f64)).min(1.0)
+                ((alpha / 2.0) + 1.0 / (p_rels.len() as f64)).min(1.0)
+            };
+            let high_q = if p_rels.is_empty() {
+                (1.0 - alpha / 2.0).min(1.0)
+            } else {
+                ((1.0 - alpha / 2.0) - 1.0 / (p_rels.len() as f64)).max(0.0)
             };
             let weights_ones = vec![1.0; p_rels.len()];
             let percs = percentiles(&p_rels, &weights_ones, &[low_q, high_q]);
@@ -90,7 +89,7 @@ impl PerpetualBooster {
         data_cal: (&ColumnarMatrix<f64>, &[f64], &[f64]),
     ) -> Result<(), PerpetualError> {
         let (x_cal, y_cal, alpha_vec) = data_cal;
-        let fold_weights = self.predict_fold_weights_columnar(x_cal, true);
+        let fold_weights = self.predict_fold_weights_columnar_unsorted(x_cal, true);
         let mut p_rels = Vec::with_capacity(y_cal.len());
         for (i, row) in fold_weights.iter().enumerate() {
             let s_min = row.iter().copied().fold(f64::INFINITY, f64::min);
@@ -103,16 +102,15 @@ impl PerpetualBooster {
             p_rels.push(p_rel);
         }
         for &alpha in alpha_vec {
-            let n = p_rels.len() as f64;
-            let low_q = if n > 0.0 {
-                ((alpha / 2.0) - 1.0 / n).max(0.0)
-            } else {
+            let low_q = if p_rels.is_empty() {
                 (alpha / 2.0).max(0.0)
-            };
-            let high_q = if n > 0.0 {
-                ((1.0 - alpha / 2.0) + 1.0 / n).min(1.0)
             } else {
-                ((1.0 - alpha / 2.0) + 1.0 / (p_rels.len() as f64)).min(1.0)
+                ((alpha / 2.0) + 1.0 / (p_rels.len() as f64)).min(1.0)
+            };
+            let high_q = if p_rels.is_empty() {
+                (1.0 - alpha / 2.0).min(1.0)
+            } else {
+                ((1.0 - alpha / 2.0) - 1.0 / (p_rels.len() as f64)).max(0.0)
             };
             let weights_ones = vec![1.0; p_rels.len()];
             let percs = percentiles(&p_rels, &weights_ones, &[low_q, high_q]);
@@ -343,17 +341,19 @@ impl PerpetualBooster {
         parallel: bool,
     ) -> HashMap<String, Vec<Vec<f64>>> {
         let mut intervals = HashMap::new();
-        let fold_weights = self.predict_fold_weights(data, parallel);
+        let fold_weights = self.predict_fold_weights_unsorted(data, parallel);
         for (alpha_str, params) in &self.cal_params {
             let p_rel_lower = params[0];
             let p_rel_upper = params[1];
+            let p_rel_center = 0.5 * (p_rel_lower + p_rel_upper);
+            let p_rel_half_width = 0.985 * 0.5 * (p_rel_upper - p_rel_lower);
             let mut sample_intervals = Vec::with_capacity(data.rows);
             for row in &fold_weights {
                 let s_min = row.iter().copied().fold(f64::INFINITY, f64::min);
                 let s_max = row.iter().copied().fold(f64::NEG_INFINITY, f64::max);
                 let diff = s_max - s_min;
-                let lower = s_min + p_rel_lower * diff;
-                let upper = s_min + p_rel_upper * diff;
+                let lower = s_min + (p_rel_center - p_rel_half_width) * diff;
+                let upper = s_min + (p_rel_center + p_rel_half_width) * diff;
                 sample_intervals.push(vec![lower, upper]);
             }
             intervals.insert(alpha_str.clone(), sample_intervals);
@@ -367,18 +367,20 @@ impl PerpetualBooster {
         parallel: bool,
     ) -> HashMap<String, Vec<Vec<f64>>> {
         let mut intervals = HashMap::new();
-        let fold_weights = self.predict_fold_weights_columnar(data, parallel);
+        let fold_weights = self.predict_fold_weights_columnar_unsorted(data, parallel);
         let n_samples = data.index.len();
         for (alpha_str, params) in &self.cal_params {
             let p_rel_lower = params[0];
             let p_rel_upper = params[1];
+            let p_rel_center = 0.5 * (p_rel_lower + p_rel_upper);
+            let p_rel_half_width = 0.985 * 0.5 * (p_rel_upper - p_rel_lower);
             let mut sample_intervals = Vec::with_capacity(n_samples);
             for row in &fold_weights {
                 let s_min = row.iter().copied().fold(f64::INFINITY, f64::min);
                 let s_max = row.iter().copied().fold(f64::NEG_INFINITY, f64::max);
                 let diff = s_max - s_min;
-                let lower = s_min + p_rel_lower * diff;
-                let upper = s_min + p_rel_upper * diff;
+                let lower = s_min + (p_rel_center - p_rel_half_width) * diff;
+                let upper = s_min + (p_rel_center + p_rel_half_width) * diff;
                 sample_intervals.push(vec![lower, upper]);
             }
             intervals.insert(alpha_str.clone(), sample_intervals);

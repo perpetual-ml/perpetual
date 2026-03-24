@@ -9,7 +9,7 @@ use crate::node::{Node, NodeType, SplittableNode};
 use crate::objective::{Objective, ObjectiveFunction};
 use crate::partial_dependence::tree_partial_dependence;
 use crate::splitter::{SplitInfoSlice, Splitter};
-use crate::utils::{fast_f64_sum, gain, gain_const_hess, weight, weight_const_hess};
+use crate::utils::{gain_const_hess_reg, gain_reg, weight_const_hess_reg, weight_reg};
 use rayon::ThreadPool;
 use serde::{Deserialize, Serialize};
 use std::cmp::max;
@@ -45,10 +45,19 @@ pub struct Tree {
     /// Used for fast yhat updates without re-traversing the tree.
     #[serde(skip)]
     pub leaf_bounds: Vec<(f64, usize, usize)>,
+    /// Training-time leaf node ids paired with their contiguous index bounds.
+    #[serde(skip)]
+    pub leaf_node_assignments: Vec<(usize, usize, usize)>,
     /// The rearranged index from the most recent `fit()` call.
     /// Samples belonging to the same leaf are contiguous.
     #[serde(skip)]
     pub train_index: Vec<usize>,
+    /// Best fold-generalization signal observed while growing this tree.
+    #[serde(
+        default = "crate::booster::config::default_nan_f32",
+        deserialize_with = "crate::booster::config::parse_f32"
+    )]
+    pub generalization_score: f32,
 }
 
 impl Default for Tree {
@@ -65,7 +74,58 @@ impl Tree {
             depth: 0,
             n_leaves: 0,
             leaf_bounds: Vec::new(),
+            leaf_node_assignments: Vec::new(),
             train_index: Vec::new(),
+            generalization_score: 0.0,
+        }
+    }
+
+    fn fold_weight_stability(weights: &[f32; 5]) -> f32 {
+        let mean = weights.iter().sum::<f32>() / weights.len() as f32;
+        let mean_abs = weights.iter().map(|value| value.abs()).sum::<f32>() / weights.len() as f32;
+        if mean_abs <= f32::EPSILON {
+            return 1.0;
+        }
+
+        let variance = weights.iter().map(|value| (value - mean).powi(2)).sum::<f32>() / weights.len() as f32;
+        let std_dev = variance.sqrt();
+        let cv = std_dev / mean_abs;
+        let positive_share = weights.iter().filter(|&&value| value >= 0.0).count() as f32 / weights.len() as f32;
+        let sign_consistency = positive_share.max(1.0 - positive_share);
+
+        (sign_consistency / (1.0 + cv)).clamp(0.5, 1.0)
+    }
+
+    fn update_generalization_score(&mut self, node: &SplittableNode) {
+        let Some(stats) = node.stats.as_ref() else {
+            return;
+        };
+        let Some(generalization) = stats.generalization else {
+            return;
+        };
+
+        let stability = Self::fold_weight_stability(&stats.weights);
+        let node_score = generalization * (0.99 + 0.01 * stability);
+        self.generalization_score = self.generalization_score.max(node_score);
+    }
+
+    pub fn rescale_outputs(&mut self, factor: f32) {
+        if (factor - 1.0).abs() <= f32::EPSILON {
+            return;
+        }
+
+        for node in self.nodes.values_mut() {
+            node.weight_value *= factor;
+            if let Some(weights) = &mut node.leaf_weights {
+                *weights = weights.map(|value| value * factor);
+            }
+            if let Some(stats) = &mut node.stats {
+                stats.weights = stats.weights.map(|value| value * factor);
+            }
+        }
+
+        for leaf in &mut self.leaf_bounds {
+            leaf.0 *= f64::from(factor);
         }
     }
 
@@ -173,7 +233,8 @@ impl Tree {
             false,
         );
 
-        let root_node = create_root_node(&index, grad, hess.as_deref());
+        let root_node = create_root_node(&index, grad, hess.as_deref(), splitter.get_leaf_regularization());
+        self.update_generalization_score(&root_node);
         self.nodes
             .insert(root_node.num, root_node.as_node(splitter.get_eta(), save_node_stats));
 
@@ -184,6 +245,7 @@ impl Tree {
         let index_length = index.len() as f32;
 
         let mut leaf_bounds: Vec<(f64, usize, usize)> = Vec::new();
+        let mut leaf_node_assignments: Vec<(usize, usize, usize)> = Vec::new();
 
         growable.add_node(root_node);
         while !growable.is_empty() {
@@ -241,6 +303,7 @@ impl Tree {
                 // Node couldn't be split — record as leaf
                 let weight = self.nodes.get(&node.num).map(|n| n.weight_value as f64).unwrap_or(0.0);
                 leaf_bounds.push((weight, node.start_idx, node.stop_idx));
+                leaf_node_assignments.push((node.num, node.start_idx, node.stop_idx));
             } else {
                 // self.nodes[n_idx].make_parent_node(node);
                 if let Some(x) = self.nodes.get_mut(&n_idx) {
@@ -252,6 +315,7 @@ impl Tree {
                 let mut y_buffer = None;
 
                 for n in new_nodes {
+                    self.update_generalization_score(&n);
                     let node = n.as_node(splitter.get_eta(), save_node_stats);
                     let node_indices = &index[n.start_idx..n.stop_idx];
 
@@ -330,6 +394,7 @@ impl Tree {
                     } else {
                         // Missing-leaf nodes are terminal — record leaf bounds
                         leaf_bounds.push((node_weight, n.start_idx, n.stop_idx));
+                        leaf_node_assignments.push((n.num, n.start_idx, n.stop_idx));
                     }
                 }
             }
@@ -344,9 +409,11 @@ impl Tree {
                 .map(|n| n.weight_value as f64)
                 .unwrap_or(0.0);
             leaf_bounds.push((weight, remaining.start_idx, remaining.stop_idx));
+            leaf_node_assignments.push((remaining.num, remaining.start_idx, remaining.stop_idx));
         }
 
         self.leaf_bounds = leaf_bounds;
+        self.leaf_node_assignments = leaf_node_assignments;
         self.train_index = index;
 
         // Any final post processing required.
@@ -510,17 +577,28 @@ impl Display for Tree {
     }
 }
 
-pub fn create_root_node(index: &[usize], grad: &[f32], hess: Option<&[f32]>) -> SplittableNode {
+pub fn create_root_node(
+    index: &[usize],
+    grad: &[f32],
+    hess: Option<&[f32]>,
+    leaf_regularization: f32,
+) -> SplittableNode {
     let (gradient_sum, hessian_sum) = match hess {
-        Some(hess) => (fast_f64_sum(grad), fast_f64_sum(hess)),
-        None => (fast_f64_sum(grad), grad.len() as f32),
+        Some(hess) => (
+            index.iter().map(|&row| grad[row]).sum::<f32>(),
+            index.iter().map(|&row| hess[row]).sum::<f32>(),
+        ),
+        None => (index.iter().map(|&row| grad[row]).sum::<f32>(), index.len() as f32),
     };
 
     let (root_gain, root_weight) = match hess {
-        Some(_hess) => (gain(gradient_sum, hessian_sum), weight(gradient_sum, hessian_sum)),
+        Some(_hess) => (
+            gain_reg(gradient_sum, hessian_sum, leaf_regularization),
+            weight_reg(gradient_sum, hessian_sum, leaf_regularization),
+        ),
         None => (
-            gain_const_hess(gradient_sum, grad.len()),
-            weight_const_hess(gradient_sum, grad.len()),
+            gain_const_hess_reg(gradient_sum, grad.len(), leaf_regularization),
+            weight_const_hess_reg(gradient_sum, grad.len(), leaf_regularization),
         ),
     };
 
@@ -545,10 +623,12 @@ pub fn create_root_node(index: &[usize], grad: &[f32], hess: Option<&[f32]>) -> 
 // Unit-testing
 #[cfg(test)]
 mod tests {
+    use super::create_root_node;
 
     use crate::binning::bin_matrix;
     use crate::constraints::{Constraint, ConstraintMap};
     use crate::histogram::NodeHistogramOwned;
+    use crate::node::{Node, NodeStats, SplittableNode};
     use crate::objective::{Objective, ObjectiveFunction};
     use crate::splitter::{MissingImputerSplitter, SplitInfo};
     use crate::utils::precision_round;
@@ -577,7 +657,7 @@ mod tests {
         let loss = objective_function.loss(&y, &yhat, None, None);
 
         let data = Matrix::new(&data_vec, 891, 5);
-        let splitter = MissingImputerSplitter::new(0.3, true, ConstraintMap::new(), None);
+        let splitter = MissingImputerSplitter::new(0.3, 0.0, true, ConstraintMap::new(), None);
         let mut tree = Tree::new();
 
         let b = bin_matrix(&data, None, 300, f64::NAN, None).unwrap();
@@ -658,6 +738,88 @@ mod tests {
     }
 
     #[test]
+    fn test_create_root_node_respects_sampled_index() {
+        let index = vec![1, 3];
+        let grad = vec![1.0, 2.0, 3.0, 4.0];
+        let hess = vec![0.5, 1.5, 2.5, 3.5];
+
+        let node = create_root_node(&index, &grad, Some(&hess), 0.0);
+
+        assert_eq!(node.stats.as_ref().unwrap().count, 2);
+        assert!((node.gradient_sum - 6.0).abs() < 1e-6);
+        assert!((node.hessian_sum - 5.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_tree_rescale_outputs() {
+        let mut tree = Tree::new();
+        tree.nodes.insert(
+            0,
+            Node {
+                num: 0,
+                weight_value: 2.0,
+                leaf_weights: Some([1.0, 2.0, 3.0, 4.0, 5.0]),
+                hessian_sum: 1.0,
+                split_value: 0.0,
+                split_feature: 0,
+                split_gain: 0.0,
+                missing_node: 0,
+                left_child: 0,
+                right_child: 0,
+                is_leaf: true,
+                parent_node: 0,
+                left_cats: None,
+                stats: Some(Box::new(NodeStats {
+                    depth: 0,
+                    node_type: crate::node::NodeType::Root,
+                    count: 3,
+                    generalization: Some(1.0),
+                    weights: [1.0, 2.0, 3.0, 4.0, 5.0],
+                })),
+            },
+        );
+        tree.leaf_bounds = vec![(2.0, 0, 3)];
+        tree.generalization_score = 0.9;
+
+        tree.rescale_outputs(0.5);
+
+        let node = tree.nodes.get(&0).unwrap();
+        assert!((node.weight_value - 1.0).abs() < 1e-6);
+        assert_eq!(node.leaf_weights.unwrap(), [0.5, 1.0, 1.5, 2.0, 2.5]);
+        assert_eq!(node.stats.as_ref().unwrap().weights, [0.5, 1.0, 1.5, 2.0, 2.5]);
+        assert!((tree.leaf_bounds[0].0 - 1.0).abs() < 1e-9);
+        assert!((tree.generalization_score - 0.9).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_update_generalization_score_does_not_depend_on_saved_node_stats() {
+        let mut tree = Tree::new();
+        let node = SplittableNode::new(
+            0,
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            10,
+            0,
+            0,
+            10,
+            f32::NEG_INFINITY,
+            f32::INFINITY,
+            crate::node::NodeType::Root,
+            None,
+            [0.5, 0.52, 0.48, 0.51, 0.49],
+        );
+        let mut node = node;
+        node.stats.as_mut().unwrap().generalization = Some(1.01);
+
+        tree.update_generalization_score(&node);
+        let stored = node.as_node(1.0, false);
+        assert!(stored.stats.is_none());
+        assert!(tree.generalization_score > 1.0);
+    }
+
+    #[test]
     fn test_tree_fit_monotone() {
         // instantiate objective function
         let objective_function = Objective::LogLoss;
@@ -676,7 +838,7 @@ mod tests {
         let data_ = Matrix::new(&data_vec, 891, 5);
         let data = Matrix::new(data_.get_col(1), 891, 1);
         let map = ConstraintMap::from([(0, Constraint::Negative)]);
-        let splitter = MissingImputerSplitter::new(0.3, true, map, None);
+        let splitter = MissingImputerSplitter::new(0.3, 0.0, true, map, None);
         let mut tree = Tree::new();
 
         let b = bin_matrix(&data, None, 100, f64::NAN, None).unwrap();
@@ -770,7 +932,7 @@ mod tests {
         let loss = objective_function.loss(&y, &yhat, None, None);
 
         let data = Matrix::new(&data_vec, 891, 5);
-        let splitter = MissingImputerSplitter::new(0.3, true, ConstraintMap::new(), None);
+        let splitter = MissingImputerSplitter::new(0.3, 0.0, true, ConstraintMap::new(), None);
         let mut tree = Tree::new();
 
         let b = bin_matrix(&data, None, 300, f64::NAN, None).unwrap();
@@ -872,7 +1034,7 @@ mod tests {
         let is_const_hess = hess.is_none();
         let loss = objective_function.loss(&y, &yhat, None, None);
 
-        let splitter = MissingImputerSplitter::new(0.3, true, ConstraintMap::new(), None);
+        let splitter = MissingImputerSplitter::new(0.3, 0.0, true, ConstraintMap::new(), None);
 
         let cat_index = HashSet::from([0, 3, 4, 6, 7, 8, 10, 11]);
 

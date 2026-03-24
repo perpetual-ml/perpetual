@@ -5,9 +5,9 @@
 test_that("Load v2.0.0 model and verify predictions", {
   skip_if_no_resources()
   resources_dir <- get_resources_dir()
-  model_path <- file.path(resources_dir, "model_v2.0.0.json")
-  preds_path <- file.path(resources_dir, "model_v2.0.0_preds.csv")
-  probs_path <- file.path(resources_dir, "model_v2.0.0_probs.csv")
+  model_path <- file.path(resources_dir, "model_bc.json")
+  preds_path <- file.path(resources_dir, "model_bc_preds.csv")
+  probs_path <- file.path(resources_dir, "model_bc_probs.csv")
   
   skip_if_not(file.exists(model_path), "Model artifact not found. Run scripts/make_resources.py to generate it.")
   skip_if_not(file.exists(preds_path), "Predictions artifact not found.")
@@ -27,7 +27,7 @@ test_that("Load v2.0.0 model and verify predictions", {
 test_that("V2.0.0 model JSON is valid", {
   skip_if_no_resources()
   resources_dir <- get_resources_dir()
-  model_path <- file.path(resources_dir, "model_v2.0.0.json")
+  model_path <- file.path(resources_dir, "model_bc.json")
   
   skip_if_not(file.exists(model_path), "Model artifact not found.")
   
@@ -45,7 +45,7 @@ test_that("V2.0.0 model JSON is valid", {
 test_that("Loaded model can make predictions with new API", {
   skip_if_no_resources()
   resources_dir <- get_resources_dir()
-  model_path <- file.path(resources_dir, "model_v2.0.0.json")
+  model_path <- file.path(resources_dir, "model_bc.json")
   
   skip_if_not(file.exists(model_path), "Model artifact not found.")
   

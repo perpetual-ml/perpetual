@@ -112,36 +112,96 @@ pub fn sort_cat_bins_by_num(histogram: &mut [&UnsafeCell<Bin>]) {
     }
 }
 
-/// Sort categorical bins by their statistics (gradient/hessian or gradient/count).
-pub fn sort_cat_bins_by_stat(histogram: &mut [&UnsafeCell<Bin>], is_const_hess: bool) {
-    unsafe {
-        if is_const_hess {
-            histogram.sort_unstable_by(|bin1, bin2| {
-                let b1 = bin1.get().as_ref().unwrap();
-                let b2 = bin2.get().as_ref().unwrap();
-                if b1.num == 0 {
-                    return Ordering::Less;
-                } else if b2.num == 0 {
-                    return Ordering::Greater;
-                }
-                let div1: f32 = b1.g_folded.iter().sum::<f32>() / b1.counts.iter().sum::<u32>() as f32;
-                let div2: f32 = b2.g_folded.iter().sum::<f32>() / b2.counts.iter().sum::<u32>() as f32;
-                div2.total_cmp(&div1)
-            });
-        } else {
-            histogram.sort_unstable_by(|bin1, bin2| {
-                let b1 = bin1.get().as_ref().unwrap();
-                let b2 = bin2.get().as_ref().unwrap();
-                if b1.num == 0 {
-                    return Ordering::Less;
-                } else if b2.num == 0 {
-                    return Ordering::Greater;
-                }
-                let div1: f32 = b1.g_folded.iter().sum::<f32>() / b1.h_folded.iter().sum::<f32>();
-                let div2: f32 = b2.g_folded.iter().sum::<f32>() / b2.h_folded.iter().sum::<f32>();
-                div2.total_cmp(&div1)
-            });
+#[inline]
+fn folded_score_from_denoms(numerators: &[f32; 5], denominators: &[f32; 5], l2_regularization: f32) -> f32 {
+    let mut fold_scores = [0.0; 5];
+    let mut used_folds = 0_u32;
+    let mut total_denom = 0.0_f32;
+
+    for j in 0..5 {
+        let denom = denominators[j];
+        total_denom += denom;
+        if denom > 0.0 {
+            fold_scores[used_folds as usize] = numerators[j] / (denom + l2_regularization);
+            used_folds += 1;
         }
+    }
+
+    if used_folds == 0 || total_denom <= 0.0 {
+        return 0.0;
+    }
+
+    let used_folds_f = used_folds as f32;
+    let mean_score = fold_scores[..used_folds as usize].iter().sum::<f32>() / used_folds_f;
+    let variance = fold_scores[..used_folds as usize]
+        .iter()
+        .map(|score| {
+            let diff = *score - mean_score;
+            diff * diff
+        })
+        .sum::<f32>()
+        / used_folds_f;
+    let stability = 1.0 / (1.0 + variance.sqrt() / (mean_score.abs() + 1e-6));
+
+    mean_score * stability
+}
+
+#[inline]
+fn cat_bin_score(bin: &Bin, is_const_hess: bool, prior_strength: f32, l2_regularization: f32) -> f32 {
+    let (base_score, total_denom) = if is_const_hess {
+        let denominators = bin.counts.map(|count| count as f32);
+        (
+            folded_score_from_denoms(&bin.g_folded, &denominators, l2_regularization),
+            denominators.iter().sum::<f32>(),
+        )
+    } else {
+        (
+            folded_score_from_denoms(&bin.g_folded, &bin.h_folded, l2_regularization),
+            bin.h_folded.iter().sum::<f32>(),
+        )
+    };
+
+    let shrinkage = total_denom / (total_denom + 0.35 * prior_strength.max(1.0));
+    base_score * shrinkage
+}
+
+/// Sort categorical bins by their statistics (gradient/hessian or gradient/count).
+pub fn sort_cat_bins_by_stat(histogram: &mut [&UnsafeCell<Bin>], is_const_hess: bool, l2_regularization: f32) {
+    unsafe {
+        let mut prior_strength = 1.0_f32;
+        let mut used_bins = 0_u32;
+        for bin in histogram.iter() {
+            let current = bin.get().as_ref().unwrap();
+            if current.num == 0 {
+                continue;
+            }
+            let denom = if is_const_hess {
+                current.counts.iter().sum::<u32>() as f32
+            } else {
+                current.h_folded.iter().sum::<f32>()
+            };
+            if denom > 0.0 {
+                prior_strength += denom;
+                used_bins += 1;
+            }
+        }
+        if used_bins > 0 {
+            prior_strength /= used_bins as f32;
+        }
+
+        histogram.sort_unstable_by(|bin1, bin2| {
+            let b1 = bin1.get().as_ref().unwrap();
+            let b2 = bin2.get().as_ref().unwrap();
+            if b1.num == 0 {
+                return Ordering::Less;
+            } else if b2.num == 0 {
+                return Ordering::Greater;
+            }
+
+            let score1 = cat_bin_score(b1, is_const_hess, prior_strength, l2_regularization);
+            let score2 = cat_bin_score(b2, is_const_hess, prior_strength, l2_regularization);
+            score2.total_cmp(&score1)
+        });
     }
 }
 
@@ -224,7 +284,7 @@ mod tests {
         let c1 = UnsafeCell::new(b1);
         let c2 = UnsafeCell::new(b2);
         let mut hist: Vec<&UnsafeCell<Bin>> = vec![&c2, &c0, &c1];
-        sort_cat_bins_by_stat(&mut hist, true);
+        sort_cat_bins_by_stat(&mut hist, true, 1.0);
         unsafe {
             assert_eq!(hist[0].get().as_ref().unwrap().num, 0); // num=0 always first
         }
@@ -243,9 +303,37 @@ mod tests {
         let c1 = UnsafeCell::new(b1);
         let c2 = UnsafeCell::new(b2);
         let mut hist: Vec<&UnsafeCell<Bin>> = vec![&c2, &c0, &c1];
-        sort_cat_bins_by_stat(&mut hist, false);
+        sort_cat_bins_by_stat(&mut hist, false, 1.0);
         unsafe {
             assert_eq!(hist[0].get().as_ref().unwrap().num, 0); // num=0 always first
         }
+    }
+
+    #[test]
+    fn test_cat_bin_score_shrinks_rare_categories() {
+        let mut rare = Bin::empty_const_hess(1, 0.0);
+        rare.g_folded = [2.0; 5];
+        rare.counts = [1; 5];
+
+        let mut dense = Bin::empty_const_hess(2, 0.0);
+        dense.g_folded = [10.0; 5];
+        dense.counts = [20; 5];
+
+        let prior_strength = (rare.counts.iter().sum::<u32>() + dense.counts.iter().sum::<u32>()) as f32 / 2.0;
+
+        assert!(cat_bin_score(&dense, true, prior_strength, 1.0) > cat_bin_score(&rare, true, prior_strength, 1.0));
+    }
+
+    #[test]
+    fn test_cat_bin_score_penalizes_fold_instability() {
+        let mut stable = Bin::empty(1, 0.0);
+        stable.g_folded = [2.0; 5];
+        stable.h_folded = [10.0; 5];
+
+        let mut unstable = Bin::empty(2, 0.0);
+        unstable.g_folded = [10.0, -6.0, 10.0, -6.0, 2.0];
+        unstable.h_folded = [10.0; 5];
+
+        assert!(cat_bin_score(&stable, false, 10.0, 1.0) > cat_bin_score(&unstable, false, 10.0, 1.0));
     }
 }

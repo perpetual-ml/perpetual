@@ -107,6 +107,30 @@ impl PerpetualBooster {
         results
     }
 
+    pub(crate) fn predict_fold_weights_unsorted(&self, data: &Matrix<f64>, parallel: bool) -> Vec<[f64; 5]> {
+        let n_samples = data.rows;
+        let mut results = vec![[self.base_score; 5]; n_samples];
+
+        for tree in self.get_prediction_trees() {
+            let tree_weights = tree.predict_weights(data, parallel, &self.cfg.missing);
+            for (i, row_weights) in tree_weights.iter().enumerate() {
+                for k in 0..5 {
+                    results[i][k] += row_weights[k] as f64;
+                }
+            }
+        }
+
+        for row in results.iter_mut() {
+            for value in row.iter_mut() {
+                if !value.is_finite() {
+                    *value = self.base_score;
+                }
+            }
+        }
+
+        results
+    }
+
     /// Internal method to predict fold weights for each sample using columnar data.
     ///
     /// # Arguments
@@ -135,6 +159,34 @@ impl PerpetualBooster {
                 }
             }
         }
+        results
+    }
+
+    pub(crate) fn predict_fold_weights_columnar_unsorted(
+        &self,
+        data: &ColumnarMatrix<f64>,
+        parallel: bool,
+    ) -> Vec<[f64; 5]> {
+        let n_samples = data.index.len();
+        let mut results = vec![[self.base_score; 5]; n_samples];
+
+        for tree in self.get_prediction_trees() {
+            let tree_weights = tree.predict_weights_columnar(data, parallel, &self.cfg.missing);
+            for (i, row_weights) in tree_weights.iter().enumerate() {
+                for k in 0..5 {
+                    results[i][k] += row_weights[k] as f64;
+                }
+            }
+        }
+
+        for row in results.iter_mut() {
+            for value in row.iter_mut() {
+                if !value.is_finite() {
+                    *value = self.base_score;
+                }
+            }
+        }
+
         results
     }
 

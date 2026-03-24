@@ -20,6 +20,17 @@ fn adaptive_delta(y: &[f64], yhat: &[f64], alpha: f64) -> f64 {
     abs_res[((n as f64) * alpha).floor() as usize % n]
 }
 
+#[inline]
+fn clipped_gradient(diff: f32, delta: f32) -> f32 {
+    diff.clamp(-delta, delta)
+}
+
+#[inline]
+fn surrogate_hessian(diff: f32, delta: f32) -> f32 {
+    let abs_diff = diff.abs().max(delta);
+    (delta / abs_diff).clamp(0.05, 1.0)
+}
+
 impl ObjectiveFunction for AdaptiveHuberLoss {
     #[inline]
     fn loss(&self, y: &[f64], yhat: &[f64], sample_weight: Option<&[f64]>, _group: Option<&[u64]>) -> Vec<f32> {
@@ -76,26 +87,16 @@ impl ObjectiveFunction for AdaptiveHuberLoss {
                 for i in 0..n {
                     let diff = (yhat[i] - y[i]) as f32;
                     let w = weights[i] as f32;
-                    if diff.abs() <= delta {
-                        g.push(diff * w);
-                        h.push(w);
-                    } else {
-                        g.push(delta * diff.signum() * w);
-                        h.push(0.0);
-                    }
+                    g.push(clipped_gradient(diff, delta) * w);
+                    h.push(surrogate_hessian(diff, delta) * w);
                 }
                 (g, Some(h))
             }
             None => {
                 for i in 0..n {
                     let diff = (yhat[i] - y[i]) as f32;
-                    if diff.abs() <= delta {
-                        g.push(diff);
-                        h.push(1.0);
-                    } else {
-                        g.push(delta * diff.signum());
-                        h.push(0.0);
-                    }
+                    g.push(clipped_gradient(diff, delta));
+                    h.push(surrogate_hessian(diff, delta));
                 }
                 (g, Some(h))
             }
@@ -130,13 +131,11 @@ impl ObjectiveFunction for AdaptiveHuberLoss {
                     let ar = r.abs();
                     let diff = r as f32;
                     let w = weights[i] as f32;
+                    g.push(clipped_gradient(diff, delta32) * w);
+                    h.push(surrogate_hessian(diff, delta32) * w);
                     if ar <= delta {
-                        g.push(diff * w);
-                        h.push(w);
                         l.push((0.5 * r * r * weights[i]) as f32);
                     } else {
-                        g.push(delta32 * diff.signum() * w);
-                        h.push(0.0);
                         l.push((delta * (ar - 0.5 * delta) * weights[i]) as f32);
                     }
                 }
@@ -146,13 +145,11 @@ impl ObjectiveFunction for AdaptiveHuberLoss {
                     let r = yhat[i] - y[i];
                     let ar = r.abs();
                     let diff = r as f32;
+                    g.push(clipped_gradient(diff, delta32));
+                    h.push(surrogate_hessian(diff, delta32));
                     if ar <= delta {
-                        g.push(diff);
-                        h.push(1.0);
                         l.push((0.5 * r * r) as f32);
                     } else {
-                        g.push(delta32 * diff.signum());
-                        h.push(0.0);
                         l.push((delta * (ar - 0.5 * delta)) as f32);
                     }
                 }
@@ -239,6 +236,17 @@ mod tests {
         let h = h.unwrap();
         assert_eq!(g.len(), 4);
         assert_eq!(h.len(), 4);
+    }
+
+    #[test]
+    fn test_adaptive_huber_gradient_retains_positive_curvature_for_outliers() {
+        let y = vec![0.0, 0.0, 0.0, 0.0];
+        let yhat = vec![0.1, 0.2, 0.3, 10.0];
+        let loss_fn = AdaptiveHuberLoss { quantile: Some(0.5) };
+        let (_, h) = loss_fn.gradient(&y, &yhat, None, None);
+        let h = h.unwrap();
+
+        assert!(h[3] >= 0.05);
     }
 
     #[test]

@@ -12,6 +12,36 @@ use rayon::prelude::*;
 use std::collections::{HashMap, HashSet};
 
 impl PerpetualBooster {
+    fn predict_fold_logits(&self, data: &Matrix<f64>, parallel: bool) -> Vec<[f64; 5]> {
+        let mut results = vec![[self.base_score; 5]; data.rows];
+
+        for tree in self.get_prediction_trees() {
+            let tree_weights = tree.predict_weights(data, parallel, &self.cfg.missing);
+            for (row_logits, row_weights) in results.iter_mut().zip(tree_weights.iter()) {
+                for fold in 0..5 {
+                    row_logits[fold] += row_weights[fold] as f64;
+                }
+            }
+        }
+
+        results
+    }
+
+    fn predict_fold_logits_columnar(&self, data: &ColumnarMatrix<f64>, parallel: bool) -> Vec<[f64; 5]> {
+        let mut results = vec![[self.base_score; 5]; data.rows];
+
+        for tree in self.get_prediction_trees() {
+            let tree_weights = tree.predict_weights_columnar(data, parallel, &self.cfg.missing);
+            for (row_logits, row_weights) in results.iter_mut().zip(tree_weights.iter()) {
+                for fold in 0..5 {
+                    row_logits[fold] += row_weights[fold] as f64;
+                }
+            }
+        }
+
+        results
+    }
+
     /// Generate predictions for the given data.
     ///
     /// # Arguments
@@ -64,11 +94,26 @@ impl PerpetualBooster {
     /// * `data` - The feature matrix.
     /// * `parallel` - Predict in parallel.
     pub fn predict_proba(&self, data: &Matrix<f64>, parallel: bool, calibrated: bool) -> Vec<f64> {
-        let preds = self.predict(data, parallel);
-        let mut proba: Vec<f64> = if parallel {
-            preds.par_iter().map(|p| 1.0 / (1.0 + (-p).exp())).collect()
+        let mut proba: Vec<f64> = if matches!(self.cfg.objective, Objective::LogLoss) {
+            let fold_logits = self.predict_fold_logits(data, parallel);
+            if parallel {
+                fold_logits
+                    .par_iter()
+                    .map(|row| row.iter().map(|p| odds(*p)).sum::<f64>() / 5.0)
+                    .collect()
+            } else {
+                fold_logits
+                    .iter()
+                    .map(|row| row.iter().map(|p| odds(*p)).sum::<f64>() / 5.0)
+                    .collect()
+            }
         } else {
-            preds.iter().map(|p| 1.0 / (1.0 + (-p).exp())).collect()
+            let preds = self.predict(data, parallel);
+            if parallel {
+                preds.par_iter().map(|p| odds(*p)).collect()
+            } else {
+                preds.iter().map(|p| odds(*p)).collect()
+            }
         };
 
         if let Some(calibrator) = self.isotonic_calibrator.as_ref().filter(|_| calibrated) {
@@ -86,11 +131,26 @@ impl PerpetualBooster {
     /// * `data` - The columnar feature matrix.
     /// * `parallel` - Predict in parallel.
     pub fn predict_proba_columnar(&self, data: &ColumnarMatrix<f64>, parallel: bool, calibrated: bool) -> Vec<f64> {
-        let preds = self.predict_columnar(data, parallel);
-        let mut proba: Vec<f64> = if parallel {
-            preds.par_iter().map(|p| 1.0 / (1.0 + (-p).exp())).collect()
+        let mut proba: Vec<f64> = if matches!(self.cfg.objective, Objective::LogLoss) {
+            let fold_logits = self.predict_fold_logits_columnar(data, parallel);
+            if parallel {
+                fold_logits
+                    .par_iter()
+                    .map(|row| row.iter().map(|p| odds(*p)).sum::<f64>() / 5.0)
+                    .collect()
+            } else {
+                fold_logits
+                    .iter()
+                    .map(|row| row.iter().map(|p| odds(*p)).sum::<f64>() / 5.0)
+                    .collect()
+            }
         } else {
-            preds.iter().map(|p| 1.0 / (1.0 + (-p).exp())).collect()
+            let preds = self.predict_columnar(data, parallel);
+            if parallel {
+                preds.par_iter().map(|p| odds(*p)).collect()
+            } else {
+                preds.iter().map(|p| odds(*p)).collect()
+            }
         };
 
         if let Some(calibrator) = self.isotonic_calibrator.as_ref().filter(|_| calibrated) {
@@ -516,6 +576,65 @@ impl PerpetualBooster {
 }
 
 impl MultiOutputBooster {
+    fn softmax_probabilities_with_temperature(logits: &[f64], temperature: f64) -> Vec<f64> {
+        let max_logit = logits.iter().copied().fold(f64::NEG_INFINITY, f64::max);
+        let scale = temperature.max(f64::EPSILON);
+        let exp_logits = logits
+            .iter()
+            .map(|value| ((value - max_logit) / scale).exp())
+            .collect::<Vec<_>>();
+        let normalizer = exp_logits.iter().sum::<f64>().max(f64::EPSILON);
+        exp_logits.into_iter().map(|value| value / normalizer).collect()
+    }
+
+    fn native_multiclass_temperature(&self) -> f64 {
+        if !self.native_multiclass {
+            return 1.0;
+        }
+
+        match self.n_boosters {
+            0..=4 => 1.0,
+            5 => 1.5,
+            6..=8 => 2.0,
+            _ => 1.75,
+        }
+    }
+
+    fn multiclass_probability_alpha(&self) -> f64 {
+        if self.n_boosters == 3 {
+            0.25
+        } else if (4..=5).contains(&self.n_boosters) {
+            0.5
+        } else {
+            0.0
+        }
+    }
+
+    fn multiclass_probability_beta(&self) -> f64 {
+        if self.n_boosters == 3 { 0.0 } else { 0.25 }
+    }
+
+    fn normalize_multiclass_probabilities(probabilities: &mut [f64], alpha: f64, priors: Option<&[f64]>, beta: f64) {
+        probabilities.iter_mut().enumerate().for_each(|(idx, value)| {
+            let clipped = value.clamp(f64::EPSILON, 1.0 - f64::EPSILON);
+            let prior = priors
+                .and_then(|class_priors| class_priors.get(idx))
+                .copied()
+                .unwrap_or(1.0)
+                .clamp(f64::EPSILON, 1.0);
+            *value = clipped / (1.0 - clipped).powf(alpha) / prior.powf(beta);
+        });
+
+        let sum = probabilities.iter().sum::<f64>();
+        if sum <= f64::EPSILON {
+            let uniform = 1.0 / probabilities.len().max(1) as f64;
+            probabilities.iter_mut().for_each(|value| *value = uniform);
+            return;
+        }
+
+        probabilities.iter_mut().for_each(|value| *value /= sum);
+    }
+
     /// Generate predictions on data using the multi-output booster.
     ///
     /// * `data` -  Either a Polars or Pandas DataFrame, or a 2 dimensional Numpy array.
@@ -540,15 +659,32 @@ impl MultiOutputBooster {
     /// * `data` -  Either a Polars or Pandas DataFrame, or a 2 dimensional Numpy array.
     /// * `parallel` -  Predict in parallel.
     pub fn predict_proba(&self, data: &Matrix<f64>, parallel: bool) -> Vec<f64> {
-        let log_odds = self.predict(data, parallel);
-        let data_log_odds = Matrix::new(&log_odds, data.rows, self.n_boosters);
-        let mut preds = Vec::with_capacity(log_odds.len());
+        if self.native_multiclass {
+            let logits = self.predict(data, parallel);
+            let logits_matrix = Matrix::new(&logits, data.rows, self.n_boosters);
+            let mut preds = Vec::with_capacity(logits.len());
+            let temperature = self.native_multiclass_temperature();
+            for row in 0..data.rows {
+                let row_logits = logits_matrix.get_row(row);
+                preds.extend(Self::softmax_probabilities_with_temperature(&row_logits, temperature));
+            }
+            return preds;
+        }
+
+        let alpha = self.multiclass_probability_alpha();
+        let beta = self.multiclass_probability_beta();
+        let class_probabilities = self
+            .boosters
+            .iter()
+            .map(|b| b.predict_proba(data, parallel, false))
+            .collect::<Vec<_>>();
+        let mut preds = Vec::with_capacity(data.rows * self.n_boosters);
         for row in 0..data.rows {
-            let row_values = data_log_odds.get_row(row);
-            let max_val = row_values.iter().fold(f64::NEG_INFINITY, |a, &b| a.max(b));
-            let y_p_exp = row_values.iter().map(|e| (e - max_val).exp()).collect::<Vec<f64>>();
-            let y_p_exp_sum = y_p_exp.iter().sum::<f64>();
-            let probabilities = y_p_exp.iter().map(|e| e / y_p_exp_sum).collect::<Vec<f64>>();
+            let mut probabilities = class_probabilities
+                .iter()
+                .map(|class_probs| class_probs[row])
+                .collect::<Vec<f64>>();
+            Self::normalize_multiclass_probabilities(&mut probabilities, alpha, Some(&self.class_priors), beta);
             preds.extend(probabilities);
         }
         preds
@@ -556,15 +692,32 @@ impl MultiOutputBooster {
 
     /// Generate probabilities on columnar data using the multi-output booster (zero-copy from Polars).
     pub fn predict_proba_columnar(&self, data: &ColumnarMatrix<f64>, parallel: bool) -> Vec<f64> {
-        let log_odds = self.predict_columnar(data, parallel);
-        let data_log_odds = Matrix::new(&log_odds, data.rows, self.n_boosters);
-        let mut preds = Vec::with_capacity(log_odds.len());
+        if self.native_multiclass {
+            let logits = self.predict_columnar(data, parallel);
+            let logits_matrix = Matrix::new(&logits, data.rows, self.n_boosters);
+            let mut preds = Vec::with_capacity(logits.len());
+            let temperature = self.native_multiclass_temperature();
+            for row in 0..data.rows {
+                let row_logits = logits_matrix.get_row(row);
+                preds.extend(Self::softmax_probabilities_with_temperature(&row_logits, temperature));
+            }
+            return preds;
+        }
+
+        let alpha = self.multiclass_probability_alpha();
+        let beta = self.multiclass_probability_beta();
+        let class_probabilities = self
+            .boosters
+            .iter()
+            .map(|b| b.predict_proba_columnar(data, parallel, false))
+            .collect::<Vec<_>>();
+        let mut preds = Vec::with_capacity(data.rows * self.n_boosters);
         for row in 0..data.rows {
-            let row_values = data_log_odds.get_row(row);
-            let max_val = row_values.iter().fold(f64::NEG_INFINITY, |a, &b| a.max(b));
-            let y_p_exp = row_values.iter().map(|e| (e - max_val).exp()).collect::<Vec<f64>>();
-            let y_p_exp_sum = y_p_exp.iter().sum::<f64>();
-            let probabilities = y_p_exp.iter().map(|e| e / y_p_exp_sum).collect::<Vec<f64>>();
+            let mut probabilities = class_probabilities
+                .iter()
+                .map(|class_probs| class_probs[row])
+                .collect::<Vec<f64>>();
+            Self::normalize_multiclass_probabilities(&mut probabilities, alpha, Some(&self.class_priors), beta);
             preds.extend(probabilities);
         }
         preds
@@ -684,6 +837,7 @@ mod tests {
         let root = Node {
             num: 0,
             weight_value: 0.1,
+            leaf_weights: None,
             hessian_sum: 10.0,
             split_value: 0.0,
             split_feature: 0,
@@ -697,16 +851,28 @@ mod tests {
             stats: None,
         };
         tree.nodes.insert(0, root);
-        tree.n_leaves = 1;
         booster.trees = vec![tree];
         booster
     }
 
     fn create_mock_multi_booster() -> MultiOutputBooster {
+        let mut first = create_mock_booster();
+        first.base_score = 0.5;
+        first.trees[0].nodes.get_mut(&0).unwrap().weight_value = 0.1;
+
+        let mut second = create_mock_booster();
+        second.base_score = 0.5;
+        second.trees[0].nodes.get_mut(&0).unwrap().weight_value = 0.1;
+
+        let cfg = first.cfg.clone();
+
         MultiOutputBooster {
-            boosters: vec![create_mock_booster(), create_mock_booster()],
             n_boosters: 2,
-            ..Default::default()
+            cfg,
+            boosters: vec![first, second],
+            class_priors: vec![0.5, 0.5],
+            native_multiclass: false,
+            metadata: HashMap::new(),
         }
     }
 
@@ -780,6 +946,32 @@ mod tests {
     }
 
     #[test]
+    fn test_predict_proba_uses_fold_ensemble_when_available() {
+        let mut booster = create_mock_booster();
+        booster.cfg.objective = Objective::LogLoss;
+        booster.base_score = 0.0;
+        booster.trees[0].nodes.get_mut(&0).unwrap().leaf_weights = Some([-0.4, -0.1, 0.1, 0.4, 0.8]);
+
+        let data = Matrix::new(&[1.0, 2.0], 1, 2);
+        let proba = booster.predict_proba(&data, false, false);
+        let expected = [-0.4_f64, -0.1, 0.1, 0.4, 0.8].iter().map(|p| odds(*p)).sum::<f64>() / 5.0;
+        assert_relative_eq!(proba[0], expected, epsilon = 1e-7);
+    }
+
+    #[test]
+    fn test_predict_proba_calibrated_uses_same_fold_ensemble_before_calibration() {
+        let mut booster = create_mock_booster();
+        booster.cfg.objective = Objective::LogLoss;
+        booster.base_score = 0.0;
+        booster.trees[0].nodes.get_mut(&0).unwrap().leaf_weights = Some([-0.4, -0.1, 0.1, 0.4, 0.8]);
+
+        let data = Matrix::new(&[1.0, 2.0], 1, 2);
+        let proba = booster.predict_proba(&data, false, true);
+        let expected = [-0.4_f64, -0.1, 0.1, 0.4, 0.8].iter().map(|p| odds(*p)).sum::<f64>() / 5.0;
+        assert_relative_eq!(proba[0], expected, epsilon = 1e-7);
+    }
+
+    #[test]
     fn test_predict_contributions_methods() {
         let booster = create_mock_booster();
         let data = Matrix::new(&[1.0, 2.0], 1, 2);
@@ -844,6 +1036,32 @@ mod tests {
         let proba = booster.predict_proba(&data, false);
         assert_eq!(proba.len(), 2);
         assert_relative_eq!(proba[0], 0.5, epsilon = 1e-7);
+    }
+
+    #[test]
+    fn test_multi_output_predict_proba_normalizes_binary_probabilities() {
+        let mut first = create_mock_booster();
+        first.cfg.objective = Objective::LogLoss;
+        first.base_score = 0.0;
+        first.trees.clear();
+
+        let mut second = create_mock_booster();
+        second.cfg.objective = Objective::LogLoss;
+        second.base_score = 2.0;
+        second.trees.clear();
+
+        let booster = MultiOutputBooster {
+            n_boosters: 2,
+            boosters: vec![first, second],
+            class_priors: vec![0.5, 0.5],
+            ..Default::default()
+        };
+        let data = Matrix::new(&[1.0, 2.0], 1, 2);
+        let proba = booster.predict_proba(&data, false);
+
+        assert_eq!(proba.len(), 2);
+        assert_relative_eq!(proba[0], 0.362_109_7, epsilon = 1e-6);
+        assert_relative_eq!(proba[1], 0.637_890_3, epsilon = 1e-6);
     }
 
     #[test]
@@ -1036,6 +1254,107 @@ mod tests {
         let proba = booster.predict_proba_columnar(&data, false);
         assert_eq!(proba.len(), 4);
         // Probabilities should sum to 1 per row
+    }
+
+    #[test]
+    fn test_multi_output_predict_proba_columnar_normalizes_binary_probabilities() {
+        let mut first = create_mock_booster();
+        first.cfg.objective = Objective::LogLoss;
+        first.base_score = 0.0;
+        first.trees.clear();
+
+        let mut second = create_mock_booster();
+        second.cfg.objective = Objective::LogLoss;
+        second.base_score = 2.0;
+        second.trees.clear();
+
+        let booster = MultiOutputBooster {
+            n_boosters: 2,
+            boosters: vec![first, second],
+            class_priors: vec![0.5, 0.5],
+            ..Default::default()
+        };
+        let data_vec = [1.0, 2.0, 3.0, 4.0];
+        let col0 = &data_vec[0..2];
+        let col1 = &data_vec[2..4];
+        let data = ColumnarMatrix::new(vec![col0, col1], None, 2);
+        let proba = booster.predict_proba_columnar(&data, false);
+
+        assert_eq!(proba.len(), 4);
+        assert_relative_eq!(proba[0], 0.362_109_7, epsilon = 1e-6);
+        assert_relative_eq!(proba[1], 0.637_890_3, epsilon = 1e-6);
+    }
+
+    #[test]
+    fn test_multiclass_probability_alpha_prefers_small_class_odds_coupling() {
+        let booster = MultiOutputBooster {
+            n_boosters: 3,
+            class_priors: vec![0.5, 0.3, 0.2],
+            ..Default::default()
+        };
+        let mut probabilities = vec![0.5, 0.880_797_077_977_882_3, 0.2];
+        MultiOutputBooster::normalize_multiclass_probabilities(
+            &mut probabilities,
+            booster.multiclass_probability_alpha(),
+            Some(&booster.class_priors),
+            booster.multiclass_probability_beta(),
+        );
+
+        assert!(probabilities[1] > 0.55);
+        assert!(probabilities[2] < 0.12);
+    }
+
+    #[test]
+    fn test_native_multiclass_temperature_scales_with_class_count() {
+        let native_five = MultiOutputBooster {
+            n_boosters: 5,
+            native_multiclass: true,
+            ..Default::default()
+        };
+        let native_eight = MultiOutputBooster {
+            n_boosters: 8,
+            native_multiclass: true,
+            ..Default::default()
+        };
+        let ovr_three = MultiOutputBooster {
+            n_boosters: 3,
+            native_multiclass: false,
+            ..Default::default()
+        };
+
+        assert_relative_eq!(native_five.native_multiclass_temperature(), 1.5, epsilon = 1e-12);
+        assert_relative_eq!(native_eight.native_multiclass_temperature(), 2.0, epsilon = 1e-12);
+        assert_relative_eq!(ovr_three.native_multiclass_temperature(), 1.0, epsilon = 1e-12);
+    }
+
+    #[test]
+    fn test_native_multiclass_predict_proba_applies_temperature_scaling() {
+        let logits = [3.0_f64, 1.0, 0.0, -1.0, -2.0];
+        let boosters = logits
+            .iter()
+            .map(|&base_score| {
+                let mut booster = create_mock_booster();
+                booster.base_score = base_score;
+                booster.trees.clear();
+                booster
+            })
+            .collect::<Vec<_>>();
+        let booster = MultiOutputBooster {
+            n_boosters: logits.len(),
+            boosters,
+            native_multiclass: true,
+            ..Default::default()
+        };
+        let data = Matrix::new(&[1.0, 2.0], 1, 2);
+
+        let proba = booster.predict_proba(&data, false);
+        let expected = MultiOutputBooster::softmax_probabilities_with_temperature(&logits, 1.5);
+
+        assert_eq!(proba.len(), logits.len());
+        proba
+            .iter()
+            .zip(expected.iter())
+            .for_each(|(actual, expected_value)| assert_relative_eq!(*actual, *expected_value, epsilon = 1e-7));
     }
 
     #[test]

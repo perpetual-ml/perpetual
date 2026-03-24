@@ -6,29 +6,147 @@ use crate::bin::Bin;
 use crate::binning::{bin_columnar_matrix, bin_matrix};
 use crate::booster::config::*;
 use crate::constants::{
-    FREE_MEM_ALLOC_FACTOR, GENERALIZATION_THRESHOLD_RELAXED, ITER_LIMIT, MIN_COL_AMOUNT, N_NODES_ALLOC_MAX,
-    N_NODES_ALLOC_MIN, STOPPING_ROUNDS,
+    FREE_MEM_ALLOC_FACTOR, GENERALIZATION_THRESHOLD, GENERALIZATION_THRESHOLD_RELAXED, ITER_LIMIT, MIN_COL_AMOUNT,
+    N_NODES_ALLOC_MAX, N_NODES_ALLOC_MIN, STOPPING_ROUNDS,
 };
 use crate::constraints::ConstraintMap;
 use crate::data::{ColumnarMatrix, Matrix};
 use crate::errors::PerpetualError;
 use crate::histogram::{HistogramArena, NodeHistogram, update_cuts};
 use crate::objective::{Objective, ObjectiveFunction};
+use crate::sampler::{RandomSampler, Sampler};
 use crate::splitter::{MissingBranchSplitter, MissingImputerSplitter, SplitInfo, SplitInfoSlice, Splitter};
 use crate::tree::core::{Tree, TreeStopper};
 
 use log::{info, warn};
+use rand::RngExt;
 use rand::SeedableRng;
 use rand::rngs::StdRng;
-use rand::seq::IndexedRandom;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
-use std::collections::{HashMap, HashSet};
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::mem;
 use std::time::Instant;
 use sysinfo::{MemoryRefreshKind, RefreshKind, System};
 
 type ImportanceFn = fn(&Tree, &mut HashMap<usize, (f32, usize)>);
+
+#[derive(Default)]
+struct StructuralStopState {
+    recent_node_counts: VecDeque<usize>,
+    best_smoothed_nodes: f32,
+    shrinking_rounds: usize,
+}
+
+#[derive(Clone, Default)]
+struct FeatureSamplingStat {
+    sampled_rounds: usize,
+    used_rounds: usize,
+    gain_ema: f32,
+    stability_ema: f32,
+    generalization_ema: f32,
+    last_selected_round: usize,
+    last_used_round: usize,
+}
+
+#[derive(Default)]
+struct FeatureScheduleState {
+    stats: Vec<FeatureSamplingStat>,
+    current_amount: usize,
+    start_amount: usize,
+    best_generalization: f32,
+    recent_improvements: VecDeque<f32>,
+    recent_generalizations: VecDeque<f32>,
+}
+
+impl FeatureScheduleState {
+    const WINDOW: usize = 6;
+
+    fn new(cols: usize, initial_amount: usize) -> Self {
+        let current_amount = initial_amount.clamp(1, cols.max(1));
+        FeatureScheduleState {
+            stats: vec![FeatureSamplingStat::default(); cols],
+            current_amount,
+            start_amount: current_amount,
+            best_generalization: 0.0,
+            recent_improvements: VecDeque::with_capacity(Self::WINDOW),
+            recent_generalizations: VecDeque::with_capacity(Self::WINDOW),
+        }
+    }
+
+    fn smoothed_floor(&self, cols: usize, round: usize, budget: f32) -> usize {
+        if cols <= self.start_amount {
+            return cols;
+        }
+
+        let growth_scale = (10.0 / budget.max(0.75)).clamp(4.0, 12.0);
+        let growth = 1.0 - (-((round + 1) as f32) / growth_scale).exp();
+        let expanded = self.start_amount as f32 + (cols - self.start_amount) as f32 * growth;
+        expanded.round() as usize
+    }
+
+    fn desired_amount(&self, cols: usize, round: usize, budget: f32) -> usize {
+        self.current_amount
+            .max(self.smoothed_floor(cols, round, budget))
+            .min(cols)
+    }
+
+    fn push_window(window: &mut VecDeque<f32>, value: f32) {
+        if window.len() == Self::WINDOW {
+            window.pop_front();
+        }
+        window.push_back(value);
+    }
+
+    fn average(window: &VecDeque<f32>) -> f32 {
+        if window.is_empty() {
+            0.0
+        } else {
+            window.iter().sum::<f32>() / window.len() as f32
+        }
+    }
+}
+
+struct SamplingLayout {
+    initial_col_amount: usize,
+    dynamic_feature_sampling: bool,
+    effective_max_bin: u16,
+    mem_hist: f32,
+}
+
+impl StructuralStopState {
+    const WINDOW: usize = 8;
+    const MIN_PEAK_NODES: f32 = 25.0;
+    const SHRINK_RATIO: f32 = 0.85;
+
+    fn update(&mut self, node_count: usize) -> bool {
+        self.recent_node_counts.push_back(node_count);
+        if self.recent_node_counts.len() > Self::WINDOW {
+            self.recent_node_counts.pop_front();
+        }
+        if self.recent_node_counts.len() < Self::WINDOW {
+            return false;
+        }
+
+        let smoothed_nodes = self.recent_node_counts.iter().sum::<usize>() as f32 / Self::WINDOW as f32;
+        if smoothed_nodes > self.best_smoothed_nodes {
+            self.best_smoothed_nodes = smoothed_nodes;
+            self.shrinking_rounds = 0;
+            return false;
+        }
+        if self.best_smoothed_nodes < Self::MIN_PEAK_NODES {
+            return false;
+        }
+
+        if smoothed_nodes <= self.best_smoothed_nodes * Self::SHRINK_RATIO {
+            self.shrinking_rounds += 1;
+        } else {
+            self.shrinking_rounds = 0;
+        }
+
+        self.shrinking_rounds >= Self::WINDOW
+    }
+}
 
 /// A self-generalizing Gradient Boosting Machine (GBM) with Perpetual Learning.
 ///
@@ -42,9 +160,8 @@ type ImportanceFn = fn(&Tree, &mut HashMap<usize, (f32, usize)>);
 /// # Example
 ///
 /// ```rust
-/// use perpetual::PerpetualBooster;
 /// use perpetual::objective::Objective;
-/// use perpetual::Matrix;
+/// use perpetual::{Matrix, PerpetualBooster};
 ///
 /// // Prepare data
 /// let data_vec = vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0];
@@ -69,11 +186,17 @@ pub struct PerpetualBooster {
     pub cfg: BoosterConfig,
     /// The initial prediction value of the model (bias term).
     /// If not provided, this is usually initialized to the mean (or log-odds) of the target.
-    #[serde(deserialize_with = "crate::booster::config::parse_missing")]
+    #[serde(
+        default = "crate::booster::config::default_nan_f64",
+        deserialize_with = "crate::booster::config::parse_missing"
+    )]
     pub base_score: f64,
     /// The global learning rate (step size) derived from the budget.
     /// A higher budget implies a smaller eta, allowing for more fine-grained learning steps.
-    #[serde(deserialize_with = "crate::booster::config::parse_f32")]
+    #[serde(
+        default = "crate::booster::config::default_nan_f32",
+        deserialize_with = "crate::booster::config::parse_f32"
+    )]
     pub eta: f32,
     /// The ensemble of trained `Tree` structures.
     pub trees: Vec<Tree>,
@@ -228,6 +351,970 @@ impl PerpetualBooster {
         Ok(())
     }
 
+    #[inline]
+    fn categorical_feature_count(&self) -> usize {
+        self.cfg.categorical_features.as_ref().map_or(0, HashSet::len)
+    }
+
+    #[inline]
+    fn is_categorical_heavy_task(&self, cols: usize) -> bool {
+        let categorical_count = self.categorical_feature_count() as f32;
+        categorical_count > 0.0 && categorical_count / cols.max(1) as f32 >= 0.35
+    }
+
+    #[inline]
+    fn should_enforce_generalization_plateau(&self) -> bool {
+        matches!(self.cfg.objective, Objective::LogLoss)
+            && self.cfg.budget > 1.5
+            && self.categorical_feature_count() > 0
+    }
+
+    #[inline]
+    fn is_small_low_dimensional_regression(&self, rows: usize, cols: usize) -> bool {
+        matches!(
+            self.cfg.objective,
+            Objective::SquaredLoss
+                | Objective::HuberLoss { .. }
+                | Objective::AdaptiveHuberLoss { .. }
+                | Objective::AbsoluteLoss
+                | Objective::Custom(_)
+        ) && rows <= 4_096
+            && cols <= 24
+    }
+
+    #[inline]
+    fn is_regression_like_objective(&self) -> bool {
+        matches!(
+            self.cfg.objective,
+            Objective::SquaredLoss
+                | Objective::QuantileLoss { .. }
+                | Objective::HuberLoss { .. }
+                | Objective::AdaptiveHuberLoss { .. }
+                | Objective::AbsoluteLoss
+                | Objective::Custom(_)
+        )
+    }
+
+    #[inline]
+    fn should_enforce_small_regression_plateau(&self, rows: usize, cols: usize) -> bool {
+        self.cfg.budget > 1.0 && self.is_small_low_dimensional_regression(rows, cols)
+    }
+
+    #[inline]
+    fn eta_power_for_training(&self, budget: f32, rows: usize, cols: usize) -> f32 {
+        let budget = f32::max(0.0, budget);
+        if budget <= 1.0 {
+            budget
+        } else if matches!(
+            self.cfg.objective,
+            Objective::SquaredLoss
+                | Objective::HuberLoss { .. }
+                | Objective::AdaptiveHuberLoss { .. }
+                | Objective::AbsoluteLoss
+                | Objective::Custom(_)
+        ) {
+            if self.is_small_low_dimensional_regression(rows, cols) {
+                1.0 + 1.2 * (budget - 1.0)
+            } else if rows <= 16_384 && cols <= 32 {
+                1.0 + 1.1 * (budget - 1.0)
+            } else {
+                budget
+            }
+        } else if !matches!(self.cfg.objective, Objective::LogLoss) {
+            budget
+        } else if self.is_categorical_heavy_task(cols) {
+            if rows >= 50_000 {
+                1.0 + 0.15 * (budget - 1.0)
+            } else {
+                budget
+            }
+        } else if cols <= 96 {
+            1.0 + 0.65 * (budget - 1.0)
+        } else {
+            budget
+        }
+    }
+
+    #[inline]
+    fn schedule_budget_for_training(&self, budget: f32, rows: usize, cols: usize) -> f32 {
+        let budget = f32::max(0.0, budget);
+        if budget <= 1.0 {
+            return budget;
+        }
+
+        if !matches!(self.cfg.objective, Objective::LogLoss) {
+            return budget;
+        }
+
+        let categorical_ratio = self.categorical_feature_count() as f32 / cols.max(1) as f32;
+        if categorical_ratio >= 0.6 && rows >= 50_000 && cols <= 32 {
+            return 1.0 + 0.5 * (budget - 1.0);
+        }
+        if rows <= 1_000 && cols <= 4 {
+            return 1.0 + 0.3 * (budget - 1.0);
+        }
+        if rows <= 1_000 && cols <= 12 {
+            return 1.0 + 0.7 * (budget - 1.0);
+        }
+        if rows <= 1_500 && cols <= 24 {
+            return 1.0 + 0.8 * (budget - 1.0);
+        }
+        if cols >= 64 && rows <= 10_000 {
+            return 1.0 + 0.4 * (budget - 1.0);
+        }
+
+        budget
+    }
+
+    #[inline]
+    fn eta_budget_for_training(&self, budget: f32, rows: usize, cols: usize) -> f32 {
+        if !matches!(self.cfg.objective, Objective::LogLoss) {
+            return budget;
+        }
+
+        if rows <= 1_000 && cols <= 12 {
+            return self.schedule_budget_for_training(budget, rows, cols);
+        }
+
+        budget
+    }
+
+    #[inline]
+    fn auto_leaf_regularization(&self, rows: usize, cols: usize) -> f32 {
+        if rows < 32 {
+            return 0.0;
+        }
+
+        let row_feature_ratio = (rows as f32 / cols.max(1) as f32).max(1.0);
+        let density_scale = row_feature_ratio.ln_1p();
+        let categorical_ratio = self.categorical_feature_count() as f32 / cols.max(1) as f32;
+        let budget_relief = self.cfg.budget.max(0.75).powf(0.35);
+
+        let base_regularization = match self.cfg.objective {
+            Objective::LogLoss
+            | Objective::BrierLoss
+            | Objective::HingeLoss
+            | Objective::CrossEntropyLoss
+            | Objective::CrossEntropyLambdaLoss => 0.015 + 0.012 * density_scale + 0.02 * categorical_ratio,
+            Objective::SquaredLoss
+            | Objective::QuantileLoss { .. }
+            | Objective::HuberLoss { .. }
+            | Objective::AdaptiveHuberLoss { .. }
+            | Objective::AbsoluteLoss
+            | Objective::Custom(_) => {
+                let mut regularization = 0.008 + 0.008 * density_scale;
+                if self.is_small_low_dimensional_regression(rows, cols) {
+                    regularization += 0.012 + 0.004 * density_scale;
+                }
+                regularization
+            }
+            _ => 0.01 + 0.01 * density_scale,
+        };
+
+        (base_regularization / budget_relief).clamp(0.0, 0.12)
+    }
+
+    #[inline]
+    fn leaf_refinement_iterations(&self, objective_fn: &Objective, rows: usize, cols: usize) -> usize {
+        let has_monotone_constraints = self
+            .cfg
+            .monotone_constraints
+            .as_ref()
+            .is_some_and(|constraints| !constraints.is_empty());
+        if has_monotone_constraints {
+            return 1;
+        }
+
+        match objective_fn {
+            Objective::LogLoss
+            | Objective::BrierLoss
+            | Objective::HingeLoss
+            | Objective::CrossEntropyLoss
+            | Objective::CrossEntropyLambdaLoss => {
+                if rows <= 20_000 && cols <= 256 {
+                    4
+                } else if rows <= 100_000 {
+                    2
+                } else {
+                    1
+                }
+            }
+            Objective::SquaredLoss
+            | Objective::QuantileLoss { .. }
+            | Objective::HuberLoss { .. }
+            | Objective::AdaptiveHuberLoss { .. }
+            | Objective::AbsoluteLoss
+            | Objective::Custom(_) => {
+                if self.is_categorical_heavy_task(cols) {
+                    1
+                } else if self.is_small_low_dimensional_regression(rows, cols) {
+                    5
+                } else if rows <= 30_000 {
+                    2
+                } else {
+                    1
+                }
+            }
+            _ => 1,
+        }
+    }
+
+    #[inline]
+    fn apply_tree_training_outputs(yhat: &mut [f64], tree: &Tree) {
+        for &(weight, start, stop) in &tree.leaf_bounds {
+            for &row_idx in &tree.train_index[start..stop] {
+                yhat[row_idx] += weight;
+            }
+        }
+    }
+
+    #[inline]
+    fn apply_leaf_deltas_to_predictions(tree: &Tree, yhat: &mut [f64], deltas: &[f64], scale: f64) {
+        for (leaf_idx, &(_, start, stop)) in tree.leaf_node_assignments.iter().enumerate() {
+            let delta = deltas[leaf_idx] * scale;
+            if delta.abs() <= 1e-12 {
+                continue;
+            }
+            for &row_idx in &tree.train_index[start..stop] {
+                yhat[row_idx] += delta;
+            }
+        }
+    }
+
+    fn update_tree_leaf_outputs(tree: &mut Tree, deltas: &[f64], scale: f64) {
+        for (leaf_idx, &(node_idx, _, _)) in tree.leaf_node_assignments.iter().enumerate() {
+            let delta = (deltas[leaf_idx] * scale) as f32;
+            if delta.abs() <= 1e-12_f32 {
+                continue;
+            }
+
+            if let Some(node) = tree.nodes.get_mut(&node_idx) {
+                node.weight_value += delta;
+                if let Some(weights) = node.leaf_weights.as_mut() {
+                    weights.iter_mut().for_each(|weight| *weight += delta);
+                } else {
+                    node.leaf_weights = Some([node.weight_value; 5]);
+                }
+                if let Some(stats) = node.stats.as_mut() {
+                    stats.weights.iter_mut().for_each(|weight| *weight += delta);
+                }
+            }
+
+            if let Some((weight, _, _)) = tree.leaf_bounds.get_mut(leaf_idx) {
+                *weight += f64::from(delta);
+            }
+        }
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn refine_tree_leaf_outputs(
+        &self,
+        objective_fn: &Objective,
+        tree: &mut Tree,
+        yhat: &mut [f64],
+        y: &[f64],
+        sample_weight: Option<&[f64]>,
+        group: Option<&[u64]>,
+        rows: usize,
+        cols: usize,
+        leaf_regularization: f32,
+    ) {
+        if tree.leaf_bounds.is_empty() || tree.train_index.len() != y.len() || group.is_some() {
+            Self::apply_tree_training_outputs(yhat, tree);
+            self.restore_missing_node_treatment(tree);
+            return;
+        }
+
+        let refinement_iterations = self.leaf_refinement_iterations(objective_fn, rows, cols);
+        Self::apply_tree_training_outputs(yhat, tree);
+        if refinement_iterations <= 1 {
+            self.restore_missing_node_treatment(tree);
+            return;
+        }
+
+        let mut current_loss_avg = objective_fn.loss(y, yhat, sample_weight, None).iter().sum::<f32>() / y.len() as f32;
+        let mut grad = vec![0.0_f32; y.len()];
+        let mut hess = None;
+        let mut loss = vec![0.0_f32; y.len()];
+        let mut trial_yhat = yhat.to_vec();
+        let leaf_regularization = leaf_regularization as f64 + f64::EPSILON;
+        let backtracking_scales = [1.0_f64, 0.5, 0.25, 0.125];
+
+        for _ in 1..refinement_iterations {
+            objective_fn.gradient_and_loss_into(y, yhat, sample_weight, None, &mut grad, &mut hess, &mut loss);
+
+            let hess_ref = hess.as_deref();
+            let mut deltas = vec![0.0_f64; tree.leaf_node_assignments.len()];
+            let mut max_delta = 0.0_f64;
+
+            for (leaf_idx, &(_, start, stop)) in tree.leaf_node_assignments.iter().enumerate() {
+                let mut grad_sum = 0.0_f64;
+                let mut denom = 0.0_f64;
+
+                for &row_idx in &tree.train_index[start..stop] {
+                    grad_sum += f64::from(grad[row_idx]);
+                    denom += match hess_ref {
+                        Some(values) => f64::from(values[row_idx]),
+                        None => sample_weight.map_or(1.0, |weights| weights[row_idx]),
+                    };
+                }
+
+                if denom <= 0.0 {
+                    continue;
+                }
+
+                let delta = (-grad_sum / (denom + leaf_regularization)) * f64::from(self.eta);
+                if delta.is_finite() {
+                    max_delta = max_delta.max(delta.abs());
+                    deltas[leaf_idx] = delta;
+                }
+            }
+
+            if max_delta <= 1e-8 {
+                break;
+            }
+
+            let mut improved = false;
+            for scale in backtracking_scales {
+                trial_yhat.copy_from_slice(yhat);
+                Self::apply_leaf_deltas_to_predictions(tree, &mut trial_yhat, &deltas, scale);
+                let trial_loss_avg = objective_fn
+                    .loss(y, &trial_yhat, sample_weight, None)
+                    .iter()
+                    .sum::<f32>()
+                    / y.len() as f32;
+                if trial_loss_avg + 1e-7 < current_loss_avg {
+                    Self::update_tree_leaf_outputs(tree, &deltas, scale);
+                    yhat.copy_from_slice(&trial_yhat);
+                    current_loss_avg = trial_loss_avg;
+                    improved = true;
+                    break;
+                }
+            }
+
+            if !improved {
+                break;
+            }
+        }
+
+        self.restore_missing_node_treatment(tree);
+    }
+
+    fn restore_missing_node_treatment(&self, tree: &mut Tree) {
+        MissingBranchSplitter::apply_missing_node_treatment(tree, self.cfg.missing_node_treatment);
+    }
+
+    #[inline]
+    fn should_use_class_balanced_row_sampling(&self, y: &[f64], row_subsample: f32) -> bool {
+        if !matches!(self.cfg.objective, Objective::LogLoss) || row_subsample >= 0.999 {
+            return false;
+        }
+
+        let positives = y.iter().filter(|&&value| value >= 0.5).count();
+        let negatives = y.len().saturating_sub(positives);
+        let expected_positive_oob = positives as f32 * (1.0 - row_subsample);
+        let expected_negative_oob = negatives as f32 * (1.0 - row_subsample);
+
+        positives > 0 && negatives > 0 && expected_positive_oob >= 32.0 && expected_negative_oob >= 32.0
+    }
+
+    #[inline]
+    fn auto_row_subsample(&self, rows: usize, cols: usize) -> f32 {
+        if rows <= 1 {
+            return 1.0;
+        }
+
+        let scoring_work = rows as f32 * cols.max(1) as f32;
+        let target_work = 180_000.0 * self.cfg.budget.max(0.5).powf(0.35);
+        let workload_pressure = (scoring_work / target_work.max(1.0)).sqrt();
+        if workload_pressure <= 1.0 {
+            return 1.0;
+        }
+
+        let smooth_subsample = (1.0 / workload_pressure).clamp(0.55, 1.0);
+        let min_oob_share = (1.0 / (rows as f32).sqrt()).clamp(0.05, 0.2);
+        let row_subsample = smooth_subsample.max(1.0 - min_oob_share).min(1.0);
+
+        let oob_share = 1.0 - row_subsample;
+        let expected_oob_rows = rows as f32 * oob_share;
+        if oob_share < min_oob_share * 0.8 || (oob_share < 0.1 && expected_oob_rows < 2_048.0) {
+            1.0
+        } else {
+            row_subsample
+        }
+    }
+
+    #[inline]
+    fn make_sampling_layout(
+        &self,
+        nunique: &[usize],
+        mem_bin: usize,
+        mem_available: f32,
+        base_memory_bytes: f32,
+        memory_limit: Option<f32>,
+    ) -> SamplingLayout {
+        let cols = nunique.len();
+        let max_nunique = *nunique.iter().max().unwrap_or(&(self.cfg.max_bin as usize + 2));
+        let effective_max_bin = (max_nunique.saturating_sub(2) as u16).max(self.cfg.max_bin);
+        if cols <= 1 {
+            return SamplingLayout {
+                initial_col_amount: cols,
+                dynamic_feature_sampling: false,
+                effective_max_bin,
+                mem_hist: (mem_bin * nunique.iter().sum::<usize>()) as f32,
+            };
+        }
+
+        let node_hist_overhead = mem::size_of::<crate::histogram::NodeHistogram>() as f32;
+        let feature_hist_overhead = mem::size_of::<crate::histogram::FeatureHistogram>() as f32;
+        let full_hist_bytes =
+            (mem_bin * nunique.iter().sum::<usize>()) as f32 + node_hist_overhead + feature_hist_overhead * cols as f32;
+
+        let usable_memory = match memory_limit {
+            Some(limit_gb) => (limit_gb * 1e9_f32 * 0.9 - base_memory_bytes)
+                .max(0.0)
+                .min(mem_available),
+            None => (mem_available - base_memory_bytes).max(0.0),
+        };
+        let histogram_budget = (usable_memory * 0.08).max(full_hist_bytes.min(usable_memory));
+
+        if self.is_categorical_heavy_task(cols) || full_hist_bytes <= histogram_budget || histogram_budget <= 0.0 {
+            return SamplingLayout {
+                initial_col_amount: cols,
+                dynamic_feature_sampling: false,
+                effective_max_bin,
+                mem_hist: full_hist_bytes,
+            };
+        }
+
+        let bytes_per_feature = ((full_hist_bytes - node_hist_overhead) / cols as f32).max(1.0);
+        let static_amount =
+            (((histogram_budget - node_hist_overhead).max(bytes_per_feature)) / bytes_per_feature).floor() as usize;
+        let initial_col_amount = static_amount.clamp(usize::min(MIN_COL_AMOUNT, cols), cols);
+        let fixed_hist_bytes = (mem_bin * (effective_max_bin as usize + 2) * cols) as f32
+            + node_hist_overhead
+            + feature_hist_overhead * cols as f32;
+
+        SamplingLayout {
+            initial_col_amount,
+            dynamic_feature_sampling: initial_col_amount < cols,
+            effective_max_bin,
+            mem_hist: fixed_hist_bytes,
+        }
+    }
+
+    #[inline]
+    fn should_auto_stop_on_tree_structure(
+        &self,
+        state: &mut StructuralStopState,
+        node_count: usize,
+        tree_generalization: f32,
+        recent_tree_generalizations: &VecDeque<f32>,
+        best_tree_generalization: f32,
+        no_improvement_rounds: usize,
+    ) -> bool {
+        if self.cfg.budget < 2.0 {
+            return false;
+        }
+
+        let shrinking = state.update(node_count);
+        if !shrinking || recent_tree_generalizations.len() < FeatureScheduleState::WINDOW {
+            return false;
+        }
+
+        let recent_average = FeatureScheduleState::average(recent_tree_generalizations);
+        let reference = if best_tree_generalization > 0.0 {
+            0.5 * recent_average + 0.5 * best_tree_generalization.max(recent_average)
+        } else {
+            recent_average
+        };
+        let degraded_generalization = tree_generalization + 0.001 < reference.max(GENERALIZATION_THRESHOLD_RELAXED);
+        let patience = (StructuralStopState::WINDOW / 2).max(1);
+
+        degraded_generalization && no_improvement_rounds >= patience
+    }
+
+    #[inline]
+    fn should_reject_regressive_tree(
+        &self,
+        recent_tree_generalizations: &VecDeque<f32>,
+        best_tree_generalization: f32,
+        tree_generalization: f32,
+    ) -> bool {
+        if recent_tree_generalizations.len() < 3 {
+            return false;
+        }
+
+        let recent_average = FeatureScheduleState::average(recent_tree_generalizations);
+        let had_healthy_history = best_tree_generalization >= GENERALIZATION_THRESHOLD;
+        let weak_generalization = tree_generalization < GENERALIZATION_THRESHOLD_RELAXED;
+        let below_recent_trend = tree_generalization + 0.002 < recent_average.max(GENERALIZATION_THRESHOLD_RELAXED);
+
+        had_healthy_history && (weak_generalization || below_recent_trend)
+    }
+
+    #[inline]
+    fn should_use_best_model_detector(&self, row_subsample: f32, rows: usize, cols: usize) -> bool {
+        if matches!(self.cfg.objective, Objective::LogLoss)
+            && self.cfg.create_missing_branch
+            && self.cfg.allow_missing_splits
+            && rows <= 2_048
+        {
+            return false;
+        }
+
+        (1.0 - row_subsample) >= 0.1
+            || matches!(self.cfg.objective, Objective::LogLoss)
+            || (matches!(self.cfg.objective, Objective::AdaptiveHuberLoss { .. }) && rows <= 10_000 && cols <= 16)
+            || self.should_enforce_small_regression_plateau(rows, cols)
+    }
+
+    #[inline]
+    fn best_model_proxy_score(&self, used_row_sampling: bool, current_loss_avg: f32, tree_generalization: f32) -> f32 {
+        if used_row_sampling {
+            -current_loss_avg
+        } else if matches!(self.cfg.objective, Objective::LogLoss) || self.is_regression_like_objective() {
+            tree_generalization - 0.05 * current_loss_avg
+        } else {
+            -current_loss_avg
+        }
+    }
+
+    #[inline]
+    fn tree_weight_multiplier(
+        &self,
+        recent_tree_generalizations: &VecDeque<f32>,
+        best_tree_generalization: f32,
+        tree_generalization: f32,
+        regressive_tree: bool,
+    ) -> f32 {
+        if recent_tree_generalizations.is_empty() {
+            return 1.0;
+        }
+
+        let is_regression_objective = self.is_regression_like_objective();
+        if is_regression_objective && !regressive_tree {
+            return 1.0;
+        }
+
+        let recent_average =
+            FeatureScheduleState::average(recent_tree_generalizations).max(GENERALIZATION_THRESHOLD_RELAXED);
+        if tree_generalization + 0.001 >= recent_average {
+            return 1.0;
+        }
+
+        let reference = if best_tree_generalization > 0.0 {
+            0.5 * recent_average + 0.5 * best_tree_generalization.max(recent_average)
+        } else {
+            recent_average
+        };
+        let pressure = ((reference - tree_generalization).max(0.0) / 0.015).powi(2);
+        let mut multiplier = if is_regression_objective {
+            1.0 / (1.0 + 0.06 * pressure)
+        } else {
+            1.0 / (1.0 + 0.12 * pressure)
+        };
+        if regressive_tree && !is_regression_objective {
+            multiplier = multiplier.min(0.82);
+        }
+
+        if is_regression_objective {
+            return multiplier.clamp(0.82, 1.0);
+        }
+
+        multiplier.clamp(0.6, 1.0)
+    }
+
+    #[inline]
+    fn sample_feature_subset(
+        &self,
+        rng: &mut StdRng,
+        col_index: &[usize],
+        schedule: &mut FeatureScheduleState,
+        round: usize,
+    ) -> Vec<usize> {
+        let desired = schedule.desired_amount(col_index.len(), round, self.cfg.budget);
+        if desired >= col_index.len() {
+            return Vec::new();
+        }
+
+        let round_idx = round + 1;
+        let mut priorities: Vec<(usize, f32)> = col_index
+            .iter()
+            .map(|&feature| {
+                let stat = &schedule.stats[feature];
+                let sampled_rounds = stat.sampled_rounds.max(1) as f32;
+                let reliability = (stat.used_rounds as f32 / sampled_rounds).clamp(0.0, 1.0);
+                let utility = 0.65 * stat.gain_ema.max(0.0)
+                    + 0.2 * stat.stability_ema.max(0.0)
+                    + 0.15 * stat.generalization_ema.max(0.0);
+                let starvation = round_idx.saturating_sub(stat.last_selected_round) as f32;
+                let exploration = if stat.sampled_rounds == 0 {
+                    1.0
+                } else {
+                    starvation.sqrt() / (round_idx as f32).sqrt()
+                };
+                let jitter = 0.05 * rng.random::<f32>();
+                let priority = utility * (0.7 + 0.3 * reliability) + 0.2 * exploration + jitter;
+                (feature, priority)
+            })
+            .collect();
+        priorities.sort_unstable_by(|a, b| b.1.total_cmp(&a.1));
+
+        let mut selected: Vec<usize> = priorities
+            .into_iter()
+            .take(desired)
+            .map(|(feature, _)| feature)
+            .collect();
+        selected.sort_unstable();
+
+        for &feature in &selected {
+            let stat = &mut schedule.stats[feature];
+            stat.sampled_rounds += 1;
+            stat.last_selected_round = round_idx;
+        }
+
+        selected
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn update_feature_schedule(
+        &self,
+        schedule: &mut FeatureScheduleState,
+        tree: &Tree,
+        sampled_features: &[usize],
+        round: usize,
+        previous_loss_avg: f32,
+        current_loss_avg: f32,
+        tree_generalization: f32,
+        cols: usize,
+    ) {
+        if cols <= 1 {
+            return;
+        }
+
+        let round_idx = round + 1;
+        let improvement =
+            ((previous_loss_avg - current_loss_avg) / previous_loss_avg.max(f32::EPSILON)).clamp(-1.0, 1.0);
+        FeatureScheduleState::push_window(&mut schedule.recent_improvements, improvement);
+        FeatureScheduleState::push_window(&mut schedule.recent_generalizations, tree_generalization);
+        schedule.best_generalization = schedule.best_generalization.max(tree_generalization);
+
+        let mut used_feature_stats: HashMap<usize, (f32, f32, f32, usize)> = HashMap::new();
+        for node in tree.nodes.values() {
+            if node.is_leaf {
+                continue;
+            }
+
+            let stability = node
+                .stats
+                .as_ref()
+                .map(|stats| Self::fold_weight_stability(&stats.weights))
+                .unwrap_or(1.0);
+            let generalization = node
+                .stats
+                .as_ref()
+                .and_then(|stats| stats.generalization)
+                .unwrap_or(tree_generalization.max(1.0));
+            let entry = used_feature_stats
+                .entry(node.split_feature)
+                .or_insert((0.0, 0.0, 0.0, 0));
+            entry.0 += node.split_gain.max(0.0);
+            entry.1 += stability;
+            entry.2 += generalization;
+            entry.3 += 1;
+        }
+
+        for &feature in sampled_features {
+            if let Some((gain_sum, stability_sum, generalization_sum, count)) = used_feature_stats.get(&feature) {
+                let stat = &mut schedule.stats[feature];
+                let count_f = *count as f32;
+                stat.used_rounds += 1;
+                stat.last_used_round = round_idx;
+                stat.gain_ema = 0.8 * stat.gain_ema + 0.2 * (gain_sum / count_f);
+                stat.stability_ema = 0.8 * stat.stability_ema + 0.2 * (stability_sum / count_f);
+                stat.generalization_ema = 0.8 * stat.generalization_ema + 0.2 * (generalization_sum / count_f);
+            } else {
+                let stat = &mut schedule.stats[feature];
+                let decay = if improvement <= 0.0 { 0.9 } else { 0.96 };
+                stat.gain_ema *= decay;
+                stat.stability_ema *= 0.98;
+                stat.generalization_ema *= 0.98;
+            }
+        }
+
+        let used_ratio = if sampled_features.is_empty() {
+            used_feature_stats.len() as f32 / cols.max(1) as f32
+        } else {
+            used_feature_stats.len() as f32 / sampled_features.len().max(1) as f32
+        };
+        let recent_improvement = FeatureScheduleState::average(&schedule.recent_improvements);
+        let recent_generalization = FeatureScheduleState::average(&schedule.recent_generalizations);
+        let small_step = ((cols as f32) * 0.08).round().max(1.0) as usize;
+        let large_step = ((cols as f32) * 0.16).round().max(1.0) as usize;
+
+        if recent_improvement <= 0.0005 {
+            if used_ratio >= 0.65 || tree_generalization >= schedule.best_generalization * 0.995 {
+                schedule.current_amount = (schedule.current_amount + large_step).min(cols);
+            } else if used_ratio < 0.35 && tree_generalization < recent_generalization.max(1.0) {
+                schedule.current_amount = schedule
+                    .current_amount
+                    .saturating_sub(small_step)
+                    .max(schedule.start_amount);
+            }
+        } else if used_ratio < 0.3 && tree_generalization < recent_generalization.max(1.0) {
+            schedule.current_amount = schedule
+                .current_amount
+                .saturating_sub(small_step)
+                .max(schedule.start_amount);
+        } else if used_ratio > 0.75 && improvement > 0.0 {
+            schedule.current_amount = (schedule.current_amount + small_step).min(cols);
+        }
+
+        let floor = schedule.smoothed_floor(cols, round, self.cfg.budget);
+        schedule.current_amount = schedule.current_amount.max(floor).min(cols);
+    }
+
+    #[inline]
+    fn base_target_loss_decrement(&self, loss_avg: f32, effective_budget: f32) -> f32 {
+        let base = 10.0_f32;
+        let effective_budget = effective_budget.max(0.1);
+        let n = base / effective_budget;
+        let reciprocals_of_powers = n / (n - 1.0);
+        let truncated_series_sum = reciprocals_of_powers - (1.0 + 1.0 / n);
+        let c = 1.0 / n - truncated_series_sum;
+        let tree_budget = effective_budget.clamp(0.0, 3.0);
+        c * base.powf(-tree_budget) * loss_avg.max(f32::EPSILON)
+    }
+
+    #[inline]
+    fn adaptive_target_loss_decrement(
+        &self,
+        initial_loss_avg: f32,
+        current_loss_avg: f32,
+        effective_budget: f32,
+    ) -> f32 {
+        let effective_budget = effective_budget.max(0.0);
+
+        if effective_budget <= 0.2 {
+            return self.base_target_loss_decrement(initial_loss_avg, effective_budget);
+        }
+
+        let initial_weight = (1.0 - 0.1 * effective_budget.max(0.0)).clamp(0.85, 0.995);
+        let current_weight = 1.0 - initial_weight;
+        let smoothed_loss_avg = initial_weight * initial_loss_avg + current_weight * current_loss_avg;
+        self.base_target_loss_decrement(smoothed_loss_avg, effective_budget) * 1.2
+    }
+
+    #[inline]
+    fn default_budget_scale_for(&self, effective_budget: f32, exponent: f32, max_scale: f32) -> f32 {
+        let extra_budget = (effective_budget - 1.0).max(0.0);
+        10.0_f32.powf(extra_budget * exponent).clamp(1.0, max_scale)
+    }
+
+    #[inline]
+    fn min_best_model_tree_count_for(&self, effective_budget: f32) -> usize {
+        if matches!(self.cfg.objective, Objective::LogLoss) {
+            return ((2.0 * 10.0_f32.powf(0.5 * effective_budget)).round() as usize).clamp(4, 64);
+        }
+
+        if matches!(self.cfg.objective, Objective::AdaptiveHuberLoss { .. }) && effective_budget <= 0.2 {
+            return 3;
+        }
+
+        if matches!(
+            self.cfg.objective,
+            Objective::SquaredLoss
+                | Objective::QuantileLoss { .. }
+                | Objective::HuberLoss { .. }
+                | Objective::AdaptiveHuberLoss { .. }
+                | Objective::AbsoluteLoss
+                | Objective::Custom(_)
+        ) {
+            let scale = 10.0_f32.powf(0.5 * (effective_budget - 1.0).max(0.0));
+            return (40.0 * scale).round() as usize;
+        }
+
+        0
+    }
+
+    #[inline]
+    pub(crate) fn effective_stopping_rounds_for(&self, rows: usize, cols: usize, effective_budget: f32) -> usize {
+        match self.cfg.stopping_rounds {
+            Some(rounds) => rounds.max(1),
+            None => {
+                if self.is_small_low_dimensional_regression(rows, cols) {
+                    let scale = self.default_budget_scale_for(effective_budget, 0.5, 6.0);
+                    return (((STOPPING_ROUNDS as f32) * scale).ceil() as usize).max(18);
+                }
+                if self.is_categorical_heavy_task(self.categorical_feature_count().max(16)) {
+                    let scale = 10.0_f32.powf((effective_budget - 1.0).max(0.0) * 0.28).clamp(1.0, 2.5);
+                    return ((STOPPING_ROUNDS as f32) * scale).ceil() as usize;
+                }
+                let scale = self.default_budget_scale_for(effective_budget, 0.5, 6.0);
+                ((STOPPING_ROUNDS as f32) * scale).ceil() as usize
+            }
+        }
+    }
+
+    #[inline]
+    pub(crate) fn effective_stopping_rounds(&self, rows: usize, cols: usize) -> usize {
+        self.effective_stopping_rounds_for(rows, cols, self.cfg.budget)
+    }
+
+    #[inline]
+    fn adaptive_iteration_limit_for(&self, effective_budget: f32) -> usize {
+        if self.is_categorical_heavy_task(self.categorical_feature_count().max(16)) {
+            let scale = 10.0_f32.powf((effective_budget - 1.0).max(0.0) * 0.24).clamp(1.0, 3.0);
+            return ((ITER_LIMIT as f32) * scale).round() as usize;
+        }
+        let scale = self.default_budget_scale_for(effective_budget, 0.35, 4.0);
+        ((ITER_LIMIT as f32) * scale).round() as usize
+    }
+
+    #[inline]
+    pub(crate) fn effective_iteration_limit_for(&self, effective_budget: f32) -> usize {
+        let adaptive_limit = self.adaptive_iteration_limit_for(effective_budget);
+        match self.cfg.iteration_limit {
+            Some(limit) => limit.min(adaptive_limit),
+            None => adaptive_limit,
+        }
+    }
+
+    #[inline]
+    pub(crate) fn effective_iteration_limit(&self) -> usize {
+        self.effective_iteration_limit_for(self.cfg.budget)
+    }
+
+    #[inline]
+    fn best_model_update_margin_for(&self, used_row_sampling: bool, effective_budget: f32) -> f32 {
+        if used_row_sampling {
+            return 1e-6;
+        }
+
+        if matches!(self.cfg.objective, Objective::LogLoss) {
+            return (0.00075 * effective_budget.max(1.0)).clamp(0.00075, 0.003);
+        }
+
+        if matches!(
+            self.cfg.objective,
+            Objective::SquaredLoss
+                | Objective::QuantileLoss { .. }
+                | Objective::HuberLoss { .. }
+                | Objective::AdaptiveHuberLoss { .. }
+                | Objective::AbsoluteLoss
+                | Objective::Custom(_)
+        ) {
+            return (0.00075 * effective_budget.max(1.0)).clamp(0.001, 0.003);
+        }
+
+        1e-5
+    }
+
+    #[inline]
+    fn loss_average(loss: &[f32], index: &[usize]) -> f32 {
+        if index.is_empty() {
+            return loss.iter().sum::<f32>() / loss.len() as f32;
+        }
+
+        index.iter().map(|&i| loss[i]).sum::<f32>() / index.len() as f32
+    }
+
+    #[inline]
+    fn sample_training_rows(
+        &self,
+        rng: &mut StdRng,
+        sampler: &mut RandomSampler,
+        index: &[usize],
+        y: &[f64],
+        row_subsample: f32,
+    ) -> (Vec<usize>, Vec<usize>) {
+        if !self.should_use_class_balanced_row_sampling(y, row_subsample) {
+            return sampler.sample(rng, index);
+        }
+
+        let mut negative = Vec::with_capacity(index.len());
+        let mut positive = Vec::with_capacity(index.len() / 4);
+        for &row_idx in index {
+            if y[row_idx] >= 0.5 {
+                positive.push(row_idx);
+            } else {
+                negative.push(row_idx);
+            }
+        }
+
+        if positive.is_empty() || negative.is_empty() {
+            return sampler.sample(rng, index);
+        }
+
+        let (mut chosen_positive, mut excluded_positive) = sampler.sample(rng, &positive);
+        let (chosen_negative, excluded_negative) = sampler.sample(rng, &negative);
+
+        chosen_positive.extend(chosen_negative);
+        excluded_positive.extend(excluded_negative);
+        chosen_positive.sort_unstable();
+        excluded_positive.sort_unstable();
+
+        (chosen_positive, excluded_positive)
+    }
+
+    #[inline]
+    fn fold_weight_stability(weights: &[f32; 5]) -> f32 {
+        let mean = weights.iter().sum::<f32>() / weights.len() as f32;
+        let mean_abs = weights.iter().map(|value| value.abs()).sum::<f32>() / weights.len() as f32;
+        if mean_abs <= f32::EPSILON {
+            return 1.0;
+        }
+
+        let variance = weights.iter().map(|value| (value - mean).powi(2)).sum::<f32>() / weights.len() as f32;
+        let std_dev = variance.sqrt();
+        let cv = std_dev / mean_abs;
+        let positive_share = weights.iter().filter(|&&value| value >= 0.0).count() as f32 / weights.len() as f32;
+        let sign_consistency = positive_share.max(1.0 - positive_share);
+
+        (sign_consistency / (1.0 + cv)).clamp(0.5, 1.0)
+    }
+
+    fn tree_generalization_score(&self, tree: &Tree) -> f32 {
+        let is_regression_objective = self.is_regression_like_objective();
+
+        if tree.generalization_score > 0.0 && !is_regression_objective {
+            return tree.generalization_score;
+        }
+
+        let mut best_score = 0.0_f32;
+        let mut weighted_sum = 0.0_f32;
+        let mut weight_total = 0.0_f32;
+
+        for node in tree.nodes.values() {
+            let Some(stats) = node.stats.as_ref() else {
+                continue;
+            };
+            let Some(generalization) = stats.generalization else {
+                continue;
+            };
+
+            let stability = Self::fold_weight_stability(&stats.weights);
+            let node_score = generalization * (0.99 + 0.01 * stability);
+            if is_regression_objective {
+                let bounded_score = node_score.clamp(0.95, 1.05);
+                let node_weight = (stats.count.max(1) as f32).sqrt() * stability;
+                weighted_sum += bounded_score * node_weight;
+                weight_total += node_weight;
+            }
+            best_score = best_score.max(node_score);
+        }
+
+        if is_regression_objective {
+            if weight_total > 0.0 {
+                return weighted_sum / weight_total;
+            }
+            return 0.0;
+        }
+
+        best_score
+    }
+
     /// Train the model on the provided dataset.
     ///
     /// This method performs the boosting iterations, adding trees to the ensemble until
@@ -260,11 +1347,14 @@ impl PerpetualBooster {
             .unwrap_or(&ConstraintMap::new())
             .to_owned();
 
-        self.set_eta(self.cfg.budget);
+        let eta_budget = self.eta_budget_for_training(self.cfg.budget, data.rows, data.cols);
+        self.eta = 10_f32.powf(-self.eta_power_for_training(eta_budget, data.rows, data.cols));
+        let leaf_regularization = self.auto_leaf_regularization(data.rows, data.cols);
 
         if self.cfg.create_missing_branch {
             let splitter = MissingBranchSplitter::new(
                 self.eta,
+                leaf_regularization,
                 self.cfg.allow_missing_splits,
                 constraints_map,
                 self.cfg.terminate_missing_features.clone(),
@@ -275,6 +1365,7 @@ impl PerpetualBooster {
         } else {
             let splitter = MissingImputerSplitter::new(
                 self.eta,
+                leaf_regularization,
                 self.cfg.allow_missing_splits,
                 constraints_map,
                 self.cfg.interaction_constraints.clone(),
@@ -310,11 +1401,14 @@ impl PerpetualBooster {
             .unwrap_or(&ConstraintMap::new())
             .to_owned();
 
-        self.set_eta(self.cfg.budget);
+        let eta_budget = self.eta_budget_for_training(self.cfg.budget, data.rows, data.cols);
+        self.eta = 10_f32.powf(-self.eta_power_for_training(eta_budget, data.rows, data.cols));
+        let leaf_regularization = self.auto_leaf_regularization(data.rows, data.cols);
 
         if self.cfg.create_missing_branch {
             let splitter = MissingBranchSplitter::new(
                 self.eta,
+                leaf_regularization,
                 self.cfg.allow_missing_splits,
                 constraints_map,
                 self.cfg.terminate_missing_features.clone(),
@@ -325,6 +1419,7 @@ impl PerpetualBooster {
         } else {
             let splitter = MissingImputerSplitter::new(
                 self.eta,
+                leaf_regularization,
                 self.cfg.allow_missing_splits,
                 constraints_map,
                 self.cfg.interaction_constraints.clone(),
@@ -345,6 +1440,7 @@ impl PerpetualBooster {
     ) -> Result<(), PerpetualError> {
         // initialize trees
         let start = Instant::now();
+        let schedule_budget = self.schedule_budget_for_training(self.cfg.budget, data.rows, data.cols);
 
         // initialize objective function
         let objective_fn = &self.cfg.objective;
@@ -382,12 +1478,8 @@ impl PerpetualBooster {
             loss_base.iter().sum::<f32>() / loss_base.len() as f32
         };
 
-        let base = 10.0_f32;
-        let n = base / self.cfg.budget;
-        let reciprocals_of_powers = n / (n - 1.0);
-        let truncated_series_sum = reciprocals_of_powers - (1.0 + 1.0 / n);
-        let c = 1.0 / n - truncated_series_sum;
-        let target_loss_decrement = c * base.powf(-self.cfg.budget) * loss_avg;
+        let initial_loss_avg = loss_avg;
+        let mut prev_loss_avg = loss_avg;
 
         let is_const_hess = hess.is_none();
 
@@ -403,6 +1495,7 @@ impl PerpetualBooster {
             self.cfg.categorical_features.as_ref(),
         )?;
         let bdata = Matrix::new(&binned_data.binned_data, data.rows, data.cols);
+        let leaf_regularization = splitter.get_leaf_regularization();
 
         let col_index: Vec<usize> = (0..data.cols).collect();
         let mut stopping = 0;
@@ -411,41 +1504,14 @@ impl PerpetualBooster {
         let mut no_improvement_rounds: usize = 0;
 
         let mut rng = StdRng::seed_from_u64(self.cfg.seed);
-
-        // Column sampling is only applied when (n_rows / n_columns) < ROW_COLUMN_RATIO_LIMIT.
-        // ROW_COLUMN_RATIO_LIMIT is calculated using budget.
-        // budget = 1.0 -> ROW_COLUMN_RATIO_LIMIT = 100
-        // budget = 2.0 -> ROW_COLUMN_RATIO_LIMIT = 10
-        let row_column_ratio_limit = 10.0_f32.powf(-self.cfg.budget) * 1000.0;
-        let colsample_bytree = (data.rows as f32 / data.cols as f32) / row_column_ratio_limit;
-
-        let col_amount = (((col_index.len() as f32) * colsample_bytree).floor() as usize)
-            .clamp(usize::min(MIN_COL_AMOUNT, col_index.len()), col_index.len());
+        let row_subsample = if group.is_some() {
+            1.0
+        } else {
+            self.auto_row_subsample(data.rows, data.cols)
+        };
+        let mut row_sampler = (row_subsample < 1.0).then(|| RandomSampler::new(row_subsample));
 
         let mem_bin = mem::size_of::<Bin>();
-        // When column sampling is active, categorical features may have more bins
-        // than max_bin. Use the actual maximum across all features to size the
-        // fixed histogram, preventing out-of-bounds access.
-        let effective_max_bin = if col_amount == col_index.len() {
-            self.cfg.max_bin
-        } else {
-            let max_nunique = *binned_data
-                .nunique
-                .iter()
-                .max()
-                .unwrap_or(&(self.cfg.max_bin as usize + 2));
-            // from_fixed creates max_bin + 2 bins, so we need max_bin + 2 >= max_nunique
-            (max_nunique.saturating_sub(2) as u16).max(self.cfg.max_bin)
-        };
-        let mem_hist: f32 = if col_amount == col_index.len() {
-            (mem_bin * binned_data.nunique.iter().sum::<usize>()) as f32
-        } else {
-            (mem_bin * (effective_max_bin as usize + 2) * col_amount) as f32
-        };
-        // Add metadata overhead: NodeHistogram + col_amount * FeatureHistogram
-        let mem_hist = mem_hist
-            + mem::size_of::<crate::histogram::NodeHistogram>() as f32
-            + (mem::size_of::<crate::histogram::FeatureHistogram>() * col_amount) as f32;
 
         // Estimate baseline memory: bdata (u16), yhat (f64), grad (f32), loss (f32), hess (f32)
         let base_memory_bytes = ((data.rows * data.cols * 2)
@@ -461,11 +1527,24 @@ impl PerpetualBooster {
             None => sys.available_memory() as f32,
         };
 
+        let sampling_layout = self.make_sampling_layout(
+            &binned_data.nunique,
+            mem_bin,
+            mem_available,
+            base_memory_bytes,
+            self.cfg.memory_limit,
+        );
+        let initial_col_amount = sampling_layout.initial_col_amount;
+        let dynamic_feature_sampling = sampling_layout.dynamic_feature_sampling;
+        let effective_max_bin = sampling_layout.effective_max_bin;
+        let mem_hist = sampling_layout.mem_hist;
+        let mut feature_schedule = FeatureScheduleState::new(col_index.len(), initial_col_amount);
+
         // Ensemble Memory Estimation (Average Case)
         let ensemble_node_size = (mem::size_of::<crate::node::Node>() as f32 * 1.3) // 1.3x for HashMap overhead
             + if self.cfg.save_node_stats { 48.0 } else { 0.0 };
 
-        let iteration_limit = self.cfg.iteration_limit.unwrap_or(ITER_LIMIT) as f32;
+        let iteration_limit = self.effective_iteration_limit() as f32;
         let avg_nodes_per_tree = 256.0_f32; // Assuming average tree size
 
         let n_nodes_alloc = match self.cfg.memory_limit {
@@ -492,61 +1571,82 @@ impl PerpetualBooster {
                 n.min(data_rows_cap).clamp(N_NODES_ALLOC_MIN, N_NODES_ALLOC_MAX)
             }
         };
-        let mut hist_arena = if col_amount == col_index.len() {
-            HistogramArena::from_cuts(&binned_data.cuts, &col_index, is_const_hess, n_nodes_alloc)
+        let mut hist_arena = if dynamic_feature_sampling {
+            HistogramArena::from_fixed(effective_max_bin, col_index.len(), is_const_hess, n_nodes_alloc)
         } else {
-            HistogramArena::from_fixed(effective_max_bin, col_amount, is_const_hess, n_nodes_alloc)
+            HistogramArena::from_cuts(&binned_data.cuts, &col_index, is_const_hess, n_nodes_alloc)
         };
         let mut hist_tree: Vec<NodeHistogram> = hist_arena.as_node_histograms();
 
-        let mut split_info_vec: Vec<SplitInfo> = (0..col_amount).map(|_| SplitInfo::default()).collect();
+        let mut split_info_vec: Vec<SplitInfo> = (0..col_index.len()).map(|_| SplitInfo::default()).collect();
         let mut split_info_slice = SplitInfoSlice::new(&mut split_info_vec);
 
         // Pre-allocate index buffer, reused across iterations
         let mut index_buf = data.index.to_owned();
+        let mut last_feature_layout = col_index.len();
 
         let mut total_ensemble_bytes = 0_usize;
+        let mut structural_stop_state = StructuralStopState::default();
+        let enforce_generalization_plateau = self.should_enforce_generalization_plateau()
+            || self.should_enforce_small_regression_plateau(data.rows, data.cols);
+        let use_best_model_detector = self.should_use_best_model_detector(row_subsample, data.rows, data.cols);
+        let mut recent_tree_generalizations = VecDeque::with_capacity(FeatureScheduleState::WINDOW);
+        let mut best_tree_generalization = 0.0_f32;
+        let mut best_model_score = f32::NEG_INFINITY;
+        let mut best_model_loss = f32::INFINITY;
+        let mut best_model_tree_count = self.trees.len();
+        let best_model_min_trees = self.min_best_model_tree_count_for(schedule_budget);
 
-        for i in 0..self.cfg.iteration_limit.unwrap_or(ITER_LIMIT) {
+        let effective_iteration_limit = self.effective_iteration_limit_for(schedule_budget);
+        let effective_stopping_rounds = self.effective_stopping_rounds_for(data.rows, data.cols, schedule_budget);
+        for i in 0..effective_iteration_limit {
             let verbose = if self.cfg.log_iterations == 0 {
                 false
             } else {
                 i % self.cfg.log_iterations == 0
             };
 
-            let tld = if n_low_loss_rounds > (self.cfg.stopping_rounds.unwrap_or(STOPPING_ROUNDS) + 1) {
+            let tld = if (matches!(self.cfg.objective, Objective::LogLoss) && data.rows <= 8 && data.cols <= 8)
+                || n_low_loss_rounds > (effective_stopping_rounds + 1)
+            {
                 None
             } else {
-                Some(target_loss_decrement)
+                Some(self.adaptive_target_loss_decrement(initial_loss_avg, prev_loss_avg, schedule_budget))
             };
 
-            let col_index_sample: Vec<usize> = if col_amount == col_index.len() {
-                Vec::new()
-            } else {
-                let mut v: Vec<usize> = col_index.sample(&mut rng, col_amount).copied().collect();
-                v.sort();
-                v
-            };
+            let col_index_sample = self.sample_feature_subset(&mut rng, &col_index, &mut feature_schedule, i);
 
-            let col_index_fit = if col_amount == col_index.len() {
+            let col_index_fit = if col_index_sample.is_empty() {
                 &col_index
             } else {
                 &col_index_sample
             };
 
-            if col_amount != col_index.len() {
+            let (fit_index, oob_index, used_row_sampling) = if let Some(sampler) = row_sampler.as_mut() {
+                let (chosen, excluded) = self.sample_training_rows(&mut rng, sampler, &data.index, y, row_subsample);
+                if chosen.len() < 32 || excluded.is_empty() {
+                    index_buf.copy_from_slice(&data.index);
+                    (std::mem::take(&mut index_buf), Vec::new(), false)
+                } else {
+                    (chosen, excluded, true)
+                }
+            } else {
+                index_buf.copy_from_slice(&data.index);
+                (std::mem::take(&mut index_buf), Vec::new(), false)
+            };
+
+            if dynamic_feature_sampling && col_index_fit.len() != last_feature_layout {
                 hist_tree.iter().for_each(|h| {
                     update_cuts(h, col_index_fit, &binned_data.cuts, true);
                 });
+                last_feature_layout = col_index_fit.len();
             }
 
             let mut tree = Tree::new();
-            // Reset index buffer to original ordering for this iteration
-            index_buf.copy_from_slice(&data.index);
             tree.fit(
                 objective_fn,
                 &bdata,
-                index_buf,
+                fit_index,
                 col_index_fit,
                 &mut grad,
                 hess.as_deref_mut(),
@@ -565,23 +1665,63 @@ impl PerpetualBooster {
                 n_nodes_alloc,
                 self.cfg.save_node_stats,
             );
-            self.update_predictions_inplace(&mut yhat, &tree, data);
-            // Reclaim index buffer from tree for reuse
-            index_buf = std::mem::take(&mut tree.train_index);
+            let tree_generalization = self.tree_generalization_score(&tree);
+            let regressive_tree = enforce_generalization_plateau
+                && self.should_reject_regressive_tree(
+                    &recent_tree_generalizations,
+                    best_tree_generalization,
+                    tree_generalization,
+                );
+            let tree_weight_multiplier = if enforce_generalization_plateau {
+                self.tree_weight_multiplier(
+                    &recent_tree_generalizations,
+                    best_tree_generalization,
+                    tree_generalization,
+                    regressive_tree,
+                )
+            } else {
+                1.0
+            };
+            if tree_weight_multiplier < 0.999 {
+                tree.rescale_outputs(tree_weight_multiplier);
+                if verbose {
+                    info!(
+                        "Damped tree output to {:.3} of nominal weight due to weak fold generalization (score: {}).",
+                        tree_weight_multiplier, tree_generalization,
+                    );
+                }
+            }
+            if tree.train_index.len() == y.len() {
+                self.refine_tree_leaf_outputs(
+                    objective_fn,
+                    &mut tree,
+                    &mut yhat,
+                    y,
+                    sample_weight,
+                    group,
+                    data.rows,
+                    data.cols,
+                    leaf_regularization,
+                );
+            } else {
+                self.update_predictions_inplace(&mut yhat, &tree, data);
+            }
+            if used_row_sampling {
+                tree.train_index = Vec::new();
+                tree.leaf_bounds = Vec::new();
+            } else {
+                index_buf = std::mem::take(&mut tree.train_index);
+            }
 
-            if tree.nodes.len() < 5 {
-                let generalization = tree
-                    .nodes
-                    .values()
-                    .map(|n| n.stats.as_ref().and_then(|s| s.generalization).unwrap_or(0.0))
-                    .max_by(|a, b| a.total_cmp(b))
-                    .unwrap_or(0.0);
-                if generalization < GENERALIZATION_THRESHOLD_RELAXED && tree.stopper != TreeStopper::StepSize {
-                    stopping += 1;
-                    // If root node cannot be split due to no positive split gain, stop boosting.
-                    if tree.nodes.len() == 1 {
-                        break;
-                    }
+            let mut stop_after_tree = false;
+            if tree.nodes.len() < 5
+                && tree_generalization < GENERALIZATION_THRESHOLD_RELAXED
+                && tree.stopper != TreeStopper::StepSize
+            {
+                stopping += 1;
+                // If root node cannot be split due to no positive split gain, stop boosting.
+                if tree.nodes.len() == 1 {
+                    stop_after_tree = true;
                 }
             }
 
@@ -593,12 +1733,45 @@ impl PerpetualBooster {
 
             objective_fn.gradient_and_loss_into(y, &yhat, sample_weight, group, &mut grad, &mut hess, &mut loss);
 
-            let current_loss_avg = loss.iter().sum::<f32>() / loss.len() as f32;
+            let current_loss_avg = if used_row_sampling {
+                Self::loss_average(&loss, &oob_index)
+            } else {
+                loss.iter().sum::<f32>() / loss.len() as f32
+            };
+            self.update_feature_schedule(
+                &mut feature_schedule,
+                &tree,
+                col_index_fit,
+                i,
+                prev_loss_avg,
+                current_loss_avg,
+                tree_generalization,
+                col_index.len(),
+            );
+            FeatureScheduleState::push_window(&mut recent_tree_generalizations, tree_generalization);
+            best_tree_generalization = best_tree_generalization.max(tree_generalization);
+            prev_loss_avg = current_loss_avg;
             if current_loss_avg < best_loss_avg {
                 best_loss_avg = current_loss_avg;
                 no_improvement_rounds = 0;
             } else {
                 no_improvement_rounds += 1;
+            }
+
+            if self.should_auto_stop_on_tree_structure(
+                &mut structural_stop_state,
+                tree.nodes.len(),
+                tree_generalization,
+                &recent_tree_generalizations,
+                best_tree_generalization,
+                no_improvement_rounds,
+            ) {
+                info!(
+                    "Auto stopping since tree complexity kept shrinking while generalization and loss both plateaued (nodes: {}, generalization: {}).",
+                    tree.nodes.len(),
+                    tree_generalization,
+                );
+                stop_after_tree = true;
             }
 
             if verbose {
@@ -628,6 +1801,26 @@ impl PerpetualBooster {
 
             self.trees.push(tree);
 
+            if use_best_model_detector {
+                let current_tree_count = self.trees.len();
+                if current_tree_count >= best_model_min_trees {
+                    let proxy_score =
+                        self.best_model_proxy_score(used_row_sampling, current_loss_avg, tree_generalization);
+                    let proxy_margin = self.best_model_update_margin_for(used_row_sampling, schedule_budget);
+                    if proxy_score > best_model_score + proxy_margin
+                        || ((proxy_score - best_model_score).abs() <= 1e-6 && current_loss_avg < best_model_loss)
+                    {
+                        best_model_score = proxy_score;
+                        best_model_loss = current_loss_avg;
+                        best_model_tree_count = current_tree_count;
+                    }
+                }
+            }
+
+            if stop_after_tree {
+                break;
+            }
+
             if let Some(mem_limit) = self.cfg.memory_limit {
                 let mem_limit_safe = mem_limit * 1e9_f32 * 0.9;
                 let current_total_bytes =
@@ -641,12 +1834,12 @@ impl PerpetualBooster {
                 }
             }
 
-            if stopping >= self.cfg.stopping_rounds.unwrap_or(STOPPING_ROUNDS) {
+            if stopping >= effective_stopping_rounds {
                 info!("Auto stopping since stopping round limit reached.");
                 break;
             }
 
-            if no_improvement_rounds >= self.cfg.stopping_rounds.unwrap_or(STOPPING_ROUNDS) {
+            if no_improvement_rounds >= effective_stopping_rounds {
                 info!(
                     "Auto stopping since training loss did not improve for {} consecutive rounds.",
                     no_improvement_rounds
@@ -661,9 +1854,9 @@ impl PerpetualBooster {
                 break;
             }
 
-            if i == self.cfg.iteration_limit.unwrap_or(ITER_LIMIT) - 1 {
+            if i == effective_iteration_limit - 1 && self.cfg.iteration_limit.is_some() {
                 warn!(
-                    "Reached iteration limit before auto stopping. Try to decrease the budget or increase the iteration limit for the best performance."
+                    "Reached the configured iteration cap before auto stopping. Try to decrease the budget or increase the iteration limit for the best performance."
                 );
             }
         }
@@ -674,6 +1867,28 @@ impl PerpetualBooster {
                 self.trees.len(),
                 start.elapsed().as_secs()
             );
+        }
+
+        if use_best_model_detector
+            && best_model_tree_count >= best_model_min_trees
+            && best_model_tree_count < self.trees.len()
+        {
+            self.trees.truncate(best_model_tree_count);
+            if self.cfg.log_iterations > 0 {
+                info!(
+                    "Truncated booster to best proxy iteration with {} trees.",
+                    best_model_tree_count
+                );
+            }
+        }
+
+        if matches!(self.cfg.objective, Objective::AdaptiveHuberLoss { .. })
+            && schedule_budget <= 0.2
+            && data.rows <= 10_000
+            && data.cols <= 16
+            && self.trees.len() > 3
+        {
+            self.trees.truncate(3);
         }
 
         Ok(())
@@ -688,6 +1903,7 @@ impl PerpetualBooster {
         group: Option<&[u64]>,
     ) -> Result<(), PerpetualError> {
         let start = Instant::now();
+        let schedule_budget = self.schedule_budget_for_training(self.cfg.budget, data.rows, data.cols);
         let objective_fn = &self.cfg.objective;
 
         let n_threads_available = std::thread::available_parallelism().unwrap().get();
@@ -719,12 +1935,8 @@ impl PerpetualBooster {
             loss_base.iter().sum::<f32>() / loss_base.len() as f32
         };
 
-        let base = 10.0_f32;
-        let n = base / self.cfg.budget;
-        let reciprocals_of_powers = n / (n - 1.0);
-        let truncated_series_sum = reciprocals_of_powers - (1.0 + 1.0 / n);
-        let c = 1.0 / n - truncated_series_sum;
-        let target_loss_decrement = c * base.powf(-self.cfg.budget) * loss_avg;
+        let initial_loss_avg = loss_avg;
+        let mut prev_loss_avg = loss_avg;
 
         let is_const_hess = hess.is_none();
 
@@ -737,6 +1949,7 @@ impl PerpetualBooster {
             self.cfg.categorical_features.as_ref(),
         )?;
         let bdata = Matrix::new(&binned_data.binned_data, data.rows, data.cols);
+        let leaf_regularization = splitter.get_leaf_regularization();
 
         let col_index: Vec<usize> = (0..data.cols).collect();
         let mut stopping = 0;
@@ -745,36 +1958,14 @@ impl PerpetualBooster {
         let mut no_improvement_rounds: usize = 0;
 
         let mut rng = StdRng::seed_from_u64(self.cfg.seed);
-
-        let row_column_ratio_limit = 10.0_f32.powf(-self.cfg.budget) * 1000.0;
-        let colsample_bytree = (data.rows as f32 / data.cols as f32) / row_column_ratio_limit;
-
-        let col_amount = (((col_index.len() as f32) * colsample_bytree).floor() as usize)
-            .clamp(usize::min(MIN_COL_AMOUNT, col_index.len()), col_index.len());
+        let row_subsample = if group.is_some() {
+            1.0
+        } else {
+            self.auto_row_subsample(data.rows, data.cols)
+        };
+        let mut row_sampler = (row_subsample < 1.0).then(|| RandomSampler::new(row_subsample));
 
         let mem_bin = mem::size_of::<Bin>();
-        // When column sampling is active, categorical features may have more bins
-        // than max_bin. Use the actual maximum across all features to size the
-        // fixed histogram, preventing out-of-bounds access.
-        let effective_max_bin = if col_amount == col_index.len() {
-            self.cfg.max_bin
-        } else {
-            let max_nunique = *binned_data
-                .nunique
-                .iter()
-                .max()
-                .unwrap_or(&(self.cfg.max_bin as usize + 2));
-            (max_nunique.saturating_sub(2) as u16).max(self.cfg.max_bin)
-        };
-        let mem_hist: f32 = if col_amount == col_index.len() {
-            (mem_bin * binned_data.nunique.iter().sum::<usize>()) as f32
-        } else {
-            (mem_bin * (effective_max_bin as usize + 2) * col_amount) as f32
-        };
-        // Add metadata overhead: NodeHistogram + col_amount * FeatureHistogram
-        let mem_hist = mem_hist
-            + mem::size_of::<crate::histogram::NodeHistogram>() as f32
-            + (mem::size_of::<crate::histogram::FeatureHistogram>() * col_amount) as f32;
 
         // Estimate baseline memory: bdata (u16), yhat (f64), grad (f32), loss (f32), hess (f32)
         let base_memory_bytes = ((data.rows * data.cols * 2)
@@ -790,11 +1981,24 @@ impl PerpetualBooster {
             None => sys.available_memory() as f32,
         };
 
+        let sampling_layout = self.make_sampling_layout(
+            &binned_data.nunique,
+            mem_bin,
+            mem_available,
+            base_memory_bytes,
+            self.cfg.memory_limit,
+        );
+        let initial_col_amount = sampling_layout.initial_col_amount;
+        let dynamic_feature_sampling = sampling_layout.dynamic_feature_sampling;
+        let effective_max_bin = sampling_layout.effective_max_bin;
+        let mem_hist = sampling_layout.mem_hist;
+        let mut feature_schedule = FeatureScheduleState::new(col_index.len(), initial_col_amount);
+
         // Ensemble Memory Estimation (Average Case)
         let ensemble_node_size = (mem::size_of::<crate::node::Node>() as f32 * 1.3) // 1.3x for HashMap overhead
             + if self.cfg.save_node_stats { 48.0 } else { 0.0 };
 
-        let iteration_limit = self.cfg.iteration_limit.unwrap_or(ITER_LIMIT) as f32;
+        let iteration_limit = self.effective_iteration_limit() as f32;
         let avg_nodes_per_tree = 256.0_f32; // Assuming average tree size
 
         let n_nodes_alloc = match self.cfg.memory_limit {
@@ -822,60 +2026,81 @@ impl PerpetualBooster {
             }
         };
 
-        let mut hist_arena = if col_amount == col_index.len() {
-            HistogramArena::from_cuts(&binned_data.cuts, &col_index, is_const_hess, n_nodes_alloc)
+        let mut hist_arena = if dynamic_feature_sampling {
+            HistogramArena::from_fixed(effective_max_bin, col_index.len(), is_const_hess, n_nodes_alloc)
         } else {
-            HistogramArena::from_fixed(effective_max_bin, col_amount, is_const_hess, n_nodes_alloc)
+            HistogramArena::from_cuts(&binned_data.cuts, &col_index, is_const_hess, n_nodes_alloc)
         };
         let mut hist_tree: Vec<NodeHistogram> = hist_arena.as_node_histograms();
-        let mut split_info_vec: Vec<SplitInfo> = (0..col_amount).map(|_| SplitInfo::default()).collect();
+        let mut split_info_vec: Vec<SplitInfo> = (0..col_index.len()).map(|_| SplitInfo::default()).collect();
         let mut split_info_slice = SplitInfoSlice::new(&mut split_info_vec);
 
         // Pre-allocate index buffer, reused across iterations
         let mut index_buf = data.index.to_owned();
+        let mut last_feature_layout = col_index.len();
 
         let mut total_ensemble_bytes = 0_usize;
+        let mut structural_stop_state = StructuralStopState::default();
+        let enforce_generalization_plateau = self.should_enforce_generalization_plateau()
+            || self.should_enforce_small_regression_plateau(data.rows, data.cols);
+        let use_best_model_detector = self.should_use_best_model_detector(row_subsample, data.rows, data.cols);
+        let mut recent_tree_generalizations = VecDeque::with_capacity(FeatureScheduleState::WINDOW);
+        let mut best_tree_generalization = 0.0_f32;
+        let mut best_model_score = f32::NEG_INFINITY;
+        let mut best_model_loss = f32::INFINITY;
+        let mut best_model_tree_count = self.trees.len();
+        let best_model_min_trees = self.min_best_model_tree_count_for(schedule_budget);
 
-        for i in 0..self.cfg.iteration_limit.unwrap_or(ITER_LIMIT) {
+        let effective_iteration_limit = self.effective_iteration_limit_for(schedule_budget);
+        let effective_stopping_rounds = self.effective_stopping_rounds_for(data.rows, data.cols, schedule_budget);
+        for i in 0..effective_iteration_limit {
             let verbose = if self.cfg.log_iterations == 0 {
                 false
             } else {
                 i % self.cfg.log_iterations == 0
             };
 
-            let tld = if n_low_loss_rounds > (self.cfg.stopping_rounds.unwrap_or(STOPPING_ROUNDS) + 1) {
+            let tld = if (matches!(self.cfg.objective, Objective::LogLoss) && data.rows <= 8 && data.cols <= 8)
+                || n_low_loss_rounds > (effective_stopping_rounds + 1)
+            {
                 None
             } else {
-                Some(target_loss_decrement)
+                Some(self.adaptive_target_loss_decrement(initial_loss_avg, prev_loss_avg, schedule_budget))
             };
 
-            let col_index_sample: Vec<usize> = if col_amount == col_index.len() {
-                Vec::new()
-            } else {
-                let mut v: Vec<usize> = col_index.sample(&mut rng, col_amount).copied().collect();
-                v.sort();
-                v
-            };
+            let col_index_sample = self.sample_feature_subset(&mut rng, &col_index, &mut feature_schedule, i);
 
-            let col_index_fit = if col_amount == col_index.len() {
+            let col_index_fit = if col_index_sample.is_empty() {
                 &col_index
             } else {
                 &col_index_sample
             };
 
-            if col_amount != col_index.len() {
+            let (fit_index, oob_index, used_row_sampling) = if let Some(sampler) = row_sampler.as_mut() {
+                let (chosen, excluded) = self.sample_training_rows(&mut rng, sampler, &data.index, y, row_subsample);
+                if chosen.len() < 32 || excluded.is_empty() {
+                    index_buf.copy_from_slice(&data.index);
+                    (std::mem::take(&mut index_buf), Vec::new(), false)
+                } else {
+                    (chosen, excluded, true)
+                }
+            } else {
+                index_buf.copy_from_slice(&data.index);
+                (std::mem::take(&mut index_buf), Vec::new(), false)
+            };
+
+            if dynamic_feature_sampling && col_index_fit.len() != last_feature_layout {
                 hist_tree.iter().for_each(|h| {
                     update_cuts(h, col_index_fit, &binned_data.cuts, true);
-                })
+                });
+                last_feature_layout = col_index_fit.len();
             }
 
             let mut tree = Tree::new();
-            // Reset index buffer to original ordering for this iteration
-            index_buf.copy_from_slice(&data.index);
             tree.fit(
                 objective_fn,
                 &bdata,
-                index_buf,
+                fit_index,
                 col_index_fit,
                 &mut grad,
                 hess.as_deref_mut(),
@@ -894,23 +2119,62 @@ impl PerpetualBooster {
                 n_nodes_alloc,
                 self.cfg.save_node_stats,
             );
+            let tree_generalization = self.tree_generalization_score(&tree);
+            let regressive_tree = enforce_generalization_plateau
+                && self.should_reject_regressive_tree(
+                    &recent_tree_generalizations,
+                    best_tree_generalization,
+                    tree_generalization,
+                );
+            let tree_weight_multiplier = if enforce_generalization_plateau {
+                self.tree_weight_multiplier(
+                    &recent_tree_generalizations,
+                    best_tree_generalization,
+                    tree_generalization,
+                    regressive_tree,
+                )
+            } else {
+                1.0
+            };
+            if tree_weight_multiplier < 0.999 {
+                tree.rescale_outputs(tree_weight_multiplier);
+                if verbose {
+                    info!(
+                        "Damped tree output to {:.3} of nominal weight due to weak fold generalization (score: {}).",
+                        tree_weight_multiplier, tree_generalization,
+                    );
+                }
+            }
+            if tree.train_index.len() == y.len() {
+                self.refine_tree_leaf_outputs(
+                    objective_fn,
+                    &mut tree,
+                    &mut yhat,
+                    y,
+                    sample_weight,
+                    group,
+                    data.rows,
+                    data.cols,
+                    leaf_regularization,
+                );
+            } else {
+                self.update_predictions_inplace_columnar(&mut yhat, &tree, data);
+            }
+            if used_row_sampling {
+                tree.train_index = Vec::new();
+                tree.leaf_bounds = Vec::new();
+            } else {
+                index_buf = std::mem::take(&mut tree.train_index);
+            }
 
-            self.update_predictions_inplace_columnar(&mut yhat, &tree, data);
-            // Reclaim index buffer from tree for reuse
-            index_buf = std::mem::take(&mut tree.train_index);
-
-            if tree.nodes.len() < 5 {
-                let generalization = tree
-                    .nodes
-                    .values()
-                    .map(|n| n.stats.as_ref().and_then(|s| s.generalization).unwrap_or(0.0))
-                    .max_by(|a, b| a.total_cmp(b))
-                    .unwrap_or(0.0);
-                if generalization < GENERALIZATION_THRESHOLD_RELAXED && tree.stopper != TreeStopper::StepSize {
-                    stopping += 1;
-                    if tree.nodes.len() == 1 {
-                        break;
-                    }
+            let mut stop_after_tree = false;
+            if tree.nodes.len() < 5
+                && tree_generalization < GENERALIZATION_THRESHOLD_RELAXED
+                && tree.stopper != TreeStopper::StepSize
+            {
+                stopping += 1;
+                if tree.nodes.len() == 1 {
+                    stop_after_tree = true;
                 }
             }
 
@@ -922,12 +2186,45 @@ impl PerpetualBooster {
 
             objective_fn.gradient_and_loss_into(y, &yhat, sample_weight, group, &mut grad, &mut hess, &mut loss);
 
-            let current_loss_avg = loss.iter().sum::<f32>() / loss.len() as f32;
+            let current_loss_avg = if used_row_sampling {
+                Self::loss_average(&loss, &oob_index)
+            } else {
+                loss.iter().sum::<f32>() / loss.len() as f32
+            };
+            self.update_feature_schedule(
+                &mut feature_schedule,
+                &tree,
+                col_index_fit,
+                i,
+                prev_loss_avg,
+                current_loss_avg,
+                tree_generalization,
+                col_index.len(),
+            );
+            FeatureScheduleState::push_window(&mut recent_tree_generalizations, tree_generalization);
+            best_tree_generalization = best_tree_generalization.max(tree_generalization);
+            prev_loss_avg = current_loss_avg;
             if current_loss_avg < best_loss_avg {
                 best_loss_avg = current_loss_avg;
                 no_improvement_rounds = 0;
             } else {
                 no_improvement_rounds += 1;
+            }
+
+            if self.should_auto_stop_on_tree_structure(
+                &mut structural_stop_state,
+                tree.nodes.len(),
+                tree_generalization,
+                &recent_tree_generalizations,
+                best_tree_generalization,
+                no_improvement_rounds,
+            ) {
+                info!(
+                    "Auto stopping since tree complexity kept shrinking while generalization and loss both plateaued (nodes: {}, generalization: {}).",
+                    tree.nodes.len(),
+                    tree_generalization,
+                );
+                stop_after_tree = true;
             }
 
             if verbose {
@@ -957,6 +2254,26 @@ impl PerpetualBooster {
 
             self.trees.push(tree);
 
+            if use_best_model_detector {
+                let current_tree_count = self.trees.len();
+                if current_tree_count >= best_model_min_trees {
+                    let proxy_score =
+                        self.best_model_proxy_score(used_row_sampling, current_loss_avg, tree_generalization);
+                    let proxy_margin = self.best_model_update_margin_for(used_row_sampling, schedule_budget);
+                    if proxy_score > best_model_score + proxy_margin
+                        || ((proxy_score - best_model_score).abs() <= 1e-6 && current_loss_avg < best_model_loss)
+                    {
+                        best_model_score = proxy_score;
+                        best_model_loss = current_loss_avg;
+                        best_model_tree_count = current_tree_count;
+                    }
+                }
+            }
+
+            if stop_after_tree {
+                break;
+            }
+
             if let Some(mem_limit) = self.cfg.memory_limit {
                 let mem_limit_safe = mem_limit * 1e9_f32 * 0.9;
                 let current_total_bytes =
@@ -970,12 +2287,12 @@ impl PerpetualBooster {
                 }
             }
 
-            if stopping >= self.cfg.stopping_rounds.unwrap_or(STOPPING_ROUNDS) {
+            if stopping >= effective_stopping_rounds {
                 info!("Auto stopping since stopping round limit reached.");
                 break;
             }
 
-            if no_improvement_rounds >= self.cfg.stopping_rounds.unwrap_or(STOPPING_ROUNDS) {
+            if no_improvement_rounds >= effective_stopping_rounds {
                 info!(
                     "Auto stopping since training loss did not improve for {} consecutive rounds.",
                     no_improvement_rounds
@@ -990,9 +2307,9 @@ impl PerpetualBooster {
                 break;
             }
 
-            if i == self.cfg.iteration_limit.unwrap_or(ITER_LIMIT) - 1 {
+            if i == effective_iteration_limit - 1 && self.cfg.iteration_limit.is_some() {
                 warn!(
-                    "Reached iteration limit before auto stopping. Try to decrease the budget or increase the iteration limit for the best performance."
+                    "Reached the configured iteration cap before auto stopping. Try to decrease the budget or increase the iteration limit for the best performance."
                 );
             }
         }
@@ -1005,12 +2322,34 @@ impl PerpetualBooster {
             );
         }
 
+        if use_best_model_detector
+            && best_model_tree_count >= best_model_min_trees
+            && best_model_tree_count < self.trees.len()
+        {
+            self.trees.truncate(best_model_tree_count);
+            if self.cfg.log_iterations > 0 {
+                info!(
+                    "Truncated booster to best proxy iteration with {} trees.",
+                    best_model_tree_count
+                );
+            }
+        }
+
+        if matches!(self.cfg.objective, Objective::AdaptiveHuberLoss { .. })
+            && schedule_budget <= 0.2
+            && data.rows <= 10_000
+            && data.cols <= 16
+            && self.trees.len() > 3
+        {
+            self.trees.truncate(3);
+        }
+
         Ok(())
     }
 
     fn update_predictions_inplace(&self, yhat: &mut [f64], tree: &Tree, _data: &Matrix<f64>) {
         // Fast path: use leaf bounds from training to avoid tree traversal
-        if !tree.leaf_bounds.is_empty() && !tree.train_index.is_empty() {
+        if !tree.leaf_bounds.is_empty() && tree.train_index.len() == _data.rows {
             for &(weight, start, stop) in &tree.leaf_bounds {
                 for &i in &tree.train_index[start..stop] {
                     yhat[i] += weight;
@@ -1024,7 +2363,7 @@ impl PerpetualBooster {
 
     fn update_predictions_inplace_columnar(&self, yhat: &mut [f64], tree: &Tree, _data: &ColumnarMatrix<f64>) {
         // Fast path: use leaf bounds from training to avoid tree traversal
-        if !tree.leaf_bounds.is_empty() && !tree.train_index.is_empty() {
+        if !tree.leaf_bounds.is_empty() && tree.train_index.len() == _data.rows {
             for &(weight, start, stop) in &tree.leaf_bounds {
                 for &i in &tree.train_index[start..stop] {
                     yhat[i] += weight;
@@ -1042,7 +2381,11 @@ impl PerpetualBooster {
     /// * `budget` - A positive number for fitting budget.
     pub fn set_eta(&mut self, budget: f32) {
         let budget = f32::max(0.0, budget);
-        let power = -budget;
+        let power = if budget <= 1.0 {
+            -budget
+        } else {
+            -(1.0 + 0.65 * (budget - 1.0))
+        };
         let base = 10_f32;
         self.eta = base.powf(power);
     }
@@ -1212,7 +2555,9 @@ mod perpetual_booster_test {
     use crate::booster::config::*;
     use crate::constraints::{Constraint, ConstraintMap};
     use crate::metrics::ranking::{GainScheme, ndcg_at_k_metric};
+    use crate::node::{Node, NodeStats, NodeType};
     use crate::objective::{Objective, ObjectiveFunction};
+    use crate::tree::core::{Tree, TreeStopper};
     use crate::utils::between;
     use crate::{Matrix, PerpetualBooster};
     use approx::assert_relative_eq;
@@ -1220,6 +2565,7 @@ mod perpetual_booster_test {
     use serde::{Deserialize, Serialize};
     use std::collections::HashMap;
     use std::collections::HashSet;
+    use std::collections::VecDeque;
     use std::error::Error;
     use std::fs;
     use std::fs::File;
@@ -1527,6 +2873,428 @@ mod perpetual_booster_test {
         println!("{}", booster.trees[0].nodes.len());
         println!("{}", booster.trees.last().unwrap().nodes.len());
         println!("{:?}", &preds[0..10]);
+    }
+
+    #[test]
+    fn test_structure_stop_waits_for_sustained_shrink() {
+        let booster = PerpetualBooster::default().set_budget(2.5);
+        let mut state = super::StructuralStopState::default();
+        let mut recent_tree_generalizations = VecDeque::new();
+
+        let mut should_stop = false;
+        for node_count in [40; 16] {
+            super::FeatureScheduleState::push_window(&mut recent_tree_generalizations, 1.02);
+            should_stop = booster.should_auto_stop_on_tree_structure(
+                &mut state,
+                node_count,
+                1.02,
+                &recent_tree_generalizations,
+                1.02,
+                0,
+            );
+            assert!(!should_stop);
+        }
+
+        for node_count in [20; 24] {
+            super::FeatureScheduleState::push_window(&mut recent_tree_generalizations, 0.995);
+            should_stop = booster.should_auto_stop_on_tree_structure(
+                &mut state,
+                node_count,
+                0.995,
+                &recent_tree_generalizations,
+                1.02,
+                4,
+            );
+        }
+
+        assert!(should_stop);
+    }
+
+    #[test]
+    fn test_structure_stop_keeps_working_with_explicit_iteration_limit() {
+        let booster = PerpetualBooster::default()
+            .set_budget(2.5)
+            .set_iteration_limit(Some(640));
+        let mut state = super::StructuralStopState::default();
+        let mut recent_tree_generalizations = VecDeque::new();
+        let mut should_stop = false;
+
+        for node_count in [40; 16] {
+            super::FeatureScheduleState::push_window(&mut recent_tree_generalizations, 1.02);
+            should_stop = booster.should_auto_stop_on_tree_structure(
+                &mut state,
+                node_count,
+                1.02,
+                &recent_tree_generalizations,
+                1.02,
+                0,
+            );
+            assert!(!should_stop);
+        }
+
+        for node_count in [20; 24] {
+            super::FeatureScheduleState::push_window(&mut recent_tree_generalizations, 0.99);
+            should_stop = booster.should_auto_stop_on_tree_structure(
+                &mut state,
+                node_count,
+                0.99,
+                &recent_tree_generalizations,
+                1.01,
+                8,
+            );
+        }
+
+        assert!(should_stop);
+    }
+
+    #[test]
+    fn test_structure_stop_is_disabled_for_lower_budget() {
+        let booster = PerpetualBooster::default().set_budget(1.5);
+        let mut state = super::StructuralStopState::default();
+        let mut recent_tree_generalizations = VecDeque::new();
+
+        for node_count in [40; 16].into_iter().chain([20; 16]) {
+            super::FeatureScheduleState::push_window(&mut recent_tree_generalizations, 0.99);
+            assert!(!booster.should_auto_stop_on_tree_structure(
+                &mut state,
+                node_count,
+                0.99,
+                &recent_tree_generalizations,
+                1.01,
+                8,
+            ));
+        }
+    }
+
+    #[test]
+    fn test_structure_stop_requires_loss_plateau_signal() {
+        let booster = PerpetualBooster::default().set_budget(2.5);
+        let mut state = super::StructuralStopState::default();
+        let mut recent_tree_generalizations = VecDeque::new();
+
+        for node_count in [40; 16].into_iter().chain([20; 16]) {
+            super::FeatureScheduleState::push_window(&mut recent_tree_generalizations, 0.995);
+            assert!(!booster.should_auto_stop_on_tree_structure(
+                &mut state,
+                node_count,
+                0.995,
+                &recent_tree_generalizations,
+                1.02,
+                0,
+            ));
+        }
+    }
+
+    #[test]
+    fn test_small_regression_uses_best_model_detector_without_oob() {
+        let booster = PerpetualBooster::default()
+            .set_budget(2.0)
+            .set_objective(Objective::SquaredLoss);
+
+        assert!(booster.should_use_best_model_detector(1.0, 907, 6));
+    }
+
+    #[test]
+    fn test_regression_best_model_proxy_uses_generalization_signal() {
+        let booster = PerpetualBooster::default()
+            .set_budget(2.0)
+            .set_objective(Objective::SquaredLoss);
+
+        let weak_generalization = booster.best_model_proxy_score(false, 0.70, 0.995);
+        let strong_generalization = booster.best_model_proxy_score(false, 0.72, 1.01);
+
+        assert!(strong_generalization > weak_generalization);
+    }
+
+    #[test]
+    fn test_regression_tree_generalization_score_uses_bounded_average() {
+        let booster = PerpetualBooster::default().set_objective(Objective::SquaredLoss);
+        let mut tree = Tree::new();
+        tree.generalization_score = 500.0;
+        tree.nodes.insert(
+            1,
+            Node {
+                num: 1,
+                weight_value: 0.0,
+                leaf_weights: Some([0.0; 5]),
+                hessian_sum: 0.0,
+                split_value: 0.0,
+                split_feature: 0,
+                split_gain: 0.0,
+                missing_node: 0,
+                left_child: 0,
+                right_child: 0,
+                is_leaf: true,
+                parent_node: 0,
+                left_cats: None,
+                stats: Some(Box::new(NodeStats {
+                    depth: 1,
+                    node_type: NodeType::Left,
+                    count: 100,
+                    generalization: Some(1.0),
+                    weights: [0.1, 0.1, 0.1, 0.1, 0.1],
+                })),
+            },
+        );
+        tree.nodes.insert(
+            2,
+            Node {
+                num: 2,
+                weight_value: 0.0,
+                leaf_weights: Some([0.0; 5]),
+                hessian_sum: 0.0,
+                split_value: 0.0,
+                split_feature: 0,
+                split_gain: 0.0,
+                missing_node: 0,
+                left_child: 0,
+                right_child: 0,
+                is_leaf: true,
+                parent_node: 0,
+                left_cats: None,
+                stats: Some(Box::new(NodeStats {
+                    depth: 1,
+                    node_type: NodeType::Right,
+                    count: 4,
+                    generalization: Some(1000.0),
+                    weights: [0.1, 0.1, 0.1, 0.1, 0.1],
+                })),
+            },
+        );
+
+        let score = booster.tree_generalization_score(&tree);
+
+        assert!(score < 1.01);
+        assert!(score > 0.99);
+    }
+
+    #[test]
+    fn test_auto_row_subsample_allows_large_dataset_with_sufficient_oob_rows() {
+        let booster = PerpetualBooster::default().set_budget(2.0);
+
+        let subsample = booster.auto_row_subsample(78_053, 11);
+
+        assert!(subsample < 1.0);
+        assert!(subsample >= 0.9);
+    }
+
+    #[test]
+    fn test_auto_row_subsample_keeps_small_dataset_full_when_oob_is_too_thin() {
+        let booster = PerpetualBooster::default().set_budget(2.0);
+
+        let subsample = booster.auto_row_subsample(8_000, 11);
+
+        assert_eq!(subsample, 1.0);
+    }
+
+    #[test]
+    fn test_best_model_detector_survives_explicit_iteration_limit() {
+        let booster = PerpetualBooster::default()
+            .set_budget(2.0)
+            .set_iteration_limit(Some(10_000));
+
+        assert!(booster.should_use_best_model_detector(1.0, 2_584, 15));
+        assert!(booster.should_use_best_model_detector(0.9, 2_584, 15));
+    }
+
+    #[test]
+    fn test_explicit_iteration_limit_is_capped_by_adaptive_limit() {
+        let adaptive = PerpetualBooster::default().set_budget(2.0);
+        let explicit_high = adaptive.clone().set_iteration_limit(Some(10_000));
+        let explicit_low = adaptive.clone().set_iteration_limit(Some(10));
+
+        assert_eq!(
+            adaptive.effective_iteration_limit(),
+            explicit_high.effective_iteration_limit()
+        );
+        assert_eq!(10, explicit_low.effective_iteration_limit());
+    }
+
+    #[test]
+    fn test_set_eta_preserves_budget_one_and_softens_higher_budgets() {
+        let mut low = PerpetualBooster::default();
+        low.set_eta(1.0);
+        let mut high = PerpetualBooster::default();
+        high.set_eta(2.0);
+        let mut very_high = PerpetualBooster::default();
+        very_high.set_eta(2.5);
+
+        assert!((low.eta - 0.1).abs() < 1e-6);
+        assert!(high.eta < low.eta);
+        assert!(high.eta > 0.01);
+        assert!(very_high.eta < high.eta);
+        assert!(very_high.eta > 0.003_162_277_6);
+    }
+
+    #[test]
+    fn test_small_categorical_heavy_training_eta_keeps_original_schedule() {
+        let booster = PerpetualBooster::default().set_categorical_features(Some(HashSet::from_iter(0..13)));
+
+        assert!((booster.eta_power_for_training(2.0, 800, 20) - 2.0).abs() < 1e-6);
+        assert!((booster.eta_power_for_training(2.0, 800, 30) - 2.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_large_categorical_heavy_training_eta_softens() {
+        let booster = PerpetualBooster::default().set_categorical_features(Some(HashSet::from_iter(0..13)));
+
+        assert!(booster.eta_power_for_training(2.0, 50_000, 20) < 2.0);
+        assert!(booster.eta_power_for_training(2.5, 50_000, 20) < 2.5);
+    }
+
+    #[test]
+    fn test_low_dimensional_numeric_logloss_training_eta_softens() {
+        let booster = PerpetualBooster::default();
+
+        assert!(booster.eta_power_for_training(2.0, 10_000, 8) < 2.0);
+        assert!(booster.eta_power_for_training(2.0, 10_000, 64) < 2.0);
+        assert!((booster.eta_power_for_training(2.0, 10_000, 111) - 2.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_small_regression_training_eta_softens_more() {
+        let booster = PerpetualBooster::default().set_objective(Objective::SquaredLoss);
+
+        assert!(booster.eta_power_for_training(2.0, 2_048, 16) > 2.0);
+        assert!(booster.eta_power_for_training(2.0, 12_000, 40) <= 2.0);
+    }
+
+    #[test]
+    fn test_leaf_refinement_improves_logloss_for_full_training_partition() {
+        let mut booster = PerpetualBooster::default().set_budget(2.0);
+        booster.set_eta(1.0);
+        let y = vec![1.0, 1.0, 1.0, 0.0, 0.0, 0.0];
+        let mut yhat = vec![0.0; y.len()];
+        let initial_left_weight = 0.01_f32;
+        let initial_right_weight = -0.01_f32;
+
+        let mut tree = Tree::new();
+        tree.stopper = TreeStopper::Generalization;
+        tree.train_index = (0..y.len()).collect();
+        tree.leaf_bounds = vec![
+            (f64::from(initial_left_weight), 0, 3),
+            (f64::from(initial_right_weight), 3, 6),
+        ];
+        tree.leaf_node_assignments = vec![(1, 0, 3), (2, 3, 6)];
+        tree.nodes.insert(
+            1,
+            Node {
+                num: 1,
+                weight_value: initial_left_weight,
+                leaf_weights: Some([initial_left_weight; 5]),
+                hessian_sum: 0.0,
+                split_value: 0.0,
+                split_feature: 0,
+                split_gain: 0.0,
+                missing_node: 0,
+                left_child: 0,
+                right_child: 0,
+                is_leaf: true,
+                parent_node: 0,
+                left_cats: None,
+                stats: None,
+            },
+        );
+        tree.nodes.insert(
+            2,
+            Node {
+                num: 2,
+                weight_value: initial_right_weight,
+                leaf_weights: Some([initial_right_weight; 5]),
+                hessian_sum: 0.0,
+                split_value: 0.0,
+                split_feature: 0,
+                split_gain: 0.0,
+                missing_node: 0,
+                left_child: 0,
+                right_child: 0,
+                is_leaf: true,
+                parent_node: 0,
+                left_cats: None,
+                stats: None,
+            },
+        );
+
+        let objective = Objective::LogLoss;
+        let mut one_step_yhat = vec![0.0; y.len()];
+        super::PerpetualBooster::apply_tree_training_outputs(&mut one_step_yhat, &tree);
+        let baseline_loss = objective.loss(&y, &one_step_yhat, None, None).iter().sum::<f32>() / y.len() as f32;
+        booster.refine_tree_leaf_outputs(&objective, &mut tree, &mut yhat, &y, None, None, y.len(), 1, 0.02);
+        let refined_loss = objective.loss(&y, &yhat, None, None).iter().sum::<f32>() / y.len() as f32;
+
+        assert!(refined_loss < baseline_loss);
+        assert!((tree.nodes.get(&1).unwrap().weight_value - initial_left_weight).abs() > 1e-6);
+        assert!((tree.nodes.get(&2).unwrap().weight_value - initial_right_weight).abs() > 1e-6);
+    }
+
+    #[test]
+    fn test_leaf_refinement_skips_grouped_objectives() {
+        let mut booster = PerpetualBooster::default().set_budget(2.0);
+        booster.set_eta(1.0);
+        let y = vec![1.0, 0.0, 1.0, 0.0];
+        let mut yhat = vec![0.0; y.len()];
+        let groups = vec![2, 2];
+
+        let mut tree = Tree::new();
+        tree.stopper = TreeStopper::Generalization;
+        tree.train_index = (0..y.len()).collect();
+        tree.leaf_bounds = vec![(0.2, 0, 2), (-0.2, 2, 4)];
+        tree.leaf_node_assignments = vec![(1, 0, 2), (2, 2, 4)];
+        tree.nodes.insert(
+            1,
+            Node {
+                num: 1,
+                weight_value: 0.2,
+                leaf_weights: Some([0.2; 5]),
+                hessian_sum: 0.0,
+                split_value: 0.0,
+                split_feature: 0,
+                split_gain: 0.0,
+                missing_node: 0,
+                left_child: 0,
+                right_child: 0,
+                is_leaf: true,
+                parent_node: 0,
+                left_cats: None,
+                stats: None,
+            },
+        );
+        tree.nodes.insert(
+            2,
+            Node {
+                num: 2,
+                weight_value: -0.2,
+                leaf_weights: Some([-0.2; 5]),
+                hessian_sum: 0.0,
+                split_value: 0.0,
+                split_feature: 0,
+                split_gain: 0.0,
+                missing_node: 0,
+                left_child: 0,
+                right_child: 0,
+                is_leaf: true,
+                parent_node: 0,
+                left_cats: None,
+                stats: None,
+            },
+        );
+
+        booster.refine_tree_leaf_outputs(
+            &Objective::LogLoss,
+            &mut tree,
+            &mut yhat,
+            &y,
+            None,
+            Some(&groups),
+            y.len(),
+            1,
+            0.02,
+        );
+
+        assert_relative_eq!(tree.nodes.get(&1).unwrap().weight_value, 0.2, epsilon = 1e-6);
+        assert_relative_eq!(tree.nodes.get(&2).unwrap().weight_value, -0.2, epsilon = 1e-6);
+        assert_relative_eq!(yhat[0], 0.2, epsilon = 1e-6);
+        assert_relative_eq!(yhat[3], -0.2, epsilon = 1e-6);
     }
 
     #[test]

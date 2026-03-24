@@ -38,7 +38,7 @@ fn create_booster(
     PerpetualBooster::new(
         objective,
         budget,
-        0.0, // Set base_score to 0.0 for causal models to ensure stable diffs
+        f64::NAN,
         max_bin,
         num_threads,
         monotone_constraints,

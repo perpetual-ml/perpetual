@@ -69,3 +69,6 @@ package-r/inst/c/
 
 # Temp folder
 tmp/
+
+# Temp files
+tmp_*

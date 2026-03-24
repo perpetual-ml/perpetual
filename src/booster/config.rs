@@ -75,6 +75,14 @@ fn default_budget() -> f32 {
     0.5
 }
 
+pub(crate) fn default_nan_f64() -> f64 {
+    f64::NAN
+}
+
+pub(crate) fn default_nan_f32() -> f32 {
+    f32::NAN
+}
+
 fn default_reset() -> Option<bool> {
     None
 }

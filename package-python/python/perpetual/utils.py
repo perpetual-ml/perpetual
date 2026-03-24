@@ -7,6 +7,39 @@ import numpy as np
 
 logger = logging.getLogger(__name__)
 
+MIN_AVG_CATEGORY_SUPPORT = 64.0
+LOW_CARDINALITY_CATEGORY_SUPPORT = 48.0
+LOW_CARDINALITY_CATEGORY_LIMIT = 16
+MIN_ROWS_FOR_CATEGORY_SUPPORT_CHECK = 128
+
+
+def _is_polars_string_like_dtype(dtype, pl_module) -> bool:
+    base_type = dtype.base_type() if hasattr(dtype, "base_type") else dtype
+    if base_type in {pl_module.Categorical, pl_module.String}:
+        return True
+
+    enum_dtype = getattr(pl_module, "Enum", None)
+    return enum_dtype is not None and base_type == enum_dtype
+
+
+CLASSIFICATION_OBJECTIVES = {
+    "LogLoss",
+    "BrierLoss",
+    "HingeLoss",
+    "CrossEntropyLoss",
+    "CrossEntropyLambdaLoss",
+}
+
+
+def categorical_support_threshold(
+    n_non_missing_categories: int, n_non_missing_rows: int
+) -> float:
+    if n_non_missing_rows < MIN_ROWS_FOR_CATEGORY_SUPPORT_CHECK:
+        return 0.0
+    if n_non_missing_categories <= LOW_CARDINALITY_CATEGORY_LIMIT:
+        return LOW_CARDINALITY_CATEGORY_SUPPORT
+    return MIN_AVG_CATEGORY_SUPPORT
+
 
 def type_df(df):
     """Return a string tag for the DataFrame library (``'pandas_df'``, ``'polars_df'``, ``'numpy'``, or ``''``)."""
@@ -71,7 +104,7 @@ def convert_input_array(
             do_class_detection = False
         else:
             # Fallback to heuristic if not explicitly set
-            do_class_detection = objective == "LogLoss"
+            do_class_detection = objective in CLASSIFICATION_OBJECTIVES
 
     if do_class_detection:
         classes_, x_index = np.unique(x_, return_inverse=True)
@@ -109,7 +142,9 @@ def convert_input_frame(
         X_ = X.to_numpy()
         features_ = X.columns.to_list()
         if categorical_features == "auto":
-            categorical_columns = X.select_dtypes(include=["category"]).columns.tolist()
+            categorical_columns = X.select_dtypes(
+                include=["category", "object", "string"]
+            ).columns.tolist()
             categorical_features_ = [
                 features_.index(c) for c in categorical_columns
             ] or None
@@ -141,14 +176,33 @@ def convert_input_frame(
             categories = list(categories)
             if "nan" in categories:
                 categories.remove("nan")
+            n_non_missing_categories = len(categories)
+            n_non_missing_rows = np.count_nonzero(
+                ~np.isnan(X_[:, i].astype(dtype="float64", copy=False))
+                if np.issubdtype(X_[:, i].dtype, np.number)
+                else X_[:, i].astype(str) != "nan"
+            )
+            avg_category_support = (
+                n_non_missing_rows / n_non_missing_categories
+                if n_non_missing_categories > 0
+                else float("inf")
+            )
+            min_support_threshold = categorical_support_threshold(
+                n_non_missing_categories, n_non_missing_rows
+            )
             categories.insert(0, "nan")
 
             inversed = inversed + 1.0
 
-            if len(categories) > max_cat:
+            if n_non_missing_categories > max_cat:
                 cat_to_num.append(i)
                 logger.warning(
-                    f"Feature {features_[i]} will be treated as numerical since the number of categories ({len(categories)}) exceeds max_cat ({max_cat}) threshold."
+                    f"Feature {features_[i]} will be treated as numerical since the number of non-missing categories ({n_non_missing_categories}) exceeds max_cat ({max_cat}) threshold."
+                )
+            elif avg_category_support < min_support_threshold:
+                cat_to_num.append(i)
+                logger.warning(
+                    f"Feature {features_[i]} will be treated as numerical since its average support per non-missing category ({avg_category_support:.1f}) is below the native categorical stability threshold ({min_support_threshold:.1f})."
                 )
 
             feature_name = features_[i]
@@ -190,7 +244,7 @@ def convert_input_frame_columnar(
 
     Returns list of column arrays and list of validity masks.
     """
-    import polars.selectors as cs
+    import polars as pl
 
     features_ = list(X.columns)
     rows, cols = X.shape
@@ -198,7 +252,11 @@ def convert_input_frame_columnar(
     # Determine categorical features
     categorical_features_ = None
     if categorical_features == "auto":
-        categorical_columns = X.select(cs.categorical()).columns
+        categorical_columns = [
+            name
+            for name, dtype in X.schema.items()
+            if _is_polars_string_like_dtype(dtype, pl)
+        ]
         categorical_features_ = [
             features_.index(c) for c in categorical_columns
         ] or None
@@ -222,9 +280,6 @@ def convert_input_frame_columnar(
     # Convert each column to numpy array
     columns = []
     masks = []
-    import polars as pl
-    import pyarrow as pa
-
     for i, col_name in enumerate(features_):
         if i in categorical_set:
             # For categorical columns, cast to String first to bypass
@@ -242,13 +297,28 @@ def convert_input_frame_columnar(
                 cats = [c for c in cats if c != "nan"]
             else:
                 cats = []
+            n_non_missing_categories = len(cats)
+            n_non_missing_rows = int((~null_mask).sum())
+            avg_category_support = (
+                n_non_missing_rows / n_non_missing_categories
+                if n_non_missing_categories > 0
+                else float("inf")
+            )
+            min_support_threshold = categorical_support_threshold(
+                n_non_missing_categories, n_non_missing_rows
+            )
 
             cats.insert(0, "nan")
 
-            if len(cats) > max_cat:
+            if n_non_missing_categories > max_cat:
                 cat_to_num.append(i)
                 logger.warning(
-                    f"Feature {col_name} will be treated as numerical since the number of categories ({len(cats)}) exceeds max_cat ({max_cat}) threshold."
+                    f"Feature {col_name} will be treated as numerical since the number of non-missing categories ({n_non_missing_categories}) exceeds max_cat ({max_cat}) threshold."
+                )
+            elif avg_category_support < min_support_threshold:
+                cat_to_num.append(i)
+                logger.warning(
+                    f"Feature {col_name} will be treated as numerical since its average support per non-missing category ({avg_category_support:.1f}) is below the native categorical stability threshold ({min_support_threshold:.1f})."
                 )
 
             cat_mapping[col_name] = cats
@@ -259,34 +329,25 @@ def convert_input_frame_columnar(
             out_values = np.full(rows, np.nan, dtype=np.float64)
             valid_indices = ~null_mask
             if valid_indices.any():
-                encoded = np.searchsorted(cats_arr, valid_strs) + 1.0
+                positions = np.searchsorted(cats_arr, valid_strs)
+                encoded = positions.astype(np.float64) + 1.0
+                exact_match = np.zeros(len(valid_strs), dtype=bool)
+                in_range = positions < len(cats_arr)
+                if in_range.any():
+                    exact_match[in_range] = (
+                        cats_arr[positions[in_range]] == valid_strs[in_range]
+                    )
+                encoded[~exact_match] = np.nan
                 out_values[valid_indices] = encoded
 
             columns.append(out_values)
             masks.append(None)  # Categorical encoding handles NaNs
         else:
-            # For non-categorical columns, use zero-copy via Arrow
-            series = X[col_name]
-            # Use Arrow to get validity bitmap and values zero-copy
-            arr = series.to_arrow()
-            if isinstance(arr, pa.ChunkedArray):
-                if arr.num_chunks > 1:
-                    arr = arr.combine_chunks()
-                else:
-                    arr = arr.chunk(0)
-
-            # Check buffers
-            buffers = arr.buffers()
-            # buffers[0] is validity bitmap
-            # buffers[1] is values
-            if buffers[0] is None:
-                masks.append(None)
-            else:
-                masks.append(np.frombuffer(buffers[0], dtype=np.uint8))
-
-            # values — truncate to `rows` to exclude Arrow buffer padding
-            col_array = np.frombuffer(buffers[1], dtype=np.float64)[:rows]
-            columns.append(col_array)
+            series = X[col_name].cast(pl.Float64)
+            columns.append(
+                series.to_numpy(allow_copy=True).astype(np.float64, copy=False)
+            )
+            masks.append(None)
 
     if categorical_features_:
         categorical_features_ = [
@@ -321,10 +382,17 @@ def transform_input_frame(X, cat_mapping) -> Tuple[List[str], np.ndarray, int, i
             feature_index = features_.index(feature_name)
             cats = categories.copy()
             cats.remove("nan")
-            x_enc = np.searchsorted(cats, X_[:, feature_index].astype(str))
-            x_enc = x_enc + 1.0
-            ind_nan = len(categories)
-            x_enc[x_enc == ind_nan] = np.nan
+            values = X_[:, feature_index].astype(str)
+            positions = np.searchsorted(cats, values)
+            x_enc = positions.astype(np.float64) + 1.0
+            exact_match = np.zeros(len(values), dtype=bool)
+            in_range = positions < len(cats)
+            if in_range.any():
+                cat_array = np.asarray(cats, dtype=object)
+                exact_match[in_range] = (
+                    cat_array[positions[in_range]] == values[in_range]
+                )
+            x_enc[~exact_match] = np.nan
             X_[:, feature_index] = x_enc
 
     if not np.issubdtype(X_.dtype, "float64"):
@@ -348,7 +416,6 @@ def transform_input_frame_columnar(
     columns = []
     masks = []
     import polars as pl
-    import pyarrow as pa
 
     for i, col_name in enumerate(features_):
         if cat_mapping and col_name in cat_mapping:
@@ -367,27 +434,26 @@ def transform_input_frame_columnar(
             valid_indices = ~null_mask
             if valid_indices.any():
                 valid_strs = str_np[valid_indices]
-                encoded = np.searchsorted(cats, valid_strs) + 1.0
-                ind_nan = len(categories)
-                encoded[encoded == ind_nan] = np.nan
+                positions = np.searchsorted(cats, valid_strs)
+                encoded = positions.astype(np.float64) + 1.0
+                exact_match = np.zeros(len(valid_strs), dtype=bool)
+                in_range = positions < len(cats)
+                if in_range.any():
+                    cat_array = np.asarray(cats, dtype=object)
+                    exact_match[in_range] = (
+                        cat_array[positions[in_range]] == valid_strs[in_range]
+                    )
+                encoded[~exact_match] = np.nan
                 x_enc[valid_indices] = encoded
 
             columns.append(x_enc)
             masks.append(None)
         else:
-            series = X[col_name]
-            arr = series.to_arrow()
-            if isinstance(arr, pa.ChunkedArray):
-                if arr.num_chunks > 1:
-                    arr = arr.combine_chunks()  # Fallback for chunked
-                else:
-                    arr = arr.chunk(0)
-            buffers = arr.buffers()
-            if buffers[0] is None:
-                masks.append(None)
-            else:
-                masks.append(np.frombuffer(buffers[0], dtype=np.uint8))
-            columns.append(np.frombuffer(buffers[1], dtype=np.float64)[:rows])
+            series = X[col_name].cast(pl.Float64)
+            columns.append(
+                series.to_numpy(allow_copy=True).astype(np.float64, copy=False)
+            )
+            masks.append(None)
 
     return features_, columns, masks, rows, cols
 

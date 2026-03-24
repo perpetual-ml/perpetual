@@ -96,7 +96,7 @@ mod tests {
         let loss = objective_function.loss(&y, &yhat, None, None);
 
         let data = Matrix::new(&data_vec, 891, 5);
-        let splitter = MissingImputerSplitter::new(0.3, true, ConstraintMap::new(), None);
+        let splitter = MissingImputerSplitter::new(0.3, 0.0, true, ConstraintMap::new(), None);
         let mut tree = Tree::new();
 
         let b = bin_matrix(&data, None, 300, f64::NAN, None).unwrap();

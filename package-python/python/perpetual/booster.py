@@ -3,6 +3,7 @@
 import inspect
 import json
 import warnings
+from dataclasses import fields
 from enum import Enum
 from types import FunctionType
 from typing import Any, Dict, Iterable, List, Optional, Set, Tuple, Union, cast
@@ -30,6 +31,17 @@ from perpetual.utils import (
 )
 
 MultiOutputBooster = CrateMultiOutputBooster
+NODE_FIELDS = {field.name for field in fields(Node)}
+
+
+def _native_multiclass_export_temperature(n_classes: int) -> float:
+    if n_classes <= 4:
+        return 1.0
+    if n_classes == 5:
+        return 1.5
+    if 6 <= n_classes <= 8:
+        return 2.0
+    return 1.75
 
 
 class CalibrationMethod(str, Enum):
@@ -285,9 +297,12 @@ class PerpetualBooster:
         self._is_fitted = False
 
         booster = CratePerpetualBooster(
-            objective="SquaredLoss"
-            if isinstance(self.objective, str) and self.objective.startswith("Custom")
-            else (self.objective if not isinstance(self.objective, tuple) else None),
+            objective=(
+                "SquaredLoss"
+                if isinstance(self.objective, str)
+                and self.objective.startswith("Custom")
+                else (self.objective if not isinstance(self.objective, tuple) else None)
+            ),
             budget=self.budget,
             max_bin=self.max_bin,
             num_threads=self.num_threads,
@@ -408,11 +423,15 @@ class PerpetualBooster:
             len(classes_) > 1 and self.objective == "SquaredLoss"
         ):
             booster = CratePerpetualBooster(
-                objective="Custom"
-                if isinstance(self.objective, str)
-                and self.objective.startswith("Custom")
-                else (
-                    self.objective if not isinstance(self.objective, tuple) else None
+                objective=(
+                    "Custom"
+                    if isinstance(self.objective, str)
+                    and self.objective.startswith("Custom")
+                    else (
+                        self.objective
+                        if not isinstance(self.objective, tuple)
+                        else None
+                    )
                 ),
                 budget=self.budget,
                 max_bin=self.max_bin,
@@ -442,11 +461,15 @@ class PerpetualBooster:
         else:
             booster = CrateMultiOutputBooster(
                 n_boosters=len(classes_),
-                objective="Custom"
-                if isinstance(self.objective, str)
-                and self.objective.startswith("Custom")
-                else (
-                    self.objective if not isinstance(self.objective, tuple) else None
+                objective=(
+                    "Custom"
+                    if isinstance(self.objective, str)
+                    and self.objective.startswith("Custom")
+                    else (
+                        self.objective
+                        if not isinstance(self.objective, tuple)
+                        else None
+                    )
                 ),
                 budget=self.budget,
                 max_bin=self.max_bin,
@@ -1733,7 +1756,15 @@ class PerpetualBooster:
                         node["split_feature"] = feature_map[node["split_feature"]]
                     else:
                         node["split_feature"] = leaf_split_feature
-                    nodes.append(Node(**node))
+                    nodes.append(
+                        Node(
+                            **{
+                                key: value
+                                for key, value in node.items()
+                                if key in NODE_FIELDS
+                            }
+                        )
+                    )
                 trees.append(nodes)
         return trees
 
@@ -1797,6 +1828,13 @@ class PerpetualBooster:
 
         # Get raw dump
         raw_dump = json.loads(self.json_dump())
+        native_multiclass = bool(raw_dump.get("native_multiclass", False))
+        multiclass_temperature = (
+            _native_multiclass_export_temperature(len(self.classes_))
+            if is_multi and native_multiclass
+            else 1.0
+        )
+        multiclass_leaf_scale = 1.0 / multiclass_temperature
 
         # Initialize XGBoost structure
         xgb_json = {
@@ -1852,9 +1890,9 @@ class PerpetualBooster:
             xgb_json["learner"]["learner_model_param"]["num_class"] = str(n_classes)
             xgb_json["learner"]["learner_model_param"]["num_target"] = "1"
 
-            # Base score vector [0.5, 0.5, ...]
-            # 5.0E-1
-            base_score_str = ",".join(["5.0E-1"] * n_classes)
+            # Keep the model base score neutral and inject class-specific biases
+            # into the first tree of each class so exported logits match inference.
+            base_score_str = ",".join(["0.0E+0"] * n_classes)
             xgb_json["learner"]["learner_model_param"]["base_score"] = (
                 f"[{base_score_str}]"
             )
@@ -1892,9 +1930,11 @@ class PerpetualBooster:
                     booster_trees = booster_dump["trees"]
                     if round_idx < len(booster_trees):
                         tree = booster_trees[round_idx]
-                        base_score = booster_dump["base_score"]
+                        base_score = booster_dump["base_score"] * multiclass_leaf_scale
 
-                        xgb_tree = self._convert_tree(tree, current_ptr)
+                        xgb_tree = self._convert_tree(
+                            tree, current_ptr, leaf_scale=multiclass_leaf_scale
+                        )
 
                         if round_idx == 0:
                             self._adjust_tree_leaves(xgb_tree, base_score)
@@ -1974,7 +2014,9 @@ class PerpetualBooster:
 
         return xgb_json
 
-    def _convert_tree(self, tree: Dict[str, Any], group_id: int) -> Dict[str, Any]:
+    def _convert_tree(
+        self, tree: Dict[str, Any], group_id: int, leaf_scale: float = 1.0
+    ) -> Dict[str, Any]:
         """Convert a single Perpetual tree to XGBoost dictionary format."""
 
         nodes_dict = tree["nodes"]
@@ -2008,14 +2050,14 @@ class PerpetualBooster:
             idx = node_map[nid]
 
             sum_hessian[idx] = node["hessian_sum"]
-            base_weights[idx] = node["weight_value"]
+            base_weights[idx] = node["weight_value"] * leaf_scale
             loss_changes[idx] = node.get("split_gain", 0.0)
 
             if node["is_leaf"]:
                 left_children[idx] = -1
                 right_children[idx] = -1
                 split_indices[idx] = 0
-                split_conditions[idx] = node["weight_value"]
+                split_conditions[idx] = node["weight_value"] * leaf_scale
             else:
                 left_id = node["left_child"]
                 right_id = node["right_child"]
@@ -2178,6 +2220,16 @@ class PerpetualBooster:
         else:
             base_values = [float(base_score)]
 
+        native_multiclass = bool(raw_dump.get("native_multiclass", False))
+        multiclass_temperature = (
+            _native_multiclass_export_temperature(len(self.classes_))
+            if is_multi and native_multiclass
+            else 1.0
+        )
+        multiclass_leaf_scale = 1.0 / multiclass_temperature
+        if is_multi and native_multiclass:
+            base_values = [value * multiclass_leaf_scale for value in base_values]
+
         global_tree_idx = 0
         for b_idx, booster in enumerate(booster_data):
             for tree_data in booster["trees"]:
@@ -2207,7 +2259,9 @@ class PerpetualBooster:
                         target_treeids.append(global_tree_idx)
                         target_nodeids.append(idx_for_onnx)
                         target_ids.append(b_idx if is_multi else 0)
-                        target_weights.append(float(node_dict["weight_value"]))
+                        target_weights.append(
+                            float(node_dict["weight_value"]) * multiclass_leaf_scale
+                        )
                     else:
                         nodes_modes.append("BRANCH_LT")
                         feat_val = node_dict["split_feature"]
