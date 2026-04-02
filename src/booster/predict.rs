@@ -12,6 +12,77 @@ use rayon::prelude::*;
 use std::collections::{HashMap, HashSet};
 
 impl PerpetualBooster {
+    pub(crate) fn predict_tree_ensemble(&self, data: &Matrix<f64>, parallel: bool) -> Vec<f64> {
+        let mut init_preds = vec![self.base_score; data.rows];
+        self.get_prediction_trees().iter().for_each(|tree| {
+            for (prediction, value) in init_preds
+                .iter_mut()
+                .zip(tree.predict(data, parallel, &self.cfg.missing))
+            {
+                *prediction += value;
+            }
+        });
+        init_preds
+    }
+
+    pub(crate) fn predict_tree_ensemble_columnar(&self, data: &ColumnarMatrix<f64>, parallel: bool) -> Vec<f64> {
+        let mut init_preds = vec![self.base_score; data.rows];
+        self.get_prediction_trees().iter().for_each(|tree| {
+            for (prediction, value) in
+                init_preds
+                    .iter_mut()
+                    .zip(tree.predict_columnar(data, parallel, &self.cfg.missing))
+            {
+                *prediction += value;
+            }
+        });
+        init_preds
+    }
+
+    fn apply_regression_head(&self, data: &Matrix<f64>, predictions: &mut [f64]) {
+        let Some(head) = self.regression_head.as_ref() else {
+            return;
+        };
+
+        for (row_idx, prediction) in predictions.iter_mut().enumerate() {
+            let mut residual_prediction = head.intercept;
+            for col_idx in 0..data.cols {
+                let value = *data.get(row_idx, col_idx);
+                let standardized = if value.is_finite() {
+                    (value - head.feature_means[col_idx]) / head.feature_scales[col_idx]
+                } else {
+                    0.0
+                };
+                residual_prediction += head.coefficients[col_idx] * standardized;
+            }
+            *prediction += head.blend_weight * residual_prediction;
+        }
+    }
+
+    fn apply_regression_head_columnar(&self, data: &ColumnarMatrix<f64>, predictions: &mut [f64]) {
+        let Some(head) = self.regression_head.as_ref() else {
+            return;
+        };
+
+        for (row_idx, prediction) in predictions.iter_mut().enumerate() {
+            let mut residual_prediction = head.intercept;
+            for col_idx in 0..data.cols {
+                let standardized = if data.is_valid(row_idx, col_idx) {
+                    let value = *data.get(row_idx, col_idx);
+                    if value.is_finite() {
+                        (value - head.feature_means[col_idx]) / head.feature_scales[col_idx]
+                    } else {
+                        0.0
+                    }
+                } else {
+                    0.0
+                };
+                residual_prediction += head.coefficients[col_idx] * standardized;
+            }
+            *prediction += head.blend_weight * residual_prediction;
+        }
+    }
+
     fn predict_fold_logits(&self, data: &Matrix<f64>, parallel: bool) -> Vec<[f64; 5]> {
         let mut results = vec![[self.base_score; 5]; data.rows];
 
@@ -55,17 +126,9 @@ impl PerpetualBooster {
     /// * For regression/ranking: The raw predicted score.
     /// * For classification: The log-odds (logit). Apply sigmoid to get probabilities.
     pub fn predict(&self, data: &Matrix<f64>, parallel: bool) -> Vec<f64> {
-        let mut init_preds = vec![self.base_score; data.rows];
-        let trees = self.get_prediction_trees();
-        trees.iter().for_each(|tree| {
-            for (p_, val) in init_preds
-                .iter_mut()
-                .zip(tree.predict(data, parallel, &self.cfg.missing))
-            {
-                *p_ += val;
-            }
-        });
-        init_preds
+        let mut predictions = self.predict_tree_ensemble(data, parallel);
+        self.apply_regression_head(data, &mut predictions);
+        predictions
     }
 
     /// Generate predictions for columnar data (Zero-Copy).
@@ -75,16 +138,9 @@ impl PerpetualBooster {
     /// * `data` - The columnar feature matrix.
     /// * `parallel` - If `true`, predictions are computed in parallel.
     pub fn predict_columnar(&self, data: &ColumnarMatrix<f64>, parallel: bool) -> Vec<f64> {
-        let mut init_preds = vec![self.base_score; data.rows];
-        self.get_prediction_trees().iter().for_each(|tree| {
-            for (p_, val) in init_preds
-                .iter_mut()
-                .zip(tree.predict_columnar(data, parallel, &self.cfg.missing))
-            {
-                *p_ += val;
-            }
-        });
-        init_preds
+        let mut predictions = self.predict_tree_ensemble_columnar(data, parallel);
+        self.apply_regression_head_columnar(data, &mut predictions);
+        predictions
     }
 
     /// Generate class probabilities (sigmoid of log-odds) for the given data.
@@ -611,7 +667,7 @@ impl MultiOutputBooster {
     }
 
     fn multiclass_probability_beta(&self) -> f64 {
-        if self.n_boosters == 3 { 0.0 } else { 0.25 }
+        0.25
     }
 
     fn normalize_multiclass_probabilities(probabilities: &mut [f64], alpha: f64, priors: Option<&[f64]>, beta: f64) {
@@ -824,6 +880,7 @@ impl MultiOutputBooster {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::booster::core::RegressionLinearHead;
     use crate::node::Node;
     use crate::objective::Objective;
     use crate::tree::core::Tree;
@@ -883,6 +940,27 @@ mod tests {
         let preds = booster.predict(&data, false);
         assert_eq!(preds.len(), 1);
         assert_relative_eq!(preds[0], 0.6, epsilon = 1e-7);
+    }
+
+    #[test]
+    fn test_predict_applies_regression_head_for_dense_and_columnar_data() {
+        let mut booster = create_mock_booster();
+        booster.regression_head = Some(RegressionLinearHead {
+            feature_means: vec![0.0, 0.0],
+            feature_scales: vec![1.0, 1.0],
+            coefficients: vec![0.1, 0.2],
+            intercept: 0.5,
+            blend_weight: 0.4,
+        });
+
+        let data = Matrix::new(&[1.0, 2.0], 1, 2);
+        let preds = booster.predict(&data, false);
+        assert_relative_eq!(preds[0], 1.0, epsilon = 1e-7);
+
+        let data_vec = [1.0, 2.0];
+        let columnar = ColumnarMatrix::new(vec![&data_vec[0..1], &data_vec[1..2]], None, 1);
+        let columnar_preds = booster.predict_columnar(&columnar, false);
+        assert_relative_eq!(columnar_preds[0], 1.0, epsilon = 1e-7);
     }
 
     #[test]
@@ -1302,6 +1380,33 @@ mod tests {
 
         assert!(probabilities[1] > 0.55);
         assert!(probabilities[2] < 0.12);
+    }
+
+    #[test]
+    fn test_multiclass_probability_beta_boosts_rare_three_class_prior() {
+        let booster = MultiOutputBooster {
+            n_boosters: 3,
+            class_priors: vec![0.7, 0.2, 0.1],
+            ..Default::default()
+        };
+        let mut with_prior_coupling = vec![0.35, 0.35, 0.35];
+        let mut without_prior_coupling = with_prior_coupling.clone();
+
+        MultiOutputBooster::normalize_multiclass_probabilities(
+            &mut with_prior_coupling,
+            booster.multiclass_probability_alpha(),
+            Some(&booster.class_priors),
+            booster.multiclass_probability_beta(),
+        );
+        MultiOutputBooster::normalize_multiclass_probabilities(
+            &mut without_prior_coupling,
+            booster.multiclass_probability_alpha(),
+            Some(&booster.class_priors),
+            0.0,
+        );
+
+        assert!(with_prior_coupling[2] > without_prior_coupling[2]);
+        assert!(with_prior_coupling[0] < without_prior_coupling[0]);
     }
 
     #[test]

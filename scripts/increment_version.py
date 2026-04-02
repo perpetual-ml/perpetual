@@ -5,7 +5,7 @@ from pathlib import Path
 
 # python scripts/increment_version.py 3.0.0
 # python scripts/increment_version.py 3.0.0 --dry-run
-# python scripts/increment_version.py 3.0.0-rc.1 --dry-run
+# python scripts/increment_version.py 3.0.0-rc.2 --dry-run
 
 
 SEMVER_CORE_PATTERN = re.compile(

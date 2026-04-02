@@ -353,6 +353,22 @@ class PerpetualBooster:
             Returns self.
         """
 
+        # Detect task type from scikit-learn estimator type if present
+        is_classification = getattr(self, "_estimator_type", None)
+        if isinstance(is_classification, str):
+            is_classification = is_classification == "classifier"
+
+        y_, classes_ = convert_input_array(
+            y, self.objective, is_target=True, is_classification=is_classification
+        )
+
+        target_task = None
+        if y_.ndim == 1:
+            if len(classes_) == 2:
+                target_task = "binary"
+            elif len(classes_) == 0:
+                target_task = "regression"
+
         # Check if input is a Polars DataFrame for zero-copy columnar path
         is_polars = type_df(X) == "polars_df"
 
@@ -366,7 +382,13 @@ class PerpetualBooster:
                 cols,
                 categorical_features_,
                 cat_mapping,
-            ) = convert_input_frame_columnar(X, self.categorical_features, self.max_cat)
+            ) = convert_input_frame_columnar(
+                X,
+                self.categorical_features,
+                self.max_cat,
+                target_values=y_ if target_task is not None else None,
+                target_task=target_task,
+            )
         else:
             # Use existing flat path for pandas and numpy
             (
@@ -376,20 +398,17 @@ class PerpetualBooster:
                 cols,
                 categorical_features_,
                 cat_mapping,
-            ) = convert_input_frame(X, self.categorical_features, self.max_cat)
+            ) = convert_input_frame(
+                X,
+                self.categorical_features,
+                self.max_cat,
+                target_values=y_ if target_task is not None else None,
+                target_task=target_task,
+            )
 
         self.n_features_ = cols
         self.cat_mapping = cat_mapping
         self.feature_names_in_ = features_
-
-        # Detect task type from scikit-learn estimator type if present
-        is_classification = getattr(self, "_estimator_type", None)
-        if isinstance(is_classification, str):
-            is_classification = is_classification == "classifier"
-
-        y_, classes_ = convert_input_array(
-            y, self.objective, is_target=True, is_classification=is_classification
-        )
 
         self.classes_ = np.array(classes_)
         self._is_fitted = True

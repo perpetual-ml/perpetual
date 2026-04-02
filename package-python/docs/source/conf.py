@@ -8,7 +8,7 @@ copyright = f"{datetime.now().year}, Mutlu Simsek, Serkan Korkmaz, Pieter Pel"
 author = "Mutlu Simsek, Serkan Korkmaz, Pieter Pel"
 
 # The full version, including alpha/beta/rc tags
-release = "3.0.0-rc.1"
+release = "3.0.0-rc.2"
 
 # -- General configuration ---------------------------------------------------
 

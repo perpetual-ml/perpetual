@@ -15,6 +15,8 @@ use crate::histogram::{HistogramArena, NodeHistogram};
 use crate::objective::Objective;
 use crate::splitter::{MissingBranchSplitter, MissingImputerSplitter, SplitInfo, SplitInfoSlice, Splitter};
 use crate::tree::core::Tree;
+#[cfg(test)]
+use crate::utils::odds;
 use crate::{ColumnarMatrix, Matrix, PerpetualBooster};
 use rayon::ThreadPoolBuilder;
 
@@ -64,6 +66,10 @@ impl Default for MultiOutputBooster {
 }
 
 impl MultiOutputBooster {
+    #[cfg(test)]
+    #[allow(dead_code)]
+    const OVR_FRONTIER_EXPANSION_FACTOR: usize = 2;
+
     fn center_multiclass_leaf_values(values: &mut [f32]) {
         if values.is_empty() {
             return;
@@ -332,39 +338,116 @@ impl MultiOutputBooster {
             .collect();
     }
 
-    fn ovr_positive_weight(&self, positives: usize, negatives: usize) -> f64 {
-        if !self.is_multiclass_logloss() || self.n_boosters > 3 || positives == 0 {
-            return 1.0;
-        }
-
-        let imbalance = negatives as f64 / positives as f64;
-        if imbalance <= 1.0 || imbalance >= 10.0 {
-            1.0
-        } else {
-            imbalance.sqrt()
-        }
-    }
-
     fn build_multiclass_sample_weight(&self, y_col: &[f64], sample_weight: Option<&[f64]>) -> Option<Vec<f64>> {
-        let positives = y_col.iter().filter(|&&value| value >= 0.5).count();
-        let negatives = y_col.len().saturating_sub(positives);
-        let positive_weight = self.ovr_positive_weight(positives, negatives);
-
-        if (positive_weight - 1.0).abs() < f64::EPSILON {
+        if !self.is_multiclass_logloss() || y_col.len() < 2 {
             return sample_weight.map(|weights| weights.to_vec());
         }
 
+        // OVR LogLoss submodels already receive binary class balancing inside
+        // PerpetualBooster::fit, so avoid double-weighting positives here.
+        sample_weight.map(|weights| weights.to_vec())
+    }
+
+    fn multiclass_class_balance_strength(class_counts: &[usize]) -> f64 {
+        if class_counts.len() <= 1 {
+            return 0.0;
+        }
+
+        let total = class_counts.iter().sum::<usize>() as f64;
+        if total <= 0.0 {
+            return 0.0;
+        }
+
+        let class_count = class_counts.len() as f64;
+        let mut entropy = 0.0;
+        let mut majority = 0.0_f64;
+        let mut minority = f64::INFINITY;
+
+        for &count in class_counts {
+            if count == 0 {
+                continue;
+            }
+
+            let proportion = count as f64 / total;
+            entropy -= proportion * proportion.ln();
+            majority = majority.max(count as f64);
+            minority = minority.min(count as f64);
+        }
+
+        if !minority.is_finite() || majority <= 0.0 {
+            return 0.0;
+        }
+
+        let normalized_entropy = (entropy / class_count.ln().max(f64::EPSILON)).clamp(0.0, 1.0);
+        let entropy_gap = 1.0 - normalized_entropy;
+        let ratio_pressure = 1.0 - (minority / majority).clamp(0.0, 1.0);
+
+        (0.75 * entropy_gap + 0.25 * ratio_pressure).clamp(0.0, 1.0)
+    }
+
+    fn effective_number_weight(class_count: usize, beta: f64) -> f64 {
+        if class_count <= 1 {
+            return 1.0;
+        }
+
+        let denominator = 1.0 - beta.powf(class_count as f64);
+        if denominator <= f64::EPSILON {
+            1.0
+        } else {
+            (1.0 - beta) / denominator
+        }
+    }
+
+    fn build_native_multiclass_sample_weight(
+        &self,
+        labels: &[usize],
+        sample_weight: Option<&[f64]>,
+    ) -> Option<Vec<f64>> {
+        if !self.is_multiclass_logloss() || labels.len() < 2 {
+            return sample_weight.map(|weights| weights.to_vec());
+        }
+
+        let mut class_counts = vec![0_usize; self.n_boosters];
+        for &label in labels {
+            if let Some(count) = class_counts.get_mut(label) {
+                *count += 1;
+            }
+        }
+
+        let active_class_counts = class_counts
+            .iter()
+            .copied()
+            .filter(|&count| count > 0)
+            .collect::<Vec<_>>();
+        let balance_strength = Self::multiclass_class_balance_strength(&active_class_counts);
+        if balance_strength <= 1e-6 {
+            return sample_weight.map(|weights| weights.to_vec());
+        }
+
+        let beta = ((labels.len().saturating_sub(1)) as f64 / labels.len().max(1) as f64).clamp(0.9, 0.999_99);
+        let normalization = labels.len() as f64
+            / class_counts
+                .iter()
+                .copied()
+                .filter(|&count| count > 0)
+                .map(|count| count as f64 * Self::effective_number_weight(count, beta))
+                .sum::<f64>()
+                .max(f64::EPSILON);
+
         Some(
-            y_col
+            labels
                 .iter()
                 .enumerate()
-                .map(|(idx, &value)| {
+                .map(|(idx, &label)| {
                     let base_weight = sample_weight.map_or(1.0, |weights| weights[idx]);
-                    if value >= 0.5 {
-                        base_weight * positive_weight
-                    } else {
-                        base_weight
-                    }
+                    let class_weight = class_counts
+                        .get(label)
+                        .copied()
+                        .filter(|&count| count > 0)
+                        .map(|count| Self::effective_number_weight(count, beta) * normalization)
+                        .unwrap_or(1.0);
+                    let blended_weight = 1.0 + balance_strength * (class_weight - 1.0);
+                    base_weight * blended_weight
                 })
                 .collect(),
         )
@@ -410,6 +493,19 @@ impl MultiOutputBooster {
         (base_regularization / budget_relief).clamp(0.0, 0.12)
     }
 
+    fn native_multiclass_categorical_generalization_min_folds(&self, rows: usize, cols: usize) -> u8 {
+        if self.is_multiclass_logloss()
+            && self.n_boosters == 3
+            && rows >= 2_000
+            && cols >= 512
+            && self.categorical_feature_count() >= cols.saturating_mul(3) / 4
+        {
+            3
+        } else {
+            5
+        }
+    }
+
     fn native_multiclass_target_loss_decrement(&self, loss_avg: f32) -> f32 {
         let base = 10.0_f32;
         let effective_budget = self.cfg.budget.max(0.1);
@@ -430,7 +526,7 @@ impl MultiOutputBooster {
             || (self.n_boosters >= 12 && rows >= 2_000)
             || (self.n_boosters >= 6 && rows_per_class >= 24 && cols <= 10)
             || (self.n_boosters >= 6 && rows_per_class >= 48 && cols >= 16)
-            || (self.n_boosters <= 8 && rows_per_class >= 96 && cols >= 24)
+            || ((4..=8).contains(&self.n_boosters) && rows_per_class >= 96 && cols >= 24)
     }
 
     fn ovr_multiclass_budget(&self, rows: usize, cols: usize) -> f32 {
@@ -439,6 +535,285 @@ impl MultiOutputBooster {
         } else {
             self.cfg.budget
         }
+    }
+
+    #[cfg(test)]
+    fn ovr_multiclass_probability_alpha(&self) -> f64 {
+        if self.n_boosters == 3 {
+            0.25
+        } else if (4..=5).contains(&self.n_boosters) {
+            0.5
+        } else {
+            0.0
+        }
+    }
+
+    #[cfg(test)]
+    fn ovr_multiclass_probability_beta(&self) -> f64 {
+        0.25
+    }
+
+    #[cfg(test)]
+    fn normalize_ovr_multiclass_probabilities(&self, probabilities: &mut [f64]) {
+        let alpha = self.ovr_multiclass_probability_alpha();
+        let beta = self.ovr_multiclass_probability_beta();
+
+        probabilities.iter_mut().enumerate().for_each(|(idx, value)| {
+            let clipped = value.clamp(f64::EPSILON, 1.0 - f64::EPSILON);
+            let prior = self
+                .class_priors
+                .get(idx)
+                .copied()
+                .unwrap_or(1.0)
+                .clamp(f64::EPSILON, 1.0);
+            *value = clipped / (1.0 - clipped).powf(alpha) / prior.powf(beta);
+        });
+
+        let sum = probabilities.iter().sum::<f64>();
+        if sum <= f64::EPSILON {
+            let uniform = 1.0 / probabilities.len().max(1) as f64;
+            probabilities.iter_mut().for_each(|value| *value = uniform);
+        } else {
+            probabilities.iter_mut().for_each(|value| *value /= sum);
+        }
+    }
+
+    #[cfg(test)]
+    #[inline]
+    fn ovr_virtual_fold(row_idx: usize) -> usize {
+        let mut mixed = (row_idx as u64).wrapping_add(0x9E37_79B9_7F4A_7C15);
+        mixed = (mixed ^ (mixed >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
+        mixed = (mixed ^ (mixed >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
+        mixed ^= mixed >> 31;
+        (mixed % 5) as usize
+    }
+
+    #[cfg(test)]
+    fn ovr_multiclass_loss_from_fold_logits(
+        &self,
+        fold_logits_by_class: &[Vec<[f64; 5]>],
+        row_index: &[usize],
+        labels: &[usize],
+        sample_weight: Option<&[f64]>,
+    ) -> f32 {
+        let weight_denom = sample_weight
+            .map(|weights| weights.iter().sum::<f64>() as f32)
+            .unwrap_or(labels.len() as f32)
+            .max(f32::EPSILON);
+        let mut total_loss = 0.0_f32;
+
+        for row_idx in 0..labels.len() {
+            let mut probabilities = fold_logits_by_class
+                .iter()
+                .map(|class_logits| {
+                    let fold = Self::ovr_virtual_fold(row_index[row_idx]);
+                    odds(class_logits[row_idx][fold])
+                })
+                .collect::<Vec<_>>();
+            self.normalize_ovr_multiclass_probabilities(&mut probabilities);
+
+            let sample_weight_value = sample_weight.map_or(1.0, |weights| weights[row_idx]);
+            total_loss +=
+                (-(probabilities[labels[row_idx]].clamp(f64::EPSILON, 1.0)).ln() * sample_weight_value) as f32;
+        }
+
+        total_loss / weight_denom
+    }
+
+    #[cfg(test)]
+    fn select_ovr_tree_prefix(
+        &mut self,
+        data: &Matrix<f64>,
+        y: &Matrix<f64>,
+        sample_weight: Option<&[f64]>,
+    ) -> Option<(usize, usize)> {
+        if !self.is_multiclass_logloss() || self.native_multiclass || self.n_boosters <= 2 {
+            return None;
+        }
+
+        let min_tree_count = self
+            .boosters
+            .iter()
+            .map(|booster| booster.trees.len())
+            .min()
+            .unwrap_or(0);
+        if min_tree_count == 0 {
+            return None;
+        }
+
+        let labels = self.multiclass_labels(y);
+        let mut fold_logits_by_class = self
+            .boosters
+            .iter()
+            .map(|booster| vec![[booster.base_score; 5]; data.rows])
+            .collect::<Vec<_>>();
+
+        let mut best_tree_count = 0_usize;
+        let mut best_loss =
+            self.ovr_multiclass_loss_from_fold_logits(&fold_logits_by_class, &data.index, &labels, sample_weight);
+
+        for tree_idx in 0..min_tree_count {
+            for (class_idx, booster) in self.boosters.iter().enumerate() {
+                let tree_weights = booster.trees[tree_idx].predict_weights(data, false, &booster.cfg.missing);
+                for (row_logits, row_weights) in fold_logits_by_class[class_idx].iter_mut().zip(tree_weights.iter()) {
+                    for fold_idx in 0..5 {
+                        row_logits[fold_idx] += row_weights[fold_idx] as f64;
+                    }
+                }
+            }
+
+            let loss =
+                self.ovr_multiclass_loss_from_fold_logits(&fold_logits_by_class, &data.index, &labels, sample_weight);
+            if loss + 1e-7 < best_loss {
+                best_loss = loss;
+                best_tree_count = tree_idx + 1;
+            }
+        }
+
+        for booster in &mut self.boosters {
+            if booster.trees.len() > best_tree_count {
+                booster.trees.truncate(best_tree_count);
+            }
+        }
+
+        Some((best_tree_count, min_tree_count))
+    }
+
+    #[cfg(test)]
+    #[allow(dead_code)]
+    fn select_ovr_tree_prefix_columnar(
+        &mut self,
+        data: &ColumnarMatrix<f64>,
+        y: &Matrix<f64>,
+        sample_weight: Option<&[f64]>,
+    ) -> Option<(usize, usize)> {
+        if !self.is_multiclass_logloss() || self.native_multiclass || self.n_boosters <= 2 {
+            return None;
+        }
+
+        let min_tree_count = self
+            .boosters
+            .iter()
+            .map(|booster| booster.trees.len())
+            .min()
+            .unwrap_or(0);
+        if min_tree_count == 0 {
+            return None;
+        }
+
+        let labels = self.multiclass_labels(y);
+        let mut fold_logits_by_class = self
+            .boosters
+            .iter()
+            .map(|booster| vec![[booster.base_score; 5]; data.rows])
+            .collect::<Vec<_>>();
+
+        let mut best_tree_count = 0_usize;
+        let mut best_loss =
+            self.ovr_multiclass_loss_from_fold_logits(&fold_logits_by_class, &data.index, &labels, sample_weight);
+
+        for tree_idx in 0..min_tree_count {
+            for (class_idx, booster) in self.boosters.iter().enumerate() {
+                let tree_weights = booster.trees[tree_idx].predict_weights_columnar(data, false, &booster.cfg.missing);
+                for (row_logits, row_weights) in fold_logits_by_class[class_idx].iter_mut().zip(tree_weights.iter()) {
+                    for fold_idx in 0..5 {
+                        row_logits[fold_idx] += row_weights[fold_idx] as f64;
+                    }
+                }
+            }
+
+            let loss =
+                self.ovr_multiclass_loss_from_fold_logits(&fold_logits_by_class, &data.index, &labels, sample_weight);
+            if loss + 1e-7 < best_loss {
+                best_loss = loss;
+                best_tree_count = tree_idx + 1;
+            }
+        }
+
+        for booster in &mut self.boosters {
+            if booster.trees.len() > best_tree_count {
+                booster.trees.truncate(best_tree_count);
+            }
+        }
+
+        Some((best_tree_count, min_tree_count))
+    }
+
+    #[cfg(test)]
+    #[allow(dead_code)]
+    fn maybe_continue_ovr_training(
+        &mut self,
+        data: &Matrix<f64>,
+        y: &Matrix<f64>,
+        sample_weight: Option<&[f64]>,
+        group: Option<&[u64]>,
+        effective_budget: f32,
+    ) -> Result<(), PerpetualError> {
+        let Some((best_tree_count, frontier_tree_count)) = self.select_ovr_tree_prefix(data, y, sample_weight) else {
+            return Ok(());
+        };
+        if best_tree_count != frontier_tree_count || frontier_tree_count == 0 {
+            return Ok(());
+        }
+
+        let expanded_iteration_limit = Some(
+            self.cfg
+                .iteration_limit
+                .unwrap_or(frontier_tree_count * Self::OVR_FRONTIER_EXPANSION_FACTOR)
+                .max(frontier_tree_count * Self::OVR_FRONTIER_EXPANSION_FACTOR),
+        );
+
+        for i in 0..self.n_boosters {
+            self.boosters[i].cfg.budget = effective_budget;
+            self.boosters[i].cfg.auto_class_weights = false;
+            self.boosters[i].cfg.iteration_limit = expanded_iteration_limit;
+            self.boosters[i].cfg.reset = Some(true);
+            let y_col = y.get_col(i);
+            let adjusted_weight = self.build_multiclass_sample_weight(y_col, sample_weight);
+            self.boosters[i].fit(data, y_col, adjusted_weight.as_deref().or(sample_weight), group)?;
+            self.boosters[i].cfg.iteration_limit = self.cfg.iteration_limit;
+            self.boosters[i].cfg.reset = self.cfg.reset;
+        }
+        Ok(())
+    }
+
+    #[cfg(test)]
+    #[allow(dead_code)]
+    fn maybe_continue_ovr_training_columnar(
+        &mut self,
+        data: &ColumnarMatrix<f64>,
+        y: &Matrix<f64>,
+        sample_weight: Option<&[f64]>,
+        group: Option<&[u64]>,
+        effective_budget: f32,
+    ) -> Result<(), PerpetualError> {
+        let Some((best_tree_count, frontier_tree_count)) = self.select_ovr_tree_prefix_columnar(data, y, sample_weight)
+        else {
+            return Ok(());
+        };
+        if best_tree_count != frontier_tree_count || frontier_tree_count == 0 {
+            return Ok(());
+        }
+
+        let expanded_iteration_limit = Some(
+            self.cfg
+                .iteration_limit
+                .unwrap_or(frontier_tree_count * Self::OVR_FRONTIER_EXPANSION_FACTOR)
+                .max(frontier_tree_count * Self::OVR_FRONTIER_EXPANSION_FACTOR),
+        );
+
+        for i in 0..self.n_boosters {
+            self.boosters[i].cfg.budget = effective_budget;
+            self.boosters[i].cfg.auto_class_weights = false;
+            self.boosters[i].cfg.iteration_limit = expanded_iteration_limit;
+            self.boosters[i].cfg.reset = Some(true);
+            let y_col = y.get_col(i);
+            let adjusted_weight = self.build_multiclass_sample_weight(y_col, sample_weight);
+            self.boosters[i].fit_columnar(data, y_col, adjusted_weight.as_deref().or(sample_weight), group)?;
+            self.boosters[i].cfg.iteration_limit = self.cfg.iteration_limit;
+            self.boosters[i].cfg.reset = self.cfg.reset;
+        }
+        Ok(())
     }
 
     fn multiclass_base_scores(&self) -> Vec<f64> {
@@ -539,6 +914,8 @@ impl MultiOutputBooster {
         let mut split_info_slice = SplitInfoSlice::new(&mut split_info_vec);
 
         let labels = self.multiclass_labels(y);
+        let adjusted_sample_weight = self.build_native_multiclass_sample_weight(&labels, sample_weight);
+        let sample_weight = adjusted_sample_weight.as_deref().or(sample_weight);
         let base_scores = self.multiclass_base_scores();
         let mut scores_by_class = base_scores
             .iter()
@@ -564,7 +941,7 @@ impl MultiOutputBooster {
         let effective_iteration_limit = self
             .boosters
             .first()
-            .map(PerpetualBooster::effective_iteration_limit)
+            .map(|booster| booster.effective_iteration_limit(data.rows, data.cols))
             .unwrap_or(ITER_LIMIT);
         let effective_stopping_rounds = self
             .boosters
@@ -654,6 +1031,7 @@ impl MultiOutputBooster {
                     false,
                     &mut hist_tree,
                     self.cfg.categorical_features.as_ref(),
+                    false,
                     &mut split_info_slice,
                     n_nodes_alloc,
                     self.cfg.save_node_stats,
@@ -756,6 +1134,8 @@ impl MultiOutputBooster {
             .to_owned();
         let eta = 10_f32.powf(-self.multiclass_eta_power_for_training(self.cfg.budget, data.rows, data.cols));
         let leaf_regularization = self.multiclass_leaf_regularization(data.rows, data.cols);
+        let categorical_generalization_min_folds =
+            self.native_multiclass_categorical_generalization_min_folds(data.rows, data.cols);
 
         if self.cfg.create_missing_branch {
             let splitter = MissingBranchSplitter::new(
@@ -766,7 +1146,8 @@ impl MultiOutputBooster {
                 self.cfg.terminate_missing_features.clone(),
                 self.cfg.missing_node_treatment,
                 self.cfg.force_children_to_bound_parent,
-            );
+            )
+            .with_categorical_generalization_min_folds(categorical_generalization_min_folds);
             self.fit_native_multiclass_with_splitter(data, y, sample_weight, &splitter)
         } else {
             let splitter = MissingImputerSplitter::new(
@@ -775,7 +1156,8 @@ impl MultiOutputBooster {
                 self.cfg.allow_missing_splits,
                 constraints_map,
                 self.cfg.interaction_constraints.clone(),
-            );
+            )
+            .with_categorical_generalization_min_folds(categorical_generalization_min_folds);
             self.fit_native_multiclass_with_splitter(data, y, sample_weight, &splitter)
         }
     }
@@ -861,6 +1243,7 @@ impl MultiOutputBooster {
             iteration_limit,
             memory_limit,
             stopping_rounds,
+            auto_class_weights: true,
             save_node_stats,
             calibration_method: CalibrationMethod::default(),
         };
@@ -907,6 +1290,8 @@ impl MultiOutputBooster {
         let effective_budget = self.ovr_multiclass_budget(data.rows, data.cols);
         for i in 0..self.n_boosters {
             self.boosters[i].cfg.budget = effective_budget;
+            self.boosters[i].cfg.auto_class_weights = false;
+            self.boosters[i].cfg.iteration_limit = self.cfg.iteration_limit;
             let y_col = y.get_col(i);
             let adjusted_weight = self.build_multiclass_sample_weight(y_col, sample_weight);
             self.boosters[i].fit(data, y_col, adjusted_weight.as_deref().or(sample_weight), group)?;
@@ -927,6 +1312,8 @@ impl MultiOutputBooster {
         let effective_budget = self.ovr_multiclass_budget(data.rows, data.cols);
         for i in 0..self.n_boosters {
             self.boosters[i].cfg.budget = effective_budget;
+            self.boosters[i].cfg.auto_class_weights = false;
+            self.boosters[i].cfg.iteration_limit = self.cfg.iteration_limit;
             let y_col = y.get_col(i);
             let adjusted_weight = self.build_multiclass_sample_weight(y_col, sample_weight);
             self.boosters[i].fit_columnar(data, y_col, adjusted_weight.as_deref().or(sample_weight), group)?;
@@ -1533,6 +1920,30 @@ mod tests {
     use crate::objective::Objective;
     use crate::tree::core::{Tree, TreeStopper};
 
+    fn constant_leaf_tree(weight: f32) -> Tree {
+        let mut tree = Tree::new();
+        tree.nodes.insert(
+            0,
+            Node {
+                num: 0,
+                weight_value: weight,
+                leaf_weights: Some([weight; 5]),
+                hessian_sum: 1.0,
+                split_value: 0.0,
+                split_feature: 0,
+                split_gain: 0.0,
+                missing_node: 0,
+                left_child: 0,
+                right_child: 0,
+                is_leaf: true,
+                parent_node: 0,
+                left_cats: None,
+                stats: None,
+            },
+        );
+        tree
+    }
+
     #[test]
     fn test_multi_output_new() {
         let booster = MultiOutputBooster::new(
@@ -1591,17 +2002,53 @@ mod tests {
     }
 
     #[test]
-    fn test_multiclass_sample_weight_policy_applies_sqrt_balance() {
+    fn test_multiclass_sample_weight_policy_defers_to_binary_core_balance() {
         let booster = MultiOutputBooster::default()
             .set_objective(Objective::LogLoss)
             .set_n_boosters(3);
         let y_col = vec![1.0, 0.0, 0.0, 1.0, 0.0, 0.0];
 
-        let weights = booster.build_multiclass_sample_weight(&y_col, None).unwrap();
+        assert!(booster.build_multiclass_sample_weight(&y_col, None).is_none());
+    }
 
-        assert!(weights[0] > 1.0);
-        assert_eq!(weights[1], 1.0);
-        assert_eq!(weights[0], weights[3]);
+    #[test]
+    fn test_multiclass_sample_weight_policy_preserves_explicit_sample_weight() {
+        let booster = MultiOutputBooster::default()
+            .set_objective(Objective::LogLoss)
+            .set_n_boosters(3);
+        let y_col = vec![1.0, 0.0, 0.0, 1.0, 0.0, 0.0];
+        let sample_weight = vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0];
+
+        let weights = booster
+            .build_multiclass_sample_weight(&y_col, Some(&sample_weight))
+            .unwrap();
+
+        assert_eq!(weights, sample_weight);
+    }
+
+    #[test]
+    fn test_native_multiclass_sample_weight_upweights_rare_classes() {
+        let booster = MultiOutputBooster::default()
+            .set_objective(Objective::LogLoss)
+            .set_n_boosters(3);
+        let labels = vec![0, 0, 0, 0, 1, 2];
+
+        let weights = booster.build_native_multiclass_sample_weight(&labels, None).unwrap();
+        let average_weight = weights.iter().sum::<f64>() / weights.len() as f64;
+
+        assert!(weights[4] > weights[0]);
+        assert!(weights[5] > weights[0]);
+        assert!((average_weight - 1.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn test_native_multiclass_sample_weight_skips_balanced_labels() {
+        let booster = MultiOutputBooster::default()
+            .set_objective(Objective::LogLoss)
+            .set_n_boosters(3);
+        let labels = vec![0, 0, 1, 1, 2, 2];
+
+        assert!(booster.build_native_multiclass_sample_weight(&labels, None).is_none());
     }
 
     #[test]
@@ -1633,6 +2080,15 @@ mod tests {
     }
 
     #[test]
+    fn test_native_multiclass_gate_stays_off_for_three_class_medium_width_problem() {
+        let booster = MultiOutputBooster::default()
+            .set_objective(Objective::LogLoss)
+            .set_n_boosters(3);
+
+        assert!(!booster.should_use_native_multiclass(4_424, 36));
+    }
+
+    #[test]
     fn test_ovr_multiclass_budget_softens_large_low_dim_three_class_problem() {
         let booster = MultiOutputBooster::default()
             .set_budget(2.0)
@@ -1642,6 +2098,63 @@ mod tests {
         assert!((booster.ovr_multiclass_budget(78_053, 11) - 1.0).abs() < 1e-6);
         assert!((booster.ovr_multiclass_budget(8_000, 11) - 2.0).abs() < 1e-6);
         assert!((booster.ovr_multiclass_budget(1_699, 111) - 2.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_native_multiclass_categorical_generalization_min_folds_relaxes_46933_shape() {
+        let booster = MultiOutputBooster::default()
+            .set_objective(Objective::LogLoss)
+            .set_n_boosters(3)
+            .set_categorical_features(Some((0..1617).collect()));
+
+        assert_eq!(
+            3,
+            booster.native_multiclass_categorical_generalization_min_folds(3_845, 1_617)
+        );
+        assert_eq!(
+            5,
+            booster.native_multiclass_categorical_generalization_min_folds(4_424, 36)
+        );
+        assert_eq!(
+            5,
+            booster.native_multiclass_categorical_generalization_min_folds(1_699, 112)
+        );
+    }
+
+    #[test]
+    fn test_ovr_prefix_selection_truncates_harmful_shared_tail() {
+        let mut booster = MultiOutputBooster::default()
+            .set_budget(2.0)
+            .set_objective(Objective::LogLoss)
+            .set_n_boosters(3);
+
+        booster.class_priors = vec![1.0 / 3.0; 3];
+        booster.boosters = vec![
+            PerpetualBooster {
+                base_score: 0.0,
+                trees: vec![constant_leaf_tree(2.0), constant_leaf_tree(-4.0)],
+                ..PerpetualBooster::default().set_objective(Objective::LogLoss)
+            },
+            PerpetualBooster {
+                base_score: 0.0,
+                trees: vec![constant_leaf_tree(-2.0), constant_leaf_tree(4.0)],
+                ..PerpetualBooster::default().set_objective(Objective::LogLoss)
+            },
+            PerpetualBooster {
+                base_score: 0.0,
+                trees: vec![constant_leaf_tree(-2.0), constant_leaf_tree(4.0)],
+                ..PerpetualBooster::default().set_objective(Objective::LogLoss)
+            },
+        ];
+
+        let data = Matrix::new(&[0.0], 1, 1);
+        let y = Matrix::new(&[1.0, 0.0, 0.0], 1, 3);
+
+        booster.select_ovr_tree_prefix(&data, &y, None);
+
+        assert_eq!(1, booster.boosters[0].trees.len());
+        assert_eq!(1, booster.boosters[1].trees.len());
+        assert_eq!(1, booster.boosters[2].trees.len());
     }
 
     #[test]

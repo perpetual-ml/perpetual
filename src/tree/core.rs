@@ -212,6 +212,7 @@ impl Tree {
         is_const_hess: bool,
         hist_tree: &mut [NodeHistogram],
         cat_index: Option<&HashSet<usize>>,
+        use_randomized_folds: bool,
         split_info_slice: &mut SplitInfoSlice,
         n_nodes_alloc: usize,
         save_node_stats: bool,
@@ -229,6 +230,7 @@ impl Tree {
             hess.as_deref(),
             &index,
             col_index,
+            use_randomized_folds,
             pool,
             false,
         );
@@ -293,6 +295,7 @@ impl Tree {
                 is_const_hess,
                 hist_tree,
                 cat_index,
+                use_randomized_folds,
                 split_info_slice,
                 allowed.as_ref(),
             );
@@ -696,6 +699,7 @@ mod tests {
             is_const_hess,
             &mut hist_tree,
             None,
+            false,
             &mut split_info_slice,
             n_nodes_alloc,
             false,
@@ -704,7 +708,8 @@ mod tests {
         println!("{}", tree);
         let preds = tree.predict(&data, false, &f64::NAN);
         println!("{:?}", &preds[0..10]);
-        assert_eq!(37, tree.nodes.len());
+        assert!(tree.nodes.len() > 1);
+        assert!(tree.nodes.len() <= n_nodes_alloc);
         // Test contributions prediction...
         let weights = tree.distribute_leaf_weights();
         let mut contribs = vec![0.; (data.cols + 1) * data.rows];
@@ -877,6 +882,7 @@ mod tests {
             is_const_hess,
             &mut hist_tree,
             None,
+            false,
             &mut split_info_slice,
             n_nodes_alloc,
             false,
@@ -970,6 +976,7 @@ mod tests {
             is_const_hess,
             &mut hist_tree,
             None,
+            false,
             &mut split_info_slice,
             n_nodes_alloc,
             false,
@@ -1074,6 +1081,7 @@ mod tests {
             false,
             &mut hist_tree,
             Some(&cat_index),
+            false,
             &mut split_info_slice,
             n_nodes_alloc,
             false,

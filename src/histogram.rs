@@ -8,6 +8,17 @@ use crate::data::{FloatData, JaggedMatrix};
 use rayon::{ThreadPool, prelude::*};
 use std::cell::UnsafeCell;
 
+#[inline]
+fn histogram_fold(row_idx: usize) -> usize {
+    // Use a splitmix-style permutation so fold assignment is independent of
+    // input row order while remaining deterministic across runs.
+    let mut mixed = (row_idx as u64).wrapping_add(0x9E37_79B9_7F4A_7C15);
+    mixed = (mixed ^ (mixed >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
+    mixed = (mixed ^ (mixed >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
+    mixed ^= mixed >> 31;
+    (mixed % 5) as usize
+}
+
 /// Owned Feature Histogram.
 #[derive(Debug)]
 pub struct FeatureHistogramOwned {
@@ -88,7 +99,14 @@ impl<'a> FeatureHistogram<'a> {
     /// 4. If `sorted_hess` is `Some`, it must also cover all indices referenced by `index`.
     /// 5. The internal `self.data` structure must not be modified externally while this function is running.
     /// 6. Each element in `self.data` must contain a valid `Some` value that can be mutated.
-    pub unsafe fn update(&self, feature: &[u16], sorted_grad: &[f32], sorted_hess: Option<&[f32]>, index: &[usize]) {
+    pub unsafe fn update(
+        &self,
+        feature: &[u16],
+        sorted_grad: &[f32],
+        sorted_hess: Option<&[f32]>,
+        index: &[usize],
+        use_randomized_folds: bool,
+    ) {
         unsafe {
             let n_bins = self.data.len();
             let n = index.len();
@@ -111,7 +129,7 @@ impl<'a> FeatureHistogram<'a> {
                             let i = *index.get_unchecked(k);
                             let b = self.data.get_unchecked(*feature.get_unchecked(i) as usize).get();
                             let bin = b.as_mut().unwrap_unchecked();
-                            let fold = i % 5;
+                            let fold = if use_randomized_folds { histogram_fold(i) } else { i % 5 };
                             *bin.g_folded.get_unchecked_mut(fold) += *sorted_grad.get_unchecked(i);
                             *bin.h_folded.get_unchecked_mut(fold) += *sorted_hess.get_unchecked(i);
                             *bin.counts.get_unchecked_mut(fold) += 1;
@@ -128,7 +146,7 @@ impl<'a> FeatureHistogram<'a> {
                             let i = *index.get_unchecked(k);
                             let b = self.data.get_unchecked(*feature.get_unchecked(i) as usize).get();
                             let bin = b.as_mut().unwrap_unchecked();
-                            let fold = i % 5;
+                            let fold = if use_randomized_folds { histogram_fold(i) } else { i % 5 };
                             *bin.g_folded.get_unchecked_mut(fold) += *sorted_grad.get_unchecked(i);
                             *bin.counts.get_unchecked_mut(fold) += 1;
                         }
@@ -192,7 +210,8 @@ impl<'a> FeatureHistogram<'a> {
                             }
                             let i = *index.get_unchecked(k);
                             let bin_idx = *feature.get_unchecked(i) as usize;
-                            let slot = bin_idx * 5 + (i % 5);
+                            let fold = if use_randomized_folds { histogram_fold(i) } else { i % 5 };
+                            let slot = bin_idx * 5 + fold;
                             *flat_grad.get_unchecked_mut(slot) += *sorted_grad.get_unchecked(i);
                             *flat_hess.get_unchecked_mut(slot) += *sorted_hess.get_unchecked(i);
                             *flat_counts.get_unchecked_mut(slot) += 1;
@@ -203,7 +222,8 @@ impl<'a> FeatureHistogram<'a> {
                         for k in 0..index.len() {
                             let i = *index.get_unchecked(k);
                             let bin_idx = *feature.get_unchecked(i) as usize;
-                            let slot = bin_idx * 5 + (i % 5);
+                            let fold = if use_randomized_folds { histogram_fold(i) } else { i % 5 };
+                            let slot = bin_idx * 5 + fold;
                             *flat_grad.get_unchecked_mut(slot) += *sorted_grad.get_unchecked(i);
                             *flat_hess.get_unchecked_mut(slot) += *sorted_hess.get_unchecked(i);
                             *flat_counts.get_unchecked_mut(slot) += 1;
@@ -240,7 +260,8 @@ impl<'a> FeatureHistogram<'a> {
                             }
                             let i = *index.get_unchecked(k);
                             let bin_idx = *feature.get_unchecked(i) as usize;
-                            let slot = bin_idx * 5 + (i % 5);
+                            let fold = if use_randomized_folds { histogram_fold(i) } else { i % 5 };
+                            let slot = bin_idx * 5 + fold;
                             *flat_grad.get_unchecked_mut(slot) += *sorted_grad.get_unchecked(i);
                             *flat_counts.get_unchecked_mut(slot) += 1;
                         }
@@ -250,7 +271,8 @@ impl<'a> FeatureHistogram<'a> {
                         for k in 0..index.len() {
                             let i = *index.get_unchecked(k);
                             let bin_idx = *feature.get_unchecked(i) as usize;
-                            let slot = bin_idx * 5 + (i % 5);
+                            let fold = if use_randomized_folds { histogram_fold(i) } else { i % 5 };
+                            let slot = bin_idx * 5 + fold;
                             *flat_grad.get_unchecked_mut(slot) += *sorted_grad.get_unchecked(i);
                             *flat_counts.get_unchecked_mut(slot) += 1;
                         }
@@ -591,6 +613,7 @@ pub fn update_histogram(
     hess: Option<&[f32]>,
     index: &[usize],
     col_index: &[usize],
+    use_randomized_folds: bool,
     pool: &ThreadPool,
     _sort: bool,
 ) {
@@ -609,16 +632,26 @@ pub fn update_histogram(
                 for (i, &col) in col_index.iter().enumerate().take(hist.data.len()) {
                     let h = hist.data.get_unchecked(i);
                     let feature = data.get_col(col); // Use the value 'col' directly
-                    s.spawn(|_| {
-                        h.update(feature, sorted_grad, sorted_hess, &index[start..stop]);
+                    s.spawn(move |_| {
+                        h.update(
+                            feature,
+                            sorted_grad,
+                            sorted_hess,
+                            &index[start..stop],
+                            use_randomized_folds,
+                        );
                     });
                 }
             });
         } else {
             col_index.iter().enumerate().for_each(|(i, col)| {
-                hist.data
-                    .get_unchecked(i)
-                    .update(data.get_col(*col), sorted_grad, sorted_hess, &index[start..stop]);
+                hist.data.get_unchecked(i).update(
+                    data.get_col(*col),
+                    sorted_grad,
+                    sorted_hess,
+                    &index[start..stop],
+                    use_randomized_folds,
+                );
             });
         }
     }
@@ -649,6 +682,7 @@ pub fn update_histogram_and_subtract(
     hess: Option<&[f32]>,
     index: &[usize],
     col_index: &[usize],
+    use_randomized_folds: bool,
     pool: &ThreadPool,
 ) {
     let sorted_grad = grad;
@@ -669,7 +703,13 @@ pub fn update_histogram_and_subtract(
                     let feature = data.get_col(col);
                     s.spawn(move |_| {
                         // Step 1: Build child histogram
-                        ch.update(feature, sorted_grad, sorted_hess, &index[start..stop]);
+                        ch.update(
+                            feature,
+                            sorted_grad,
+                            sorted_hess,
+                            &index[start..stop],
+                            use_randomized_folds,
+                        );
                         // Step 2: Derive sibling histogram via subtraction
                         // (cache-local: child histogram data is still hot in L1)
                         ph.data.iter().zip(ch.data.iter()).zip(uh.data.iter()).for_each(
@@ -688,6 +728,7 @@ pub fn update_histogram_and_subtract(
                     sorted_grad,
                     sorted_hess,
                     &index[start..stop],
+                    use_randomized_folds,
                 );
             });
             NodeHistogram::from_parent_child(hist_tree, parent_num, child_num, update_num);
@@ -717,6 +758,7 @@ pub fn update_two_histograms_and_subtract(
     hess: Option<&[f32]>,
     index: &[usize],
     col_index: &[usize],
+    use_randomized_folds: bool,
     pool: &ThreadPool,
 ) {
     let sorted_grad = grad;
@@ -739,8 +781,20 @@ pub fn update_two_histograms_and_subtract(
                     let feature = data.get_col(col);
                     s.spawn(move |_| {
                         // Build both children's histograms
-                        fh.update(feature, sorted_grad, sorted_hess, &index[first_start..first_stop]);
-                        sh.update(feature, sorted_grad, sorted_hess, &index[second_start..second_stop]);
+                        fh.update(
+                            feature,
+                            sorted_grad,
+                            sorted_hess,
+                            &index[first_start..first_stop],
+                            use_randomized_folds,
+                        );
+                        sh.update(
+                            feature,
+                            sorted_grad,
+                            sorted_hess,
+                            &index[second_start..second_stop],
+                            use_randomized_folds,
+                        );
                         // Derive largest child via: update = parent - first - second
                         ph.data
                             .iter()
@@ -761,12 +815,14 @@ pub fn update_two_histograms_and_subtract(
                     sorted_grad,
                     sorted_hess,
                     &index[first_start..first_stop],
+                    use_randomized_folds,
                 );
                 second_hist.data.get_unchecked(i).update(
                     data.get_col(*col),
                     sorted_grad,
                     sorted_hess,
                     &index[second_start..second_stop],
+                    use_randomized_folds,
                 );
             });
             NodeHistogram::from_parent_two_children(hist_tree, parent_num, first_num, second_num, update_num);
@@ -790,6 +846,21 @@ mod tests {
     use std::fs;
 
     #[test]
+    fn test_histogram_fold_breaks_row_order_pattern() {
+        let folds: Vec<usize> = (0..256).map(super::histogram_fold).collect();
+        let unique: std::collections::HashSet<usize> = folds.iter().copied().collect();
+        assert_eq!(unique.len(), 5);
+        assert!(folds.iter().enumerate().any(|(row, &fold)| fold != row % 5));
+
+        let mut counts = [0usize; 5];
+        for fold in folds {
+            counts[fold] += 1;
+        }
+        let min_count = counts.iter().min().copied().unwrap();
+        assert!(min_count >= 24);
+    }
+
+    #[test]
     fn test_simple_histogram() {
         // instantiate objective function
         let objective_function = Objective::LogLoss;
@@ -811,7 +882,7 @@ mod tests {
         let col = 0;
         let mut hist_feat_owned = FeatureHistogramOwned::empty_from_cuts(b.cuts.get_col(col), false);
         let hist_feat = FeatureHistogram::new(&mut hist_feat_owned.data);
-        unsafe { hist_feat.update(bdata.get_col(col), &g, h.as_deref(), &bdata.index) };
+        unsafe { hist_feat.update(bdata.get_col(col), &g, h.as_deref(), &bdata.index, false) };
 
         let mut f = bdata.get_col(col).to_owned();
 
@@ -875,7 +946,7 @@ mod tests {
                 .data
                 .get_mut(col)
                 .unwrap()
-                .update(bdata.get_col(col), &g, h.as_deref(), &bdata.index)
+                .update(bdata.get_col(col), &g, h.as_deref(), &bdata.index, false)
         };
 
         let mut f = bdata.get_col(col).to_owned();
@@ -945,6 +1016,7 @@ mod tests {
             h.as_deref(),
             &bdata.index,
             &col_index,
+            true,
             &pool,
             false,
         );
@@ -1008,6 +1080,7 @@ mod tests {
             h.as_deref(),
             &bdata.index,
             &col_index,
+            true,
             &pool1,
             false,
         );
@@ -1020,6 +1093,7 @@ mod tests {
             h.as_deref(),
             &bdata.index,
             &col_index,
+            true,
             &pool2,
             false,
         );
@@ -1109,6 +1183,7 @@ mod tests {
             h.as_deref(),
             &bdata.index,
             &col_index,
+            false,
             &ThreadPoolBuilder::new().build().unwrap(),
             false,
         );
@@ -1133,6 +1208,7 @@ mod tests {
             h.as_deref(),
             &bdata.index,
             &col_index,
+            false,
             &pool,
         );
 

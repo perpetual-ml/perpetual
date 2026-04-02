@@ -42,6 +42,7 @@ impl Sampler for RandomSampler {
                 excluded.push(*i)
             }
         }
+
         (chosen, excluded)
     }
 }

@@ -11,7 +11,6 @@ import optuna
 import pandas as pd
 import requests
 from catboost import CatBoostClassifier, CatBoostRegressor
-from perpetual import PerpetualBooster
 from sklearn.datasets import fetch_openml
 from sklearn.metrics import log_loss, mean_squared_error, roc_auc_score
 from sklearn.model_selection import KFold, StratifiedKFold, train_test_split
@@ -79,6 +78,62 @@ HR_Analytics_Job_Change_of_Data_Scientists       binary  roc_auc PB (tuned)     
                               NATICUSdroid       binary  roc_auc PB (tuned)      0.014906   9.0             18
           in_vehicle_coupon_recommendation       binary  roc_auc PB (tuned)      0.166644   9.0             18
                                Bioresponse       binary  roc_auc PB (tuned)      0.123246   2.0             17
+
+PerpetualBooster 3.0.0rc1 results (tuned):
+
+dataset,method,pb_metric_error,pb_rank,n_methods_compared,tid,did,task_type,problem_type,target_feature,NumberOfClasses,NumberOfFeatures,NumberOfInstances
+Another-Dataset-on-used-Fiat-500,PB (tuned),719.7110393314281,1.0,18,363615,46907,Supervised Regression,regression,price,0.0,8.0,1538.0
+Bioresponse,PB (tuned),0.1221640488656196,1.0,18,363620,46912,Supervised Classification,binary,MoleculeElicitsResponse,2.0,1777.0,3751.0
+Marketing_Campaign,PB (tuned),0.07171086180520136,1.0,18,363684,46940,Supervised Classification,binary,Response,2.0,26.0,2240.0
+healthcare_insurance_expenses,PB (tuned),4186.912613037499,1.0,18,363675,46931,Supervised Regression,regression,charges,0.0,7.0,1338.0
+splice,PB (tuned),0.10279068474808135,2.0,18,363702,46958,Supervised Classification,multiclass,SiteType,3.0,61.0,3190.0
+taiwanese_bankruptcy_prediction,PB (tuned),0.051936488169364914,3.0,18,363706,46962,Supervised Classification,binary,Bankrupt,2.0,95.0,6819.0
+churn,PB (tuned),0.07280673702163953,4.0,18,363623,46915,Supervised Classification,binary,CustomerChurned,2.0,20.0,5000.0
+E-CommereShippingData,PB (tuned),0.25774848488219604,5.0,18,363632,46924,Supervised Classification,binary,ArrivedLate,2.0,11.0,10999.0
+jm1,PB (tuned),0.24378392741904875,5.0,18,363712,46979,Supervised Classification,binary,defects,2.0,22.0,10885.0
+Bank_Customer_Churn,PB (tuned),0.13038893465243284,6.0,18,363619,46911,Supervised Classification,binary,churn,2.0,11.0,10000.0
+polish_companies_bankruptcy,PB (tuned),0.03585059978189742,6.0,18,363694,46950,Supervised Classification,binary,company_bankrupt,2.0,65.0,5910.0
+in_vehicle_coupon_recommendation,PB (tuned),0.16609287882768498,8.0,18,363681,46937,Supervised Classification,binary,AcceptCoupon,2.0,25.0,12684.0
+Food_Delivery_Time,PB (tuned),7.531697842070671,10.0,18,363672,46928,Supervised Regression,regression,Time_taken(min),0.0,10.0,45451.0
+houses,PB (tuned),0.2189612400514908,10.0,18,363678,46934,Supervised Regression,regression,LnMedianHouseValue,0.0,9.0,20640.0
+customer_satisfaction_in_airline,PB (tuned),0.006049132292364923,11.0,18,363628,46920,Supervised Classification,binary,satisfaction,2.0,22.0,129880.0
+diamonds,PB (tuned),540.1534852944271,11.0,18,363631,46923,Supervised Regression,regression,price,0.0,10.0,53940.0
+superconductivity,PB (tuned),9.553816255683303,11.0,18,363705,46961,Supervised Regression,regression,critical_temp,0.0,82.0,21263.0
+wine_quality,PB (tuned),0.6227992745117511,12.0,18,363708,46964,Supervised Regression,regression,median_wine_quality,0.0,13.0,6497.0
+anneal,PB (tuned),0.035889218714893645,13.0,18,363614,46906,Supervised Classification,multiclass,classes,5.0,39.0,898.0
+miami_housing,PB (tuned),87784.37215632183,13.0,18,363686,46942,Supervised Regression,regression,SALE_PRC,0.0,16.0,13776.0
+NATICUSdroid,PB (tuned),0.01707047293553332,14.0,18,363689,46969,Supervised Classification,binary,Malware,2.0,87.0,7491.0
+SDSS17,PB (tuned),0.08762948766631677,14.0,18,363699,46955,Supervised Classification,multiclass,ObjectType,3.0,12.0,78053.0
+coil2000_insurance_policies,PB (tuned),0.2558389753582997,14.0,18,363624,46916,Supervised Classification,binary,MobileHomePolicy,2.0,86.0,9822.0
+hazelnut-spread-contaminant-detection,PB (tuned),0.027149999999999896,14.0,18,363674,46930,Supervised Classification,binary,Contaminated,2.0,31.0,2400.0
+maternal_health_risk,PB (tuned),0.5294716401552494,14.0,18,363685,46941,Supervised Classification,multiclass,RiskLevel,3.0,7.0,1014.0
+physiochemical_protein,PB (tuned),3.5898867185082426,14.0,18,363693,46949,Supervised Regression,regression,ResidualSize,0.0,10.0,45730.0
+HR_Analytics_Job_Change_of_Data_Scientists,PB (tuned),0.20224224218715603,15.0,18,363679,46935,Supervised Classification,binary,LookingForJobChange,2.0,13.0,19158.0
+MIC,PB (tuned),0.4785837728960037,15.0,18,363711,46980,Supervised Classification,multiclass,LET_IS,8.0,112.0,1699.0
+bank-marketing,PB (tuned),0.24631949598167324,15.0,18,363618,46910,Supervised Classification,binary,SubscribeTermDeposit,2.0,14.0,45211.0
+credit_card_clients_default,PB (tuned),0.2218481497941378,15.0,18,363627,46919,Supervised Classification,binary,DefaultOnPaymentNextMonth,2.0,24.0,30000.0
+Fitness_Club,PB (tuned),0.19390880217785844,16.0,18,363671,46927,Supervised Classification,binary,attended,2.0,7.0,1500.0
+GiveMeSomeCredit,PB (tuned),0.15410723943371973,16.0,18,363673,46929,Supervised Classification,binary,FinancialDistressNextTwoYears,2.0,11.0,150000.0
+QSAR-TID-11,PB (tuned),0.8578547523515985,16.0,18,363697,46953,Supervised Regression,regression,MEDIAN_PXC50,0.0,1025.0,5742.0
+airfoil_self_noise,PB (tuned),1.9171906454706062,16.0,18,363612,46904,Supervised Regression,regression,scaled-sound-pressure,0.0,6.0,1503.0
+concrete_compressive_strength,PB (tuned),5.364084848050503,16.0,18,363625,46917,Supervised Regression,regression,ConcreteCompressiveStrength,0.0,9.0,1030.0
+credit-g,PB (tuned),0.22303418803418795,16.0,18,363626,46918,Supervised Classification,binary,good_or_bad_customer,2.0,21.0,1000.0
+online_shoppers_intention,PB (tuned),0.07809676917116559,16.0,18,363691,46947,Supervised Classification,binary,Revenue,2.0,18.0,12330.0
+website_phishing,PB (tuned),0.2911696798264711,16.0,18,363707,46963,Supervised Classification,multiclass,WebsiteType,3.0,10.0,1353.0
+Amazon_employee_access,PB (tuned),0.1807549825397392,17.0,18,363613,46905,Supervised Classification,binary,ResourceApproved,2.0,10.0,32769.0
+Is-this-a-good-customer,PB (tuned),0.28269929154015594,17.0,18,363682,46938,Supervised Classification,binary,bad_client_target,2.0,14.0,1723.0
+QSAR_fish_toxicity,PB (tuned),0.9265520335204859,17.0,18,363698,46954,Supervised Regression,regression,LC50,0.0,7.0,907.0
+hiva_agnostic,PB (tuned),0.3285674240514629,17.0,18,363677,46933,Supervised Classification,multiclass,CompoundActivity,3.0,1618.0,3845.0
+seismic-bumps,PB (tuned),0.24282445243543638,17.0,18,363700,46956,Supervised Classification,binary,HighEnergySeismicBump,2.0,16.0,2584.0
+APSFailure,PB (tuned),0.021148312367939903,18.0,18,363616,46908,Supervised Classification,binary,AirPressureSystemFailure,2.0,171.0,76000.0
+Diabetes130US,PB (tuned),0.3803649352985119,18.0,18,363630,46922,Supervised Classification,binary,EarlyReadmission,2.0,48.0,71518.0
+blood-transfusion-service-center,PB (tuned),0.35298245614035084,18.0,18,363621,46913,Supervised Classification,binary,DonatedBloodInMarch2007,2.0,5.0,748.0
+diabetes,PB (tuned),0.1771419009370816,18.0,18,363629,46921,Supervised Classification,binary,TestedPositiveForDiabetes,2.0,9.0,768.0
+heloc,PB (tuned),0.21382097206932238,18.0,18,363676,46932,Supervised Classification,binary,RiskPerformance,2.0,24.0,10459.0
+kddcup09_appetency,PB (tuned),0.2647601035811177,18.0,18,363683,46939,Supervised Classification,binary,appetency,2.0,213.0,50000.0
+qsar-biodeg,PB (tuned),0.09030908500739354,18.0,18,363696,46952,Supervised Classification,binary,Biodegradable,2.0,42.0,1054.0
+students_dropout_and_academic_success,PB (tuned),0.9426793317606776,18.0,18,363704,46960,Supervised Classification,multiclass,AcademicOutcome,3.0,37.0,4424.0
+
 """
 
 
@@ -88,6 +143,46 @@ HR_Analytics_Job_Change_of_Data_Scientists       binary  roc_auc PB (tuned)     
 # TASK_IDS = [46913, 46921, 46906, 46954, 46918]
 # All 11 datasets
 TASK_IDS = [46913, 46921, 46906, 46954, 46918, 46955, 46920, 46929, 46980, 46956, 46962]
+WEAKEST_RC1_TASK_IDS = [
+    46960,
+    46922,
+    46913,
+    46939,
+    46932,
+    46952,
+    46908,
+    46954,
+    46933,
+    46938,
+]
+
+PERPETUAL_BOOSTER_CLS = None
+
+TABARENA_REFERENCE_RANKS = {
+    46913: {
+        "dataset": "blood-transfusion-service-center",
+        "v2_rank": 17.0,
+        "v3_rank": 18.0,
+    },
+    46921: {"dataset": "diabetes", "v2_rank": 17.0, "v3_rank": 18.0},
+    46906: {"dataset": "anneal", "v2_rank": 17.0, "v3_rank": 13.0},
+    46954: {"dataset": "QSAR_fish_toxicity", "v2_rank": 15.0, "v3_rank": 17.0},
+    46918: {"dataset": "credit-g", "v2_rank": 14.0, "v3_rank": 16.0},
+    46955: {"dataset": "SDSS17", "v2_rank": 15.0, "v3_rank": 14.0},
+    46920: {
+        "dataset": "customer_satisfaction_in_airline",
+        "v2_rank": 11.0,
+        "v3_rank": 11.0,
+    },
+    46929: {"dataset": "GiveMeSomeCredit", "v2_rank": 14.0, "v3_rank": 16.0},
+    46980: {"dataset": "MIC", "v2_rank": 18.0, "v3_rank": 15.0},
+    46956: {"dataset": "seismic-bumps", "v2_rank": 18.0, "v3_rank": 17.0},
+    46962: {
+        "dataset": "taiwanese_bankruptcy_prediction",
+        "v2_rank": 18.0,
+        "v3_rank": 3.0,
+    },
+}
 
 cb_iterations = 100
 n_trials = 100
@@ -195,6 +290,70 @@ def evaluate_predictions(task_type, y_true, y_pred):
     return mean_squared_error(y_true, y_pred)
 
 
+def parse_task_ids(raw_task_ids):
+    if not raw_task_ids:
+        return TASK_IDS
+    if raw_task_ids == "weakest-rc1-10":
+        return WEAKEST_RC1_TASK_IDS
+    return [
+        int(task_id.strip()) for task_id in raw_task_ids.split(",") if task_id.strip()
+    ]
+
+
+def get_perpetual_booster_cls():
+    global PERPETUAL_BOOSTER_CLS
+    if PERPETUAL_BOOSTER_CLS is None:
+        from perpetual import PerpetualBooster
+
+        PERPETUAL_BOOSTER_CLS = PerpetualBooster
+    return PERPETUAL_BOOSTER_CLS
+
+
+def metric_higher_is_better(task_type):
+    return task_type == "binary"
+
+
+def count_perpetual_wins(task_type, pb_scores, cb_scores):
+    if metric_higher_is_better(task_type):
+        return sum(
+            pb_score > cb_score for pb_score, cb_score in zip(pb_scores, cb_scores)
+        )
+    return sum(pb_score < cb_score for pb_score, cb_score in zip(pb_scores, cb_scores))
+
+
+def summarize_task_result(result):
+    task_type = result.get("task_type")
+    reference = TABARENA_REFERENCE_RANKS.get(result["data_id"], {})
+    higher_is_better = metric_higher_is_better(task_type) if task_type else None
+    catboost_mean = np.mean(result["CatBoost"]) if "CatBoost" in result else np.nan
+    pb_mean = np.mean(result["PB_test"]) if "PB_test" in result else np.nan
+    wins = None
+    pb_advantage = None
+    if "CatBoost" in result and "PB_test" in result and task_type is not None:
+        wins = count_perpetual_wins(task_type, result["PB_test"], result["CatBoost"])
+        pb_advantage = (
+            pb_mean - catboost_mean if higher_is_better else catboost_mean - pb_mean
+        )
+
+    return {
+        "task_id": result["data_id"],
+        "dataset": reference.get("dataset"),
+        "task_type": task_type,
+        "catboost_mean": catboost_mean,
+        "pb_mean": pb_mean,
+        "pb_advantage": pb_advantage,
+        "pb_wins": wins,
+        "seed_count": len(result.get("PB_test", result.get("CatBoost", []))),
+        "reference_v2_rank": reference.get("v2_rank"),
+        "reference_v3_rank": reference.get("v3_rank"),
+        "reference_rank_delta": (
+            None
+            if "v2_rank" not in reference or "v3_rank" not in reference
+            else reference["v2_rank"] - reference["v3_rank"]
+        ),
+    }
+
+
 def predict_for_metric(model, X_data, task_type):
     if task_type == "binary":
         return model.predict_proba(X_data)[:, 1]
@@ -203,7 +362,21 @@ def predict_for_metric(model, X_data, task_type):
     return model.predict(X_data)
 
 
+def prepare_catboost_frame(X_data):
+    X_catboost = X_data.copy()
+    cat_features = X_catboost.select_dtypes(
+        include=["object", "category"]
+    ).columns.tolist()
+
+    for feature in cat_features:
+        values = X_catboost[feature].astype("object")
+        X_catboost[feature] = values.where(values.notna(), "__nan__").astype(str)
+
+    return X_catboost, cat_features
+
+
 def objective_catboost(trial, X_train, y_train, task_type, seed):
+    X_train_cb, cat_features = prepare_catboost_frame(X_train)
     params = {
         "iterations": cb_iterations,
         "learning_rate": trial.suggest_float("learning_rate", 0.001, 0.5, log=True),
@@ -218,16 +391,11 @@ def objective_catboost(trial, X_train, y_train, task_type, seed):
         "allow_writing_files": False,
     }
 
-    # Identify cat features
-    cat_features = X_train.select_dtypes(
-        include=["object", "category"]
-    ).columns.tolist()
-
     cv = build_cv(task_type, seed)
 
     scores = []
-    for train_idx, val_idx in cv.split(X_train, y_train):
-        X_tr, X_val = X_train.iloc[train_idx], X_train.iloc[val_idx]
+    for train_idx, val_idx in cv.split(X_train_cb, y_train):
+        X_tr, X_val = X_train_cb.iloc[train_idx], X_train_cb.iloc[val_idx]
         y_tr, y_val = y_train.iloc[train_idx], y_train.iloc[val_idx]
 
         if task_type in {"binary", "multiclass"}:
@@ -253,6 +421,8 @@ def objective_catboost(trial, X_train, y_train, task_type, seed):
 def run_catboost(X_train, y_train, X_test, y_test, task_type, seed):
     start_cpu = process_time()
     start_wall = time()
+    X_train_cb, cat_features = prepare_catboost_frame(X_train)
+    X_test_cb, _ = prepare_catboost_frame(X_test)
 
     if use_optuna:
         sampler = optuna.samplers.TPESampler(seed=seed)
@@ -260,7 +430,7 @@ def run_catboost(X_train, y_train, X_test, y_test, task_type, seed):
 
         obj = partial(
             objective_catboost,
-            X_train=X_train,
+            X_train=X_train_cb,
             y_train=y_train,
             task_type=task_type,
             seed=seed,
@@ -279,12 +449,9 @@ def run_catboost(X_train, y_train, X_test, y_test, task_type, seed):
     cv = build_cv(task_type, seed)
 
     ensemble_preds = []
-    cat_features = X_train.select_dtypes(
-        include=["object", "category"]
-    ).columns.tolist()
 
-    for train_idx, val_idx in cv.split(X_train, y_train):
-        X_tr, y_tr = X_train.iloc[train_idx], y_train.iloc[train_idx]
+    for train_idx, val_idx in cv.split(X_train_cb, y_train):
+        X_tr, y_tr = X_train_cb.iloc[train_idx], y_train.iloc[train_idx]
         if task_type in {"binary", "multiclass"}:
             model = CatBoostClassifier(**best_params)
         else:
@@ -292,7 +459,7 @@ def run_catboost(X_train, y_train, X_test, y_test, task_type, seed):
 
         model.fit(X_tr, y_tr, cat_features=cat_features)
 
-        ensemble_preds.append(predict_for_metric(model, X_test, task_type))
+        ensemble_preds.append(predict_for_metric(model, X_test_cb, task_type))
 
     y_pred = np.mean(ensemble_preds, axis=0)
     stop_cpu = process_time()
@@ -311,14 +478,25 @@ def run_catboost(X_train, y_train, X_test, y_test, task_type, seed):
     }
 
 
-def run_perpetual(X_train, y_train, X_test, y_test, task_type, seed):
+def run_perpetual(
+    X_train,
+    y_train,
+    X_test,
+    y_test,
+    task_type,
+    seed,
+    budget,
+    stopping_rounds=None,
+    iteration_limit=None,
+):
     objective = "LogLoss" if task_type in {"binary", "multiclass"} else "SquaredLoss"
-    model = PerpetualBooster(
+    model = get_perpetual_booster_cls()(
         objective=objective,
-        budget=PERPETUAL_BUDGET,
+        budget=budget,
         max_cat=1000,
         seed=seed,
-        iteration_limit=10000,
+        stopping_rounds=stopping_rounds,
+        iteration_limit=iteration_limit,
     )
 
     start_cpu = process_time()
@@ -331,6 +509,16 @@ def run_perpetual(X_train, y_train, X_test, y_test, task_type, seed):
     metric = evaluate_predictions(task_type, y_test, y_pred)
 
     return metric, stop_cpu - start_cpu, stop_wall - start_wall
+
+
+def persist_catboost_results(rows, path):
+    if path is None or not rows:
+        return
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    pd.DataFrame(rows).drop_duplicates(subset=["task_id", "seed"], keep="last").to_csv(
+        path, index=False
+    )
 
 
 if __name__ == "__main__":
@@ -370,6 +558,40 @@ if __name__ == "__main__":
             "catboost_results.csv when --catboost-only is used. When used with --skip-catboost, reads results from this file to compare."
         ),
     )
+    parser.add_argument(
+        "--budget",
+        type=float,
+        default=PERPETUAL_BUDGET,
+        help="PerpetualBooster fixed benchmark budget",
+    )
+    parser.add_argument(
+        "--task-ids",
+        default=None,
+        help="Comma-separated OpenML task IDs to run, or 'weakest-rc1-10'. Defaults to the built-in 11-task subset.",
+    )
+    parser.add_argument(
+        "--seed-count",
+        type=int,
+        default=5,
+        help="Number of random seeds to evaluate per task",
+    )
+    parser.add_argument(
+        "--perpetual-stopping-rounds",
+        type=int,
+        default=None,
+        help="Optional explicit stopping_rounds override for PerpetualBooster",
+    )
+    parser.add_argument(
+        "--perpetual-iteration-limit",
+        type=int,
+        default=None,
+        help="Optional explicit iteration_limit override for PerpetualBooster",
+    )
+    parser.add_argument(
+        "--summary-path",
+        default=None,
+        help="Optional CSV path for the aggregated benchmark summary",
+    )
     args = parser.parse_args()
 
     # Initialize execution flags with default values.
@@ -383,6 +605,17 @@ if __name__ == "__main__":
     if args.no_optuna:
         use_optuna = False
         print("Optuna optimization skipped. Using default CatBoost parameters.")
+
+    PERPETUAL_BUDGET = args.budget
+    task_ids = parse_task_ids(args.task_ids)
+    seed_count = max(args.seed_count, 1)
+
+    print(
+        f"Benchmark config: tasks={task_ids}, seeds={seed_count}, "
+        f"pb_budget={PERPETUAL_BUDGET:.2f}, "
+        f"pb_stopping_rounds={args.perpetual_stopping_rounds}, "
+        f"pb_iteration_limit={args.perpetual_iteration_limit}"
+    )
 
     if args.skip_catboost:
         skip_catboost = True
@@ -404,8 +637,9 @@ if __name__ == "__main__":
     catboost_saved_rows = []
 
     loaded_catboost_results = {}
-    if skip_catboost and catboost_results_path and catboost_results_path.exists():
+    if catboost_results_path and catboost_results_path.exists():
         cb_df = pd.read_csv(catboost_results_path)
+        catboost_saved_rows = cb_df.to_dict("records")
         for _, row in cb_df.iterrows():
             loaded_catboost_results[(int(row["task_id"]), int(row["seed"]))] = row[
                 "metric"
@@ -413,12 +647,14 @@ if __name__ == "__main__":
 
     all_results = []
 
-    for data_id in TASK_IDS:
+    summary_path = Path(args.summary_path) if args.summary_path else None
+
+    for data_id in task_ids:
         print(f"\nEvaluating Task ID: {data_id}")
         task_results = {"data_id": data_id}
 
         # Methodology: 5 seeds
-        seeds = range(5)
+        seeds = range(seed_count)
 
         for seed in seeds:
             try:
@@ -431,9 +667,18 @@ if __name__ == "__main__":
                     scoring,
                     metric_function,
                 ) = prepare_data(data_id, seed)
+                task_results["task_type"] = task_type
 
                 # CatBoost
-                if not skip_catboost:
+                if not skip_catboost and (data_id, seed) in loaded_catboost_results:
+                    cb_metric = loaded_catboost_results[(data_id, seed)]
+                    print(
+                        f"Seed {seed} - CatBoost: reusing saved result {cb_metric:.4f}"
+                    )
+                    if "CatBoost" not in task_results:
+                        task_results["CatBoost"] = []
+                    task_results["CatBoost"].append(cb_metric)
+                elif not skip_catboost:
                     cb_result = run_catboost(
                         X_train, y_train, X_test, y_test, task_type, seed
                     )
@@ -463,6 +708,9 @@ if __name__ == "__main__":
                                 ),
                             }
                         )
+                        persist_catboost_results(
+                            catboost_saved_rows, catboost_results_path
+                        )
                 elif skip_catboost and (data_id, seed) in loaded_catboost_results:
                     cb_metric = loaded_catboost_results[(data_id, seed)]
                     if "CatBoost" not in task_results:
@@ -472,7 +720,15 @@ if __name__ == "__main__":
                 # PerpetualBooster fixed-budget benchmark run.
                 if not skip_perpetual:
                     pb_metric, pb_cpu, pb_wall = run_perpetual(
-                        X_train, y_train, X_test, y_test, task_type, seed
+                        X_train,
+                        y_train,
+                        X_test,
+                        y_test,
+                        task_type,
+                        seed,
+                        PERPETUAL_BUDGET,
+                        stopping_rounds=args.perpetual_stopping_rounds,
+                        iteration_limit=args.perpetual_iteration_limit,
                     )
                     print(
                         "Seed "
@@ -497,9 +753,12 @@ if __name__ == "__main__":
 
     # Print final summary table
     print("\n" + "=" * 50)
-    print("FINAL SUMMARY (Averaged over 5 seeds)")
+    print(f"FINAL SUMMARY (Averaged over {seed_count} seeds)")
     print("=" * 50)
+    summary_rows = []
     for res in all_results:
+        summary_row = summarize_task_result(res)
+        summary_rows.append(summary_row)
         summary = f"Dataset {res['data_id']}: "
         if "CatBoost" in res:
             summary += f"CatBoost={np.mean(res['CatBoost']):.4f}, "
@@ -507,17 +766,32 @@ if __name__ == "__main__":
         if "PB_test" in res:
             wins = None
             if "CatBoost" in res:
-                wins = sum(pb > cb for pb, cb in zip(res["PB_test"], res["CatBoost"]))
-            summary += f"PB(test)={np.mean(res['PB_test']):.4f}, PB(budget)=2.0"
+                wins = count_perpetual_wins(
+                    res["task_type"], res["PB_test"], res["CatBoost"]
+                )
+            summary += (
+                f"PB(test)={np.mean(res['PB_test']):.4f}, "
+                f"PB(budget)={PERPETUAL_BUDGET:.1f}"
+            )
             if wins is not None:
-                summary += f", PB wins={wins}/5"
+                summary += f", PB wins={wins}/{seed_count}"
+
+        if summary_row["reference_v3_rank"] is not None:
+            summary += (
+                ", rank v2->v3="
+                f"{summary_row['reference_v2_rank']:.0f}->{summary_row['reference_v3_rank']:.0f}"
+            )
 
         print(summary)
 
     if catboost_results_path is not None and catboost_saved_rows:
-        catboost_results_path.parent.mkdir(parents=True, exist_ok=True)
-        pd.DataFrame(catboost_saved_rows).to_csv(catboost_results_path, index=False)
+        persist_catboost_results(catboost_saved_rows, catboost_results_path)
         print(f"Saved CatBoost results to {catboost_results_path}")
+
+    if summary_path is not None:
+        summary_path.parent.mkdir(parents=True, exist_ok=True)
+        pd.DataFrame(summary_rows).to_csv(summary_path, index=False)
+        print(f"Saved benchmark summary to {summary_path}")
 
 """
 ==================================================

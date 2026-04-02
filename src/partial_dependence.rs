@@ -134,6 +134,7 @@ mod tests {
             false,
             &mut hist_tree,
             None,
+            false,
             &mut split_info_slice,
             n_nodes_alloc,
             false,
