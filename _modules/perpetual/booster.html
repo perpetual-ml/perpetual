@@ -5,7 +5,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>perpetual.booster &mdash; Perpetual 3.0.0-rc.1 documentation</title>
+  <title>perpetual.booster &mdash; Perpetual 3.0.0-rc.2 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../../_static/custom.css?v=9cdd1368" />
@@ -13,7 +13,7 @@
   
       <script src="../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../_static/documentation_options.js?v=844c15b5"></script>
+      <script src="../../_static/documentation_options.js?v=b3b49fdf"></script>
       <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
@@ -445,6 +445,22 @@
 <span class="sd">            Returns self.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
 
+        <span class="c1"># Detect task type from scikit-learn estimator type if present</span>
+        <span class="n">is_classification</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;_estimator_type&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">is_classification</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+            <span class="n">is_classification</span> <span class="o">=</span> <span class="n">is_classification</span> <span class="o">==</span> <span class="s2">&quot;classifier&quot;</span>
+
+        <span class="n">y_</span><span class="p">,</span> <span class="n">classes_</span> <span class="o">=</span> <span class="n">convert_input_array</span><span class="p">(</span>
+            <span class="n">y</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">objective</span><span class="p">,</span> <span class="n">is_target</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">is_classification</span><span class="o">=</span><span class="n">is_classification</span>
+        <span class="p">)</span>
+
+        <span class="n">target_task</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="k">if</span> <span class="n">y_</span><span class="o">.</span><span class="n">ndim</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">classes_</span><span class="p">)</span> <span class="o">==</span> <span class="mi">2</span><span class="p">:</span>
+                <span class="n">target_task</span> <span class="o">=</span> <span class="s2">&quot;binary&quot;</span>
+            <span class="k">elif</span> <span class="nb">len</span><span class="p">(</span><span class="n">classes_</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="n">target_task</span> <span class="o">=</span> <span class="s2">&quot;regression&quot;</span>
+
         <span class="c1"># Check if input is a Polars DataFrame for zero-copy columnar path</span>
         <span class="n">is_polars</span> <span class="o">=</span> <span class="n">type_df</span><span class="p">(</span><span class="n">X</span><span class="p">)</span> <span class="o">==</span> <span class="s2">&quot;polars_df&quot;</span>
 
@@ -458,7 +474,13 @@
                 <span class="n">cols</span><span class="p">,</span>
                 <span class="n">categorical_features_</span><span class="p">,</span>
                 <span class="n">cat_mapping</span><span class="p">,</span>
-            <span class="p">)</span> <span class="o">=</span> <span class="n">convert_input_frame_columnar</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">categorical_features</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">max_cat</span><span class="p">)</span>
+            <span class="p">)</span> <span class="o">=</span> <span class="n">convert_input_frame_columnar</span><span class="p">(</span>
+                <span class="n">X</span><span class="p">,</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">categorical_features</span><span class="p">,</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">max_cat</span><span class="p">,</span>
+                <span class="n">target_values</span><span class="o">=</span><span class="n">y_</span> <span class="k">if</span> <span class="n">target_task</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="kc">None</span><span class="p">,</span>
+                <span class="n">target_task</span><span class="o">=</span><span class="n">target_task</span><span class="p">,</span>
+            <span class="p">)</span>
         <span class="k">else</span><span class="p">:</span>
             <span class="c1"># Use existing flat path for pandas and numpy</span>
             <span class="p">(</span>
@@ -468,20 +490,17 @@
                 <span class="n">cols</span><span class="p">,</span>
                 <span class="n">categorical_features_</span><span class="p">,</span>
                 <span class="n">cat_mapping</span><span class="p">,</span>
-            <span class="p">)</span> <span class="o">=</span> <span class="n">convert_input_frame</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">categorical_features</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">max_cat</span><span class="p">)</span>
+            <span class="p">)</span> <span class="o">=</span> <span class="n">convert_input_frame</span><span class="p">(</span>
+                <span class="n">X</span><span class="p">,</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">categorical_features</span><span class="p">,</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">max_cat</span><span class="p">,</span>
+                <span class="n">target_values</span><span class="o">=</span><span class="n">y_</span> <span class="k">if</span> <span class="n">target_task</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="kc">None</span><span class="p">,</span>
+                <span class="n">target_task</span><span class="o">=</span><span class="n">target_task</span><span class="p">,</span>
+            <span class="p">)</span>
 
         <span class="bp">self</span><span class="o">.</span><span class="n">n_features_</span> <span class="o">=</span> <span class="n">cols</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">cat_mapping</span> <span class="o">=</span> <span class="n">cat_mapping</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">feature_names_in_</span> <span class="o">=</span> <span class="n">features_</span>
-
-        <span class="c1"># Detect task type from scikit-learn estimator type if present</span>
-        <span class="n">is_classification</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;_estimator_type&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
-        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">is_classification</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
-            <span class="n">is_classification</span> <span class="o">=</span> <span class="n">is_classification</span> <span class="o">==</span> <span class="s2">&quot;classifier&quot;</span>
-
-        <span class="n">y_</span><span class="p">,</span> <span class="n">classes_</span> <span class="o">=</span> <span class="n">convert_input_array</span><span class="p">(</span>
-            <span class="n">y</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">objective</span><span class="p">,</span> <span class="n">is_target</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">is_classification</span><span class="o">=</span><span class="n">is_classification</span>
-        <span class="p">)</span>
 
         <span class="bp">self</span><span class="o">.</span><span class="n">classes_</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">classes_</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_is_fitted</span> <span class="o">=</span> <span class="kc">True</span>
