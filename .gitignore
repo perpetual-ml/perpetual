@@ -61,6 +61,7 @@ package-r/inst/c/
 *.pyd
 *.pyd.old
 *.pyd.*
+*.pdb
 
 *.profraw
 
