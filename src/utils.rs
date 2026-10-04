@@ -29,7 +29,7 @@ pub fn fmt_vec_output<T: FloatData<T>>(v: &[T]) -> String {
             res.push_str(format!("{:.4}", n).as_str());
             res.push_str(", ");
         }
-        res.push_str(format!("{:.4}", &v[last]).as_str());
+        res.push_str(format!("{:.4}", v[last]).as_str());
     }
     res
 }
@@ -248,6 +248,7 @@ const LANES: usize = 16;
 /// than values.iter().copied().sum().
 /// Shamelessly stolen from https://stackoverflow.com/a/67191480
 #[inline]
+#[allow(clippy::chunks_exact_to_as_chunks)]
 pub fn fast_sum<T: FloatData<T>>(values: &[T]) -> T {
     let chunks = values.chunks_exact(LANES);
     let remainder = chunks.remainder();
@@ -274,6 +275,7 @@ pub fn fast_sum<T: FloatData<T>>(values: &[T]) -> T {
 /// This way, we can still work with f32 values, but get the correct sum
 /// value.
 #[inline]
+#[allow(clippy::chunks_exact_to_as_chunks)]
 pub fn fast_f64_sum(values: &[f32]) -> f32 {
     let chunks = values.chunks_exact(LANES);
     let remainder = chunks.remainder();

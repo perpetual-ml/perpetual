@@ -1,3 +1,4 @@
+#![allow(unused_features)]
 #![feature(array_ptr_get)]
 
 //! # Perpetual

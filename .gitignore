@@ -69,3 +69,12 @@ package-r/inst/c/
 
 # Temp folder
 tmp/
+
+# Debug symbols and build artifacts
+*.pdb
+
+# Benchmark and model directories
+AutogluonModels/
+autogluon/
+tabarena/
+/uv.lock

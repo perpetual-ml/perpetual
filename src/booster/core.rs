@@ -28,6 +28,46 @@ use std::mem;
 use std::time::Instant;
 use sysinfo::{MemoryRefreshKind, RefreshKind, System};
 
+pub(crate) fn get_available_memory() -> f32 {
+    let sys = System::new_with_specifics(RefreshKind::nothing().with_memory(MemoryRefreshKind::everything()));
+    #[allow(unused_mut)]
+    let mut mem_avail = match sys.cgroup_limits() {
+        Some(limits) => limits.free_memory as f32,
+        None => sys.available_memory() as f32,
+    };
+
+    #[cfg(target_os = "linux")]
+    {
+        // Try reading cgroup v2 memory limits
+        if let (Ok(max_str), Ok(cur_str)) = (
+            std::fs::read_to_string("/sys/fs/cgroup/memory.max"),
+            std::fs::read_to_string("/sys/fs/cgroup/memory.current"),
+        ) {
+            let max_trimmed = max_str.trim();
+            if max_trimmed != "max" {
+                if let (Ok(max_val), Ok(cur_val)) = (max_trimmed.parse::<u64>(), cur_str.trim().parse::<u64>()) {
+                    let cgroup_free = max_val.saturating_sub(cur_val) as f32;
+                    mem_avail = mem_avail.min(cgroup_free);
+                }
+            }
+        }
+        // Try reading cgroup v1 memory limits
+        if let (Ok(limit_str), Ok(usage_str)) = (
+            std::fs::read_to_string("/sys/fs/cgroup/memory/memory.limit_in_bytes"),
+            std::fs::read_to_string("/sys/fs/cgroup/memory/memory.usage_in_bytes"),
+        ) {
+            if let (Ok(limit_val), Ok(usage_val)) = (limit_str.trim().parse::<u64>(), usage_str.trim().parse::<u64>()) {
+                if limit_val < 1_000_000_000_000_000 {
+                    let cgroup_free = limit_val.saturating_sub(usage_val) as f32;
+                    mem_avail = mem_avail.min(cgroup_free);
+                }
+            }
+        }
+    }
+
+    mem_avail
+}
+
 type ImportanceFn = fn(&Tree, &mut HashMap<usize, (f32, usize)>);
 
 /// A self-generalizing Gradient Boosting Machine (GBM) with Perpetual Learning.
@@ -454,12 +494,7 @@ impl PerpetualBooster {
             + (data.rows * 4)
             + if is_const_hess { 0 } else { data.rows * 4 }) as f32;
 
-        let sys = System::new_with_specifics(RefreshKind::nothing().with_memory(MemoryRefreshKind::everything()));
-
-        let mem_available = match sys.cgroup_limits() {
-            Some(limits) => limits.free_memory as f32,
-            None => sys.available_memory() as f32,
-        };
+        let mem_available = get_available_memory();
 
         // Ensemble Memory Estimation (Average Case)
         let ensemble_node_size = (mem::size_of::<crate::node::Node>() as f32 * 1.3) // 1.3x for HashMap overhead
@@ -489,7 +524,7 @@ impl PerpetualBooster {
                 let actual_available = (mem_available - base_memory_bytes).max(0.0);
                 let n = (FREE_MEM_ALLOC_FACTOR * (actual_available / mem_hist)) as usize;
                 let data_rows_cap = (data.rows * 2).max(N_NODES_ALLOC_MIN);
-                n.min(data_rows_cap).clamp(N_NODES_ALLOC_MIN, N_NODES_ALLOC_MAX)
+                n.max(3).min(data_rows_cap).min(N_NODES_ALLOC_MAX)
             }
         };
         let mut hist_arena = if col_amount == col_index.len() {
@@ -783,12 +818,7 @@ impl PerpetualBooster {
             + (data.rows * 4)
             + if is_const_hess { 0 } else { data.rows * 4 }) as f32;
 
-        let sys = System::new_with_specifics(RefreshKind::nothing().with_memory(MemoryRefreshKind::everything()));
-
-        let mem_available = match sys.cgroup_limits() {
-            Some(limits) => limits.free_memory as f32,
-            None => sys.available_memory() as f32,
-        };
+        let mem_available = get_available_memory();
 
         // Ensemble Memory Estimation (Average Case)
         let ensemble_node_size = (mem::size_of::<crate::node::Node>() as f32 * 1.3) // 1.3x for HashMap overhead
@@ -818,7 +848,7 @@ impl PerpetualBooster {
                 let actual_available = (mem_available - base_memory_bytes).max(0.0);
                 let n = (FREE_MEM_ALLOC_FACTOR * (actual_available / mem_hist)) as usize;
                 let data_rows_cap = (data.rows * 2).max(N_NODES_ALLOC_MIN);
-                n.min(data_rows_cap).clamp(N_NODES_ALLOC_MIN, N_NODES_ALLOC_MAX)
+                n.max(3).min(data_rows_cap).min(N_NODES_ALLOC_MAX)
             }
         };
 

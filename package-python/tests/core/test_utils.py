@@ -78,3 +78,35 @@ def test_convert_input_frame_categorical_list_str():
         df, ["b"], 1000
     )
     assert cat_features == {1}
+
+
+def test_scipy_sparse_support():
+    import scipy.sparse as sp
+
+    # Test CSR and CSC matrices
+    csr = sp.csr_matrix([[1.0, 0.0, 2.0], [0.0, 3.0, 0.0]])
+    csc = sp.csc_matrix([[1.0, 0.0, 2.0], [0.0, 3.0, 0.0]])
+
+    assert type_df(csr) == "scipy_sparse"
+    assert type_df(csc) == "scipy_sparse"
+
+    # convert_input_frame
+    features, flat_data, rows, cols, cat_features, cat_mapping = convert_input_frame(
+        csr, None, 1000
+    )
+    assert rows == 2
+    assert cols == 3
+    assert len(features) == 3
+    assert np.allclose(flat_data, [1.0, 0.0, 0.0, 3.0, 2.0, 0.0])  # Fortran order
+
+    # transform_input_frame
+    features_t, flat_data_t, rows_t, cols_t = transform_input_frame(csc, {})
+    assert rows_t == 2
+    assert cols_t == 3
+    assert np.allclose(flat_data_t, [1.0, 0.0, 0.0, 3.0, 2.0, 0.0])
+
+    # convert_input_array
+    y_sparse = sp.csr_matrix([[0], [1], [0]])
+    y_conv, classes = convert_input_array(y_sparse, "LogLoss", is_target=True)
+    assert len(classes) == 2
+    assert y_conv.shape == (3,)

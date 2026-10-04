@@ -8,8 +8,20 @@ import numpy as np
 logger = logging.getLogger(__name__)
 
 
+def is_scipy_sparse(obj) -> bool:
+    """Return True if ``obj`` is a SciPy sparse matrix or array."""
+    try:
+        import scipy.sparse
+
+        return scipy.sparse.issparse(obj)
+    except ImportError:
+        return False
+
+
 def type_df(df):
-    """Return a string tag for the DataFrame library (``'pandas_df'``, ``'polars_df'``, ``'numpy'``, or ``''``)."""
+    """Return a string tag for the DataFrame library (``'pandas_df'``, ``'polars_df'``, ``'numpy'``, ``'scipy_sparse'``, or ``''``)."""
+    if is_scipy_sparse(df):
+        return "scipy_sparse"
     library_name = type(df).__module__.split(".")[0]
     if type(df).__name__ == "DataFrame":
         if library_name == "pandas":
@@ -48,7 +60,9 @@ def convert_input_array(
     """
     classes_ = []
 
-    if type(x).__module__.split(".")[0] == "numpy":
+    if is_scipy_sparse(x):
+        x_ = np.asarray(x.toarray()).squeeze()
+    elif type(x).__module__.split(".")[0] == "numpy":
         if len(x.shape) == 2:
             classes_, x_, *_ = convert_input_frame(x, None, 1000)
         else:
@@ -115,6 +129,13 @@ def convert_input_frame(
             ] or None
     elif type_df(X) == "numpy":
         X_ = X
+        features_ = list(map(str, range(X_.shape[1])))
+    elif type_df(X) == "scipy_sparse":
+        X_ = (
+            X.toarray(order="F")
+            if hasattr(X, "toarray")
+            else np.asarray(X.todense(order="F"))
+        )
         features_ = list(map(str, range(X_.shape[1])))
     else:
         raise ValueError(f"Object type {type(X)} is not supported.")
@@ -312,6 +333,13 @@ def transform_input_frame(X, cat_mapping) -> Tuple[List[str], np.ndarray, int, i
         features_ = X.columns.to_list()
     elif type_df(X) == "numpy":
         X_ = X
+        features_ = list(map(str, range(X_.shape[1])))
+    elif type_df(X) == "scipy_sparse":
+        X_ = (
+            X.toarray(order="F")
+            if hasattr(X, "toarray")
+            else np.asarray(X.todense(order="F"))
+        )
         features_ = list(map(str, range(X_.shape[1])))
     else:
         raise ValueError(f"Object type {type(X)} is not supported.")

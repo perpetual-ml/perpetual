@@ -24,6 +24,7 @@ from perpetual.utils import (
     convert_input_array,
     convert_input_frame,
     convert_input_frame_columnar,
+    is_scipy_sparse,
     transform_input_frame,
     transform_input_frame_columnar,
     type_df,
@@ -1536,7 +1537,7 @@ class PerpetualBooster:
         self,
         X,
     ) -> Dict[int, Any]:
-        if isinstance(X, np.ndarray):
+        if isinstance(X, np.ndarray) or is_scipy_sparse(X):
             return self.monotone_constraints
         else:
             feature_map = {f: i for i, f in enumerate(X.columns)}
@@ -1546,7 +1547,7 @@ class PerpetualBooster:
         self,
         X,
     ) -> Set[int]:
-        if isinstance(X, np.ndarray):
+        if isinstance(X, np.ndarray) or is_scipy_sparse(X):
             return set(self.terminate_missing_features)
         else:
             feature_map = {f: i for i, f in enumerate(X.columns)}

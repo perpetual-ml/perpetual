@@ -1030,3 +1030,29 @@ def test_multiclass_extras():
     # set_params
     model.set_params(budget=0.2)
     assert model.budget == 0.2
+
+
+def test_scipy_sparse_fit_predict():
+    import scipy.sparse as sp
+
+    rng = np.random.default_rng(42)
+    dense_X = rng.standard_normal((100, 5))
+    dense_X[dense_X < 0] = 0.0  # create sparsity
+    y = (dense_X[:, 0] > 0.5).astype(int)
+
+    csr_X = sp.csr_matrix(dense_X)
+    csc_X = sp.csc_matrix(dense_X)
+
+    # Test fit with CSR
+    model_csr = PerpetualBooster(budget=0.5, objective="LogLoss")
+    model_csr.fit(csr_X, y)
+    preds_csr = model_csr.predict(csr_X)
+    assert preds_csr.shape == (100,)
+    proba_csr = model_csr.predict_proba(csr_X)
+    assert proba_csr.shape == (100, 2)
+
+    # Test fit with CSC
+    model_csc = PerpetualBooster(budget=0.5, objective="LogLoss")
+    model_csc.fit(csc_X, y)
+    preds_csc = model_csc.predict(csc_X)
+    assert preds_csc.shape == (100,)
