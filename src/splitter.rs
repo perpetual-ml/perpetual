@@ -2,9 +2,9 @@
 //!
 //! Split-finding logic for decision tree nodes, including support for
 //! missing-value imputation, ternary branches, and monotone constraints.
-use crate::bin::{Bin, categorical_histogram_orders, sort_cat_bins_by_stat};
+use crate::bin::{Bin, sort_cat_bins_by_stat};
 use crate::booster::config::MissingNodeTreatment;
-use crate::constants::{GENERALIZATION_THRESHOLD, GENERALIZATION_THRESHOLD_RELAXED};
+use crate::constants::GENERALIZATION_THRESHOLD;
 use crate::constraints::{Constraint, ConstraintMap};
 use crate::data::{FloatData, Matrix};
 use crate::histogram::{
@@ -13,9 +13,9 @@ use crate::histogram::{
 use crate::node::{NodeType, SplittableNode};
 use crate::tree::Tree;
 use crate::utils::{
-    bound_to_parent, constrained_weight_const_hess_reg, constrained_weight_reg, cull_gain,
-    gain_given_weight_const_hess_reg, gain_given_weight_reg, pivot_on_split, pivot_on_split_const_hess,
-    pivot_on_split_exclude_missing, pivot_on_split_exclude_missing_const_hess,
+    bound_to_parent, constrained_weight, constrained_weight_const_hess, cull_gain, gain_given_weight,
+    gain_given_weight_const_hess, pivot_on_split, pivot_on_split_const_hess, pivot_on_split_exclude_missing,
+    pivot_on_split_exclude_missing_const_hess,
 };
 use rayon::ThreadPool;
 use std::borrow::BorrowMut;
@@ -25,147 +25,6 @@ use std::collections::HashSet;
 #[inline]
 fn average(numbers: &[f32]) -> f32 {
     numbers.iter().sum::<f32>() / numbers.len() as f32
-}
-
-#[inline]
-fn calculate_generalization(
-    parent_score: f32,
-    train_score: f32,
-    valid_score: f32,
-    left_weights: &[f32; 5],
-    right_weights: &[f32; 5],
-) -> f32 {
-    let _ = (left_weights, right_weights);
-    let delta_score_train = parent_score - train_score;
-    let delta_score_valid = parent_score - valid_score;
-    delta_score_train / delta_score_valid
-}
-
-#[inline]
-fn fold_weight_stability(weights: &[f32; 5]) -> f32 {
-    let mean = weights.iter().sum::<f32>() / weights.len() as f32;
-    let mean_abs = weights.iter().map(|value| value.abs()).sum::<f32>() / weights.len() as f32;
-    if mean_abs <= f32::EPSILON {
-        return 1.0;
-    }
-
-    let variance = weights.iter().map(|value| (value - mean).powi(2)).sum::<f32>() / weights.len() as f32;
-    let std_dev = variance.sqrt();
-    (1.0 / (1.0 + std_dev / (mean_abs + 1e-6))).clamp(0.5, 1.0)
-}
-
-#[inline]
-fn fold_weight_energy(weights: &[f32; 5]) -> f32 {
-    (weights.iter().map(|value| value * value).sum::<f32>() / weights.len() as f32).sqrt()
-}
-
-#[inline]
-fn split_weight_stability(left_weights: &[f32; 5], right_weights: &[f32; 5]) -> f32 {
-    0.5 * (fold_weight_stability(left_weights) + fold_weight_stability(right_weights))
-}
-
-#[inline]
-fn node_generalization_context(node: &SplittableNode) -> (usize, usize) {
-    node.stats
-        .as_ref()
-        .map(|stats| (stats.depth, stats.count))
-        .unwrap_or((0, node.stop_idx.saturating_sub(node.start_idx)))
-}
-
-#[inline]
-fn generalization_floor(stability: f32, is_categorical: bool, node_depth: usize, node_count: usize) -> f32 {
-    let floor = if is_categorical {
-        GENERALIZATION_THRESHOLD_RELAXED + 0.004 * (1.0 - stability)
-    } else {
-        GENERALIZATION_THRESHOLD
-    };
-
-    let support_scale = (1.0 - node_count.min(2_048) as f32 / 2_048.0).clamp(0.0, 1.0);
-    let depth_scale = (node_depth.min(3) as f32 / 3.0).clamp(0.0, 1.0);
-    let stability_scale = stability.clamp(0.5, 1.0);
-    let max_relief = if is_categorical { 0.006 } else { 0.01 };
-    let relief = max_relief * support_scale * (0.5 + 0.5 * depth_scale) * stability_scale;
-    let min_floor = if is_categorical { 0.984 } else { 0.98 };
-
-    (floor - relief).clamp(min_floor, GENERALIZATION_THRESHOLD)
-}
-
-#[inline]
-fn passes_generalization_filter(
-    node_num: usize,
-    node_depth: usize,
-    node_count: usize,
-    generalization: f32,
-    left_weights: &[f32; 5],
-    right_weights: &[f32; 5],
-    is_categorical: bool,
-) -> bool {
-    if node_num == 0 {
-        return true;
-    }
-
-    let stability = split_weight_stability(left_weights, right_weights);
-    generalization >= generalization_floor(stability, is_categorical, node_depth, node_count)
-}
-
-fn score_split_gain(split_gain: f32, generalization: f32, left_weights: &[f32; 5], right_weights: &[f32; 5]) -> f32 {
-    let stability = split_weight_stability(left_weights, right_weights);
-    let generalization_factor = generalization.clamp(generalization_floor(stability, false, 0, usize::MAX), 1.05);
-
-    split_gain * (0.92 + 0.08 * stability) * generalization_factor.powf(0.1)
-}
-
-#[inline]
-fn score_categorical_split_gain(
-    split_gain: f32,
-    generalization: f32,
-    left_weights: &[f32; 5],
-    right_weights: &[f32; 5],
-) -> f32 {
-    let stability = split_weight_stability(left_weights, right_weights);
-    let generalization_factor = generalization.clamp(generalization_floor(stability, true, 0, usize::MAX), 1.12);
-    let energy = fold_weight_energy(left_weights) + fold_weight_energy(right_weights);
-    let magnitude_penalty = 1.0 / (1.0 + 0.02 * energy);
-
-    split_gain * (0.75 + 0.25 * stability) * generalization_factor.powf(0.3) * magnitude_penalty
-}
-
-#[inline]
-fn sparse_categorical_balance_factor(left_count: usize, right_count: usize, strict_balance: bool) -> f32 {
-    let total_count = left_count.saturating_add(right_count).max(1) as f32;
-    let smaller_count = usize::min(left_count, right_count);
-    let smaller_share = smaller_count as f32 / total_count;
-
-    // Only damp splits that isolate a very small child on large sparse histograms.
-    if smaller_share >= 0.12 || smaller_count >= 96 {
-        return 1.0;
-    }
-
-    let share_score = (smaller_share / 0.12).clamp(0.0, 1.0).sqrt();
-    let support_score = (smaller_count as f32 / 96.0).clamp(0.0, 1.0).sqrt();
-    let balance_score = share_score.min(support_score);
-    let floor = if strict_balance { 0.82 } else { 0.9 };
-
-    (floor + (1.0 - floor) * balance_score).clamp(floor, 1.0)
-}
-
-#[inline]
-fn score_sparse_categorical_split_gain(
-    split_gain: f32,
-    generalization: f32,
-    left_weights: &[f32; 5],
-    right_weights: &[f32; 5],
-    left_count: usize,
-    right_count: usize,
-    strict_balance: bool,
-) -> f32 {
-    score_categorical_split_gain(split_gain, generalization, left_weights, right_weights)
-        * sparse_categorical_balance_factor(left_count, right_count, strict_balance)
-}
-
-#[inline]
-fn should_use_sparse_categorical_ranking(active_bins: usize) -> bool {
-    active_bins >= 48
 }
 
 /// Information about the best split found for a feature.
@@ -305,12 +164,8 @@ pub trait Splitter {
     fn get_allow_missing_splits(&self) -> bool;
     fn get_create_missing_branch(&self) -> bool;
     fn get_eta(&self) -> f32;
-    fn get_leaf_regularization(&self) -> f32;
     fn get_missing_node_treatment(&self) -> MissingNodeTreatment;
     fn get_force_children_to_bound_parent(&self) -> bool;
-    fn get_use_multi_order_categorical_search(&self) -> bool;
-    fn get_use_strict_sparse_categorical_balance(&self) -> bool;
-    fn get_categorical_generalization_min_folds(&self) -> u8;
 
     /// Perform any post processing on the tree that is
     /// relevant for the specific splitter, empty default
@@ -336,10 +191,6 @@ pub trait Splitter {
         let create_missing_branch = self.get_create_missing_branch();
         let missing_node_treatment = self.get_missing_node_treatment();
         let force_children_to_bound_parent = self.get_force_children_to_bound_parent();
-        let leaf_regularization = self.get_leaf_regularization();
-        let use_multi_order_categorical_search = self.get_use_multi_order_categorical_search();
-        let use_strict_sparse_categorical_balance = self.get_use_strict_sparse_categorical_balance();
-        let categorical_generalization_min_folds = self.get_categorical_generalization_min_folds();
 
         let hist_node = unsafe { hist_tree.get_unchecked(node.num) };
 
@@ -376,10 +227,6 @@ pub trait Splitter {
                             missing_node_treatment,
                             allow_missing_splits,
                             create_missing_branch,
-                            use_multi_order_categorical_search,
-                            use_strict_sparse_categorical_balance,
-                            categorical_generalization_min_folds,
-                            leaf_regularization,
                             &sis,
                         );
                     });
@@ -406,10 +253,6 @@ pub trait Splitter {
                     missing_node_treatment,
                     allow_missing_splits,
                     create_missing_branch,
-                    use_multi_order_categorical_search,
-                    use_strict_sparse_categorical_balance,
-                    categorical_generalization_min_folds,
-                    leaf_regularization,
                     split_info_slice,
                 );
             }
@@ -432,7 +275,6 @@ pub trait Splitter {
         hess: Option<&mut [f32]>,
         pool: &ThreadPool,
         hist_tree: &[NodeHistogram],
-        use_randomized_folds: bool,
     ) -> Vec<SplittableNode>;
 
     /// Split the node, if we cant find a best split, we will need to
@@ -451,7 +293,6 @@ pub trait Splitter {
         is_const_hess: bool,
         hist_tree: &[NodeHistogram],
         cat_index: Option<&HashSet<usize>>,
-        use_randomized_folds: bool,
         split_info_slice: &mut SplitInfoSlice,
         allowed_features: Option<&HashSet<usize>>,
     ) -> Vec<SplittableNode> {
@@ -470,17 +311,7 @@ pub trait Splitter {
 
         if split_info.split_gain > 0.0 {
             self.handle_split_info(
-                split_info,
-                n_nodes,
-                node,
-                index,
-                col_index,
-                data,
-                grad,
-                hess,
-                pool,
-                hist_tree,
-                use_randomized_folds,
+                split_info, n_nodes, node, index, col_index, data, grad, hess, pool, hist_tree,
             )
         } else {
             Vec::new()
@@ -496,11 +327,7 @@ pub trait Splitter {
 pub struct MissingBranchSplitter {
     pub create_missing_branch: bool,
     pub eta: f32,
-    pub leaf_regularization: f32,
     pub allow_missing_splits: bool,
-    pub use_multi_order_categorical_search: bool,
-    pub use_strict_sparse_categorical_balance: bool,
-    pub categorical_generalization_min_folds: u8,
     pub constraints_map: ConstraintMap,
     pub terminate_missing_features: HashSet<usize>,
     pub missing_node_treatment: MissingNodeTreatment,
@@ -512,7 +339,6 @@ impl MissingBranchSplitter {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         eta: f32,
-        leaf_regularization: f32,
         allow_missing_splits: bool,
         constraints_map: ConstraintMap,
         terminate_missing_features: HashSet<usize>,
@@ -522,31 +348,12 @@ impl MissingBranchSplitter {
         MissingBranchSplitter {
             create_missing_branch: true,
             eta,
-            leaf_regularization,
             allow_missing_splits,
-            use_multi_order_categorical_search: false,
-            use_strict_sparse_categorical_balance: false,
-            categorical_generalization_min_folds: 5,
             constraints_map,
             terminate_missing_features,
             missing_node_treatment,
             force_children_to_bound_parent,
         }
-    }
-
-    pub fn with_multi_order_categorical_search(mut self, enabled: bool) -> Self {
-        self.use_multi_order_categorical_search = enabled;
-        self
-    }
-
-    pub fn with_strict_sparse_categorical_balance(mut self, enabled: bool) -> Self {
-        self.use_strict_sparse_categorical_balance = enabled;
-        self
-    }
-
-    pub fn with_categorical_generalization_min_folds(mut self, min_folds: u8) -> Self {
-        self.categorical_generalization_min_folds = min_folds.clamp(1, 5);
-        self
     }
 
     pub fn new_leaves_added(&self) -> usize {
@@ -589,125 +396,22 @@ impl MissingBranchSplitter {
         // Update current node, and the missing value
         if let Some(n) = tree.nodes.get_mut(&current_node) {
             n.weight_value = update as f32;
-            n.leaf_weights = None;
-            if let Some(stats) = n.stats.as_mut() {
-                stats.weights = [update as f32; 5];
-            }
         }
         // Only update the missing node if it's a leaf, otherwise we will auto-update
         // them via the recursion called earlier.
         if let Some(m) = tree.nodes.get_mut(&missing).filter(|_| missing_leaf) {
             m.weight_value = update as f32;
-            m.leaf_weights = Some([update as f32; 5]);
-            if let Some(stats) = m.stats.as_mut() {
-                stats.weights = [update as f32; 5];
-            }
         }
 
         update
-    }
-
-    pub fn update_average_node_weights(tree: &mut Tree, node_idx: usize) -> f32 {
-        let node = &tree.nodes[&node_idx];
-
-        if node.is_leaf {
-            return node.weight_value;
-        }
-
-        let right = node.right_child;
-        let left = node.left_child;
-        let current_node = node.num;
-        let missing = node.missing_node;
-        let has_missing_branch = missing != left && missing != right;
-
-        let _ = Self::update_average_node_weights(tree, right);
-        let _ = Self::update_average_node_weights(tree, left);
-        if has_missing_branch {
-            let _ = Self::update_average_node_weights(tree, missing);
-        }
-
-        let right_node = &tree.nodes[&right];
-        let left_node = &tree.nodes[&left];
-        let update = if left_node.hessian_sum + right_node.hessian_sum > 0.0 {
-            (left_node.weight_value * left_node.hessian_sum + right_node.weight_value * right_node.hessian_sum)
-                / (left_node.hessian_sum + right_node.hessian_sum)
-        } else {
-            tree.nodes[&current_node].weight_value
-        };
-
-        if let Some(node) = tree.nodes.get_mut(&current_node) {
-            node.weight_value = update;
-            node.leaf_weights = None;
-            if let Some(stats) = node.stats.as_mut() {
-                stats.weights = [update; 5];
-            }
-        }
-
-        if has_missing_branch && let Some(missing_node) = tree.nodes.get_mut(&missing) {
-            missing_node.weight_value = update;
-            if missing_node.is_leaf {
-                missing_node.leaf_weights = Some([update; 5]);
-            }
-            if let Some(stats) = missing_node.stats.as_mut() {
-                stats.weights = [update; 5];
-            }
-        }
-
-        update
-    }
-
-    pub fn assign_missing_nodes_to_parent(tree: &mut Tree, node_idx: usize) {
-        let node = &tree.nodes[&node_idx];
-        if node.is_leaf {
-            return;
-        }
-
-        let left = node.left_child;
-        let right = node.right_child;
-        let missing = node.missing_node;
-        let parent_weight = node.weight_value;
-        let has_missing_branch = missing != left && missing != right;
-
-        if has_missing_branch {
-            if let Some(missing_node) = tree.nodes.get_mut(&missing) {
-                missing_node.weight_value = parent_weight;
-                if missing_node.is_leaf {
-                    missing_node.leaf_weights = Some([parent_weight; 5]);
-                }
-                if let Some(stats) = missing_node.stats.as_mut() {
-                    stats.weights = [parent_weight; 5];
-                }
-            }
-            Self::assign_missing_nodes_to_parent(tree, missing);
-        }
-
-        Self::assign_missing_nodes_to_parent(tree, left);
-        Self::assign_missing_nodes_to_parent(tree, right);
-    }
-
-    pub fn apply_missing_node_treatment(tree: &mut Tree, missing_node_treatment: MissingNodeTreatment) {
-        if !tree.nodes.contains_key(&0) {
-            return;
-        }
-
-        match missing_node_treatment {
-            MissingNodeTreatment::AssignToParent => {
-                Self::assign_missing_nodes_to_parent(tree, 0);
-            }
-            MissingNodeTreatment::AverageLeafWeight => {
-                Self::update_average_missing_nodes(tree, 0);
-            }
-            MissingNodeTreatment::AverageNodeWeight => {
-                Self::update_average_node_weights(tree, 0);
-            }
-            MissingNodeTreatment::None => {}
-        }
     }
 }
 
 impl Splitter for MissingBranchSplitter {
     fn clean_up_splits(&self, tree: &mut Tree) {
-        MissingBranchSplitter::apply_missing_node_treatment(tree, self.missing_node_treatment);
+        if let MissingNodeTreatment::AverageLeafWeight = self.missing_node_treatment {
+            MissingBranchSplitter::update_average_missing_nodes(tree, 0);
+        }
     }
     fn get_constraint(&self, feature: &usize) -> Option<&Constraint> {
         self.constraints_map.get(feature)
@@ -727,23 +431,11 @@ impl Splitter for MissingBranchSplitter {
     fn get_eta(&self) -> f32 {
         self.eta
     }
-    fn get_leaf_regularization(&self) -> f32 {
-        self.leaf_regularization
-    }
     fn get_missing_node_treatment(&self) -> MissingNodeTreatment {
         self.missing_node_treatment
     }
     fn get_force_children_to_bound_parent(&self) -> bool {
         self.force_children_to_bound_parent
-    }
-    fn get_use_multi_order_categorical_search(&self) -> bool {
-        self.use_multi_order_categorical_search
-    }
-    fn get_use_strict_sparse_categorical_balance(&self) -> bool {
-        self.use_strict_sparse_categorical_balance
-    }
-    fn get_categorical_generalization_min_folds(&self) -> u8 {
-        self.categorical_generalization_min_folds
     }
 
     fn handle_split_info(
@@ -758,7 +450,6 @@ impl Splitter for MissingBranchSplitter {
         mut hess: Option<&mut [f32]>,
         pool: &ThreadPool,
         hist_tree: &[NodeHistogram],
-        use_randomized_folds: bool,
     ) -> Vec<SplittableNode> {
         let missing_child = *n_nodes;
         let left_child = missing_child + 1;
@@ -855,7 +546,6 @@ impl Splitter for MissingBranchSplitter {
                     hess.as_deref(),
                     index,
                     col_index,
-                    use_randomized_folds,
                     pool,
                 );
             } else {
@@ -871,7 +561,6 @@ impl Splitter for MissingBranchSplitter {
                     hess.as_deref(),
                     index,
                     col_index,
-                    use_randomized_folds,
                     pool,
                 );
             }
@@ -892,7 +581,6 @@ impl Splitter for MissingBranchSplitter {
                 hess.as_deref(),
                 index,
                 col_index,
-                use_randomized_folds,
                 pool,
             );
         } else if max_ == 1 {
@@ -912,7 +600,6 @@ impl Splitter for MissingBranchSplitter {
                 hess.as_deref(),
                 index,
                 col_index,
-                use_randomized_folds,
                 pool,
             );
         } else {
@@ -932,7 +619,6 @@ impl Splitter for MissingBranchSplitter {
                 hess.as_deref(),
                 index,
                 col_index,
-                use_randomized_folds,
                 pool,
             );
         }
@@ -979,11 +665,7 @@ impl Splitter for MissingBranchSplitter {
 pub struct MissingImputerSplitter {
     pub create_missing_branch: bool,
     pub eta: f32,
-    pub leaf_regularization: f32,
     pub allow_missing_splits: bool,
-    pub use_multi_order_categorical_search: bool,
-    pub use_strict_sparse_categorical_balance: bool,
-    pub categorical_generalization_min_folds: u8,
     pub constraints_map: ConstraintMap,
     pub interaction_constraints: Option<Vec<Vec<usize>>>,
     pub missing_node_treatment: MissingNodeTreatment,
@@ -995,7 +677,6 @@ impl MissingImputerSplitter {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         eta: f32,
-        leaf_regularization: f32,
         allow_missing_splits: bool,
         constraints_map: ConstraintMap,
         interaction_constraints: Option<Vec<Vec<usize>>>,
@@ -1003,31 +684,12 @@ impl MissingImputerSplitter {
         MissingImputerSplitter {
             create_missing_branch: false,
             eta,
-            leaf_regularization,
             allow_missing_splits,
-            use_multi_order_categorical_search: false,
-            use_strict_sparse_categorical_balance: false,
-            categorical_generalization_min_folds: 5,
             constraints_map,
             interaction_constraints,
             missing_node_treatment: MissingNodeTreatment::None,
             force_children_to_bound_parent: false,
         }
-    }
-
-    pub fn with_multi_order_categorical_search(mut self, enabled: bool) -> Self {
-        self.use_multi_order_categorical_search = enabled;
-        self
-    }
-
-    pub fn with_strict_sparse_categorical_balance(mut self, enabled: bool) -> Self {
-        self.use_strict_sparse_categorical_balance = enabled;
-        self
-    }
-
-    pub fn with_categorical_generalization_min_folds(mut self, min_folds: u8) -> Self {
-        self.categorical_generalization_min_folds = min_folds.clamp(1, 5);
-        self
     }
 }
 
@@ -1050,23 +712,11 @@ impl Splitter for MissingImputerSplitter {
     fn get_eta(&self) -> f32 {
         self.eta
     }
-    fn get_leaf_regularization(&self) -> f32 {
-        self.leaf_regularization
-    }
     fn get_missing_node_treatment(&self) -> MissingNodeTreatment {
         self.missing_node_treatment
     }
     fn get_force_children_to_bound_parent(&self) -> bool {
         self.force_children_to_bound_parent
-    }
-    fn get_use_multi_order_categorical_search(&self) -> bool {
-        self.use_multi_order_categorical_search
-    }
-    fn get_use_strict_sparse_categorical_balance(&self) -> bool {
-        self.use_strict_sparse_categorical_balance
-    }
-    fn get_categorical_generalization_min_folds(&self) -> u8 {
-        self.categorical_generalization_min_folds
     }
 
     fn handle_split_info(
@@ -1081,7 +731,6 @@ impl Splitter for MissingImputerSplitter {
         mut hess: Option<&mut [f32]>,
         pool: &ThreadPool,
         hist_tree: &[NodeHistogram],
-        use_randomized_folds: bool,
     ) -> Vec<SplittableNode> {
         let left_child = *n_nodes;
         let right_child = left_child + 1;
@@ -1155,7 +804,6 @@ impl Splitter for MissingImputerSplitter {
                 hess.as_deref(),
                 index,
                 col_index,
-                use_randomized_folds,
                 pool,
             );
         } else {
@@ -1171,7 +819,6 @@ impl Splitter for MissingImputerSplitter {
                 hess.as_deref(),
                 index,
                 col_index,
-                use_randomized_folds,
                 pool,
             );
         }
@@ -1214,10 +861,6 @@ type BestFeatureSplitFn = fn(
     MissingNodeTreatment,
     bool,
     bool,
-    bool,
-    bool,
-    u8,
-    f32,
     &SplitInfoSlice,
 );
 
@@ -1244,10 +887,6 @@ fn best_feature_split_const_hess(
     missing_node_treatment: MissingNodeTreatment,
     allow_missing_splits: bool,
     create_missing_branch: bool,
-    use_multi_order_categorical_search: bool,
-    _use_strict_sparse_categorical_balance: bool,
-    categorical_generalization_min_folds: u8,
-    leaf_regularization: f32,
     split_info_slice: &SplitInfoSlice,
 ) {
     let split_info = unsafe { split_info_slice.get_mut(feat_idx) };
@@ -1257,8 +896,7 @@ fn best_feature_split_const_hess(
     let mut all_cats: Vec<usize> = Vec::new();
 
     // For categorical features, we need to sort the bins.
-    let mut hist_vec: Vec<&UnsafeCell<Bin>>;
-    let mut categorical_orders: Vec<Vec<&UnsafeCell<Bin>>> = Vec::new();
+    let mut hist_vec: Vec<&UnsafeCell<Bin>> = Vec::new();
     let is_categorical = if let Some(c_index) = cat_index {
         if c_index.contains(&feature) {
             hist_vec = hist_feat.data[1..]
@@ -1268,12 +906,11 @@ fn best_feature_split_const_hess(
                     bin.counts.iter().sum::<u32>() > 0 && !bin.cut_value.is_nan()
                 })
                 .collect::<Vec<_>>();
-            if use_multi_order_categorical_search {
-                categorical_orders = categorical_histogram_orders(&hist_vec, true, leaf_regularization);
-            } else {
-                sort_cat_bins_by_stat(&mut hist_vec, true, leaf_regularization);
-                categorical_orders.push(hist_vec.clone());
-            }
+            sort_cat_bins_by_stat(&mut hist_vec, true);
+            all_cats = hist_vec
+                .iter()
+                .map(|b| unsafe { &*b.get() }.cut_value as usize)
+                .collect();
             true
         } else {
             false
@@ -1320,153 +957,53 @@ fn best_feature_split_const_hess(
     let mut cuml_counts_valid = [0_usize; 5];
 
     if is_categorical {
-        for hist_vec in categorical_orders {
-            let ordered_cats = hist_vec
-                .iter()
-                .map(|b| unsafe { &*b.get() }.cut_value as usize)
-                .collect::<Vec<_>>();
-            let mut right_gradient_train = [f32::ZERO; 5];
-            let mut right_counts_train = [0_usize; 5];
-            let mut right_gradient_valid = [f32::ZERO; 5];
-            let mut right_counts_valid = [0_usize; 5];
+        for bin in hist_vec {
+            let b: &Bin = unsafe { &*bin.get() };
+            // -- Inlined logic --
+            let left_gradient_train = cuml_gradient_train;
+            let left_counts_train = cuml_counts_train;
+            let left_gradient_valid = cuml_gradient_valid;
+            let left_counts_valid = cuml_counts_valid;
 
-            let mut cuml_gradient_train = [f32::ZERO; 5];
-            let mut cuml_counts_train = [0_usize; 5];
-            let mut cuml_gradient_valid = [f32::ZERO; 5];
-            let mut cuml_counts_valid = [0_usize; 5];
+            let mut left_objs = [0.0; 5];
+            let mut right_objs = [0.0; 5];
+            let mut train_scores = [0.0; 5];
+            let mut valid_scores = [0.0; 5];
+            let mut n_folds: u8 = 0;
+            let mut left_weights = [0.0; 5];
+            let mut right_weights = [0.0; 5];
+            #[allow(clippy::needless_late_init)]
+            let generalization;
+            let b_grad_total: f32 = b.g_folded.iter().sum();
+            let b_coun_total: usize = b.counts.iter().map(|&c| c as usize).sum();
+            for j in 0..5 {
+                right_gradient_train[j] = node_grad_train_sum[j] - cuml_gradient_train[j];
+                right_counts_train[j] = node_coun_train_sum[j] - cuml_counts_train[j];
+                right_gradient_valid[j] = node_grad_sum[j] - cuml_gradient_valid[j];
+                right_counts_valid[j] = node_coun_sum[j] - cuml_counts_valid[j];
 
-            for bin in hist_vec {
-                let b: &Bin = unsafe { &*bin.get() };
-                // -- Inlined logic --
-                let left_gradient_train = cuml_gradient_train;
-                let left_counts_train = cuml_counts_train;
-                let left_gradient_valid = cuml_gradient_valid;
-                let left_counts_valid = cuml_counts_valid;
+                cuml_gradient_train[j] += b_grad_total - b.g_folded[j];
+                cuml_counts_train[j] += b_coun_total - b.counts[j] as usize;
+                cuml_gradient_valid[j] += b.g_folded[j];
+                cuml_counts_valid[j] += b.counts[j] as usize;
 
-                let mut left_objs = [0.0; 5];
-                let mut right_objs = [0.0; 5];
-                let mut train_scores = [0.0; 5];
-                let mut valid_scores = [0.0; 5];
-                let mut n_folds: u8 = 0;
-                let mut left_weights = [0.0; 5];
-                let mut right_weights = [0.0; 5];
-                #[allow(clippy::needless_late_init)]
-                let generalization;
-                let b_grad_total: f32 = b.g_folded.iter().sum();
-                let b_coun_total: usize = b.counts.iter().map(|&c| c as usize).sum();
-                for j in 0..5 {
-                    right_gradient_train[j] = node_grad_train_sum[j] - cuml_gradient_train[j];
-                    right_counts_train[j] = node_coun_train_sum[j] - cuml_counts_train[j];
-                    right_gradient_valid[j] = node_grad_sum[j] - cuml_gradient_valid[j];
-                    right_counts_valid[j] = node_coun_sum[j] - cuml_counts_valid[j];
+                let left_c_train = left_counts_train[j];
+                let right_c_train = right_counts_train[j];
+                let left_c_valid = left_counts_valid[j];
+                let right_c_valid = right_counts_valid[j];
 
-                    cuml_gradient_train[j] += b_grad_total - b.g_folded[j];
-                    cuml_counts_train[j] += b_coun_total - b.counts[j] as usize;
-                    cuml_gradient_valid[j] += b.g_folded[j];
-                    cuml_counts_valid[j] += b.counts[j] as usize;
-
-                    let left_c_train = left_counts_train[j];
-                    let right_c_train = right_counts_train[j];
-                    let left_c_valid = left_counts_valid[j];
-                    let right_c_valid = right_counts_valid[j];
-
-                    if right_c_train == 0 || right_c_valid == 0 || left_c_train == 0 || left_c_valid == 0 {
-                        continue;
-                    }
-
-                    let split_result = if create_missing_branch {
-                        evaluate_branch_split_const_hess(
-                            left_gradient_train[j],
-                            f32::NAN,
-                            left_counts_train[j],
-                            right_gradient_train[j],
-                            f32::NAN,
-                            right_counts_train[j],
-                            miss_grad_sum,
-                            f32::NAN,
-                            miss_coun_sum,
-                            node.lower_bound,
-                            node.upper_bound,
-                            node.weight_value,
-                            constraint,
-                            force_children_to_bound_parent,
-                            missing_node_treatment,
-                            allow_missing_splits,
-                            leaf_regularization,
-                        )
-                    } else {
-                        evaluate_impute_split_const_hess(
-                            left_gradient_train[j],
-                            f32::NAN,
-                            left_counts_train[j],
-                            right_gradient_train[j],
-                            f32::NAN,
-                            right_counts_train[j],
-                            miss_grad_sum,
-                            f32::NAN,
-                            miss_coun_sum,
-                            node.lower_bound,
-                            node.upper_bound,
-                            node.weight_value,
-                            constraint,
-                            force_children_to_bound_parent,
-                            missing_node_treatment,
-                            allow_missing_splits,
-                            leaf_regularization,
-                        )
-                    };
-                    let (left_node, right_node, _) = match split_result {
-                        Some(v) => v,
-                        None => continue,
-                    };
-
-                    left_weights[j] = left_node.weight;
-                    right_weights[j] = right_node.weight;
-
-                    let left_obj = left_gradient_valid[j] * left_node.weight
-                        + 0.5 * (left_counts_valid[j] as f32) * left_node.weight * left_node.weight;
-                    let right_obj = right_gradient_valid[j] * right_node.weight
-                        + 0.5 * (right_counts_valid[j] as f32) * right_node.weight * right_node.weight;
-                    left_objs[j] = left_obj / left_counts_train[j] as f32;
-                    right_objs[j] = right_obj / right_counts_train[j] as f32;
-                    valid_scores[j] = (left_obj + right_obj) / (left_counts_valid[j] + right_counts_valid[j]) as f32;
-                    train_scores[j] = -0.5 * (left_node.gain + right_node.gain)
-                        / (left_counts_train[j] + right_counts_train[j]) as f32;
-
-                    n_folds += 1;
-                }
-
-                if n_folds >= categorical_generalization_min_folds || node.num == 0 {
-                    let train_score = average(&train_scores);
-                    let valid_score = average(&valid_scores);
-                    let parent_score = -0.5 * node.gain_value / node.stats.as_ref().unwrap().count as f32;
-                    let (node_depth, node_count) = node_generalization_context(node);
-                    let gen_val =
-                        calculate_generalization(parent_score, train_score, valid_score, &left_weights, &right_weights);
-                    if !passes_generalization_filter(
-                        node.num,
-                        node_depth,
-                        node_count,
-                        gen_val,
-                        &left_weights,
-                        &right_weights,
-                        true,
-                    ) {
-                        continue;
-                    }
-                    generalization = Some(gen_val);
-                } else {
+                if right_c_train == 0 || right_c_valid == 0 || left_c_train == 0 || left_c_valid == 0 {
                     continue;
                 }
 
                 let split_result = if create_missing_branch {
                     evaluate_branch_split_const_hess(
-                        left_gradient_valid.iter().sum(),
+                        left_gradient_train[j],
                         f32::NAN,
-                        left_counts_valid.iter().sum::<usize>(),
-                        right_gradient_valid.iter().sum(),
+                        left_counts_train[j],
+                        right_gradient_train[j],
                         f32::NAN,
-                        right_counts_valid.iter().sum::<usize>(),
+                        right_counts_train[j],
                         miss_grad_sum,
                         f32::NAN,
                         miss_coun_sum,
@@ -1477,16 +1014,15 @@ fn best_feature_split_const_hess(
                         force_children_to_bound_parent,
                         missing_node_treatment,
                         allow_missing_splits,
-                        leaf_regularization,
                     )
                 } else {
                     evaluate_impute_split_const_hess(
-                        left_gradient_valid.iter().sum(),
+                        left_gradient_train[j],
                         f32::NAN,
-                        left_counts_valid.iter().sum::<usize>(),
-                        right_gradient_valid.iter().sum(),
+                        left_counts_train[j],
+                        right_gradient_train[j],
                         f32::NAN,
-                        right_counts_valid.iter().sum::<usize>(),
+                        right_counts_train[j],
                         miss_grad_sum,
                         f32::NAN,
                         miss_coun_sum,
@@ -1497,58 +1033,122 @@ fn best_feature_split_const_hess(
                         force_children_to_bound_parent,
                         missing_node_treatment,
                         allow_missing_splits,
-                        leaf_regularization,
                     )
                 };
-
-                let (mut left_node_info, mut right_node_info, missing_info) = match split_result {
+                let (left_node, right_node, _) = match split_result {
                     Some(v) => v,
                     None => continue,
                 };
 
-                left_node_info.weights = left_weights;
-                right_node_info.weights = right_weights;
+                left_weights[j] = left_node.weight;
+                right_weights[j] = right_node.weight;
 
-                let split_gain = node.get_split_gain(&left_node_info, &right_node_info, &missing_info);
-                let split_gain = cull_gain(split_gain, left_node_info.weight, right_node_info.weight, constraint);
+                let left_obj = left_gradient_valid[j] * left_node.weight
+                    + 0.5 * (left_counts_valid[j] as f32) * left_node.weight * left_node.weight;
+                let right_obj = right_gradient_valid[j] * right_node.weight
+                    + 0.5 * (right_counts_valid[j] as f32) * right_node.weight * right_node.weight;
+                left_objs[j] = left_obj / left_counts_train[j] as f32;
+                right_objs[j] = right_obj / right_counts_train[j] as f32;
+                valid_scores[j] = (left_obj + right_obj) / (left_counts_valid[j] + right_counts_valid[j]) as f32;
+                train_scores[j] =
+                    -0.5 * (left_node.gain + right_node.gain) / (left_counts_train[j] + right_counts_train[j]) as f32;
 
-                if split_gain <= 0.0 {
+                n_folds += 1;
+            }
+
+            if n_folds >= 5 || node.num == 0 {
+                let train_score = average(&train_scores);
+                let valid_score = average(&valid_scores);
+                let parent_score = -0.5 * node.gain_value / node.stats.as_ref().unwrap().count as f32;
+                let delta_score_train = parent_score - train_score;
+                let delta_score_valid = parent_score - valid_score;
+                let gen_val = delta_score_train / delta_score_valid;
+                if gen_val < GENERALIZATION_THRESHOLD && node.num != 0 {
                     continue;
                 }
+                generalization = Some(gen_val);
+            } else {
+                continue;
+            }
 
-                // Constant-hessian categorical objectives already passed the
-                // fold-generalization gate above, so keep the final ranking
-                // aligned with the full-data gain to avoid reshuffling stable
-                // stump sequences on small categorical regression problems.
-                let ranking_gain = split_gain;
+            let split_result = if create_missing_branch {
+                evaluate_branch_split_const_hess(
+                    left_gradient_valid.iter().sum(),
+                    f32::NAN,
+                    left_counts_valid.iter().sum::<usize>(),
+                    right_gradient_valid.iter().sum(),
+                    f32::NAN,
+                    right_counts_valid.iter().sum::<usize>(),
+                    miss_grad_sum,
+                    f32::NAN,
+                    miss_coun_sum,
+                    node.lower_bound,
+                    node.upper_bound,
+                    node.weight_value,
+                    constraint,
+                    force_children_to_bound_parent,
+                    missing_node_treatment,
+                    allow_missing_splits,
+                )
+            } else {
+                evaluate_impute_split_const_hess(
+                    left_gradient_valid.iter().sum(),
+                    f32::NAN,
+                    left_counts_valid.iter().sum::<usize>(),
+                    right_gradient_valid.iter().sum(),
+                    f32::NAN,
+                    right_counts_valid.iter().sum::<usize>(),
+                    miss_grad_sum,
+                    f32::NAN,
+                    miss_coun_sum,
+                    node.lower_bound,
+                    node.upper_bound,
+                    node.weight_value,
+                    constraint,
+                    force_children_to_bound_parent,
+                    missing_node_treatment,
+                    allow_missing_splits,
+                )
+            };
 
-                let mid = (left_node_info.weight + right_node_info.weight) / 2.0;
-                let (left_bounds, right_bounds) = match constraint {
-                    None | Some(Constraint::Unconstrained) => (
-                        (node.lower_bound, node.upper_bound),
-                        (node.lower_bound, node.upper_bound),
-                    ),
-                    Some(Constraint::Negative) => ((mid, node.upper_bound), (node.lower_bound, mid)),
-                    Some(Constraint::Positive) => ((node.lower_bound, mid), (mid, node.upper_bound)),
-                };
-                left_node_info.bounds = left_bounds;
-                right_node_info.bounds = right_bounds;
-                let split_gain = if split_gain.is_nan() { 0.0 } else { split_gain };
+            let (mut left_node_info, mut right_node_info, missing_info) = match split_result {
+                Some(v) => v,
+                None => continue,
+            };
 
-                if (max_gain.is_none() || ranking_gain > max_gain.unwrap())
-                    && (generalization.is_some() || node.num == 0)
-                {
-                    max_gain = Some(ranking_gain);
-                    all_cats = ordered_cats.clone();
-                    split_info.split_gain = split_gain;
-                    split_info.split_feature = feature;
-                    split_info.split_value = b.cut_value;
-                    split_info.split_bin = b.num;
-                    split_info.left_node = left_node_info;
-                    split_info.right_node = right_node_info;
-                    split_info.missing_node = missing_info;
-                    split_info.generalization = generalization;
-                }
+            left_node_info.weights = left_weights;
+            right_node_info.weights = right_weights;
+
+            let split_gain = node.get_split_gain(&left_node_info, &right_node_info, &missing_info);
+            let split_gain = cull_gain(split_gain, left_node_info.weight, right_node_info.weight, constraint);
+
+            if split_gain <= 0.0 {
+                continue;
+            }
+
+            let mid = (left_node_info.weight + right_node_info.weight) / 2.0;
+            let (left_bounds, right_bounds) = match constraint {
+                None | Some(Constraint::Unconstrained) => (
+                    (node.lower_bound, node.upper_bound),
+                    (node.lower_bound, node.upper_bound),
+                ),
+                Some(Constraint::Negative) => ((mid, node.upper_bound), (node.lower_bound, mid)),
+                Some(Constraint::Positive) => ((node.lower_bound, mid), (mid, node.upper_bound)),
+            };
+            left_node_info.bounds = left_bounds;
+            right_node_info.bounds = right_bounds;
+            let split_gain = if split_gain.is_nan() { 0.0 } else { split_gain };
+
+            if (max_gain.is_none() || split_gain > max_gain.unwrap()) && (generalization.is_some() || node.num == 0) {
+                max_gain = Some(split_gain);
+                split_info.split_gain = split_gain;
+                split_info.split_feature = feature;
+                split_info.split_value = b.cut_value;
+                split_info.split_bin = b.num;
+                split_info.left_node = left_node_info;
+                split_info.right_node = right_node_info;
+                split_info.missing_node = missing_info;
+                split_info.generalization = generalization;
             }
         }
     } else if miss_coun_sum == 0
@@ -1633,18 +1233,10 @@ fn best_feature_split_const_hess(
             let train_score = average(&train_scores);
             let valid_score = average(&valid_scores);
             let parent_score = -0.5 * node.gain_value / node.stats.as_ref().unwrap().count as f32;
-            let (node_depth, node_count) = node_generalization_context(node);
-            let gen_val =
-                calculate_generalization(parent_score, train_score, valid_score, &left_weights, &right_weights);
-            if !passes_generalization_filter(
-                node.num,
-                node_depth,
-                node_count,
-                gen_val,
-                &left_weights,
-                &right_weights,
-                false,
-            ) {
+            let delta_score_train = parent_score - train_score;
+            let delta_score_valid = parent_score - valid_score;
+            let gen_val = delta_score_train / delta_score_valid;
+            if gen_val < GENERALIZATION_THRESHOLD && node.num != 0 {
                 continue;
             }
             let generalization = Some(gen_val);
@@ -1665,14 +1257,8 @@ fn best_feature_split_const_hess(
                 continue;
             }
 
-            // For constant-hessian numeric objectives like SquaredLoss, the fold
-            // generalization gate already filters unstable candidates. Once a
-            // split passes that check, trust the full-data gain directly so we
-            // don't down-rank useful low-dimensional regression splits twice.
-            let ranking_gain = split_gain;
-
-            if ranking_gain > best_gain && (generalization.is_some() || node.num == 0) {
-                best_gain = ranking_gain;
+            if split_gain > best_gain && (generalization.is_some() || node.num == 0) {
+                best_gain = split_gain;
                 best_left_weights = left_weights;
                 best_right_weights = right_weights;
                 best_generalization = generalization;
@@ -1686,6 +1272,7 @@ fn best_feature_split_const_hess(
             }
         }
 
+        // Construct NodeInfo only for the winning bin
         if found_split {
             let tl_grad: f32 = best_left_grad_valid.iter().sum();
             let tl_count: usize = best_left_coun_valid.iter().sum();
@@ -1696,10 +1283,8 @@ fn best_feature_split_const_hess(
             let tl_gain = -(2.0 * tl_grad * tl_w + tl_count as f32 * tl_w * tl_w);
             let tr_gain = -(2.0 * tr_grad * tr_w + tr_count as f32 * tr_w * tr_w);
 
-            let split_gain = tl_gain + tr_gain - node.gain_value;
-
             max_gain = Some(best_gain);
-            split_info.split_gain = split_gain;
+            split_info.split_gain = best_gain;
             split_info.split_feature = feature;
             split_info.split_value = best_cut_value;
             split_info.split_bin = best_split_bin;
@@ -1829,18 +1414,10 @@ fn best_feature_split_const_hess(
             let train_score = average(&train_scores);
             let valid_score = average(&valid_scores);
             let parent_score = -0.5 * node.gain_value / node.stats.as_ref().unwrap().count as f32;
-            let (node_depth, node_count) = node_generalization_context(node);
-            let gen_val =
-                calculate_generalization(parent_score, train_score, valid_score, &left_weights, &right_weights);
-            if !passes_generalization_filter(
-                node.num,
-                node_depth,
-                node_count,
-                gen_val,
-                &left_weights,
-                &right_weights,
-                false,
-            ) {
+            let delta_score_train = parent_score - train_score;
+            let delta_score_valid = parent_score - valid_score;
+            let gen_val = delta_score_train / delta_score_valid;
+            if gen_val < GENERALIZATION_THRESHOLD && node.num != 0 {
                 continue;
             }
             let generalization = Some(gen_val);
@@ -1860,14 +1437,8 @@ fn best_feature_split_const_hess(
                 continue;
             }
 
-            // For constant-hessian numeric objectives like SquaredLoss, the fold
-            // generalization gate already filters unstable candidates. Once a
-            // split passes that check, trust the full-data gain directly so we
-            // don't down-rank useful low-dimensional regression splits twice.
-            let ranking_gain = split_gain;
-
-            if ranking_gain > best_gain && (generalization.is_some() || node.num == 0) {
-                best_gain = ranking_gain;
+            if split_gain > best_gain && (generalization.is_some() || node.num == 0) {
+                best_gain = split_gain;
                 best_left_weights = left_weights;
                 best_right_weights = right_weights;
                 best_generalization = generalization;
@@ -1892,10 +1463,8 @@ fn best_feature_split_const_hess(
             let tl_gain = -(2.0 * tl_grad * tl_w + tl_count as f32 * tl_w * tl_w);
             let tr_gain = -(2.0 * tr_grad * tr_w + tr_count as f32 * tr_w * tr_w);
 
-            let split_gain = tl_gain + tr_gain - node.gain_value;
-
             max_gain = Some(best_gain);
-            split_info.split_gain = split_gain;
+            split_info.split_gain = best_gain;
             split_info.split_feature = feature;
             split_info.split_value = best_cut_value;
             split_info.split_bin = best_split_bin;
@@ -1981,7 +1550,6 @@ fn best_feature_split_const_hess(
                         force_children_to_bound_parent,
                         missing_node_treatment,
                         allow_missing_splits,
-                        leaf_regularization,
                     )
                 } else {
                     evaluate_impute_split_const_hess(
@@ -2001,7 +1569,6 @@ fn best_feature_split_const_hess(
                         force_children_to_bound_parent,
                         missing_node_treatment,
                         allow_missing_splits,
-                        leaf_regularization,
                     )
                 };
                 let (left_node, right_node, _) = match split_result {
@@ -2029,18 +1596,10 @@ fn best_feature_split_const_hess(
                 let train_score = average(&train_scores);
                 let valid_score = average(&valid_scores);
                 let parent_score = -0.5 * node.gain_value / node.stats.as_ref().unwrap().count as f32;
-                let (node_depth, node_count) = node_generalization_context(node);
-                let gen_val =
-                    calculate_generalization(parent_score, train_score, valid_score, &left_weights, &right_weights);
-                if !passes_generalization_filter(
-                    node.num,
-                    node_depth,
-                    node_count,
-                    gen_val,
-                    &left_weights,
-                    &right_weights,
-                    true,
-                ) {
+                let delta_score_train = parent_score - train_score;
+                let delta_score_valid = parent_score - valid_score;
+                let gen_val = delta_score_train / delta_score_valid;
+                if gen_val < GENERALIZATION_THRESHOLD && node.num != 0 {
                     continue;
                 }
                 generalization = Some(gen_val);
@@ -2066,7 +1625,6 @@ fn best_feature_split_const_hess(
                     force_children_to_bound_parent,
                     missing_node_treatment,
                     allow_missing_splits,
-                    leaf_regularization,
                 )
             } else {
                 evaluate_impute_split_const_hess(
@@ -2086,7 +1644,6 @@ fn best_feature_split_const_hess(
                     force_children_to_bound_parent,
                     missing_node_treatment,
                     allow_missing_splits,
-                    leaf_regularization,
                 )
             };
 
@@ -2105,13 +1662,6 @@ fn best_feature_split_const_hess(
                 continue;
             }
 
-            let ranking_gain = score_categorical_split_gain(
-                split_gain,
-                generalization.unwrap_or(1.0),
-                &left_node_info.weights,
-                &right_node_info.weights,
-            );
-
             let mid = (left_node_info.weight + right_node_info.weight) / 2.0;
             let (left_bounds, right_bounds) = match constraint {
                 None | Some(Constraint::Unconstrained) => (
@@ -2125,8 +1675,8 @@ fn best_feature_split_const_hess(
             right_node_info.bounds = right_bounds;
             let split_gain = if split_gain.is_nan() { 0.0 } else { split_gain };
 
-            if (max_gain.is_none() || ranking_gain > max_gain.unwrap()) && (generalization.is_some() || node.num == 0) {
-                max_gain = Some(ranking_gain);
+            if (max_gain.is_none() || split_gain > max_gain.unwrap()) && (generalization.is_some() || node.num == 0) {
+                max_gain = Some(split_gain);
                 split_info.split_gain = split_gain;
                 split_info.split_feature = feature;
                 split_info.split_value = b.cut_value;
@@ -2177,10 +1727,6 @@ fn best_feature_split_var_hess(
     missing_node_treatment: MissingNodeTreatment,
     allow_missing_splits: bool,
     create_missing_branch: bool,
-    use_multi_order_categorical_search: bool,
-    use_strict_sparse_categorical_balance: bool,
-    categorical_generalization_min_folds: u8,
-    leaf_regularization: f32,
     split_info_slice: &SplitInfoSlice,
 ) {
     let split_info = unsafe { split_info_slice.get_mut(feat_idx) };
@@ -2190,8 +1736,7 @@ fn best_feature_split_var_hess(
     let mut all_cats: Vec<usize> = Vec::new();
 
     // For categorical features, we need to sort the bins.
-    let mut hist_vec: Vec<&UnsafeCell<Bin>>;
-    let mut categorical_orders: Vec<Vec<&UnsafeCell<Bin>>> = Vec::new();
+    let mut hist_vec: Vec<&UnsafeCell<Bin>> = Vec::new();
     let is_categorical = if let Some(c_index) = cat_index {
         if c_index.contains(&feature) {
             hist_vec = hist_feat.data[1..]
@@ -2201,12 +1746,11 @@ fn best_feature_split_var_hess(
                     bin.counts.iter().sum::<u32>() > 0 && !bin.cut_value.is_nan()
                 })
                 .collect::<Vec<_>>();
-            if use_multi_order_categorical_search {
-                categorical_orders = categorical_histogram_orders(&hist_vec, false, leaf_regularization);
-            } else {
-                sort_cat_bins_by_stat(&mut hist_vec, false, leaf_regularization);
-                categorical_orders.push(hist_vec.clone());
-            }
+            sort_cat_bins_by_stat(&mut hist_vec, false);
+            all_cats = hist_vec
+                .iter()
+                .map(|b| unsafe { &*b.get() }.cut_value as usize)
+                .collect();
             true
         } else {
             false
@@ -2262,165 +1806,60 @@ fn best_feature_split_var_hess(
     let mut cuml_counts_valid = [0_usize; 5];
 
     if is_categorical {
-        for hist_vec in categorical_orders {
-            let ordered_cats = hist_vec
-                .iter()
-                .map(|b| unsafe { &*b.get() }.cut_value as usize)
-                .collect::<Vec<_>>();
-            let mut right_gradient_train = [f32::ZERO; 5];
-            let mut right_hessian_train = [f32::ZERO; 5];
-            let mut right_counts_train = [0_usize; 5];
-            let mut right_gradient_valid = [f32::ZERO; 5];
-            let mut right_hessian_valid = [f32::ZERO; 5];
-            let mut right_counts_valid = [0_usize; 5];
+        for bin in hist_vec {
+            let b: &Bin = unsafe { &*bin.get() };
+            // -- Inlined process_bin logic --
+            let left_gradient_train = cuml_gradient_train;
+            let left_hessian_train = cuml_hessian_train;
+            let left_counts_train = cuml_counts_train;
+            let left_gradient_valid = cuml_gradient_valid;
+            let left_hessian_valid = cuml_hessian_valid;
+            let left_counts_valid = cuml_counts_valid;
 
-            let mut cuml_gradient_train = [f32::ZERO; 5];
-            let mut cuml_hessian_train = [f32::ZERO; 5];
-            let mut cuml_counts_train = [0_usize; 5];
-            let mut cuml_gradient_valid = [f32::ZERO; 5];
-            let mut cuml_hessian_valid = [f32::ZERO; 5];
-            let mut cuml_counts_valid = [0_usize; 5];
+            let mut left_objs = [0.0; 5];
+            let mut right_objs = [0.0; 5];
+            let mut train_scores = [0.0; 5];
+            let mut valid_scores = [0.0; 5];
+            let mut n_folds: u8 = 0;
+            let mut left_weights = [0.0; 5];
+            let mut right_weights = [0.0; 5];
+            #[allow(clippy::needless_late_init)]
+            let generalization;
+            let b_grad_total: f32 = b.g_folded.iter().sum();
+            let b_hess_total: f32 = b.h_folded.iter().sum();
+            let b_coun_total: usize = b.counts.iter().map(|&c| c as usize).sum();
+            for j in 0..5 {
+                right_gradient_train[j] = node_grad_train_sum[j] - cuml_gradient_train[j];
+                right_hessian_train[j] = node_hess_train_sum[j] - cuml_hessian_train[j];
+                right_counts_train[j] = node_coun_train_sum[j] - cuml_counts_train[j];
+                right_gradient_valid[j] = node_grad_sum[j] - cuml_gradient_valid[j];
+                right_hessian_valid[j] = node_hess_sum[j] - cuml_hessian_valid[j];
+                right_counts_valid[j] = node_coun_sum[j] - cuml_counts_valid[j];
 
-            for bin in hist_vec {
-                let b: &Bin = unsafe { &*bin.get() };
-                // -- Inlined process_bin logic --
-                let left_gradient_train = cuml_gradient_train;
-                let left_hessian_train = cuml_hessian_train;
-                let left_counts_train = cuml_counts_train;
-                let left_gradient_valid = cuml_gradient_valid;
-                let left_hessian_valid = cuml_hessian_valid;
-                let left_counts_valid = cuml_counts_valid;
+                cuml_gradient_train[j] += b_grad_total - b.g_folded[j];
+                cuml_hessian_train[j] += b_hess_total - b.h_folded[j];
+                cuml_counts_train[j] += b_coun_total - b.counts[j] as usize;
+                cuml_gradient_valid[j] += b.g_folded[j];
+                cuml_hessian_valid[j] += b.h_folded[j];
+                cuml_counts_valid[j] += b.counts[j] as usize;
 
-                let mut left_objs = [0.0; 5];
-                let mut right_objs = [0.0; 5];
-                let mut train_scores = [0.0; 5];
-                let mut valid_scores = [0.0; 5];
-                let mut n_folds: u8 = 0;
-                let mut left_weights = [0.0; 5];
-                let mut right_weights = [0.0; 5];
-                #[allow(clippy::needless_late_init)]
-                let generalization;
-                let b_grad_total: f32 = b.g_folded.iter().sum();
-                let b_hess_total: f32 = b.h_folded.iter().sum();
-                let b_coun_total: usize = b.counts.iter().map(|&c| c as usize).sum();
-                for j in 0..5 {
-                    right_gradient_train[j] = node_grad_train_sum[j] - cuml_gradient_train[j];
-                    right_hessian_train[j] = node_hess_train_sum[j] - cuml_hessian_train[j];
-                    right_counts_train[j] = node_coun_train_sum[j] - cuml_counts_train[j];
-                    right_gradient_valid[j] = node_grad_sum[j] - cuml_gradient_valid[j];
-                    right_hessian_valid[j] = node_hess_sum[j] - cuml_hessian_valid[j];
-                    right_counts_valid[j] = node_coun_sum[j] - cuml_counts_valid[j];
+                let left_c_train = left_counts_train[j];
+                let right_c_train = right_counts_train[j];
+                let left_c_valid = left_counts_valid[j];
+                let right_c_valid = right_counts_valid[j];
 
-                    cuml_gradient_train[j] += b_grad_total - b.g_folded[j];
-                    cuml_hessian_train[j] += b_hess_total - b.h_folded[j];
-                    cuml_counts_train[j] += b_coun_total - b.counts[j] as usize;
-                    cuml_gradient_valid[j] += b.g_folded[j];
-                    cuml_hessian_valid[j] += b.h_folded[j];
-                    cuml_counts_valid[j] += b.counts[j] as usize;
-
-                    let left_c_train = left_counts_train[j];
-                    let right_c_train = right_counts_train[j];
-                    let left_c_valid = left_counts_valid[j];
-                    let right_c_valid = right_counts_valid[j];
-
-                    if right_c_train == 0 || right_c_valid == 0 || left_c_train == 0 || left_c_valid == 0 {
-                        continue;
-                    }
-
-                    let split_result = if create_missing_branch {
-                        evaluate_branch_split_var_hess(
-                            left_gradient_train[j],
-                            left_hessian_train[j],
-                            left_counts_train[j],
-                            right_gradient_train[j],
-                            right_hessian_train[j],
-                            right_counts_train[j],
-                            miss_grad_sum,
-                            miss_hess_sum,
-                            miss_coun_sum,
-                            node.lower_bound,
-                            node.upper_bound,
-                            node.weight_value,
-                            constraint,
-                            force_children_to_bound_parent,
-                            missing_node_treatment,
-                            allow_missing_splits,
-                            leaf_regularization,
-                        )
-                    } else {
-                        evaluate_impute_split_var_hess(
-                            left_gradient_train[j],
-                            left_hessian_train[j],
-                            left_counts_train[j],
-                            right_gradient_train[j],
-                            right_hessian_train[j],
-                            right_counts_train[j],
-                            miss_grad_sum,
-                            miss_hess_sum,
-                            miss_coun_sum,
-                            node.lower_bound,
-                            node.upper_bound,
-                            node.weight_value,
-                            constraint,
-                            force_children_to_bound_parent,
-                            missing_node_treatment,
-                            allow_missing_splits,
-                            leaf_regularization,
-                        )
-                    };
-                    let (left_node, right_node, _) = match split_result {
-                        Some(v) => v,
-                        None => continue,
-                    };
-
-                    left_weights[j] = left_node.weight;
-                    right_weights[j] = right_node.weight;
-
-                    let left_obj = left_gradient_valid[j] * left_node.weight
-                        + 0.5 * left_hessian_valid[j] * left_node.weight * left_node.weight;
-                    let right_obj = right_gradient_valid[j] * right_node.weight
-                        + 0.5 * right_hessian_valid[j] * right_node.weight * right_node.weight;
-                    left_objs[j] = left_obj / left_counts_train[j] as f32;
-                    right_objs[j] = right_obj / right_counts_train[j] as f32;
-                    valid_scores[j] = (left_obj + right_obj) / (left_counts_valid[j] + right_counts_valid[j]) as f32;
-                    train_scores[j] = -0.5 * (left_node.gain + right_node.gain)
-                        / (left_counts_train[j] + right_counts_train[j]) as f32;
-
-                    n_folds += 1;
-                }
-
-                if n_folds >= categorical_generalization_min_folds || node.num == 0 {
-                    let train_score = average(&train_scores);
-                    let valid_score = average(&valid_scores);
-                    let parent_score = -0.5 * node.gain_value / node.stats.as_ref().unwrap().count as f32;
-                    let delta_score_train = parent_score - train_score;
-                    let delta_score_valid = parent_score - valid_score;
-                    let (node_depth, node_count) = node_generalization_context(node);
-                    let gen_val = delta_score_train / delta_score_valid;
-                    if !passes_generalization_filter(
-                        node.num,
-                        node_depth,
-                        node_count,
-                        gen_val,
-                        &left_weights,
-                        &right_weights,
-                        true,
-                    ) {
-                        continue;
-                    }
-                    generalization = Some(gen_val);
-                } else {
+                if right_c_train == 0 || right_c_valid == 0 || left_c_train == 0 || left_c_valid == 0 {
                     continue;
                 }
 
                 let split_result = if create_missing_branch {
                     evaluate_branch_split_var_hess(
-                        left_gradient_valid.iter().sum(),
-                        left_hessian_valid.iter().sum::<f32>(),
-                        left_counts_valid.iter().sum::<usize>(),
-                        right_gradient_valid.iter().sum(),
-                        right_hessian_valid.iter().sum::<f32>(),
-                        right_counts_valid.iter().sum::<usize>(),
+                        left_gradient_train[j],
+                        left_hessian_train[j],
+                        left_counts_train[j],
+                        right_gradient_train[j],
+                        right_hessian_train[j],
+                        right_counts_train[j],
                         miss_grad_sum,
                         miss_hess_sum,
                         miss_coun_sum,
@@ -2431,16 +1870,15 @@ fn best_feature_split_var_hess(
                         force_children_to_bound_parent,
                         missing_node_treatment,
                         allow_missing_splits,
-                        leaf_regularization,
                     )
                 } else {
                     evaluate_impute_split_var_hess(
-                        left_gradient_valid.iter().sum(),
-                        left_hessian_valid.iter().sum::<f32>(),
-                        left_counts_valid.iter().sum::<usize>(),
-                        right_gradient_valid.iter().sum(),
-                        right_hessian_valid.iter().sum::<f32>(),
-                        right_counts_valid.iter().sum::<usize>(),
+                        left_gradient_train[j],
+                        left_hessian_train[j],
+                        left_counts_train[j],
+                        right_gradient_train[j],
+                        right_hessian_train[j],
+                        right_counts_train[j],
                         miss_grad_sum,
                         miss_hess_sum,
                         miss_coun_sum,
@@ -2451,66 +1889,122 @@ fn best_feature_split_var_hess(
                         force_children_to_bound_parent,
                         missing_node_treatment,
                         allow_missing_splits,
-                        leaf_regularization,
                     )
                 };
-
-                let (mut left_node_info, mut right_node_info, missing_info) = match split_result {
+                let (left_node, right_node, _) = match split_result {
                     Some(v) => v,
                     None => continue,
                 };
 
-                left_node_info.weights = left_weights;
-                right_node_info.weights = right_weights;
+                left_weights[j] = left_node.weight;
+                right_weights[j] = right_node.weight;
 
-                let split_gain = node.get_split_gain(&left_node_info, &right_node_info, &missing_info);
-                let split_gain = cull_gain(split_gain, left_node_info.weight, right_node_info.weight, constraint);
+                let left_obj = left_gradient_valid[j] * left_node.weight
+                    + 0.5 * left_hessian_valid[j] * left_node.weight * left_node.weight;
+                let right_obj = right_gradient_valid[j] * right_node.weight
+                    + 0.5 * right_hessian_valid[j] * right_node.weight * right_node.weight;
+                left_objs[j] = left_obj / left_counts_train[j] as f32;
+                right_objs[j] = right_obj / right_counts_train[j] as f32;
+                valid_scores[j] = (left_obj + right_obj) / (left_counts_valid[j] + right_counts_valid[j]) as f32;
+                train_scores[j] =
+                    -0.5 * (left_node.gain + right_node.gain) / (left_counts_train[j] + right_counts_train[j]) as f32;
 
-                if split_gain <= 0.0 {
+                n_folds += 1;
+            }
+
+            if n_folds >= 5 || node.num == 0 {
+                let train_score = average(&train_scores);
+                let valid_score = average(&valid_scores);
+                let parent_score = -0.5 * node.gain_value / node.stats.as_ref().unwrap().count as f32;
+                let delta_score_train = parent_score - train_score;
+                let delta_score_valid = parent_score - valid_score;
+                let gen_val = delta_score_train / delta_score_valid;
+                if gen_val < GENERALIZATION_THRESHOLD && node.num != 0 {
                     continue;
                 }
+                generalization = Some(gen_val);
+            } else {
+                continue;
+            }
 
-                let mid = (left_node_info.weight + right_node_info.weight) / 2.0;
-                let (left_bounds, right_bounds) = match constraint {
-                    None | Some(Constraint::Unconstrained) => (
-                        (node.lower_bound, node.upper_bound),
-                        (node.lower_bound, node.upper_bound),
-                    ),
-                    Some(Constraint::Negative) => ((mid, node.upper_bound), (node.lower_bound, mid)),
-                    Some(Constraint::Positive) => ((node.lower_bound, mid), (mid, node.upper_bound)),
-                };
-                left_node_info.bounds = left_bounds;
-                right_node_info.bounds = right_bounds;
-                let split_gain = if split_gain.is_nan() { 0.0 } else { split_gain };
+            let split_result = if create_missing_branch {
+                evaluate_branch_split_var_hess(
+                    left_gradient_valid.iter().sum(),
+                    left_hessian_valid.iter().sum::<f32>(),
+                    left_counts_valid.iter().sum::<usize>(),
+                    right_gradient_valid.iter().sum(),
+                    right_hessian_valid.iter().sum::<f32>(),
+                    right_counts_valid.iter().sum::<usize>(),
+                    miss_grad_sum,
+                    miss_hess_sum,
+                    miss_coun_sum,
+                    node.lower_bound,
+                    node.upper_bound,
+                    node.weight_value,
+                    constraint,
+                    force_children_to_bound_parent,
+                    missing_node_treatment,
+                    allow_missing_splits,
+                )
+            } else {
+                evaluate_impute_split_var_hess(
+                    left_gradient_valid.iter().sum(),
+                    left_hessian_valid.iter().sum::<f32>(),
+                    left_counts_valid.iter().sum::<usize>(),
+                    right_gradient_valid.iter().sum(),
+                    right_hessian_valid.iter().sum::<f32>(),
+                    right_counts_valid.iter().sum::<usize>(),
+                    miss_grad_sum,
+                    miss_hess_sum,
+                    miss_coun_sum,
+                    node.lower_bound,
+                    node.upper_bound,
+                    node.weight_value,
+                    constraint,
+                    force_children_to_bound_parent,
+                    missing_node_treatment,
+                    allow_missing_splits,
+                )
+            };
 
-                let ranking_gain = if should_use_sparse_categorical_ranking(ordered_cats.len()) {
-                    score_sparse_categorical_split_gain(
-                        split_gain,
-                        generalization.unwrap_or(1.0),
-                        &left_node_info.weights,
-                        &right_node_info.weights,
-                        left_node_info.counts,
-                        right_node_info.counts,
-                        use_strict_sparse_categorical_balance,
-                    )
-                } else {
-                    split_gain
-                };
+            let (mut left_node_info, mut right_node_info, missing_info) = match split_result {
+                Some(v) => v,
+                None => continue,
+            };
 
-                if (max_gain.is_none() || ranking_gain > max_gain.unwrap())
-                    && (generalization.is_some() || node.num == 0)
-                {
-                    max_gain = Some(ranking_gain);
-                    all_cats = ordered_cats.clone();
-                    split_info.split_gain = split_gain;
-                    split_info.split_feature = feature;
-                    split_info.split_value = b.cut_value;
-                    split_info.split_bin = b.num;
-                    split_info.left_node = left_node_info;
-                    split_info.right_node = right_node_info;
-                    split_info.missing_node = missing_info;
-                    split_info.generalization = generalization;
-                }
+            left_node_info.weights = left_weights;
+            right_node_info.weights = right_weights;
+
+            let split_gain = node.get_split_gain(&left_node_info, &right_node_info, &missing_info);
+            let split_gain = cull_gain(split_gain, left_node_info.weight, right_node_info.weight, constraint);
+
+            if split_gain <= 0.0 {
+                continue;
+            }
+
+            let mid = (left_node_info.weight + right_node_info.weight) / 2.0;
+            let (left_bounds, right_bounds) = match constraint {
+                None | Some(Constraint::Unconstrained) => (
+                    (node.lower_bound, node.upper_bound),
+                    (node.lower_bound, node.upper_bound),
+                ),
+                Some(Constraint::Negative) => ((mid, node.upper_bound), (node.lower_bound, mid)),
+                Some(Constraint::Positive) => ((node.lower_bound, mid), (mid, node.upper_bound)),
+            };
+            left_node_info.bounds = left_bounds;
+            right_node_info.bounds = right_bounds;
+            let split_gain = if split_gain.is_nan() { 0.0 } else { split_gain };
+
+            if (max_gain.is_none() || split_gain > max_gain.unwrap()) && (generalization.is_some() || node.num == 0) {
+                max_gain = Some(split_gain);
+                split_info.split_gain = split_gain;
+                split_info.split_feature = feature;
+                split_info.split_value = b.cut_value;
+                split_info.split_bin = b.num;
+                split_info.left_node = left_node_info;
+                split_info.right_node = right_node_info;
+                split_info.missing_node = missing_info;
+                split_info.generalization = generalization;
             }
         }
     } else if miss_coun_sum == 0
@@ -2606,18 +2100,10 @@ fn best_feature_split_var_hess(
             let train_score = average(&train_scores);
             let valid_score = average(&valid_scores);
             let parent_score = -0.5 * node.gain_value / node.stats.as_ref().unwrap().count as f32;
-            let (node_depth, node_count) = node_generalization_context(node);
-            let gen_val =
-                calculate_generalization(parent_score, train_score, valid_score, &left_weights, &right_weights);
-            if !passes_generalization_filter(
-                node.num,
-                node_depth,
-                node_count,
-                gen_val,
-                &left_weights,
-                &right_weights,
-                false,
-            ) {
+            let delta_score_train = parent_score - train_score;
+            let delta_score_valid = parent_score - valid_score;
+            let gen_val = delta_score_train / delta_score_valid;
+            if gen_val < GENERALIZATION_THRESHOLD && node.num != 0 {
                 continue;
             }
             let generalization = Some(gen_val);
@@ -2640,10 +2126,8 @@ fn best_feature_split_var_hess(
                 continue;
             }
 
-            let ranking_gain = score_split_gain(split_gain, gen_val, &left_weights, &right_weights);
-
-            if ranking_gain > best_gain && (generalization.is_some() || node.num == 0) {
-                best_gain = ranking_gain;
+            if split_gain > best_gain && (generalization.is_some() || node.num == 0) {
+                best_gain = split_gain;
                 best_left_weights = left_weights;
                 best_right_weights = right_weights;
                 best_generalization = generalization;
@@ -2656,63 +2140,6 @@ fn best_feature_split_var_hess(
                 best_cut_value = b.cut_value;
                 best_split_bin = b.num;
                 found_split = true;
-            }
-        }
-
-        if !found_split && node.num == 0 && node.stats.as_ref().is_some_and(|stats| stats.count <= 8) {
-            let mut left_grad_sum = [0.0f32; 5];
-            let mut left_hess_sum = [0.0f32; 5];
-            let mut left_count_sum = [0usize; 5];
-
-            for bin in &hist_feat.data[1..] {
-                let b = unsafe { &*bin.get() };
-                let b_coun_total: usize = b.counts.iter().map(|&c| c as usize).sum();
-                if b_coun_total == 0 || b.cut_value.is_nan() {
-                    continue;
-                }
-
-                for j in 0..5 {
-                    left_grad_sum[j] += b.g_folded[j];
-                    left_hess_sum[j] += b.h_folded[j];
-                    left_count_sum[j] += b.counts[j] as usize;
-                }
-
-                let right_grad_sum = std::array::from_fn(|j| node_grad_sum[j] - left_grad_sum[j]);
-                let right_hess_sum = std::array::from_fn(|j| node_hess_sum[j] - left_hess_sum[j]);
-                let right_count_sum = std::array::from_fn(|j| node_coun_sum[j] - left_count_sum[j]);
-
-                let tl_grad: f32 = left_grad_sum.iter().sum();
-                let tl_hess: f32 = left_hess_sum.iter().sum();
-                let tl_count: usize = left_count_sum.iter().sum();
-                let tr_grad: f32 = right_grad_sum.iter().sum();
-                let tr_hess: f32 = right_hess_sum.iter().sum();
-                let tr_count: usize = right_count_sum.iter().sum();
-
-                if tl_count == 0 || tr_count == 0 || tl_hess <= 0.0 || tr_hess <= 0.0 {
-                    continue;
-                }
-
-                let tl_w = -tl_grad / (tl_hess + hessian_eps);
-                let tr_w = -tr_grad / (tr_hess + hessian_eps);
-                let tl_gain = -(2.0 * tl_grad * tl_w + (tl_hess + hessian_eps) * tl_w * tl_w);
-                let tr_gain = -(2.0 * tr_grad * tr_w + (tr_hess + hessian_eps) * tr_w * tr_w);
-                let split_gain = (tl_gain + tr_gain - node.gain_value).max(0.0);
-
-                if split_gain > best_gain {
-                    best_gain = split_gain;
-                    best_left_weights = [tl_w; 5];
-                    best_right_weights = [tr_w; 5];
-                    best_generalization = Some(1.0);
-                    best_left_grad_valid = left_grad_sum;
-                    best_left_hess_valid = left_hess_sum;
-                    best_left_coun_valid = left_count_sum;
-                    best_right_grad_valid = right_grad_sum;
-                    best_right_hess_valid = right_hess_sum;
-                    best_right_coun_valid = right_count_sum;
-                    best_cut_value = b.cut_value;
-                    best_split_bin = b.num;
-                    found_split = true;
-                }
             }
         }
 
@@ -2730,10 +2157,8 @@ fn best_feature_split_var_hess(
             let tl_gain = -(2.0 * tl_grad * tl_w + tl_h * tl_w * tl_w);
             let tr_gain = -(2.0 * tr_grad * tr_w + tr_h * tr_w * tr_w);
 
-            let split_gain = tl_gain + tr_gain - node.gain_value;
-
             max_gain = Some(best_gain);
-            split_info.split_gain = split_gain;
+            split_info.split_gain = best_gain;
             split_info.split_feature = feature;
             split_info.split_value = best_cut_value;
             split_info.split_bin = best_split_bin;
@@ -2872,18 +2297,10 @@ fn best_feature_split_var_hess(
             let train_score = average(&train_scores);
             let valid_score = average(&valid_scores);
             let parent_score = -0.5 * node.gain_value / node.stats.as_ref().unwrap().count as f32;
-            let (node_depth, node_count) = node_generalization_context(node);
-            let gen_val =
-                calculate_generalization(parent_score, train_score, valid_score, &left_weights, &right_weights);
-            if !passes_generalization_filter(
-                node.num,
-                node_depth,
-                node_count,
-                gen_val,
-                &left_weights,
-                &right_weights,
-                false,
-            ) {
+            let delta_score_train = parent_score - train_score;
+            let delta_score_valid = parent_score - valid_score;
+            let gen_val = delta_score_train / delta_score_valid;
+            if gen_val < GENERALIZATION_THRESHOLD && node.num != 0 {
                 continue;
             }
             let generalization = Some(gen_val);
@@ -2905,10 +2322,8 @@ fn best_feature_split_var_hess(
                 continue;
             }
 
-            let ranking_gain = score_split_gain(split_gain, gen_val, &left_weights, &right_weights);
-
-            if ranking_gain > best_gain && (generalization.is_some() || node.num == 0) {
-                best_gain = ranking_gain;
+            if split_gain > best_gain && (generalization.is_some() || node.num == 0) {
+                best_gain = split_gain;
                 best_left_weights = left_weights;
                 best_right_weights = right_weights;
                 best_generalization = generalization;
@@ -2937,10 +2352,8 @@ fn best_feature_split_var_hess(
             let tl_gain = -(2.0 * tl_grad * tl_w + (tl_hess + hessian_eps) * tl_w * tl_w);
             let tr_gain = -(2.0 * tr_grad * tr_w + (tr_hess + hessian_eps) * tr_w * tr_w);
 
-            let split_gain = tl_gain + tr_gain - node.gain_value;
-
             max_gain = Some(best_gain);
-            split_info.split_gain = split_gain;
+            split_info.split_gain = best_gain;
             split_info.split_feature = feature;
             split_info.split_value = best_cut_value;
             split_info.split_bin = best_split_bin;
@@ -3033,7 +2446,6 @@ fn best_feature_split_var_hess(
                         force_children_to_bound_parent,
                         missing_node_treatment,
                         allow_missing_splits,
-                        leaf_regularization,
                     )
                 } else {
                     evaluate_impute_split_var_hess(
@@ -3053,7 +2465,6 @@ fn best_feature_split_var_hess(
                         force_children_to_bound_parent,
                         missing_node_treatment,
                         allow_missing_splits,
-                        leaf_regularization,
                     )
                 };
                 let (left_node, right_node, _) = match split_result {
@@ -3077,7 +2488,7 @@ fn best_feature_split_var_hess(
                 n_folds += 1;
             }
 
-            if n_folds >= categorical_generalization_min_folds || node.num == 0 {
+            if n_folds >= 5 || node.num == 0 {
                 let train_score = average(&train_scores);
                 let valid_score = average(&valid_scores);
                 let parent_score = -0.5 * node.gain_value / node.stats.as_ref().unwrap().count as f32;
@@ -3110,7 +2521,6 @@ fn best_feature_split_var_hess(
                     force_children_to_bound_parent,
                     missing_node_treatment,
                     allow_missing_splits,
-                    leaf_regularization,
                 )
             } else {
                 evaluate_impute_split_var_hess(
@@ -3130,7 +2540,6 @@ fn best_feature_split_var_hess(
                     force_children_to_bound_parent,
                     missing_node_treatment,
                     allow_missing_splits,
-                    leaf_regularization,
                 )
             };
 
@@ -3218,7 +2627,6 @@ fn evaluate_impute_split_const_hess(
     _force_children_to_bound_parent: bool,
     _missing_node_treatment: MissingNodeTreatment,
     allow_missing_splits: bool,
-    leaf_regularization: f32,
 ) -> Option<(NodeInfo, NodeInfo, MissingInfo)> {
     // If there is no info right, or there is no
     // info left, we will possibly lead to a missing only
@@ -3236,60 +2644,43 @@ fn evaluate_impute_split_const_hess(
     let mut left_counts = left_counts;
     let mut right_counts = right_counts;
 
-    let mut left_weight = constrained_weight_const_hess_reg(
-        left_gradient,
-        left_counts,
-        leaf_regularization,
-        lower_bound,
-        upper_bound,
-        constraint,
-    );
-    let mut right_weight = constrained_weight_const_hess_reg(
-        right_gradient,
-        right_counts,
-        leaf_regularization,
-        lower_bound,
-        upper_bound,
-        constraint,
-    );
+    let mut left_weight =
+        constrained_weight_const_hess(left_gradient, left_counts, lower_bound, upper_bound, constraint);
+    let mut right_weight =
+        constrained_weight_const_hess(right_gradient, right_counts, lower_bound, upper_bound, constraint);
 
-    let mut left_gain = gain_given_weight_const_hess_reg(left_gradient, left_counts, left_weight, leaf_regularization);
-    let mut right_gain =
-        gain_given_weight_const_hess_reg(right_gradient, right_counts, right_weight, leaf_regularization);
+    let mut left_gain = gain_given_weight_const_hess(left_gradient, left_counts, left_weight);
+    let mut right_gain = gain_given_weight_const_hess(right_gradient, right_counts, right_weight);
 
     // Check Missing direction
     // Don't even worry about it, if there are no missing values
     // in this bin.
     if (missing_gradient != 0.0) || (missing_counts != 0) {
-        let missing_left_weight = constrained_weight_const_hess_reg(
+        let missing_left_weight = constrained_weight_const_hess(
             left_gradient + missing_gradient,
             left_counts + missing_counts,
-            leaf_regularization,
             lower_bound,
             upper_bound,
             constraint,
         );
-        let missing_left_gain = gain_given_weight_const_hess_reg(
+        let missing_left_gain = gain_given_weight_const_hess(
             left_gradient + missing_gradient,
             left_counts + missing_counts,
             missing_left_weight,
-            leaf_regularization,
         );
         let missing_left_gain = cull_gain(missing_left_gain, missing_left_weight, right_weight, constraint);
 
-        let missing_right_weight = constrained_weight_const_hess_reg(
+        let missing_right_weight = constrained_weight_const_hess(
             right_gradient + missing_gradient,
             right_counts + missing_counts,
-            leaf_regularization,
             lower_bound,
             upper_bound,
             constraint,
         );
-        let missing_right_gain = gain_given_weight_const_hess_reg(
+        let missing_right_gain = gain_given_weight_const_hess(
             right_gradient + missing_gradient,
             right_counts + missing_counts,
             missing_right_weight,
-            leaf_regularization,
         );
         let missing_right_gain = cull_gain(missing_right_gain, left_weight, missing_right_weight, constraint);
 
@@ -3352,7 +2743,6 @@ fn evaluate_impute_split_var_hess(
     _force_children_to_bound_parent: bool,
     _missing_node_treatment: MissingNodeTreatment,
     allow_missing_splits: bool,
-    leaf_regularization: f32,
 ) -> Option<(NodeInfo, NodeInfo, MissingInfo)> {
     // If there is no info right, or there is no
     // info left, we will possibly lead to a missing only
@@ -3370,59 +2760,41 @@ fn evaluate_impute_split_var_hess(
     let mut right_gradient = right_gradient;
     let mut right_hessian = right_hessian;
 
-    let mut left_weight = constrained_weight_reg(
-        left_gradient,
-        left_hessian,
-        leaf_regularization,
-        lower_bound,
-        upper_bound,
-        constraint,
-    );
-    let mut right_weight = constrained_weight_reg(
-        right_gradient,
-        right_hessian,
-        leaf_regularization,
-        lower_bound,
-        upper_bound,
-        constraint,
-    );
+    let mut left_weight = constrained_weight(left_gradient, left_hessian, lower_bound, upper_bound, constraint);
+    let mut right_weight = constrained_weight(right_gradient, right_hessian, lower_bound, upper_bound, constraint);
 
-    let mut left_gain = gain_given_weight_reg(left_gradient, left_hessian, left_weight, leaf_regularization);
-    let mut right_gain = gain_given_weight_reg(right_gradient, right_hessian, right_weight, leaf_regularization);
+    let mut left_gain = gain_given_weight(left_gradient, left_hessian, left_weight);
+    let mut right_gain = gain_given_weight(right_gradient, right_hessian, right_weight);
 
     // Check Missing direction
     // Don't even worry about it, if there are no missing values
     // in this bin.
     if (missing_gradient != 0.0) || (missing_hessian != 0.0) {
-        let missing_left_weight = constrained_weight_reg(
+        let missing_left_weight = constrained_weight(
             left_gradient + missing_gradient,
             left_hessian + missing_hessian,
-            leaf_regularization,
             lower_bound,
             upper_bound,
             constraint,
         );
-        let missing_left_gain = gain_given_weight_reg(
+        let missing_left_gain = gain_given_weight(
             left_gradient + missing_gradient,
             left_hessian + missing_hessian,
             missing_left_weight,
-            leaf_regularization,
         );
         let missing_left_gain = cull_gain(missing_left_gain, missing_left_weight, right_weight, constraint);
 
-        let missing_right_weight = constrained_weight_reg(
+        let missing_right_weight = constrained_weight(
             right_gradient + missing_gradient,
             right_hessian + missing_hessian,
-            leaf_regularization,
             lower_bound,
             upper_bound,
             constraint,
         );
-        let missing_right_gain = gain_given_weight_reg(
+        let missing_right_gain = gain_given_weight(
             right_gradient + missing_gradient,
             right_hessian + missing_hessian,
             missing_right_weight,
-            leaf_regularization,
         );
         let missing_right_gain = cull_gain(missing_right_gain, left_weight, missing_right_weight, constraint);
 
@@ -3485,41 +2857,27 @@ fn evaluate_branch_split_const_hess(
     force_children_to_bound_parent: bool,
     missing_node_treatment: MissingNodeTreatment,
     allow_missing_splits: bool,
-    leaf_regularization: f32,
 ) -> Option<(NodeInfo, NodeInfo, MissingInfo)> {
     if (left_counts == 0 || right_counts == 0) && !allow_missing_splits {
         return None;
     }
 
-    let mut left_weight = constrained_weight_const_hess_reg(
-        left_gradient,
-        left_counts,
-        leaf_regularization,
-        lower_bound,
-        upper_bound,
-        constraint,
-    );
-    let mut right_weight = constrained_weight_const_hess_reg(
-        right_gradient,
-        right_counts,
-        leaf_regularization,
-        lower_bound,
-        upper_bound,
-        constraint,
-    );
+    let mut left_weight =
+        constrained_weight_const_hess(left_gradient, left_counts, lower_bound, upper_bound, constraint);
+    let mut right_weight =
+        constrained_weight_const_hess(right_gradient, right_counts, lower_bound, upper_bound, constraint);
 
     if force_children_to_bound_parent {
         (left_weight, right_weight) = bound_to_parent(parent_weight, left_weight, right_weight);
     }
 
-    let left_gain = gain_given_weight_const_hess_reg(left_gradient, left_counts, left_weight, leaf_regularization);
-    let right_gain = gain_given_weight_const_hess_reg(right_gradient, right_counts, right_weight, leaf_regularization);
+    let left_gain = gain_given_weight_const_hess(left_gradient, left_counts, left_weight);
+    let right_gain = gain_given_weight_const_hess(right_gradient, right_counts, right_weight);
 
     let missing_weight = match missing_node_treatment {
-        MissingNodeTreatment::AssignToParent => constrained_weight_const_hess_reg(
+        MissingNodeTreatment::AssignToParent => constrained_weight_const_hess(
             missing_gradient + left_gradient + right_gradient,
             missing_counts + left_counts + right_counts,
-            leaf_regularization,
             lower_bound,
             upper_bound,
             constraint,
@@ -3534,21 +2892,13 @@ fn evaluate_branch_split_const_hess(
         }
         MissingNodeTreatment::None => {
             if missing_counts > 0 {
-                constrained_weight_const_hess_reg(
-                    missing_gradient,
-                    missing_counts,
-                    leaf_regularization,
-                    lower_bound,
-                    upper_bound,
-                    constraint,
-                )
+                constrained_weight_const_hess(missing_gradient, missing_counts, lower_bound, upper_bound, constraint)
             } else {
                 parent_weight
             }
         }
     };
-    let missing_gain =
-        gain_given_weight_const_hess_reg(missing_gradient, missing_counts, missing_weight, leaf_regularization);
+    let missing_gain = gain_given_weight_const_hess(missing_gradient, missing_counts, missing_weight);
     let missing_info = NodeInfo {
         gain: missing_gain,
         grad: missing_gradient,
@@ -3606,41 +2956,25 @@ fn evaluate_branch_split_var_hess(
     force_children_to_bound_parent: bool,
     missing_node_treatment: MissingNodeTreatment,
     allow_missing_splits: bool,
-    leaf_regularization: f32,
 ) -> Option<(NodeInfo, NodeInfo, MissingInfo)> {
     if (left_hessian == 0.0 || right_hessian == 0.0) && !allow_missing_splits {
         return None;
     }
 
-    let mut left_weight = constrained_weight_reg(
-        left_gradient,
-        left_hessian,
-        leaf_regularization,
-        lower_bound,
-        upper_bound,
-        constraint,
-    );
-    let mut right_weight = constrained_weight_reg(
-        right_gradient,
-        right_hessian,
-        leaf_regularization,
-        lower_bound,
-        upper_bound,
-        constraint,
-    );
+    let mut left_weight = constrained_weight(left_gradient, left_hessian, lower_bound, upper_bound, constraint);
+    let mut right_weight = constrained_weight(right_gradient, right_hessian, lower_bound, upper_bound, constraint);
 
     if force_children_to_bound_parent {
         (left_weight, right_weight) = bound_to_parent(parent_weight, left_weight, right_weight);
     }
 
-    let left_gain = gain_given_weight_reg(left_gradient, left_hessian, left_weight, leaf_regularization);
-    let right_gain = gain_given_weight_reg(right_gradient, right_hessian, right_weight, leaf_regularization);
+    let left_gain = gain_given_weight(left_gradient, left_hessian, left_weight);
+    let right_gain = gain_given_weight(right_gradient, right_hessian, right_weight);
 
     let missing_weight = match missing_node_treatment {
-        MissingNodeTreatment::AssignToParent => constrained_weight_reg(
+        MissingNodeTreatment::AssignToParent => constrained_weight(
             missing_gradient + left_gradient + right_gradient,
             missing_hessian + left_hessian + right_hessian,
-            leaf_regularization,
             lower_bound,
             upper_bound,
             constraint,
@@ -3654,20 +2988,13 @@ fn evaluate_branch_split_var_hess(
         }
         MissingNodeTreatment::None => {
             if missing_hessian > 0.0 || missing_gradient != 0.0 {
-                constrained_weight_reg(
-                    missing_gradient,
-                    missing_hessian,
-                    leaf_regularization,
-                    lower_bound,
-                    upper_bound,
-                    constraint,
-                )
+                constrained_weight(missing_gradient, missing_hessian, lower_bound, upper_bound, constraint)
             } else {
                 parent_weight
             }
         }
     };
-    let missing_gain = gain_given_weight_reg(missing_gradient, missing_hessian, missing_weight, leaf_regularization);
+    let missing_gain = gain_given_weight(missing_gradient, missing_hessian, missing_weight);
     let missing_info = NodeInfo {
         gain: missing_gain,
         grad: missing_gradient,
@@ -3740,7 +3067,7 @@ mod tests {
 
         let (grad, hess) = objective_function.gradient(&y, &yhat, None, None);
 
-        let splitter = MissingImputerSplitter::new(0.3, 0.0, true, ConstraintMap::new(), None);
+        let splitter = MissingImputerSplitter::new(0.3, true, ConstraintMap::new(), None);
         let gradient_sum = grad.iter().sum();
         let hessian_sum = match hess {
             Some(ref hess) => hess.iter().sum(),
@@ -3778,7 +3105,6 @@ mod tests {
                 hess.as_deref(),
                 &index,
                 &col_index,
-                false,
                 &pool,
                 false,
             );
@@ -3893,7 +3219,7 @@ mod tests {
         let yhat = vec![y_test_avg; y_test.len()];
         let (grad, hess) = objective_function.gradient(&y_test, &yhat, None, None);
 
-        let splitter = MissingImputerSplitter::new(0.3, 0.0, false, ConstraintMap::new(), None);
+        let splitter = MissingImputerSplitter::new(0.3, false, ConstraintMap::new(), None);
 
         let data = Matrix::new(&data_test, y_test.len(), n_cols);
 
@@ -3922,13 +3248,12 @@ mod tests {
                 hess.as_deref(),
                 &index,
                 &col_index,
-                false,
                 &pool,
                 false,
             );
         }
 
-        let mut n = create_root_node(&index, &grad, hess.as_deref(), 0.0);
+        let mut n = create_root_node(&index, &grad, hess.as_deref());
 
         let mut split_info_vec: Vec<SplitInfo> = (0..col_index.len()).map(|_| SplitInfo::default()).collect();
         let mut split_info_slice = SplitInfoSlice::new(&mut split_info_vec);
@@ -3976,7 +3301,7 @@ mod tests {
         let yhat = vec![y_avg; y.len()];
         let (grad, hess) = objective_function.gradient(&y, &yhat, None, None);
 
-        let splitter = MissingImputerSplitter::new(eta, 0.0, false, ConstraintMap::new(), None);
+        let splitter = MissingImputerSplitter::new(eta, false, ConstraintMap::new(), None);
 
         let gradient_sum = grad.iter().copied().sum();
         let hessian_sum = match hess {
@@ -4011,7 +3336,6 @@ mod tests {
                 hess.as_deref(),
                 &index,
                 &col_index,
-                false,
                 &pool,
                 false,
             );
@@ -4088,7 +3412,7 @@ mod tests {
         let yhat = vec![y_avg; y.len()];
         let (grad, hess) = objective_function.gradient(&y, &yhat, None, None);
 
-        let splitter = MissingImputerSplitter::new(eta, 0.0, false, ConstraintMap::new(), None);
+        let splitter = MissingImputerSplitter::new(eta, false, ConstraintMap::new(), None);
 
         let b = bin_matrix(&data, None, n_bins, f64::NAN, Some(&cat_index)).unwrap();
         let bdata = Matrix::new(&b.binned_data, data.rows, data.cols);
@@ -4113,13 +3437,12 @@ mod tests {
                 None,
                 &index,
                 &col_index,
-                false,
                 &pool,
                 false,
             );
         }
 
-        let mut n = create_root_node(&index, &grad, hess.as_deref(), 0.0);
+        let mut n = create_root_node(&index, &grad, hess.as_deref());
 
         let mut split_info_vec: Vec<SplitInfo> = (0..col_index.len()).map(|_| SplitInfo::default()).collect();
         let mut split_info_slice = SplitInfoSlice::new(&mut split_info_vec);
@@ -4162,7 +3485,6 @@ mod tests {
         let terminate_missing_features = HashSet::new();
         let splitter = MissingBranchSplitter::new(
             0.1,
-            0.0,
             true,
             constraints_map,
             terminate_missing_features,
@@ -4185,7 +3507,7 @@ mod tests {
     #[test]
     fn test_interaction_constraints() {
         let interaction_constraints = Some(vec![vec![0, 1]]);
-        let splitter = MissingImputerSplitter::new(0.3, 0.0, true, ConstraintMap::new(), interaction_constraints);
+        let splitter = MissingImputerSplitter::new(0.3, true, ConstraintMap::new(), interaction_constraints);
         assert_eq!(splitter.get_interaction_constraints().unwrap().len(), 1);
 
         let allowed_features = HashSet::from([0]);
@@ -4244,7 +3566,6 @@ mod tests {
     fn test_missing_branch_splitter_comprehensive() {
         let splitter = MissingBranchSplitter::new(
             0.1,
-            0.0,
             true,
             ConstraintMap::new(),
             HashSet::new(),
@@ -4269,7 +3590,6 @@ mod tests {
                 split_gain: 0.0,
                 is_leaf: false,
                 weight_value: 0.0,
-                leaf_weights: None,
                 hessian_sum: 20.0,
                 left_cats: None,
                 stats: None,
@@ -4288,7 +3608,6 @@ mod tests {
                 split_gain: 0.0,
                 is_leaf: true,
                 weight_value: 1.0,
-                leaf_weights: None,
                 hessian_sum: 10.0,
                 left_cats: None,
                 stats: None,
@@ -4307,7 +3626,6 @@ mod tests {
                 split_gain: 0.0,
                 is_leaf: true,
                 weight_value: 2.0,
-                leaf_weights: None,
                 hessian_sum: 10.0,
                 left_cats: None,
                 stats: None,
@@ -4326,7 +3644,6 @@ mod tests {
                 split_gain: 0.0,
                 is_leaf: true,
                 weight_value: 0.0,
-                leaf_weights: None,
                 hessian_sum: 5.0,
                 left_cats: None,
                 stats: None,
@@ -4339,9 +3656,7 @@ mod tests {
             depth: 1,
             n_leaves: 3,
             leaf_bounds: Vec::new(),
-            leaf_node_assignments: Vec::new(),
             train_index: Vec::new(),
-            generalization_score: 0.0,
         };
 
         splitter.clean_up_splits(&mut tree);
@@ -4402,7 +3717,7 @@ mod tests {
 
     #[test]
     fn test_missing_imputer_splitter_coverage() {
-        let splitter = MissingImputerSplitter::new(0.3, 0.0, true, ConstraintMap::new(), None);
+        let splitter = MissingImputerSplitter::new(0.3, true, ConstraintMap::new(), None);
         assert_eq!(splitter.new_leaves_added(), 1);
         assert!(splitter.get_constraint(&0).is_none());
         assert_eq!(splitter.get_missing_node_treatment(), MissingNodeTreatment::None);
@@ -4413,7 +3728,6 @@ mod tests {
     fn test_update_average_missing_nodes_recursive() {
         let splitter = MissingBranchSplitter::new(
             0.1,
-            0.0,
             true,
             ConstraintMap::new(),
             HashSet::new(),
@@ -4437,7 +3751,6 @@ mod tests {
                 split_gain: 0.0,
                 is_leaf: false,
                 weight_value: 0.0,
-                leaf_weights: None,
                 hessian_sum: 30.0,
                 left_cats: None,
                 stats: None,
@@ -4456,7 +3769,6 @@ mod tests {
                 split_gain: 0.0,
                 is_leaf: true,
                 weight_value: 1.0,
-                leaf_weights: None,
                 hessian_sum: 10.0,
                 left_cats: None,
                 stats: None,
@@ -4475,7 +3787,6 @@ mod tests {
                 split_gain: 0.0,
                 is_leaf: true,
                 weight_value: 2.0,
-                leaf_weights: None,
                 hessian_sum: 10.0,
                 left_cats: None,
                 stats: None,
@@ -4494,7 +3805,6 @@ mod tests {
                 split_gain: 0.0,
                 is_leaf: false,
                 weight_value: 0.0,
-                leaf_weights: None,
                 hessian_sum: 10.0,
                 left_cats: None,
                 stats: None,
@@ -4513,7 +3823,6 @@ mod tests {
                 split_gain: 0.0,
                 is_leaf: true,
                 weight_value: 3.0,
-                leaf_weights: None,
                 hessian_sum: 5.0,
                 left_cats: None,
                 stats: None,
@@ -4532,7 +3841,6 @@ mod tests {
                 split_gain: 0.0,
                 is_leaf: true,
                 weight_value: 4.0,
-                leaf_weights: None,
                 hessian_sum: 5.0,
                 left_cats: None,
                 stats: None,
@@ -4551,7 +3859,6 @@ mod tests {
                 split_gain: 0.0,
                 is_leaf: true,
                 weight_value: 0.0,
-                leaf_weights: None,
                 hessian_sum: 0.0,
                 left_cats: None,
                 stats: None,
@@ -4564,95 +3871,12 @@ mod tests {
             depth: 2,
             n_leaves: 5,
             leaf_bounds: Vec::new(),
-            leaf_node_assignments: Vec::new(),
             train_index: Vec::new(),
-            generalization_score: 0.0,
         };
         splitter.clean_up_splits(&mut tree);
         // Node 3 avg weight = (3.0 * 5 + 4.0 * 5 + 0 * 0) / (5 + 5 + 0) = 35 / 10 = 3.5
         // Node 0 avg weight = (1.0 * 10 + 2.0 * 10 + 3.5 * 10) / (10 + 10 + 10) = (10 + 20 + 35) / 30 = 65 / 30 = 2.166...
         assert!((tree.nodes[&0].weight_value - 2.1666667).abs() < 1e-5);
-    }
-
-    #[test]
-    fn test_score_categorical_split_gain_prefers_stable_weights() {
-        let split_gain = 4.0;
-        let stable = [0.5, 0.52, 0.48, 0.51, 0.49];
-        let unstable = [1.4, -0.1, 0.9, -0.2, 0.5];
-
-        let stable_score = score_categorical_split_gain(split_gain, 1.0, &stable, &stable);
-        let unstable_score = score_categorical_split_gain(split_gain, 1.0, &stable, &unstable);
-
-        assert!(stable_score > unstable_score);
-    }
-
-    #[test]
-    fn test_score_split_gain_prefers_stable_weights() {
-        let split_gain = 4.0;
-        let stable = [0.5, 0.52, 0.48, 0.51, 0.49];
-        let unstable = [1.4, -0.1, 0.9, -0.2, 0.5];
-
-        let stable_score = score_split_gain(split_gain, 1.0, &stable, &stable);
-        let unstable_score = score_split_gain(split_gain, 1.0, &stable, &unstable);
-
-        assert!(stable_score > unstable_score);
-    }
-
-    #[test]
-    fn test_numeric_generalization_filter_allows_stable_borderline_split() {
-        let stable = [0.5, 0.52, 0.48, 0.51, 0.49];
-
-        assert!(passes_generalization_filter(1, 1, 4_096, 1.0, &stable, &stable, false));
-        assert!(!passes_generalization_filter(
-            1, 1, 4_096, 0.975, &stable, &stable, false
-        ));
-    }
-
-    #[test]
-    fn test_categorical_generalization_filter_stays_stricter() {
-        let stable = [0.5, 0.52, 0.48, 0.51, 0.49];
-
-        assert!(passes_generalization_filter(1, 1, 4_096, 0.991, &stable, &stable, true));
-        assert!(!passes_generalization_filter(
-            1, 1, 4_096, 0.985, &stable, &stable, true
-        ));
-    }
-
-    #[test]
-    fn test_numeric_generalization_filter_relaxes_for_small_stable_nodes() {
-        let stable = [0.5, 0.52, 0.48, 0.51, 0.49];
-
-        assert!(passes_generalization_filter(1, 2, 256, 0.993, &stable, &stable, false));
-        assert!(!passes_generalization_filter(1, 2, 256, 0.99, &stable, &stable, false));
-    }
-
-    #[test]
-    fn test_categorical_generalization_filter_relaxes_for_small_stable_nodes() {
-        let stable = [0.5, 0.52, 0.48, 0.51, 0.49];
-
-        assert!(passes_generalization_filter(1, 2, 256, 0.986, &stable, &stable, true));
-    }
-
-    #[test]
-    fn test_sparse_categorical_ranking_gate_targets_large_histograms() {
-        assert!(!should_use_sparse_categorical_ranking(47));
-        assert!(should_use_sparse_categorical_ranking(48));
-    }
-
-    #[test]
-    fn test_sparse_categorical_balance_factor_prefers_less_skewed_splits() {
-        assert!(sparse_categorical_balance_factor(400, 600, false) > sparse_categorical_balance_factor(40, 960, false));
-        assert_eq!(sparse_categorical_balance_factor(120, 880, false), 1.0);
-        assert!(sparse_categorical_balance_factor(40, 960, false) >= 0.9);
-    }
-
-    #[test]
-    fn test_strict_sparse_categorical_balance_factor_penalizes_tiny_children_more() {
-        let relaxed = sparse_categorical_balance_factor(40, 960, false);
-        let strict = sparse_categorical_balance_factor(40, 960, true);
-
-        assert!(strict < relaxed);
-        assert!(strict >= 0.82);
     }
 
     #[test]
@@ -4662,7 +3886,6 @@ mod tests {
         let run_strategy = |n_missing: usize, n_left: usize, n_right: usize| {
             let splitter = MissingBranchSplitter::new(
                 0.1,
-                0.0,
                 true,
                 ConstraintMap::new(),
                 HashSet::from([0]),
@@ -4728,7 +3951,6 @@ mod tests {
                 None,
                 &index,
                 &col_index,
-                false,
                 &pool,
                 false,
             );
@@ -4779,7 +4001,6 @@ mod tests {
                 None,
                 &pool,
                 &hist_tree,
-                false,
             );
         };
 
@@ -4800,7 +4021,7 @@ mod tests {
         let pool = ThreadPoolBuilder::new().num_threads(2).build().unwrap();
 
         // 1. MissingImputerSplitter::get_eta and coverage
-        let imputer = MissingImputerSplitter::new(0.5, 0.0, true, ConstraintMap::new(), None);
+        let imputer = MissingImputerSplitter::new(0.5, true, ConstraintMap::new(), None);
         assert_eq!(imputer.get_eta(), 0.5);
         assert!(!imputer.get_create_missing_branch());
         assert!(!imputer.get_force_children_to_bound_parent());
@@ -4812,7 +4033,6 @@ mod tests {
         // 2. MissingBranchSplitter with terminate_missing_features and misc coverage
         let splitter = MissingBranchSplitter::new(
             0.1,
-            0.0,
             true,
             ConstraintMap::new(),
             HashSet::from([0]),
@@ -4878,7 +4098,6 @@ mod tests {
             None,
             &index,
             &col_index,
-            false,
             &pool,
             false,
         );
@@ -4929,7 +4148,6 @@ mod tests {
             None,
             &pool,
             &hist_tree,
-            false,
         );
 
         // 3. Interaction Constraints Parallel Path (line 208)
@@ -4989,7 +4207,6 @@ mod tests {
             Some(&hess),
             &index,
             &col_index,
-            false,
             &pool,
             false,
         );

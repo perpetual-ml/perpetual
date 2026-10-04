@@ -112,276 +112,11 @@ pub fn sort_cat_bins_by_num(histogram: &mut [&UnsafeCell<Bin>]) {
     }
 }
 
-#[derive(Copy, Clone)]
-enum CatBinSortMode {
-    OrderedStat,
-    PosteriorMean,
-    SupportLift,
-}
-
-#[inline]
-fn cat_sort_priors(histogram: &[&UnsafeCell<Bin>], is_const_hess: bool) -> (f32, f32, f32) {
+/// Sort categorical bins by their statistics (gradient/hessian or gradient/count).
+pub fn sort_cat_bins_by_stat(histogram: &mut [&UnsafeCell<Bin>], is_const_hess: bool) {
     unsafe {
-        let mut prior_strength = 1.0_f32;
-        let mut prior_numerator = 0.0_f32;
-        let mut prior_denom = 0.0_f32;
-        let mut used_bins = 0_u32;
-        for bin in histogram.iter() {
-            let current = bin.get().as_ref().unwrap();
-            if current.num == 0 {
-                continue;
-            }
-            let denom = if is_const_hess {
-                current.counts.iter().sum::<u32>() as f32
-            } else {
-                current.h_folded.iter().sum::<f32>()
-            };
-            if denom > 0.0 {
-                prior_strength += denom;
-                prior_numerator += current.g_folded.iter().sum::<f32>();
-                prior_denom += denom;
-                used_bins += 1;
-            }
-        }
-        if used_bins > 0 {
-            prior_strength /= used_bins as f32;
-        }
-        (prior_numerator, prior_denom, prior_strength)
-    }
-}
-
-#[inline]
-fn cat_bin_score(
-    bin: &Bin,
-    is_const_hess: bool,
-    prior_numerator: f32,
-    prior_denom: f32,
-    prior_strength: f32,
-    l2_regularization: f32,
-) -> f32 {
-    let denominators = if is_const_hess {
-        bin.counts.map(|count| count as f32)
-    } else {
-        bin.h_folded
-    };
-    let total_numerator = bin.g_folded.iter().sum::<f32>();
-    let total_denom = denominators.iter().sum::<f32>();
-    if total_denom <= 0.0 {
-        return 0.0;
-    }
-
-    let prior_mean = if prior_denom > 0.0 {
-        prior_numerator / (prior_denom + l2_regularization)
-    } else {
-        0.0
-    };
-
-    let mut ordered_scores = [0.0_f32; 5];
-    let mut holdout_alignment = [0.0_f32; 5];
-    let mut used_folds = 0_usize;
-
-    for (&fold_denom, &fold_gradient) in denominators.iter().zip(bin.g_folded.iter()) {
-        let train_denom = total_denom - fold_denom;
-        if train_denom <= 0.0 {
-            continue;
-        }
-
-        let train_numerator = total_numerator - fold_gradient;
-        let ordered_score =
-            (train_numerator + prior_strength * prior_mean) / (train_denom + prior_strength + l2_regularization);
-        let holdout_score = if fold_denom > 0.0 {
-            fold_gradient / (fold_denom + l2_regularization)
-        } else {
-            prior_mean
-        };
-        let alignment = 1.0 / (1.0 + (holdout_score - ordered_score).abs() / (ordered_score.abs() + 1e-3));
-
-        ordered_scores[used_folds] = ordered_score;
-        holdout_alignment[used_folds] = alignment;
-        used_folds += 1;
-    }
-
-    if used_folds == 0 {
-        return 0.0;
-    }
-
-    let mean_score = ordered_scores[..used_folds].iter().sum::<f32>() / used_folds as f32;
-    let variance = ordered_scores[..used_folds]
-        .iter()
-        .map(|score| {
-            let diff = *score - mean_score;
-            diff * diff
-        })
-        .sum::<f32>()
-        / used_folds as f32;
-    let stability = 1.0 / (1.0 + variance.sqrt() / (mean_score.abs() + 1e-6));
-    let alignment = holdout_alignment[..used_folds].iter().sum::<f32>() / used_folds as f32;
-    let support_shrinkage = total_denom / (total_denom + 0.35 * prior_strength.max(1.0));
-
-    mean_score * (0.55 * stability + 0.45 * alignment) * support_shrinkage
-}
-
-#[inline]
-fn cat_bin_posterior_mean(
-    bin: &Bin,
-    is_const_hess: bool,
-    prior_numerator: f32,
-    prior_denom: f32,
-    prior_strength: f32,
-    l2_regularization: f32,
-) -> f32 {
-    let total_numerator = bin.g_folded.iter().sum::<f32>();
-    let total_denom = if is_const_hess {
-        bin.counts.iter().sum::<u32>() as f32
-    } else {
-        bin.h_folded.iter().sum::<f32>()
-    };
-    if total_denom <= 0.0 {
-        return 0.0;
-    }
-
-    let prior_mean = if prior_denom > 0.0 {
-        prior_numerator / (prior_denom + l2_regularization)
-    } else {
-        0.0
-    };
-    (total_numerator + prior_strength * prior_mean) / (total_denom + prior_strength + l2_regularization)
-}
-
-#[inline]
-fn cat_bin_support_lift(
-    bin: &Bin,
-    is_const_hess: bool,
-    prior_numerator: f32,
-    prior_denom: f32,
-    prior_strength: f32,
-    l2_regularization: f32,
-) -> f32 {
-    let posterior_mean = cat_bin_posterior_mean(
-        bin,
-        is_const_hess,
-        prior_numerator,
-        prior_denom,
-        prior_strength,
-        l2_regularization,
-    );
-    let total_denom = if is_const_hess {
-        bin.counts.iter().sum::<u32>() as f32
-    } else {
-        bin.h_folded.iter().sum::<f32>()
-    };
-    if total_denom <= 0.0 {
-        return 0.0;
-    }
-
-    let prior_mean = if prior_denom > 0.0 {
-        prior_numerator / (prior_denom + l2_regularization)
-    } else {
-        0.0
-    };
-    let support = total_denom.sqrt() / (total_denom.sqrt() + prior_strength.max(1.0).sqrt());
-    (posterior_mean - prior_mean) * support
-}
-
-#[inline]
-fn cat_bin_sort_score(
-    bin: &Bin,
-    is_const_hess: bool,
-    prior_numerator: f32,
-    prior_denom: f32,
-    prior_strength: f32,
-    l2_regularization: f32,
-    mode: CatBinSortMode,
-) -> f32 {
-    match mode {
-        CatBinSortMode::OrderedStat => cat_bin_score(
-            bin,
-            is_const_hess,
-            prior_numerator,
-            prior_denom,
-            prior_strength,
-            l2_regularization,
-        ),
-        CatBinSortMode::PosteriorMean => cat_bin_posterior_mean(
-            bin,
-            is_const_hess,
-            prior_numerator,
-            prior_denom,
-            prior_strength,
-            l2_regularization,
-        ),
-        CatBinSortMode::SupportLift => cat_bin_support_lift(
-            bin,
-            is_const_hess,
-            prior_numerator,
-            prior_denom,
-            prior_strength,
-            l2_regularization,
-        ),
-    }
-}
-
-#[inline]
-fn preferred_single_categorical_sort_mode(
-    histogram: &[&UnsafeCell<Bin>],
-    is_const_hess: bool,
-    prior_strength: f32,
-) -> CatBinSortMode {
-    let mut active_bins = 0_usize;
-    let mut low_support_bins = 0_usize;
-    let low_support_cutoff = 1.5 * prior_strength.max(1.0);
-
-    unsafe {
-        for bin in histogram.iter() {
-            let current = bin.get().as_ref().unwrap();
-            if current.num == 0 {
-                continue;
-            }
-            let denom = if is_const_hess {
-                current.counts.iter().sum::<u32>() as f32
-            } else {
-                current.h_folded.iter().sum::<f32>()
-            };
-            if denom <= 0.0 {
-                continue;
-            }
-            active_bins += 1;
-            if denom <= low_support_cutoff {
-                low_support_bins += 1;
-            }
-        }
-    }
-
-    if active_bins < 48 {
-        return CatBinSortMode::OrderedStat;
-    }
-
-    let low_support_share = low_support_bins as f32 / active_bins as f32;
-    if low_support_share >= 0.7 {
-        CatBinSortMode::SupportLift
-    } else if low_support_share >= 0.45 {
-        CatBinSortMode::PosteriorMean
-    } else {
-        CatBinSortMode::OrderedStat
-    }
-}
-
-pub fn categorical_histogram_orders<'a>(
-    histogram: &[&'a UnsafeCell<Bin>],
-    is_const_hess: bool,
-    l2_regularization: f32,
-) -> Vec<Vec<&'a UnsafeCell<Bin>>> {
-    let (prior_numerator, prior_denom, prior_strength) = cat_sort_priors(histogram, is_const_hess);
-    let mut orders: Vec<Vec<&'a UnsafeCell<Bin>>> = Vec::new();
-
-    for mode in [
-        CatBinSortMode::OrderedStat,
-        CatBinSortMode::PosteriorMean,
-        CatBinSortMode::SupportLift,
-    ] {
-        let mut order = histogram.to_vec();
-        unsafe {
-            order.sort_unstable_by(|bin1, bin2| {
+        if is_const_hess {
+            histogram.sort_unstable_by(|bin1, bin2| {
                 let b1 = bin1.get().as_ref().unwrap();
                 let b2 = bin2.get().as_ref().unwrap();
                 if b1.num == 0 {
@@ -389,76 +124,24 @@ pub fn categorical_histogram_orders<'a>(
                 } else if b2.num == 0 {
                     return Ordering::Greater;
                 }
-
-                let score1 = cat_bin_sort_score(
-                    b1,
-                    is_const_hess,
-                    prior_numerator,
-                    prior_denom,
-                    prior_strength,
-                    l2_regularization,
-                    mode,
-                );
-                let score2 = cat_bin_sort_score(
-                    b2,
-                    is_const_hess,
-                    prior_numerator,
-                    prior_denom,
-                    prior_strength,
-                    l2_regularization,
-                    mode,
-                );
-                score2.total_cmp(&score1)
+                let div1: f32 = b1.g_folded.iter().sum::<f32>() / b1.counts.iter().sum::<u32>() as f32;
+                let div2: f32 = b2.g_folded.iter().sum::<f32>() / b2.counts.iter().sum::<u32>() as f32;
+                div2.total_cmp(&div1)
+            });
+        } else {
+            histogram.sort_unstable_by(|bin1, bin2| {
+                let b1 = bin1.get().as_ref().unwrap();
+                let b2 = bin2.get().as_ref().unwrap();
+                if b1.num == 0 {
+                    return Ordering::Less;
+                } else if b2.num == 0 {
+                    return Ordering::Greater;
+                }
+                let div1: f32 = b1.g_folded.iter().sum::<f32>() / b1.h_folded.iter().sum::<f32>();
+                let div2: f32 = b2.g_folded.iter().sum::<f32>() / b2.h_folded.iter().sum::<f32>();
+                div2.total_cmp(&div1)
             });
         }
-        let is_duplicate = orders.iter().any(|existing: &Vec<&'a UnsafeCell<Bin>>| {
-            existing
-                .iter()
-                .map(|bin| unsafe { bin.get().as_ref().unwrap().num })
-                .eq(order.iter().map(|bin| unsafe { bin.get().as_ref().unwrap().num }))
-        });
-        if !is_duplicate {
-            orders.push(order);
-        }
-    }
-
-    orders
-}
-
-/// Sort categorical bins by their statistics (gradient/hessian or gradient/count).
-pub fn sort_cat_bins_by_stat(histogram: &mut [&UnsafeCell<Bin>], is_const_hess: bool, l2_regularization: f32) {
-    let (prior_numerator, prior_denom, prior_strength) = cat_sort_priors(histogram, is_const_hess);
-    let sort_mode = preferred_single_categorical_sort_mode(histogram, is_const_hess, prior_strength);
-    unsafe {
-        histogram.sort_unstable_by(|bin1, bin2| {
-            let b1 = bin1.get().as_ref().unwrap();
-            let b2 = bin2.get().as_ref().unwrap();
-            if b1.num == 0 {
-                return Ordering::Less;
-            } else if b2.num == 0 {
-                return Ordering::Greater;
-            }
-
-            let score1 = cat_bin_sort_score(
-                b1,
-                is_const_hess,
-                prior_numerator,
-                prior_denom,
-                prior_strength,
-                l2_regularization,
-                sort_mode,
-            );
-            let score2 = cat_bin_sort_score(
-                b2,
-                is_const_hess,
-                prior_numerator,
-                prior_denom,
-                prior_strength,
-                l2_regularization,
-                sort_mode,
-            );
-            score2.total_cmp(&score1)
-        });
     }
 }
 
@@ -541,7 +224,7 @@ mod tests {
         let c1 = UnsafeCell::new(b1);
         let c2 = UnsafeCell::new(b2);
         let mut hist: Vec<&UnsafeCell<Bin>> = vec![&c2, &c0, &c1];
-        sort_cat_bins_by_stat(&mut hist, true, 1.0);
+        sort_cat_bins_by_stat(&mut hist, true);
         unsafe {
             assert_eq!(hist[0].get().as_ref().unwrap().num, 0); // num=0 always first
         }
@@ -560,48 +243,9 @@ mod tests {
         let c1 = UnsafeCell::new(b1);
         let c2 = UnsafeCell::new(b2);
         let mut hist: Vec<&UnsafeCell<Bin>> = vec![&c2, &c0, &c1];
-        sort_cat_bins_by_stat(&mut hist, false, 1.0);
+        sort_cat_bins_by_stat(&mut hist, false);
         unsafe {
             assert_eq!(hist[0].get().as_ref().unwrap().num, 0); // num=0 always first
         }
-    }
-
-    #[test]
-    fn test_cat_bin_score_shrinks_rare_categories() {
-        let mut rare = Bin::empty_const_hess(1, 0.0);
-        rare.g_folded = [2.0; 5];
-        rare.counts = [1; 5];
-
-        let mut dense = Bin::empty_const_hess(2, 0.0);
-        dense.g_folded = [10.0; 5];
-        dense.counts = [20; 5];
-
-        let prior_strength = (rare.counts.iter().sum::<u32>() + dense.counts.iter().sum::<u32>()) as f32 / 2.0;
-        let prior_numerator = rare.g_folded.iter().sum::<f32>() + dense.g_folded.iter().sum::<f32>();
-        let prior_denom = (rare.counts.iter().sum::<u32>() + dense.counts.iter().sum::<u32>()) as f32;
-
-        assert!(
-            cat_bin_score(&dense, true, prior_numerator, prior_denom, prior_strength, 1.0)
-                > cat_bin_score(&rare, true, prior_numerator, prior_denom, prior_strength, 1.0)
-        );
-    }
-
-    #[test]
-    fn test_cat_bin_score_penalizes_fold_instability() {
-        let mut stable = Bin::empty(1, 0.0);
-        stable.g_folded = [2.0; 5];
-        stable.h_folded = [10.0; 5];
-
-        let mut unstable = Bin::empty(2, 0.0);
-        unstable.g_folded = [10.0, -6.0, 10.0, -6.0, 2.0];
-        unstable.h_folded = [10.0; 5];
-
-        let prior_numerator = stable.g_folded.iter().sum::<f32>() + unstable.g_folded.iter().sum::<f32>();
-        let prior_denom = stable.h_folded.iter().sum::<f32>() + unstable.h_folded.iter().sum::<f32>();
-
-        assert!(
-            cat_bin_score(&stable, false, prior_numerator, prior_denom, 10.0, 1.0)
-                > cat_bin_score(&unstable, false, prior_numerator, prior_denom, 10.0, 1.0)
-        );
     }
 }

@@ -239,7 +239,6 @@ mod tests {
             Node {
                 num: 0,
                 weight_value: 0.0,
-                leaf_weights: None,
                 hessian_sum: 10.0,
                 split_value: 5.0,
                 split_feature: 0,
@@ -259,7 +258,6 @@ mod tests {
             Node {
                 num: 1,
                 weight_value: 1.0,
-                leaf_weights: None,
                 hessian_sum: 5.0,
                 split_value: 0.0,
                 split_feature: 0,
@@ -279,7 +277,6 @@ mod tests {
             Node {
                 num: 2,
                 weight_value: 2.0,
-                leaf_weights: None,
                 hessian_sum: 5.0,
                 split_value: 0.0,
                 split_feature: 0,
@@ -300,9 +297,7 @@ mod tests {
             depth: 1,
             n_leaves: 2,
             leaf_bounds: Vec::new(),
-            leaf_node_assignments: Vec::new(),
             train_index: Vec::new(),
-            generalization_score: 0.0,
         };
 
         let row = vec![1.0]; // Should go left (1.0 < 5.0)
@@ -333,7 +328,6 @@ mod tests {
             Node {
                 num: 0,
                 weight_value: 0.0,
-                leaf_weights: None,
                 hessian_sum: 10.0,
                 split_value: 5.0,
                 split_feature: 0,
@@ -353,7 +347,6 @@ mod tests {
             Node {
                 num: 1,
                 weight_value: 0.0,
-                leaf_weights: None,
                 hessian_sum: 6.0,
                 split_value: 10.0,
                 split_feature: 1,
@@ -373,7 +366,6 @@ mod tests {
             Node {
                 num: 2,
                 weight_value: 3.0,
-                leaf_weights: None,
                 hessian_sum: 4.0,
                 split_value: 0.0,
                 split_feature: 0,
@@ -393,7 +385,6 @@ mod tests {
             Node {
                 num: 3,
                 weight_value: 1.0,
-                leaf_weights: None,
                 hessian_sum: 2.0,
                 split_value: 0.0,
                 split_feature: 1,
@@ -413,7 +404,6 @@ mod tests {
             Node {
                 num: 4,
                 weight_value: 2.0,
-                leaf_weights: None,
                 hessian_sum: 4.0,
                 split_value: 0.0,
                 split_feature: 1,
@@ -434,9 +424,7 @@ mod tests {
             depth: 2,
             n_leaves: 3,
             leaf_bounds: Vec::new(),
-            leaf_node_assignments: Vec::new(),
             train_index: Vec::new(),
-            generalization_score: 0.0,
         };
 
         let row = vec![1.0, 1.0]; // Goes to Node 3 (weight 1.0)
@@ -461,7 +449,6 @@ mod tests {
             Node {
                 num: 0,
                 weight_value: 0.0,
-                leaf_weights: None,
                 hessian_sum: 10.0,
                 split_value: 5.0,
                 split_feature: 0,
@@ -480,7 +467,6 @@ mod tests {
             Node {
                 num: 1,
                 weight_value: 1.0,
-                leaf_weights: None,
                 hessian_sum: 4.0,
                 split_value: 0.0,
                 split_feature: 0,
@@ -499,7 +485,6 @@ mod tests {
             Node {
                 num: 2,
                 weight_value: 2.0,
-                leaf_weights: None,
                 hessian_sum: 4.0,
                 split_value: 0.0,
                 split_feature: 0,
@@ -518,7 +503,6 @@ mod tests {
             Node {
                 num: 3,
                 weight_value: 3.0,
-                leaf_weights: None,
                 hessian_sum: 2.0,
                 split_value: 0.0,
                 split_feature: 0,
@@ -539,9 +523,7 @@ mod tests {
             depth: 1,
             n_leaves: 3,
             leaf_bounds: Vec::new(),
-            leaf_node_assignments: Vec::new(),
             train_index: Vec::new(),
-            generalization_score: 0.0,
         };
 
         let row = vec![f64::NAN]; // Goes to missing node 3

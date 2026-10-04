@@ -64,7 +64,6 @@ class Node:
     node_type: str = "split"
     parent_node: int = 0
     generalization: Optional[float] = None
-    leaf_weights: Optional[Iterable[float]] = None
     left_cats: Optional[Iterable] = None
     right_cats: Optional[Iterable] = None
     count: int = 0

@@ -64,16 +64,26 @@ impl ObjectiveFunction for HuberLoss {
                 for i in 0..len {
                     let diff = (yhat[i] - y[i]) as f32;
                     let w = weights[i] as f32;
-                    g.push(Self::clipped_gradient(diff, delta) * w);
-                    h.push(Self::surrogate_hessian(diff, delta) * w);
+                    if diff.abs() <= delta {
+                        g.push(diff * w);
+                        h.push(w);
+                    } else {
+                        g.push(delta * diff.signum() * w);
+                        h.push(0.0);
+                    }
                 }
                 (g, Some(h))
             }
             None => {
                 for i in 0..len {
                     let diff = (yhat[i] - y[i]) as f32;
-                    g.push(Self::clipped_gradient(diff, delta));
-                    h.push(Self::surrogate_hessian(diff, delta));
+                    if diff.abs() <= delta {
+                        g.push(diff);
+                        h.push(1.0);
+                    } else {
+                        g.push(delta * diff.signum());
+                        h.push(0.0);
+                    }
                 }
                 (g, Some(h))
             }
@@ -108,11 +118,13 @@ impl ObjectiveFunction for HuberLoss {
                     let ar = r.abs();
                     let diff = r as f32;
                     let w = weights[i] as f32;
-                    g.push(Self::clipped_gradient(diff, delta32) * w);
-                    h.push(Self::surrogate_hessian(diff, delta32) * w);
                     if ar <= delta {
+                        g.push(diff * w);
+                        h.push(w);
                         l.push((0.5 * r * r * weights[i]) as f32);
                     } else {
+                        g.push(delta32 * diff.signum() * w);
+                        h.push(0.0);
                         l.push((delta * (ar - 0.5 * delta) * weights[i]) as f32);
                     }
                 }
@@ -122,11 +134,13 @@ impl ObjectiveFunction for HuberLoss {
                     let r = yhat[i] - y[i];
                     let ar = r.abs();
                     let diff = r as f32;
-                    g.push(Self::clipped_gradient(diff, delta32));
-                    h.push(Self::surrogate_hessian(diff, delta32));
                     if ar <= delta {
+                        g.push(diff);
+                        h.push(1.0);
                         l.push((0.5 * r * r) as f32);
                     } else {
+                        g.push(delta32 * diff.signum());
+                        h.push(0.0);
                         l.push((delta * (ar - 0.5 * delta)) as f32);
                     }
                 }
@@ -141,17 +155,6 @@ impl ObjectiveFunction for HuberLoss {
 }
 
 impl HuberLoss {
-    #[inline]
-    fn clipped_gradient(diff: f32, delta: f32) -> f32 {
-        diff.clamp(-delta, delta)
-    }
-
-    #[inline]
-    fn surrogate_hessian(diff: f32, delta: f32) -> f32 {
-        let abs_diff = diff.abs().max(delta);
-        (delta / abs_diff).clamp(0.05, 1.0)
-    }
-
     #[inline]
     pub fn loss_single(&self, y: f64, yhat: f64, sample_weight: Option<f64>) -> f32 {
         let delta = self.delta.unwrap_or(1.0);
@@ -211,7 +214,7 @@ mod tests {
         let h = h.unwrap();
         // g = delta * sign(diff) * weight = 0.5 * 1.0 * 0.5 = 0.25
         assert!((g[0] - 0.25).abs() < 1e-6);
-        assert!((h[0] - 0.25).abs() < 1e-6);
+        assert!((h[0] - 0.0).abs() < 1e-6);
     }
 
     #[test]
@@ -246,16 +249,5 @@ mod tests {
         assert!((l2 - 1.5).abs() < 1e-5);
         let l3 = loss_fn.loss_single(1.0, 1.5, Some(2.0));
         assert!((l3 - 0.25).abs() < 1e-5);
-    }
-
-    #[test]
-    fn test_huber_gradient_retains_positive_curvature_for_outliers() {
-        let y = vec![0.0];
-        let yhat = vec![10.0];
-        let loss_fn = HuberLoss { delta: Some(1.0) };
-        let (_, h) = loss_fn.gradient(&y, &yhat, None, None);
-        let h = h.unwrap();
-
-        assert!(h[0] >= 0.05);
     }
 }

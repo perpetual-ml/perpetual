@@ -50,7 +50,6 @@ pub struct NodeStats {
 pub struct Node {
     pub num: usize,
     pub weight_value: f32,
-    pub leaf_weights: Option<[f32; 5]>,
     pub hessian_sum: f32,
     pub split_value: f64,
     pub split_feature: usize,
@@ -91,7 +90,6 @@ impl Node {
     /// parent node, this consumes the SplitableNode.
     pub fn make_parent_node(&mut self, split_node: SplittableNode, eta: f32) {
         self.is_leaf = false;
-        self.leaf_weights = None;
         self.missing_node = split_node.missing_node;
         self.split_value = split_node.split_value;
         self.split_feature = split_node.split_feature;
@@ -284,7 +282,6 @@ impl SplittableNode {
         Node {
             num: self.num,
             weight_value: self.weight_value * eta,
-            leaf_weights: self.stats.as_ref().map(|s| s.weights.map(|x| x * eta)),
             hessian_sum: self.hessian_sum,
             missing_node: self.missing_node,
             split_value: self.split_value,

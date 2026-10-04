@@ -279,9 +279,7 @@ impl Tree {
         loop {
             let node = &self.nodes.get(&node_idx).unwrap();
             if node.is_leaf {
-                return node
-                    .leaf_weights
-                    .unwrap_or_else(|| node.stats.as_ref().map_or([node.weight_value; 5], |s| s.weights));
+                return node.stats.as_ref().map_or([node.weight_value; 5], |s| s.weights);
             } else {
                 node_idx = node.get_child_idx(data.get(row, node.split_feature), missing);
             }
@@ -388,9 +386,7 @@ impl Tree {
         loop {
             let node = &self.nodes.get(&node_idx).unwrap();
             if node.is_leaf {
-                return node
-                    .leaf_weights
-                    .unwrap_or_else(|| node.stats.as_ref().map_or([node.weight_value; 5], |s| s.weights));
+                return node.stats.as_ref().map_or([node.weight_value; 5], |s| s.weights);
             } else {
                 let val = if data.is_valid(row, node.split_feature) {
                     data.get(row, node.split_feature)
@@ -478,7 +474,6 @@ mod tests {
         let root = Node {
             num: 0,
             weight_value: 0.0, // root weight doesn't matter much for predict_row
-            leaf_weights: None,
             hessian_sum: 30.0,
             split_value: 0.5,
             split_feature: 0,
@@ -494,7 +489,6 @@ mod tests {
         let left = Node {
             num: 1,
             weight_value: 0.1,
-            leaf_weights: None,
             hessian_sum: 10.0,
             split_value: 0.0,
             split_feature: 0,
@@ -510,7 +504,6 @@ mod tests {
         let right = Node {
             num: 2,
             weight_value: 0.2,
-            leaf_weights: None,
             hessian_sum: 20.0,
             split_value: 0.0,
             split_feature: 0,

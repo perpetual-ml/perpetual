@@ -61,7 +61,6 @@ package-r/inst/c/
 *.pyd
 *.pyd.old
 *.pyd.*
-*.pdb
 
 *.profraw
 
@@ -71,5 +70,11 @@ package-r/inst/c/
 # Temp folder
 tmp/
 
-# Temp files
-tmp_*
+# Debug symbols and build artifacts
+*.pdb
+
+# Benchmark and model directories
+AutogluonModels/
+autogluon/
+tabarena/
+/uv.lock

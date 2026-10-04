@@ -231,9 +231,4 @@ class PolicyLearner:
             Probability of treatment being beneficial (sigmoid of score).
         """
         scores = self.decision_function(X)
-        probabilities = np.empty_like(scores, dtype=np.float64)
-        positive = scores >= 0.0
-        probabilities[positive] = 1.0 / (1.0 + np.exp(-scores[positive]))
-        exp_scores = np.exp(scores[~positive])
-        probabilities[~positive] = exp_scores / (1.0 + exp_scores)
-        return probabilities
+        return 1.0 / (1.0 + np.exp(-scores))

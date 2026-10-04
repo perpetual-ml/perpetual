@@ -29,7 +29,7 @@ pub fn fmt_vec_output<T: FloatData<T>>(v: &[T]) -> String {
             res.push_str(format!("{:.4}", n).as_str());
             res.push_str(", ");
         }
-        res.push_str(format!("{:.4}", &v[last]).as_str());
+        res.push_str(format!("{:.4}", v[last]).as_str());
     }
     res
 }
@@ -85,33 +85,6 @@ pub fn is_missing(value: &f64, missing: &f64) -> bool {
 /// and a constraint.
 #[allow(clippy::too_many_arguments)]
 #[inline]
-pub fn constrained_weight_reg(
-    gradient_sum: f32,
-    hessian_sum: f32,
-    l2_regularization: f32,
-    lower_bound: f32,
-    upper_bound: f32,
-    constraint: Option<&Constraint>,
-) -> f32 {
-    let weight = weight_reg(gradient_sum, hessian_sum, l2_regularization);
-    match constraint {
-        None | Some(Constraint::Unconstrained) => weight,
-        _ => {
-            if weight > upper_bound {
-                upper_bound
-            } else if weight < lower_bound {
-                lower_bound
-            } else {
-                weight
-            }
-        }
-    }
-}
-
-/// Calculate the constraint weight given bounds
-/// and a constraint.
-#[allow(clippy::too_many_arguments)]
-#[inline]
 pub fn constrained_weight(
     gradient_sum: f32,
     hessian_sum: f32,
@@ -119,22 +92,7 @@ pub fn constrained_weight(
     upper_bound: f32,
     constraint: Option<&Constraint>,
 ) -> f32 {
-    constrained_weight_reg(gradient_sum, hessian_sum, 0.0, lower_bound, upper_bound, constraint)
-}
-
-/// Calculate the constraint weight given bounds
-/// and a constraint.
-#[allow(clippy::too_many_arguments)]
-#[inline]
-pub fn constrained_weight_const_hess_reg(
-    gradient_sum: f32,
-    count_sum: usize,
-    l2_regularization: f32,
-    lower_bound: f32,
-    upper_bound: f32,
-    constraint: Option<&Constraint>,
-) -> f32 {
-    let weight = weight_const_hess_reg(gradient_sum, count_sum, l2_regularization);
+    let weight = weight(gradient_sum, hessian_sum);
     match constraint {
         None | Some(Constraint::Unconstrained) => weight,
         _ => {
@@ -160,7 +118,19 @@ pub fn constrained_weight_const_hess(
     upper_bound: f32,
     constraint: Option<&Constraint>,
 ) -> f32 {
-    constrained_weight_const_hess_reg(gradient_sum, count_sum, 0.0, lower_bound, upper_bound, constraint)
+    let weight = weight_const_hess(gradient_sum, count_sum);
+    match constraint {
+        None | Some(Constraint::Unconstrained) => weight,
+        _ => {
+            if weight > upper_bound {
+                upper_bound
+            } else if weight < lower_bound {
+                lower_bound
+            } else {
+                weight
+            }
+        }
+    }
 }
 
 /// Test if v is contained within the range i and j
@@ -220,64 +190,34 @@ pub fn odds(v: f64) -> f64 {
 /// Calculate the weight of a given node, given the sum
 /// of the gradient, and the hessians in a node.
 #[inline]
-pub fn weight_reg(gradient_sum: f32, hessian_sum: f32, l2_regularization: f32) -> f32 {
-    -gradient_sum / (hessian_sum + l2_regularization + HESSIAN_EPS)
-}
-
-#[inline]
 pub fn weight(gradient_sum: f32, hessian_sum: f32) -> f32 {
-    weight_reg(gradient_sum, hessian_sum, 0.0)
+    -gradient_sum / (hessian_sum + HESSIAN_EPS)
 }
-#[inline]
-pub fn weight_const_hess_reg(gradient_sum: f32, count_sum: usize, l2_regularization: f32) -> f32 {
-    -gradient_sum / (count_sum as f32 + l2_regularization)
-}
-
 #[inline]
 pub fn weight_const_hess(gradient_sum: f32, count_sum: usize) -> f32 {
-    weight_const_hess_reg(gradient_sum, count_sum, 0.0)
+    -gradient_sum / (count_sum as f32)
 }
 
 /// Calculate the gain given the gradient and hessian of the node.
 #[inline]
-pub fn gain_reg(gradient_sum: f32, hessian_sum: f32, l2_regularization: f32) -> f32 {
-    (gradient_sum * gradient_sum) / (hessian_sum + l2_regularization + HESSIAN_EPS)
-}
-
-#[inline]
 pub fn gain(gradient_sum: f32, hessian_sum: f32) -> f32 {
-    gain_reg(gradient_sum, hessian_sum, 0.0) // no -0.5 multiplier term!
+    (gradient_sum * gradient_sum) / (hessian_sum + HESSIAN_EPS) // no -0.5 multiplier term!
 }
-#[inline]
-pub fn gain_const_hess_reg(gradient_sum: f32, count_sum: usize, l2_regularization: f32) -> f32 {
-    (gradient_sum * gradient_sum) / (count_sum as f32 + l2_regularization)
-}
-
 #[inline]
 pub fn gain_const_hess(gradient_sum: f32, count_sum: usize) -> f32 {
-    gain_const_hess_reg(gradient_sum, count_sum, 0.0) // no -0.5 multiplier term!
+    (gradient_sum * gradient_sum) / (count_sum as f32) // no -0.5 multiplier term!
 }
 
 /// Calculate the gain of a split given a specific weight value.
 /// This is for if the weight has to be constrained, for example for
 /// monotonicity constraints.
 #[inline]
-pub fn gain_given_weight_reg(gradient_sum: f32, hessian_sum: f32, weight: f32, l2_regularization: f32) -> f32 {
-    -(2.0 * gradient_sum * weight + (hessian_sum + l2_regularization + HESSIAN_EPS) * (weight * weight))
-}
-
-#[inline]
 pub fn gain_given_weight(gradient_sum: f32, hessian_sum: f32, weight: f32) -> f32 {
-    gain_given_weight_reg(gradient_sum, hessian_sum, weight, 0.0)
+    -(2.0 * gradient_sum * weight + (hessian_sum + HESSIAN_EPS) * (weight * weight))
 }
-#[inline]
-pub fn gain_given_weight_const_hess_reg(gradient_sum: f32, counts: usize, weight: f32, l2_regularization: f32) -> f32 {
-    -(2.0 * gradient_sum * weight + (counts as f32 + l2_regularization) * (weight * weight))
-}
-
 #[inline]
 pub fn gain_given_weight_const_hess(gradient_sum: f32, counts: usize, weight: f32) -> f32 {
-    gain_given_weight_const_hess_reg(gradient_sum, counts, weight, 0.0)
+    -(2.0 * gradient_sum * weight + (counts as f32) * (weight * weight))
 }
 
 /// Cull gain, if it does not conform to constraints.
@@ -308,6 +248,7 @@ const LANES: usize = 16;
 /// than values.iter().copied().sum().
 /// Shamelessly stolen from https://stackoverflow.com/a/67191480
 #[inline]
+#[allow(clippy::chunks_exact_to_as_chunks)]
 pub fn fast_sum<T: FloatData<T>>(values: &[T]) -> T {
     let chunks = values.chunks_exact(LANES);
     let remainder = chunks.remainder();
@@ -334,6 +275,7 @@ pub fn fast_sum<T: FloatData<T>>(values: &[T]) -> T {
 /// This way, we can still work with f32 values, but get the correct sum
 /// value.
 #[inline]
+#[allow(clippy::chunks_exact_to_as_chunks)]
 pub fn fast_f64_sum(values: &[f32]) -> f32 {
     let chunks = values.chunks_exact(LANES);
     let remainder = chunks.remainder();

@@ -75,14 +75,6 @@ fn default_budget() -> f32 {
     0.5
 }
 
-pub(crate) fn default_nan_f64() -> f64 {
-    f64::NAN
-}
-
-pub(crate) fn default_nan_f32() -> f32 {
-    f32::NAN
-}
-
 fn default_reset() -> Option<bool> {
     None
 }
@@ -101,9 +93,6 @@ fn default_memory_limit() -> Option<f32> {
 }
 fn default_stopping_rounds() -> Option<usize> {
     None
-}
-fn default_auto_class_weights() -> bool {
-    true
 }
 fn default_terminate_missing_features() -> HashSet<usize> {
     HashSet::new()
@@ -193,9 +182,6 @@ pub struct BoosterConfig {
     /// Number of rounds for early stopping.
     #[serde(default = "default_stopping_rounds")]
     pub stopping_rounds: Option<usize>,
-    /// Whether to apply automatic class balancing for binary LogLoss.
-    #[serde(default = "default_auto_class_weights")]
-    pub auto_class_weights: bool,
     /// Save node statistics for debugging.
     #[serde(default)]
     pub save_node_stats: bool,
@@ -228,7 +214,6 @@ impl Default for BoosterConfig {
             iteration_limit: None,
             memory_limit: None,
             stopping_rounds: None,
-            auto_class_weights: true,
             save_node_stats: false,
             calibration_method: CalibrationMethod::WeightVariance,
         }
@@ -278,7 +263,6 @@ mod tests {
         assert_eq!(config.budget, 0.5);
         assert_eq!(config.max_bin, 256);
         assert!(config.missing.is_nan());
-        assert!(config.auto_class_weights);
         assert_eq!(config.calibration_method, CalibrationMethod::WeightVariance);
     }
 
