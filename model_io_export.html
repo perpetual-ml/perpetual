@@ -6,7 +6,7 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Model IO &amp; Export &mdash; Perpetual 3.0.0-rc.2 documentation</title>
+  <title>Model IO &amp; Export &mdash; Perpetual 2.2.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="_static/custom.css?v=9cdd1368" />
@@ -14,7 +14,7 @@
   
       <script src="_static/jquery.js?v=5d32c60e"></script>
       <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="_static/documentation_options.js?v=b3b49fdf"></script>
+      <script src="_static/documentation_options.js?v=b21de401"></script>
       <script src="_static/doctools.js?v=fd6eb6e6"></script>
       <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
@@ -102,10 +102,10 @@
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">perpetual</span><span class="w"> </span><span class="kn">import</span> <span class="n">PerpetualBooster</span>
 
 <span class="c1"># Save a fitted model</span>
-<span class="n">model</span><span class="o">.</span><span class="n">save_booster</span><span class="p">(</span><span class="s2">&quot;model.json&quot;</span><span class="p">)</span>
+<span class="n">model</span><span class="o">.</span><span class="n">save_booster</span><span class="p">(</span><span class="s2">"model.json"</span><span class="p">)</span>
 
 <span class="c1"># Load the model</span>
-<span class="n">loaded_model</span> <span class="o">=</span> <span class="n">PerpetualBooster</span><span class="o">.</span><span class="n">load_booster</span><span class="p">(</span><span class="s2">&quot;model.json&quot;</span><span class="p">)</span>
+<span class="n">loaded_model</span> <span class="o">=</span> <span class="n">PerpetualBooster</span><span class="o">.</span><span class="n">load_booster</span><span class="p">(</span><span class="s2">"model.json"</span><span class="p">)</span>
 </pre></div>
 </div>
 </section>
@@ -115,11 +115,11 @@
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">pickle</span>
 
 <span class="c1"># Save with pickle</span>
-<span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="s2">&quot;model.pkl&quot;</span><span class="p">,</span> <span class="s2">&quot;wb&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+<span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="s2">"model.pkl"</span><span class="p">,</span> <span class="s2">"wb"</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
     <span class="n">pickle</span><span class="o">.</span><span class="n">dump</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">f</span><span class="p">)</span>
 
 <span class="c1"># Load with pickle</span>
-<span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="s2">&quot;model.pkl&quot;</span><span class="p">,</span> <span class="s2">&quot;rb&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+<span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="s2">"model.pkl"</span><span class="p">,</span> <span class="s2">"rb"</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
     <span class="n">loaded_model</span> <span class="o">=</span> <span class="n">pickle</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">f</span><span class="p">)</span>
 </pre></div>
 </div>
@@ -127,37 +127,37 @@
 <section id="metadata-persistence">
 <h2>Metadata Persistence<a class="headerlink" href="#metadata-persistence" title="Link to this heading"></a></h2>
 <p>You can attach custom metadata to your model, which will be persisted when saving and restored when loading.</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">model</span><span class="o">.</span><span class="n">insert_metadata</span><span class="p">(</span><span class="s2">&quot;experiment_id&quot;</span><span class="p">,</span> <span class="s2">&quot;42&quot;</span><span class="p">)</span>
-<span class="n">model</span><span class="o">.</span><span class="n">save_booster</span><span class="p">(</span><span class="s2">&quot;model.json&quot;</span><span class="p">)</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">model</span><span class="o">.</span><span class="n">insert_metadata</span><span class="p">(</span><span class="s2">"experiment_id"</span><span class="p">,</span> <span class="s2">"42"</span><span class="p">)</span>
+<span class="n">model</span><span class="o">.</span><span class="n">save_booster</span><span class="p">(</span><span class="s2">"model.json"</span><span class="p">)</span>
 
 <span class="c1"># Later...</span>
-<span class="n">loaded_model</span> <span class="o">=</span> <span class="n">PerpetualBooster</span><span class="o">.</span><span class="n">load_booster</span><span class="p">(</span><span class="s2">&quot;model.json&quot;</span><span class="p">)</span>
-<span class="nb">print</span><span class="p">(</span><span class="n">loaded_model</span><span class="o">.</span><span class="n">get_metadata</span><span class="p">(</span><span class="s2">&quot;experiment_id&quot;</span><span class="p">))</span>  <span class="c1"># &quot;42&quot;</span>
+<span class="n">loaded_model</span> <span class="o">=</span> <span class="n">PerpetualBooster</span><span class="o">.</span><span class="n">load_booster</span><span class="p">(</span><span class="s2">"model.json"</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">loaded_model</span><span class="o">.</span><span class="n">get_metadata</span><span class="p">(</span><span class="s2">"experiment_id"</span><span class="p">))</span>  <span class="c1"># "42"</span>
 </pre></div>
 </div>
 </section>
 <section id="exporting-to-xgboost">
 <h2>Exporting to XGBoost<a class="headerlink" href="#exporting-to-xgboost" title="Link to this heading"></a></h2>
 <p>For integration with systems that already support XGBoost, you can export your <code class="docutils literal notranslate"><span class="pre">PerpetualBooster</span></code> to the XGBoost JSON format.</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">model</span><span class="o">.</span><span class="n">save_as_xgboost</span><span class="p">(</span><span class="s2">&quot;model_xgb.json&quot;</span><span class="p">)</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">model</span><span class="o">.</span><span class="n">save_as_xgboost</span><span class="p">(</span><span class="s2">"model_xgb.json"</span><span class="p">)</span>
 </pre></div>
 </div>
 <p>This allows you to load the model using the XGBoost library:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">xgboost</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">xgb</span>
 <span class="n">bst</span> <span class="o">=</span> <span class="n">xgb</span><span class="o">.</span><span class="n">Booster</span><span class="p">()</span>
-<span class="n">bst</span><span class="o">.</span><span class="n">load_model</span><span class="p">(</span><span class="s2">&quot;model_xgb.json&quot;</span><span class="p">)</span>
+<span class="n">bst</span><span class="o">.</span><span class="n">load_model</span><span class="p">(</span><span class="s2">"model_xgb.json"</span><span class="p">)</span>
 </pre></div>
 </div>
 </section>
 <section id="exporting-to-onnx">
 <h2>Exporting to ONNX<a class="headerlink" href="#exporting-to-onnx" title="Link to this heading"></a></h2>
 <p>For high-performance deployment across different platforms and languages, Perpetual supports exporting models to the ONNX (Open Neural Network Exchange) format.</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">model</span><span class="o">.</span><span class="n">save_as_onnx</span><span class="p">(</span><span class="s2">&quot;model.onnx&quot;</span><span class="p">)</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">model</span><span class="o">.</span><span class="n">save_as_onnx</span><span class="p">(</span><span class="s2">"model.onnx"</span><span class="p">)</span>
 </pre></div>
 </div>
 <p>You can then run inference using any ONNX-compatible runtime:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">onnxruntime</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">rt</span>
-<span class="n">sess</span> <span class="o">=</span> <span class="n">rt</span><span class="o">.</span><span class="n">InferenceSession</span><span class="p">(</span><span class="s2">&quot;model.onnx&quot;</span><span class="p">)</span>
+<span class="n">sess</span> <span class="o">=</span> <span class="n">rt</span><span class="o">.</span><span class="n">InferenceSession</span><span class="p">(</span><span class="s2">"model.onnx"</span><span class="p">)</span>
 <span class="c1"># ... run inference ...</span>
 </pre></div>
 </div>

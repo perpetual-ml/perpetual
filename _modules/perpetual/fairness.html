@@ -5,7 +5,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>perpetual.fairness &mdash; Perpetual 3.0.0-rc.2 documentation</title>
+  <title>perpetual.fairness &mdash; Perpetual 2.2.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../../_static/custom.css?v=9cdd1368" />
@@ -13,7 +13,7 @@
   
       <script src="../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../_static/documentation_options.js?v=b3b49fdf"></script>
+      <script src="../../_static/documentation_options.js?v=b21de401"></script>
       <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
@@ -83,7 +83,7 @@
            <div itemprop="articleBody">
              
   <h1>Source code for perpetual.fairness</h1><div class="highlight"><pre>
-<span></span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Fairness-aware gradient boosting classifier.</span>
+<span></span><span class="sa">r</span><span class="sd">"""Fairness-aware gradient boosting classifier.</span>
 
 <span class="sd">Provides ``FairClassifier``, a wrapper around ``PerpetualBooster`` that adds</span>
 <span class="sd">an in-processing fairness regularization penalty to the log-loss gradient.</span>
@@ -99,7 +99,7 @@
 <span class="sd">.. math::</span>
 
 <span class="sd">    L = \\text{LogLoss} + \\lambda \\cdot \\text{Penalty}(\\hat{Y}, S)</span>
-<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">"""</span>
 
 <span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Optional</span>
 
@@ -110,11 +110,11 @@
 
 <span class="kn">from</span><span class="w"> </span><span class="nn">.perpetual</span><span class="w"> </span><span class="kn">import</span> <span class="n">FairnessObjective</span>
 
-<span class="n">_VALID_FAIRNESS_TYPES</span> <span class="o">=</span> <span class="p">(</span><span class="s2">&quot;demographic_parity&quot;</span><span class="p">,</span> <span class="s2">&quot;equalized_odds&quot;</span><span class="p">)</span>
+<span class="n">_VALID_FAIRNESS_TYPES</span> <span class="o">=</span> <span class="p">(</span><span class="s2">"demographic_parity"</span><span class="p">,</span> <span class="s2">"equalized_odds"</span><span class="p">)</span>
 
 
 <span class="k">def</span><span class="w"> </span><span class="nf">stable_sigmoid</span><span class="p">(</span><span class="n">x</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Numerically stable sigmoid function.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""Numerically stable sigmoid function."""</span>
     <span class="n">x</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
     <span class="n">out</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">empty_like</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">float</span><span class="p">)</span>
     <span class="n">pos_mask</span> <span class="o">=</span> <span class="n">x</span> <span class="o">&gt;=</span> <span class="mi">0</span>
@@ -133,7 +133,7 @@
 <div class="viewcode-block" id="FairClassifier">
 <a class="viewcode-back" href="../../api.html#perpetual.fairness.FairClassifier">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">FairClassifier</span><span class="p">:</span>
-<span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Fairness-aware gradient boosting classifier.</span>
+<span class="w">    </span><span class="sa">r</span><span class="sd">"""Fairness-aware gradient boosting classifier.</span>
 
 <span class="sd">    Wraps a ``PerpetualBooster`` with an in-processing fairness penalty that</span>
 <span class="sd">    regularizes the log-loss gradient to reduce dependence of predictions on</span>
@@ -144,11 +144,11 @@
 <span class="sd">    sensitive_feature : int</span>
 <span class="sd">        Column index of the sensitive attribute in *X*.  The column must be</span>
 <span class="sd">        binary (0 or 1).</span>
-<span class="sd">    fairness_type : str, default=&quot;demographic_parity&quot;</span>
+<span class="sd">    fairness_type : str, default="demographic_parity"</span>
 <span class="sd">        Fairness criterion.  One of:</span>
 
-<span class="sd">        - ``&quot;demographic_parity&quot;`` — penalize overall disparity.</span>
-<span class="sd">        - ``&quot;equalized_odds&quot;`` — penalize disparity within each label class.</span>
+<span class="sd">        - ``"demographic_parity"`` — penalize overall disparity.</span>
+<span class="sd">        - ``"equalized_odds"`` — penalize disparity within each label class.</span>
 <span class="sd">    lam : float, default=1.0</span>
 <span class="sd">        Strength of the fairness penalty (:math:`\\lambda`).</span>
 <span class="sd">    budget : float, default=0.5</span>
@@ -177,22 +177,22 @@
 <span class="sd">    The fairness penalty is applied only through the gradient; the reported</span>
 <span class="sd">    loss is standard log-loss.  This mirrors the Rust ``FairnessObjective``</span>
 <span class="sd">    implementation.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
 <div class="viewcode-block" id="FairClassifier.__init__">
 <a class="viewcode-back" href="../../api.html#perpetual.fairness.FairClassifier.__init__">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">sensitive_feature</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
-        <span class="n">fairness_type</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;demographic_parity&quot;</span><span class="p">,</span>
+        <span class="n">fairness_type</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">"demographic_parity"</span><span class="p">,</span>
         <span class="n">lam</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1.0</span><span class="p">,</span>
         <span class="n">budget</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.5</span><span class="p">,</span>
         <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
     <span class="p">):</span>
         <span class="k">if</span> <span class="n">fairness_type</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">_VALID_FAIRNESS_TYPES</span><span class="p">:</span>
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-                <span class="sa">f</span><span class="s2">&quot;fairness_type must be one of </span><span class="si">{</span><span class="n">_VALID_FAIRNESS_TYPES</span><span class="si">}</span><span class="s2">, &quot;</span>
-                <span class="sa">f</span><span class="s2">&quot;got </span><span class="si">{</span><span class="n">fairness_type</span><span class="si">!r}</span><span class="s2">.&quot;</span>
+                <span class="sa">f</span><span class="s2">"fairness_type must be one of </span><span class="si">{</span><span class="n">_VALID_FAIRNESS_TYPES</span><span class="si">}</span><span class="s2">, "</span>
+                <span class="sa">f</span><span class="s2">"got </span><span class="si">{</span><span class="n">fairness_type</span><span class="si">!r}</span><span class="s2">."</span>
             <span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">sensitive_feature</span> <span class="o">=</span> <span class="n">sensitive_feature</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">fairness_type</span> <span class="o">=</span> <span class="n">fairness_type</span>
@@ -205,7 +205,7 @@
 <div class="viewcode-block" id="FairClassifier.fit">
 <a class="viewcode-back" href="../../api.html#perpetual.fairness.FairClassifier.fit">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">fit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">X</span><span class="p">,</span> <span class="n">y</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Self</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Fit the fair classifier.</span>
+<span class="w">        </span><span class="sd">"""Fit the fair classifier.</span>
 
 <span class="sd">        Parameters</span>
 <span class="sd">        ----------</span>
@@ -219,7 +219,7 @@
 <span class="sd">        -------</span>
 <span class="sd">        self</span>
 <span class="sd">            Fitted estimator.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="n">X_arr</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">float</span><span class="p">)</span>
         <span class="n">y_arr</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">y</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">float</span><span class="p">)</span>
         <span class="c1"># Ensure int32 for Rust compatibility</span>
@@ -238,7 +238,7 @@
 <div class="viewcode-block" id="FairClassifier.predict">
 <a class="viewcode-back" href="../../api.html#perpetual.fairness.FairClassifier.predict">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">predict</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">X</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Predict class labels.</span>
+<span class="w">        </span><span class="sd">"""Predict class labels.</span>
 
 <span class="sd">        Parameters</span>
 <span class="sd">        ----------</span>
@@ -249,7 +249,7 @@
 <span class="sd">        -------</span>
 <span class="sd">        ndarray of shape (n_samples,)</span>
 <span class="sd">            Predicted class labels (0 or 1).</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="n">scores</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_model</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="n">X</span><span class="p">)</span>
         <span class="k">return</span> <span class="p">(</span><span class="n">scores</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">int</span><span class="p">)</span></div>
 
@@ -257,7 +257,7 @@
 <div class="viewcode-block" id="FairClassifier.predict_proba">
 <a class="viewcode-back" href="../../api.html#perpetual.fairness.FairClassifier.predict_proba">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">predict_proba</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">X</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Predict class probabilities.</span>
+<span class="w">        </span><span class="sd">"""Predict class probabilities.</span>
 
 <span class="sd">        Parameters</span>
 <span class="sd">        ----------</span>
@@ -268,7 +268,7 @@
 <span class="sd">        -------</span>
 <span class="sd">        ndarray of shape (n_samples, 2)</span>
 <span class="sd">            Predicted probabilities for class 0 and class 1.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="n">scores</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_model</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="n">X</span><span class="p">)</span>
         <span class="n">p1</span> <span class="o">=</span> <span class="n">stable_sigmoid</span><span class="p">(</span><span class="n">scores</span><span class="p">)</span>
         <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">column_stack</span><span class="p">([</span><span class="mf">1.0</span> <span class="o">-</span> <span class="n">p1</span><span class="p">,</span> <span class="n">p1</span><span class="p">])</span></div>
@@ -277,15 +277,15 @@
 <div class="viewcode-block" id="FairClassifier.predict_contributions">
 <a class="viewcode-back" href="../../api.html#perpetual.fairness.FairClassifier.predict_contributions">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">predict_contributions</span><span class="p">(</span>
-        <span class="bp">self</span><span class="p">,</span> <span class="n">X</span><span class="p">,</span> <span class="n">method</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;Average&quot;</span><span class="p">,</span> <span class="n">parallel</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">bool</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">X</span><span class="p">,</span> <span class="n">method</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">"Average"</span><span class="p">,</span> <span class="n">parallel</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">bool</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Predict feature contributions (SHAP-like values) for new data.</span>
+<span class="w">        </span><span class="sd">"""Predict feature contributions (SHAP-like values) for new data.</span>
 
 <span class="sd">        Parameters</span>
 <span class="sd">        ----------</span>
 <span class="sd">        X : array-like of shape (n_samples, n_features)</span>
 <span class="sd">            Input features.</span>
-<span class="sd">        method : str, default=&quot;Average&quot;</span>
+<span class="sd">        method : str, default="Average"</span>
 <span class="sd">            Method to calculate contributions.</span>
 <span class="sd">        parallel : bool, optional</span>
 <span class="sd">            Whether to run prediction in parallel.</span>
@@ -294,14 +294,14 @@
 <span class="sd">        -------</span>
 <span class="sd">        ndarray of shape (n_samples, n_features + 1)</span>
 <span class="sd">            Feature contributions.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_model</span><span class="o">.</span><span class="n">predict_contributions</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">method</span><span class="o">=</span><span class="n">method</span><span class="p">,</span> <span class="n">parallel</span><span class="o">=</span><span class="n">parallel</span><span class="p">)</span></div>
 
 
 <div class="viewcode-block" id="FairClassifier.decision_function">
 <a class="viewcode-back" href="../../api.html#perpetual.fairness.FairClassifier.decision_function">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">decision_function</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">X</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return raw log-odds scores.</span>
+<span class="w">        </span><span class="sd">"""Return raw log-odds scores.</span>
 
 <span class="sd">        Parameters</span>
 <span class="sd">        ----------</span>
@@ -312,7 +312,7 @@
 <span class="sd">        -------</span>
 <span class="sd">        ndarray of shape (n_samples,)</span>
 <span class="sd">            Raw boosted scores (log-odds).</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_model</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="n">X</span><span class="p">)</span></div>
 </div>
 

@@ -7,8 +7,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
 <title>PerpetualBooster • perpetual</title>
 <script src="deps/jquery-3.6.0/jquery-3.6.0.min.js"></script><meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-<link href="deps/bootstrap-5.3.1/bootstrap.min.css" rel="stylesheet">
-<script src="deps/bootstrap-5.3.1/bootstrap.bundle.min.js"></script><link href="deps/font-awesome-6.5.2/css/all.min.css" rel="stylesheet">
+<link href="deps/bootstrap-5.3.8/bootstrap.min.css" rel="stylesheet">
+<script src="deps/bootstrap-5.3.8/bootstrap.bundle.min.js"></script><link href="deps/font-awesome-6.5.2/css/all.min.css" rel="stylesheet">
 <link href="deps/font-awesome-6.5.2/css/v4-shims.min.css" rel="stylesheet">
 <script src="deps/headroom-0.11.0/headroom.min.js"></script><script src="deps/headroom-0.11.0/jQuery.headroom.min.js"></script><script src="deps/bootstrap-toc-1.0.1/bootstrap-toc.min.js"></script><script src="deps/clipboard.js-2.0.11/clipboard.min.js"></script><script src="deps/search-1.0.0/autocomplete.jquery.min.js"></script><script src="deps/search-1.0.0/fuse.min.js"></script><script src="deps/search-1.0.0/mark.min.js"></script><!-- pkgdown --><script src="pkgdown.js"></script><meta property="og:title" content="PerpetualBooster">
 <meta name="description" content="A self-generalizing gradient boosting machine that doesn't need hyperparameter optimization.">
@@ -22,7 +22,7 @@
 
     <a class="navbar-brand me-2" href="index.html">perpetual</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">3.0.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">2.2.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -88,7 +88,7 @@
 <col width="17%">
 <col width="36%">
 </colgroup>
-<thead><tr class="header">
+<thead><tr>
 <th align="left">Language</th>
 <th align="left">Installation</th>
 <th align="left">Documentation</th>
@@ -96,7 +96,7 @@
 <th align="left">Package</th>
 </tr></thead>
 <tbody>
-<tr class="odd">
+<tr>
 <td align="left"><strong>Python</strong></td>
 <td align="left">
 <code>pip install perpetual</code><br><br><code>conda install -c conda-forge perpetual</code>
@@ -107,14 +107,14 @@
 <a href="https://pypi.org/project/perpetual" target="_blank" class="external-link">PyPI</a><br><br><a href="https://anaconda.org/conda-forge/perpetual" target="_blank" class="external-link">Conda Forge</a>
 </td>
 </tr>
-<tr class="even">
+<tr>
 <td align="left"><strong>Rust</strong></td>
 <td align="left"><code>cargo add perpetual</code></td>
 <td align="left"><a href="https://docs.rs/perpetual" target="_blank" class="external-link">docs.rs</a></td>
 <td align="left"><a href="./src" target="_blank"><code>src</code></a></td>
 <td align="left"><a href="https://crates.io/crates/perpetual" target="_blank" class="external-link">crates.io</a></td>
 </tr>
-<tr class="odd">
+<tr>
 <td align="left"><strong>R</strong></td>
 <td align="left"><code>install.packages("perpetual")</code></td>
 <td align="left"><a href="https://perpetual-ml.github.io/perpetual/r" target="_blank">pkgdown Site</a></td>
@@ -166,7 +166,7 @@
 <col width="18%">
 <col width="17%">
 </colgroup>
-<thead><tr class="header">
+<thead><tr>
 <th align="left">Perpetual budget</th>
 <th align="left">LightGBM n_estimators</th>
 <th align="left">Perpetual mse</th>
@@ -175,7 +175,7 @@
 <th align="left">Speed-up cpu time</th>
 </tr></thead>
 <tbody>
-<tr class="odd">
+<tr>
 <td align="left">0.76</td>
 <td align="left">50</td>
 <td align="left">0.201</td>
@@ -183,7 +183,7 @@
 <td align="left">72x</td>
 <td align="left">326x</td>
 </tr>
-<tr class="even">
+<tr>
 <td align="left">0.85</td>
 <td align="left">100</td>
 <td align="left">0.196</td>
@@ -191,7 +191,7 @@
 <td align="left">113x</td>
 <td align="left">613x</td>
 </tr>
-<tr class="odd">
+<tr>
 <td align="left">1.15</td>
 <td align="left">200</td>
 <td align="left">0.190</td>
@@ -211,7 +211,7 @@
 <col width="16%">
 <col width="15%">
 </colgroup>
-<thead><tr class="header">
+<thead><tr>
 <th align="left">Perpetual budget</th>
 <th align="left">LightGBM n_estimators</th>
 <th align="left">Perpetual auc</th>
@@ -219,7 +219,7 @@
 <th align="left">Speed-up wall time</th>
 <th align="left">Speed-up cpu time</th>
 </tr></thead>
-<tbody><tr class="odd">
+<tbody><tr>
 <td align="left">1.0</td>
 <td align="left">100</td>
 <td align="left">0.944</td>
@@ -245,7 +245,7 @@
 <col width="12%">
 <col width="7%">
 </colgroup>
-<thead><tr class="header">
+<thead><tr>
 <th align="left">OpenML Task</th>
 <th align="left">Perpetual Training Duration</th>
 <th align="left">Perpetual Inference Duration</th>
@@ -255,7 +255,7 @@
 <th align="left">AutoGluon RMSE</th>
 </tr></thead>
 <tbody>
-<tr class="odd">
+<tr>
 <td align="left"><a href="https://www.openml.org/t/359929" target="_blank" class="external-link">Airlines_DepDelay_10M</a></td>
 <td align="left">518</td>
 <td align="left">11.3</td>
@@ -264,7 +264,7 @@
 <td align="left">30.9</td>
 <td align="left"><ins> 28.8 </ins></td>
 </tr>
-<tr class="even">
+<tr>
 <td align="left"><a href="https://www.openml.org/t/361940" target="_blank" class="external-link">bates_regr_100</a></td>
 <td align="left">3421</td>
 <td align="left">15.1</td>
@@ -273,7 +273,7 @@
 <td align="left">OOM</td>
 <td align="left">OOM</td>
 </tr>
-<tr class="odd">
+<tr>
 <td align="left"><a href="https://www.openml.org/t/7327" target="_blank" class="external-link">BNG(libras_move)</a></td>
 <td align="left">1956</td>
 <td align="left">4.2</td>
@@ -282,7 +282,7 @@
 <td align="left">97.6</td>
 <td align="left">2.53</td>
 </tr>
-<tr class="even">
+<tr>
 <td align="left"><a href="https://www.openml.org/t/7326" target="_blank" class="external-link">BNG(satellite_image)</a></td>
 <td align="left">334</td>
 <td align="left">1.6</td>
@@ -291,7 +291,7 @@
 <td align="left">10.0</td>
 <td align="left"><ins> 0.721 </ins></td>
 </tr>
-<tr class="odd">
+<tr>
 <td align="left"><a href="https://www.openml.org/t/14949" target="_blank" class="external-link">COMET_MC</a></td>
 <td align="left">44</td>
 <td align="left">1.0</td>
@@ -300,7 +300,7 @@
 <td align="left">5.0</td>
 <td align="left">0.0662</td>
 </tr>
-<tr class="even">
+<tr>
 <td align="left"><a href="https://www.openml.org/t/361939" target="_blank" class="external-link">friedman1</a></td>
 <td align="left">275</td>
 <td align="left">4.2</td>
@@ -309,7 +309,7 @@
 <td align="left">5.1</td>
 <td align="left">1.487</td>
 </tr>
-<tr class="odd">
+<tr>
 <td align="left"><a href="https://www.openml.org/t/10102" target="_blank" class="external-link">poker</a></td>
 <td align="left">38</td>
 <td align="left">0.6</td>
@@ -318,7 +318,7 @@
 <td align="left">1.2</td>
 <td align="left">0.722</td>
 </tr>
-<tr class="even">
+<tr>
 <td align="left"><a href="https://www.openml.org/t/361955" target="_blank" class="external-link">subset_higgs</a></td>
 <td align="left">868</td>
 <td align="left">10.6</td>
@@ -327,7 +327,7 @@
 <td align="left">24.5</td>
 <td align="left">0.421</td>
 </tr>
-<tr class="odd">
+<tr>
 <td align="left"><a href="https://www.openml.org/t/7319" target="_blank" class="external-link">BNG(autoHorse)</a></td>
 <td align="left">107</td>
 <td align="left">1.1</td>
@@ -336,7 +336,7 @@
 <td align="left">3.2</td>
 <td align="left">20.5</td>
 </tr>
-<tr class="even">
+<tr>
 <td align="left"><a href="https://www.openml.org/t/7318" target="_blank" class="external-link">BNG(pbc)</a></td>
 <td align="left">48</td>
 <td align="left">0.6</td>
@@ -345,7 +345,7 @@
 <td align="left">0.2</td>
 <td align="left">957.1</td>
 </tr>
-<tr class="odd">
+<tr>
 <td align="left">average</td>
 <td align="left">465</td>
 <td align="left">3.9</td>
@@ -368,7 +368,7 @@
 <col width="12%">
 <col width="5%">
 </colgroup>
-<thead><tr class="header">
+<thead><tr>
 <th align="left">OpenML Task</th>
 <th align="left">Perpetual Training Duration</th>
 <th align="left">Perpetual Inference Duration</th>
@@ -378,7 +378,7 @@
 <th align="left">AutoGluon AUC</th>
 </tr></thead>
 <tbody>
-<tr class="odd">
+<tr>
 <td align="left"><a href="https://www.openml.org/t/146163" target="_blank" class="external-link">BNG(spambase)</a></td>
 <td align="left">70.1</td>
 <td align="left">2.1</td>
@@ -387,7 +387,7 @@
 <td align="left">3.7</td>
 <td align="left">0.669</td>
 </tr>
-<tr class="even">
+<tr>
 <td align="left"><a href="https://www.openml.org/t/208" target="_blank" class="external-link">BNG(trains)</a></td>
 <td align="left">89.5</td>
 <td align="left">1.7</td>
@@ -396,7 +396,7 @@
 <td align="left">2.4</td>
 <td align="left">0.994</td>
 </tr>
-<tr class="odd">
+<tr>
 <td align="left"><a href="https://www.openml.org/t/361942" target="_blank" class="external-link">breast</a></td>
 <td align="left">13699.3</td>
 <td align="left">97.7</td>
@@ -405,7 +405,7 @@
 <td align="left">79.7</td>
 <td align="left">0.949</td>
 </tr>
-<tr class="even">
+<tr>
 <td align="left"><a href="https://www.openml.org/t/7291" target="_blank" class="external-link">Click_prediction_small</a></td>
 <td align="left">89.1</td>
 <td align="left">1.0</td>
@@ -414,7 +414,7 @@
 <td align="left">2.8</td>
 <td align="left">0.703</td>
 </tr>
-<tr class="odd">
+<tr>
 <td align="left"><a href="https://www.openml.org/t/361938" target="_blank" class="external-link">colon</a></td>
 <td align="left">12435.2</td>
 <td align="left">126.7</td>
@@ -423,7 +423,7 @@
 <td align="left">152.3</td>
 <td align="left">0.997</td>
 </tr>
-<tr class="even">
+<tr>
 <td align="left"><a href="https://www.openml.org/t/362113" target="_blank" class="external-link">Higgs</a></td>
 <td align="left">3485.3</td>
 <td align="left">40.9</td>
@@ -432,7 +432,7 @@
 <td align="left">67.9</td>
 <td align="left">0.816</td>
 </tr>
-<tr class="odd">
+<tr>
 <td align="left"><a href="https://www.openml.org/t/230" target="_blank" class="external-link">SEA(50000)</a></td>
 <td align="left">21.9</td>
 <td align="left">0.2</td>
@@ -441,7 +441,7 @@
 <td align="left">0.5</td>
 <td align="left">0.935</td>
 </tr>
-<tr class="even">
+<tr>
 <td align="left"><a href="https://www.openml.org/t/359994" target="_blank" class="external-link">sf-police-incidents</a></td>
 <td align="left">85.8</td>
 <td align="left">1.5</td>
@@ -450,7 +450,7 @@
 <td align="left">2.8</td>
 <td align="left">0.659</td>
 </tr>
-<tr class="odd">
+<tr>
 <td align="left"><a href="https://www.openml.org/t/361941" target="_blank" class="external-link">bates_classif_100</a></td>
 <td align="left">11152.8</td>
 <td align="left">50.0</td>
@@ -459,7 +459,7 @@
 <td align="left">OOM</td>
 <td align="left">OOM</td>
 </tr>
-<tr class="even">
+<tr>
 <td align="left"><a href="https://www.openml.org/t/361945" target="_blank" class="external-link">prostate</a></td>
 <td align="left">13699.9</td>
 <td align="left">79.8</td>
@@ -468,7 +468,7 @@
 <td align="left">OOM</td>
 <td align="left">OOM</td>
 </tr>
-<tr class="odd">
+<tr>
 <td align="left">average</td>
 <td align="left">3747.0</td>
 <td align="left">34.0</td>
@@ -543,7 +543,7 @@
 </div>
 
 <div class="pkgdown-footer-right">
-  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.2.0.</p>
+  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.2.1.</p>
 </div>
 
     </footer>

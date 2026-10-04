@@ -6,7 +6,7 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Mastering Regression Calibration: From Theoretical Basics to Advanced Methods &mdash; Perpetual 3.0.0-rc.2 documentation</title>
+  <title>Mastering Regression Calibration: From Theoretical Basics to Advanced Methods &mdash; Perpetual 2.2.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../../_static/nbsphinx-code-cells.css?v=2aa19091" />
@@ -15,7 +15,7 @@
   
       <script src="../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../_static/documentation_options.js?v=b3b49fdf"></script>
+      <script src="../../_static/documentation_options.js?v=b21de401"></script>
       <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
@@ -173,9 +173,9 @@
 <span class="kn">from</span><span class="w"> </span><span class="nn">sklearn.metrics</span><span class="w"> </span><span class="kn">import</span> <span class="n">mean_squared_error</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">sklearn.model_selection</span><span class="w"> </span><span class="kn">import</span> <span class="n">train_test_split</span>
 
-<span class="n">warnings</span><span class="o">.</span><span class="n">filterwarnings</span><span class="p">(</span><span class="s2">&quot;ignore&quot;</span><span class="p">)</span>
-<span class="n">sns</span><span class="o">.</span><span class="n">set_theme</span><span class="p">(</span><span class="n">style</span><span class="o">=</span><span class="s2">&quot;whitegrid&quot;</span><span class="p">)</span>
-<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Libraries imported successfully.&quot;</span><span class="p">)</span>
+<span class="n">warnings</span><span class="o">.</span><span class="n">filterwarnings</span><span class="p">(</span><span class="s2">"ignore"</span><span class="p">)</span>
+<span class="n">sns</span><span class="o">.</span><span class="n">set_theme</span><span class="p">(</span><span class="n">style</span><span class="o">=</span><span class="s2">"whitegrid"</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">"Libraries imported successfully."</span><span class="p">)</span>
 </pre></div>
 </div>
 </div>
@@ -203,9 +203,9 @@
     <span class="n">X_rest</span><span class="p">,</span> <span class="n">y_rest</span><span class="p">,</span> <span class="n">test_size</span><span class="o">=</span><span class="mf">0.25</span><span class="p">,</span> <span class="n">random_state</span><span class="o">=</span><span class="mi">42</span>
 <span class="p">)</span>
 
-<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Train size:       </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">X_train</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Calibration size: </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">X_cal</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Test size:        </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">X_test</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Train size:       </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">X_train</span><span class="p">)</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Calibration size: </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">X_cal</span><span class="p">)</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Test size:        </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">X_test</span><span class="p">)</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
 </pre></div>
 </div>
 </div>
@@ -217,12 +217,12 @@
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
-<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">model</span> <span class="o">=</span> <span class="n">PerpetualBooster</span><span class="p">(</span><span class="n">objective</span><span class="o">=</span><span class="s2">&quot;SquaredLoss&quot;</span><span class="p">,</span> <span class="n">budget</span><span class="o">=</span><span class="mf">1.0</span><span class="p">)</span>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">model</span> <span class="o">=</span> <span class="n">PerpetualBooster</span><span class="p">(</span><span class="n">objective</span><span class="o">=</span><span class="s2">"SquaredLoss"</span><span class="p">,</span> <span class="n">budget</span><span class="o">=</span><span class="mf">1.0</span><span class="p">)</span>
 <span class="n">model</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">X_train</span><span class="p">,</span> <span class="n">y_train</span><span class="p">)</span>
 
 <span class="n">test_preds</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="n">X_test</span><span class="p">)</span>
 <span class="n">rmse</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">mean_squared_error</span><span class="p">(</span><span class="n">y_test</span><span class="p">,</span> <span class="n">test_preds</span><span class="p">))</span>
-<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Base Model RMSE: </span><span class="si">{</span><span class="n">rmse</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Base Model RMSE: </span><span class="si">{</span><span class="n">rmse</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
 </pre></div>
 </div>
 </div>
@@ -242,17 +242,17 @@
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
-<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">methods</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;Conformal&quot;</span><span class="p">,</span> <span class="s2">&quot;MinMax&quot;</span><span class="p">,</span> <span class="s2">&quot;GRP&quot;</span><span class="p">,</span> <span class="s2">&quot;WeightVariance&quot;</span><span class="p">]</span>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">methods</span> <span class="o">=</span> <span class="p">[</span><span class="s2">"Conformal"</span><span class="p">,</span> <span class="s2">"MinMax"</span><span class="p">,</span> <span class="s2">"GRP"</span><span class="p">,</span> <span class="s2">"WeightVariance"</span><span class="p">]</span>
 <span class="n">alpha</span> <span class="o">=</span> <span class="mf">0.1</span>  <span class="c1"># Goal: 90% coverage</span>
 <span class="n">results</span> <span class="o">=</span> <span class="p">[]</span>
 <span class="n">method_data</span> <span class="o">=</span> <span class="p">{}</span>  <span class="c1"># To store intervals for viz</span>
 
 <span class="k">for</span> <span class="n">method</span> <span class="ow">in</span> <span class="n">methods</span><span class="p">:</span>
-    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Running Perpetual </span><span class="si">{</span><span class="n">method</span><span class="si">}</span><span class="s2">...&quot;</span><span class="p">)</span>
-    <span class="n">m</span> <span class="o">=</span> <span class="n">PerpetualBooster</span><span class="p">(</span><span class="n">objective</span><span class="o">=</span><span class="s2">&quot;SquaredLoss&quot;</span><span class="p">,</span> <span class="n">budget</span><span class="o">=</span><span class="mf">0.5</span><span class="p">,</span> <span class="n">save_node_stats</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Running Perpetual </span><span class="si">{</span><span class="n">method</span><span class="si">}</span><span class="s2">..."</span><span class="p">)</span>
+    <span class="n">m</span> <span class="o">=</span> <span class="n">PerpetualBooster</span><span class="p">(</span><span class="n">objective</span><span class="o">=</span><span class="s2">"SquaredLoss"</span><span class="p">,</span> <span class="n">budget</span><span class="o">=</span><span class="mf">0.5</span><span class="p">,</span> <span class="n">save_node_stats</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
     <span class="n">m</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">X_train</span><span class="p">,</span> <span class="n">y_train</span><span class="p">)</span>
 
-    <span class="k">if</span> <span class="n">method</span> <span class="o">==</span> <span class="s2">&quot;Conformal&quot;</span><span class="p">:</span>
+    <span class="k">if</span> <span class="n">method</span> <span class="o">==</span> <span class="s2">"Conformal"</span><span class="p">:</span>
         <span class="n">m</span><span class="o">.</span><span class="n">calibrate_conformal</span><span class="p">(</span><span class="n">X_train</span><span class="p">,</span> <span class="n">y_train</span><span class="p">,</span> <span class="n">X_cal</span><span class="p">,</span> <span class="n">y_cal</span><span class="p">,</span> <span class="n">alpha</span><span class="o">=</span><span class="p">[</span><span class="n">alpha</span><span class="p">])</span>
     <span class="k">else</span><span class="p">:</span>
         <span class="n">m</span><span class="o">.</span><span class="n">calibrate</span><span class="p">(</span><span class="n">X_cal</span><span class="p">,</span> <span class="n">y_cal</span><span class="p">,</span> <span class="n">alpha</span><span class="o">=</span><span class="p">[</span><span class="n">alpha</span><span class="p">],</span> <span class="n">method</span><span class="o">=</span><span class="n">method</span><span class="p">)</span>
@@ -265,13 +265,13 @@
     <span class="n">width</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">upper</span> <span class="o">-</span> <span class="n">lower</span><span class="p">)</span>
     <span class="n">results</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
         <span class="p">{</span>
-            <span class="s2">&quot;Library&quot;</span><span class="p">:</span> <span class="s2">&quot;Perpetual&quot;</span><span class="p">,</span>
-            <span class="s2">&quot;Method&quot;</span><span class="p">:</span> <span class="n">method</span><span class="p">,</span>
-            <span class="s2">&quot;Coverage&quot;</span><span class="p">:</span> <span class="n">coverage</span><span class="p">,</span>
-            <span class="s2">&quot;Avg Width&quot;</span><span class="p">:</span> <span class="n">width</span><span class="p">,</span>
+            <span class="s2">"Library"</span><span class="p">:</span> <span class="s2">"Perpetual"</span><span class="p">,</span>
+            <span class="s2">"Method"</span><span class="p">:</span> <span class="n">method</span><span class="p">,</span>
+            <span class="s2">"Coverage"</span><span class="p">:</span> <span class="n">coverage</span><span class="p">,</span>
+            <span class="s2">"Avg Width"</span><span class="p">:</span> <span class="n">width</span><span class="p">,</span>
         <span class="p">}</span>
     <span class="p">)</span>
-    <span class="n">method_data</span><span class="p">[</span><span class="sa">f</span><span class="s2">&quot;Perp_</span><span class="si">{</span><span class="n">method</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="n">lower</span><span class="p">,</span> <span class="n">upper</span><span class="p">)</span>
+    <span class="n">method_data</span><span class="p">[</span><span class="sa">f</span><span class="s2">"Perp_</span><span class="si">{</span><span class="n">method</span><span class="si">}</span><span class="s2">"</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="n">lower</span><span class="p">,</span> <span class="n">upper</span><span class="p">)</span>
 </pre></div>
 </div>
 </div>
@@ -297,16 +297,16 @@
 <span class="n">target_confidence</span> <span class="o">=</span> <span class="mi">1</span> <span class="o">-</span> <span class="n">alpha</span>
 
 <span class="n">mapie_configs</span> <span class="o">=</span> <span class="p">[</span>
-    <span class="p">(</span><span class="s2">&quot;Split&quot;</span><span class="p">,</span> <span class="s2">&quot;split&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">),</span>
-    <span class="p">(</span><span class="s2">&quot;Jackknife+&quot;</span><span class="p">,</span> <span class="s2">&quot;plus&quot;</span><span class="p">,</span> <span class="mi">20</span><span class="p">),</span>  <span class="c1"># Use high-k CV instead of LOO for speed</span>
-    <span class="p">(</span><span class="s2">&quot;Jackknife-minmax&quot;</span><span class="p">,</span> <span class="s2">&quot;minmax&quot;</span><span class="p">,</span> <span class="mi">20</span><span class="p">),</span>  <span class="c1"># on large datasets (12k samples)</span>
-    <span class="p">(</span><span class="s2">&quot;CV+&quot;</span><span class="p">,</span> <span class="s2">&quot;plus&quot;</span><span class="p">,</span> <span class="mi">5</span><span class="p">),</span>
-    <span class="p">(</span><span class="s2">&quot;CV-minmax&quot;</span><span class="p">,</span> <span class="s2">&quot;minmax&quot;</span><span class="p">,</span> <span class="mi">5</span><span class="p">),</span>
+    <span class="p">(</span><span class="s2">"Split"</span><span class="p">,</span> <span class="s2">"split"</span><span class="p">,</span> <span class="kc">None</span><span class="p">),</span>
+    <span class="p">(</span><span class="s2">"Jackknife+"</span><span class="p">,</span> <span class="s2">"plus"</span><span class="p">,</span> <span class="mi">20</span><span class="p">),</span>  <span class="c1"># Use high-k CV instead of LOO for speed</span>
+    <span class="p">(</span><span class="s2">"Jackknife-minmax"</span><span class="p">,</span> <span class="s2">"minmax"</span><span class="p">,</span> <span class="mi">20</span><span class="p">),</span>  <span class="c1"># on large datasets (12k samples)</span>
+    <span class="p">(</span><span class="s2">"CV+"</span><span class="p">,</span> <span class="s2">"plus"</span><span class="p">,</span> <span class="mi">5</span><span class="p">),</span>
+    <span class="p">(</span><span class="s2">"CV-minmax"</span><span class="p">,</span> <span class="s2">"minmax"</span><span class="p">,</span> <span class="mi">5</span><span class="p">),</span>
 <span class="p">]</span>
 
 <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">method</span><span class="p">,</span> <span class="n">cv_strategy</span> <span class="ow">in</span> <span class="n">mapie_configs</span><span class="p">:</span>
-    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Running MAPIE </span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2">...&quot;</span><span class="p">)</span>
-    <span class="k">if</span> <span class="n">method</span> <span class="o">==</span> <span class="s2">&quot;split&quot;</span><span class="p">:</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Running MAPIE </span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2">..."</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">method</span> <span class="o">==</span> <span class="s2">"split"</span><span class="p">:</span>
         <span class="n">base_est</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">X_train</span><span class="p">,</span> <span class="n">y_train</span><span class="p">)</span>
         <span class="c1"># In 1.3.0, SplitConformalRegressor takes confidence_level and prefit=True</span>
         <span class="n">mapie</span> <span class="o">=</span> <span class="n">SplitConformalRegressor</span><span class="p">(</span>
@@ -327,12 +327,12 @@
     <span class="n">coverage</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">((</span><span class="n">y_test</span> <span class="o">&gt;=</span> <span class="n">lower</span><span class="p">)</span> <span class="o">&amp;</span> <span class="p">(</span><span class="n">y_test</span> <span class="o">&lt;=</span> <span class="n">upper</span><span class="p">))</span>
     <span class="n">width</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">upper</span> <span class="o">-</span> <span class="n">lower</span><span class="p">)</span>
     <span class="n">results</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
-        <span class="p">{</span><span class="s2">&quot;Library&quot;</span><span class="p">:</span> <span class="s2">&quot;MAPIE&quot;</span><span class="p">,</span> <span class="s2">&quot;Method&quot;</span><span class="p">:</span> <span class="n">name</span><span class="p">,</span> <span class="s2">&quot;Coverage&quot;</span><span class="p">:</span> <span class="n">coverage</span><span class="p">,</span> <span class="s2">&quot;Avg Width&quot;</span><span class="p">:</span> <span class="n">width</span><span class="p">}</span>
+        <span class="p">{</span><span class="s2">"Library"</span><span class="p">:</span> <span class="s2">"MAPIE"</span><span class="p">,</span> <span class="s2">"Method"</span><span class="p">:</span> <span class="n">name</span><span class="p">,</span> <span class="s2">"Coverage"</span><span class="p">:</span> <span class="n">coverage</span><span class="p">,</span> <span class="s2">"Avg Width"</span><span class="p">:</span> <span class="n">width</span><span class="p">}</span>
     <span class="p">)</span>
-    <span class="n">method_data</span><span class="p">[</span><span class="sa">f</span><span class="s2">&quot;MAPIE_</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="n">lower</span><span class="p">,</span> <span class="n">upper</span><span class="p">)</span>
+    <span class="n">method_data</span><span class="p">[</span><span class="sa">f</span><span class="s2">"MAPIE_</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2">"</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="n">lower</span><span class="p">,</span> <span class="n">upper</span><span class="p">)</span>
 
-<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Running MAPIE CQR...&quot;</span><span class="p">)</span>
-<span class="n">cqr_est</span> <span class="o">=</span> <span class="n">HistGradientBoostingRegressor</span><span class="p">(</span><span class="n">loss</span><span class="o">=</span><span class="s2">&quot;quantile&quot;</span><span class="p">,</span> <span class="n">quantile</span><span class="o">=</span><span class="mf">0.5</span><span class="p">,</span> <span class="n">random_state</span><span class="o">=</span><span class="mi">42</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">"Running MAPIE CQR..."</span><span class="p">)</span>
+<span class="n">cqr_est</span> <span class="o">=</span> <span class="n">HistGradientBoostingRegressor</span><span class="p">(</span><span class="n">loss</span><span class="o">=</span><span class="s2">"quantile"</span><span class="p">,</span> <span class="n">quantile</span><span class="o">=</span><span class="mf">0.5</span><span class="p">,</span> <span class="n">random_state</span><span class="o">=</span><span class="mi">42</span><span class="p">)</span>
 <span class="n">mapie_cqr</span> <span class="o">=</span> <span class="n">ConformalizedQuantileRegressor</span><span class="p">(</span><span class="n">cqr_est</span><span class="p">,</span> <span class="n">confidence_level</span><span class="o">=</span><span class="n">target_confidence</span><span class="p">)</span>
 <span class="n">mapie_cqr</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">X_train</span><span class="p">,</span> <span class="n">y_train</span><span class="p">)</span><span class="o">.</span><span class="n">conformalize</span><span class="p">(</span><span class="n">X_cal</span><span class="p">,</span> <span class="n">y_cal</span><span class="p">)</span>
 <span class="n">_</span><span class="p">,</span> <span class="n">y_pis</span> <span class="o">=</span> <span class="n">mapie_cqr</span><span class="o">.</span><span class="n">predict_interval</span><span class="p">(</span><span class="n">X_test</span><span class="p">)</span>
@@ -340,9 +340,9 @@
 <span class="n">coverage</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">((</span><span class="n">y_test</span> <span class="o">&gt;=</span> <span class="n">lower</span><span class="p">)</span> <span class="o">&amp;</span> <span class="p">(</span><span class="n">y_test</span> <span class="o">&lt;=</span> <span class="n">upper</span><span class="p">))</span>
 <span class="n">width</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">upper</span> <span class="o">-</span> <span class="n">lower</span><span class="p">)</span>
 <span class="n">results</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
-    <span class="p">{</span><span class="s2">&quot;Library&quot;</span><span class="p">:</span> <span class="s2">&quot;MAPIE&quot;</span><span class="p">,</span> <span class="s2">&quot;Method&quot;</span><span class="p">:</span> <span class="s2">&quot;CQR&quot;</span><span class="p">,</span> <span class="s2">&quot;Coverage&quot;</span><span class="p">:</span> <span class="n">coverage</span><span class="p">,</span> <span class="s2">&quot;Avg Width&quot;</span><span class="p">:</span> <span class="n">width</span><span class="p">}</span>
+    <span class="p">{</span><span class="s2">"Library"</span><span class="p">:</span> <span class="s2">"MAPIE"</span><span class="p">,</span> <span class="s2">"Method"</span><span class="p">:</span> <span class="s2">"CQR"</span><span class="p">,</span> <span class="s2">"Coverage"</span><span class="p">:</span> <span class="n">coverage</span><span class="p">,</span> <span class="s2">"Avg Width"</span><span class="p">:</span> <span class="n">width</span><span class="p">}</span>
 <span class="p">)</span>
-<span class="n">method_data</span><span class="p">[</span><span class="s2">&quot;MAPIE_CQR&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="n">lower</span><span class="p">,</span> <span class="n">upper</span><span class="p">)</span>
+<span class="n">method_data</span><span class="p">[</span><span class="s2">"MAPIE_CQR"</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="n">lower</span><span class="p">,</span> <span class="n">upper</span><span class="p">)</span>
 </pre></div>
 </div>
 </div>
@@ -360,8 +360,8 @@
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">df_res</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">results</span><span class="p">)</span>
-<span class="n">df_res</span><span class="p">[</span><span class="s2">&quot;Coverage Error&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">df_res</span><span class="p">[</span><span class="s2">&quot;Coverage&quot;</span><span class="p">]</span> <span class="o">-</span> <span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="n">alpha</span><span class="p">))</span>
-<span class="n">df_res</span><span class="o">.</span><span class="n">sort_values</span><span class="p">(</span><span class="n">by</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;Library&quot;</span><span class="p">,</span> <span class="s2">&quot;Avg Width&quot;</span><span class="p">],</span> <span class="n">ascending</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">inplace</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="n">df_res</span><span class="p">[</span><span class="s2">"Coverage Error"</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">df_res</span><span class="p">[</span><span class="s2">"Coverage"</span><span class="p">]</span> <span class="o">-</span> <span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="n">alpha</span><span class="p">))</span>
+<span class="n">df_res</span><span class="o">.</span><span class="n">sort_values</span><span class="p">(</span><span class="n">by</span><span class="o">=</span><span class="p">[</span><span class="s2">"Library"</span><span class="p">,</span> <span class="s2">"Avg Width"</span><span class="p">],</span> <span class="n">ascending</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">inplace</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="n">display</span><span class="p">(</span><span class="n">df_res</span><span class="p">)</span>
 </pre></div>
 </div>
@@ -376,14 +376,14 @@
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">plt</span><span class="o">.</span><span class="n">figure</span><span class="p">(</span><span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">14</span><span class="p">,</span> <span class="mi">7</span><span class="p">))</span>
 <span class="n">sns</span><span class="o">.</span><span class="n">scatterplot</span><span class="p">(</span>
-    <span class="n">data</span><span class="o">=</span><span class="n">df_res</span><span class="p">,</span> <span class="n">x</span><span class="o">=</span><span class="s2">&quot;Avg Width&quot;</span><span class="p">,</span> <span class="n">y</span><span class="o">=</span><span class="s2">&quot;Coverage&quot;</span><span class="p">,</span> <span class="n">hue</span><span class="o">=</span><span class="s2">&quot;Library&quot;</span><span class="p">,</span> <span class="n">style</span><span class="o">=</span><span class="s2">&quot;Method&quot;</span><span class="p">,</span> <span class="n">s</span><span class="o">=</span><span class="mi">200</span>
+    <span class="n">data</span><span class="o">=</span><span class="n">df_res</span><span class="p">,</span> <span class="n">x</span><span class="o">=</span><span class="s2">"Avg Width"</span><span class="p">,</span> <span class="n">y</span><span class="o">=</span><span class="s2">"Coverage"</span><span class="p">,</span> <span class="n">hue</span><span class="o">=</span><span class="s2">"Library"</span><span class="p">,</span> <span class="n">style</span><span class="o">=</span><span class="s2">"Method"</span><span class="p">,</span> <span class="n">s</span><span class="o">=</span><span class="mi">200</span>
 <span class="p">)</span>
-<span class="n">plt</span><span class="o">.</span><span class="n">axhline</span><span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="n">alpha</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">&quot;red&quot;</span><span class="p">,</span> <span class="n">linestyle</span><span class="o">=</span><span class="s2">&quot;--&quot;</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s2">&quot;Target Coverage (90%)&quot;</span><span class="p">)</span>
-<span class="n">plt</span><span class="o">.</span><span class="n">title</span><span class="p">(</span><span class="s2">&quot;Calibration Benchmarking: Coverage vs. Efficiency (Width)&quot;</span><span class="p">)</span>
-<span class="n">plt</span><span class="o">.</span><span class="n">ylabel</span><span class="p">(</span><span class="s2">&quot;Observed Coverage&quot;</span><span class="p">)</span>
-<span class="n">plt</span><span class="o">.</span><span class="n">xlabel</span><span class="p">(</span><span class="s2">&quot;Average Interval Width (lower is better)&quot;</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">axhline</span><span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="n">alpha</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">"red"</span><span class="p">,</span> <span class="n">linestyle</span><span class="o">=</span><span class="s2">"--"</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s2">"Target Coverage (90%)"</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">title</span><span class="p">(</span><span class="s2">"Calibration Benchmarking: Coverage vs. Efficiency (Width)"</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">ylabel</span><span class="p">(</span><span class="s2">"Observed Coverage"</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">xlabel</span><span class="p">(</span><span class="s2">"Average Interval Width (lower is better)"</span><span class="p">)</span>
 <span class="n">plt</span><span class="o">.</span><span class="n">grid</span><span class="p">(</span><span class="kc">True</span><span class="p">)</span>
-<span class="n">plt</span><span class="o">.</span><span class="n">legend</span><span class="p">(</span><span class="n">bbox_to_anchor</span><span class="o">=</span><span class="p">(</span><span class="mf">1.05</span><span class="p">,</span> <span class="mi">1</span><span class="p">),</span> <span class="n">loc</span><span class="o">=</span><span class="s2">&quot;upper left&quot;</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">legend</span><span class="p">(</span><span class="n">bbox_to_anchor</span><span class="o">=</span><span class="p">(</span><span class="mf">1.05</span><span class="p">,</span> <span class="mi">1</span><span class="p">),</span> <span class="n">loc</span><span class="o">=</span><span class="s2">"upper left"</span><span class="p">)</span>
 <span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
 </pre></div>
 </div>
@@ -406,19 +406,19 @@
     <span class="k">for</span> <span class="n">w</span> <span class="ow">in</span> <span class="n">widths</span><span class="p">:</span>
         <span class="n">width_data</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
             <span class="p">{</span>
-                <span class="s2">&quot;Method&quot;</span><span class="p">:</span> <span class="n">name</span><span class="p">,</span>
-                <span class="s2">&quot;Width&quot;</span><span class="p">:</span> <span class="n">w</span><span class="p">,</span>
-                <span class="s2">&quot;Library&quot;</span><span class="p">:</span> <span class="s2">&quot;Perpetual&quot;</span> <span class="k">if</span> <span class="s2">&quot;Perp&quot;</span> <span class="ow">in</span> <span class="n">name</span> <span class="k">else</span> <span class="s2">&quot;MAPIE&quot;</span><span class="p">,</span>
+                <span class="s2">"Method"</span><span class="p">:</span> <span class="n">name</span><span class="p">,</span>
+                <span class="s2">"Width"</span><span class="p">:</span> <span class="n">w</span><span class="p">,</span>
+                <span class="s2">"Library"</span><span class="p">:</span> <span class="s2">"Perpetual"</span> <span class="k">if</span> <span class="s2">"Perp"</span> <span class="ow">in</span> <span class="n">name</span> <span class="k">else</span> <span class="s2">"MAPIE"</span><span class="p">,</span>
             <span class="p">}</span>
         <span class="p">)</span>
 
 <span class="n">df_widths</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">width_data</span><span class="p">)</span>
 
 <span class="n">plt</span><span class="o">.</span><span class="n">figure</span><span class="p">(</span><span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">15</span><span class="p">,</span> <span class="mi">8</span><span class="p">))</span>
-<span class="n">sns</span><span class="o">.</span><span class="n">boxplot</span><span class="p">(</span><span class="n">data</span><span class="o">=</span><span class="n">df_widths</span><span class="p">,</span> <span class="n">x</span><span class="o">=</span><span class="s2">&quot;Method&quot;</span><span class="p">,</span> <span class="n">y</span><span class="o">=</span><span class="s2">&quot;Width&quot;</span><span class="p">,</span> <span class="n">hue</span><span class="o">=</span><span class="s2">&quot;Library&quot;</span><span class="p">)</span>
+<span class="n">sns</span><span class="o">.</span><span class="n">boxplot</span><span class="p">(</span><span class="n">data</span><span class="o">=</span><span class="n">df_widths</span><span class="p">,</span> <span class="n">x</span><span class="o">=</span><span class="s2">"Method"</span><span class="p">,</span> <span class="n">y</span><span class="o">=</span><span class="s2">"Width"</span><span class="p">,</span> <span class="n">hue</span><span class="o">=</span><span class="s2">"Library"</span><span class="p">)</span>
 <span class="n">plt</span><span class="o">.</span><span class="n">xticks</span><span class="p">(</span><span class="n">rotation</span><span class="o">=</span><span class="mi">45</span><span class="p">)</span>
-<span class="n">plt</span><span class="o">.</span><span class="n">title</span><span class="p">(</span><span class="s2">&quot;Distribution of Prediction Interval Widths Across Methods&quot;</span><span class="p">)</span>
-<span class="n">plt</span><span class="o">.</span><span class="n">ylabel</span><span class="p">(</span><span class="s2">&quot;Interval Width&quot;</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">title</span><span class="p">(</span><span class="s2">"Distribution of Prediction Interval Widths Across Methods"</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">ylabel</span><span class="p">(</span><span class="s2">"Interval Width"</span><span class="p">)</span>
 <span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
 </pre></div>
 </div>

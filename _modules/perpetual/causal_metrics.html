@@ -5,7 +5,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>perpetual.causal_metrics &mdash; Perpetual 3.0.0-rc.2 documentation</title>
+  <title>perpetual.causal_metrics &mdash; Perpetual 2.2.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../../_static/custom.css?v=9cdd1368" />
@@ -13,7 +13,7 @@
   
       <script src="../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../_static/documentation_options.js?v=b3b49fdf"></script>
+      <script src="../../_static/documentation_options.js?v=b21de401"></script>
       <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
@@ -83,7 +83,7 @@
            <div itemprop="articleBody">
              
   <h1>Source code for perpetual.causal_metrics</h1><div class="highlight"><pre>
-<span></span><span class="sd">&quot;&quot;&quot;Causal ML evaluation metrics.</span>
+<span></span><span class="sd">"""Causal ML evaluation metrics.</span>
 
 <span class="sd">Provides standard metrics for evaluating heterogeneous treatment effect</span>
 <span class="sd">(uplift) models when ground-truth individual effects are unavailable</span>
@@ -96,7 +96,7 @@
 <span class="sd">- :func:`qini_curve` – compute the Qini curve.</span>
 <span class="sd">- :func:`qini_coefficient` – Qini coefficient (area between Qini curve and</span>
 <span class="sd">  random).</span>
-<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">"""</span>
 
 <span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">Tuple</span>
 
@@ -109,7 +109,7 @@
     <span class="n">uplift_score</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span>
     <span class="n">sample_weight</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="n">Optional</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">]]:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Sort arrays by descending uplift score.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""Sort arrays by descending uplift score."""</span>
     <span class="n">order</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">argsort</span><span class="p">(</span><span class="o">-</span><span class="n">uplift_score</span><span class="p">)</span>
     <span class="n">y_s</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">y</span><span class="p">)[</span><span class="n">order</span><span class="p">]</span>
     <span class="n">w_s</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">w</span><span class="p">)[</span><span class="n">order</span><span class="p">]</span>
@@ -130,7 +130,7 @@
     <span class="n">w_true</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span>
     <span class="n">uplift_score</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">]:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Compute the cumulative gain (uplift) curve.</span>
+<span class="w">    </span><span class="sd">"""Compute the cumulative gain (uplift) curve.</span>
 
 <span class="sd">    Samples are sorted by ``uplift_score`` in descending order.  At each</span>
 <span class="sd">    fraction of the population the observed uplift (difference in conversion</span>
@@ -152,7 +152,7 @@
 <span class="sd">        Fraction of population from 0 to 1.</span>
 <span class="sd">    gains : ndarray of shape (n_samples,)</span>
 <span class="sd">        Cumulative gain at each fraction.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="n">y_s</span><span class="p">,</span> <span class="n">w_s</span><span class="p">,</span> <span class="n">_</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">_sort_by_uplift</span><span class="p">(</span><span class="n">y_true</span><span class="p">,</span> <span class="n">w_true</span><span class="p">,</span> <span class="n">uplift_score</span><span class="p">)</span>
     <span class="n">n</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">y_s</span><span class="p">)</span>
 
@@ -190,7 +190,7 @@
     <span class="n">uplift_score</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span>
     <span class="n">normalize</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Area Under the Uplift Curve (AUUC).</span>
+<span class="w">    </span><span class="sd">"""Area Under the Uplift Curve (AUUC).</span>
 
 <span class="sd">    Parameters</span>
 <span class="sd">    ----------</span>
@@ -208,7 +208,7 @@
 <span class="sd">    -------</span>
 <span class="sd">    float</span>
 <span class="sd">        AUUC value.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="n">fracs</span><span class="p">,</span> <span class="n">gains</span> <span class="o">=</span> <span class="n">cumulative_gain_curve</span><span class="p">(</span><span class="n">y_true</span><span class="p">,</span> <span class="n">w_true</span><span class="p">,</span> <span class="n">uplift_score</span><span class="p">)</span>
     <span class="n">area</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">trapezoid</span><span class="p">(</span><span class="n">gains</span><span class="p">,</span> <span class="n">fracs</span><span class="p">))</span>
 
@@ -239,7 +239,7 @@
     <span class="n">w_true</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span>
     <span class="n">uplift_score</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">]:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Compute the Qini curve.</span>
+<span class="w">    </span><span class="sd">"""Compute the Qini curve.</span>
 
 <span class="sd">    The Qini curve counts the *incremental* number of positive outcomes</span>
 <span class="sd">    attributable to treatment as a function of the population fraction</span>
@@ -260,7 +260,7 @@
 <span class="sd">        Population fraction (starts at 0).</span>
 <span class="sd">    qini : ndarray of shape (n_samples + 1,)</span>
 <span class="sd">        Qini value at each fraction (starts at 0).</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="n">y_s</span><span class="p">,</span> <span class="n">w_s</span><span class="p">,</span> <span class="n">_</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">_sort_by_uplift</span><span class="p">(</span><span class="n">y_true</span><span class="p">,</span> <span class="n">w_true</span><span class="p">,</span> <span class="n">uplift_score</span><span class="p">)</span>
     <span class="n">n</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">y_s</span><span class="p">)</span>
 
@@ -293,7 +293,7 @@
     <span class="n">w_true</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span>
     <span class="n">uplift_score</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Qini coefficient: area between the Qini curve and the random diagonal.</span>
+<span class="w">    </span><span class="sd">"""Qini coefficient: area between the Qini curve and the random diagonal.</span>
 
 <span class="sd">    Parameters</span>
 <span class="sd">    ----------</span>
@@ -308,7 +308,7 @@
 <span class="sd">    -------</span>
 <span class="sd">    float</span>
 <span class="sd">        Qini coefficient value.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="n">fracs</span><span class="p">,</span> <span class="n">q</span> <span class="o">=</span> <span class="n">qini_curve</span><span class="p">(</span><span class="n">y_true</span><span class="p">,</span> <span class="n">w_true</span><span class="p">,</span> <span class="n">uplift_score</span><span class="p">)</span>
     <span class="n">model_area</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">trapezoid</span><span class="p">(</span><span class="n">q</span><span class="p">,</span> <span class="n">fracs</span><span class="p">))</span>
 

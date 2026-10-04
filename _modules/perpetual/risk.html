@@ -5,7 +5,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>perpetual.risk &mdash; Perpetual 3.0.0-rc.2 documentation</title>
+  <title>perpetual.risk &mdash; Perpetual 2.2.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../../_static/custom.css?v=9cdd1368" />
@@ -13,7 +13,7 @@
   
       <script src="../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../_static/documentation_options.js?v=b3b49fdf"></script>
+      <script src="../../_static/documentation_options.js?v=b21de401"></script>
       <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
@@ -83,12 +83,12 @@
            <div itemprop="articleBody">
              
   <h1>Source code for perpetual.risk</h1><div class="highlight"><pre>
-<span></span><span class="sd">&quot;&quot;&quot;Adverse-action reason-code generation for credit risk models.</span>
+<span></span><span class="sd">"""Adverse-action reason-code generation for credit risk models.</span>
 
 <span class="sd">Provides `PerpetualRiskEngine`, a wrapper around a fitted `PerpetualBooster`</span>
 <span class="sd">that explains rejection decisions by identifying the features most responsible</span>
 <span class="sd">for pushing a score below the approval threshold.</span>
-<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">"""</span>
 
 <span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">List</span>
 
@@ -100,24 +100,24 @@
 <div class="viewcode-block" id="PerpetualRiskEngine">
 <a class="viewcode-back" href="../../api.html#perpetual.risk.PerpetualRiskEngine">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">PerpetualRiskEngine</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Risk Engine for generating Adverse Action (Reason) Codes.</span>
 
 <span class="sd">    This engine wraps a fitted PerpetualBooster model and provides functionality</span>
 <span class="sd">    to explain rejections (Adverse Actions) by attributing the negative decision</span>
 <span class="sd">    to specific features.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
 <div class="viewcode-block" id="PerpetualRiskEngine.__init__">
 <a class="viewcode-back" href="../../api.html#perpetual.risk.PerpetualRiskEngine.__init__">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">model</span><span class="p">:</span> <span class="n">PerpetualBooster</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Wrap a fitted booster for reason-code generation.</span>
+<span class="w">        </span><span class="sd">"""Wrap a fitted booster for reason-code generation.</span>
 
 <span class="sd">        Parameters</span>
 <span class="sd">        ----------</span>
 <span class="sd">        model : PerpetualBooster</span>
 <span class="sd">            A fitted `PerpetualBooster` instance.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">booster</span> <span class="o">=</span> <span class="n">model</span></div>
 
 
@@ -128,17 +128,17 @@
         <span class="n">X</span><span class="p">,</span>
         <span class="n">threshold</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span>
         <span class="n">n_codes</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">3</span><span class="p">,</span>
-        <span class="n">method</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;Average&quot;</span><span class="p">,</span>
-        <span class="n">rejection_direction</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;lower&quot;</span><span class="p">,</span>
+        <span class="n">method</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">"Average"</span><span class="p">,</span>
+        <span class="n">rejection_direction</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">"lower"</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]]:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""</span>
 <span class="sd">        Generate reason codes for samples that fall below/above the approval threshold.</span>
 
 <span class="sd">        Logic:</span>
 <span class="sd">        1. Predict score for X.</span>
 <span class="sd">        2. Identify rejected samples based on ``rejection_direction``:</span>
-<span class="sd">           - &quot;lower&quot;: score &lt; threshold (e.g. FICO score)</span>
-<span class="sd">           - &quot;higher&quot;: score &gt; threshold (e.g. Default probability)</span>
+<span class="sd">           - "lower": score &lt; threshold (e.g. FICO score)</span>
+<span class="sd">           - "higher": score &gt; threshold (e.g. Default probability)</span>
 <span class="sd">        3. Identify top N features dragging the score in the rejected direction.</span>
 
 <span class="sd">        Parameters</span>
@@ -149,23 +149,23 @@
 <span class="sd">            Approval threshold.</span>
 <span class="sd">        n_codes : int, default=3</span>
 <span class="sd">            Number of reason codes to return per applicant.</span>
-<span class="sd">        method : str, default=&quot;Average&quot;</span>
+<span class="sd">        method : str, default="Average"</span>
 <span class="sd">            Contribution method.</span>
-<span class="sd">        rejection_direction : {&quot;lower&quot;, &quot;higher&quot;}, default=&quot;lower&quot;</span>
-<span class="sd">            Direction of rejection. If &quot;lower&quot;, scores below threshold are</span>
-<span class="sd">            rejected. If &quot;higher&quot;, scores above threshold are rejected.</span>
+<span class="sd">        rejection_direction : {"lower", "higher"}, default="lower"</span>
+<span class="sd">            Direction of rejection. If "lower", scores below threshold are</span>
+<span class="sd">            rejected. If "higher", scores above threshold are rejected.</span>
 
 <span class="sd">        Returns</span>
 <span class="sd">        -------</span>
 <span class="sd">        reasons : list of list of str</span>
 <span class="sd">            For each sample, a list of reason-code strings.</span>
 <span class="sd">            Approved samples get an empty list.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
-        <span class="k">if</span> <span class="n">rejection_direction</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">&quot;lower&quot;</span><span class="p">,</span> <span class="s2">&quot;higher&quot;</span><span class="p">):</span>
-            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;rejection_direction must be &#39;lower&#39; or &#39;higher&#39;&quot;</span><span class="p">)</span>
+<span class="sd">        """</span>
+        <span class="k">if</span> <span class="n">rejection_direction</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">"lower"</span><span class="p">,</span> <span class="s2">"higher"</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"rejection_direction must be 'lower' or 'higher'"</span><span class="p">)</span>
 
         <span class="c1"># Get predictions</span>
-        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">booster</span><span class="p">,</span> <span class="s2">&quot;classes_&quot;</span><span class="p">,</span> <span class="p">[]))</span> <span class="o">==</span> <span class="mi">2</span><span class="p">:</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">booster</span><span class="p">,</span> <span class="s2">"classes_"</span><span class="p">,</span> <span class="p">[]))</span> <span class="o">==</span> <span class="mi">2</span><span class="p">:</span>
             <span class="c1"># For binary classification, use probability of positive class</span>
             <span class="n">preds</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">booster</span><span class="o">.</span><span class="n">predict_proba</span><span class="p">(</span><span class="n">X</span><span class="p">)[:,</span> <span class="mi">1</span><span class="p">]</span>
         <span class="k">else</span><span class="p">:</span>
@@ -179,13 +179,13 @@
         <span class="n">feature_contribs</span> <span class="o">=</span> <span class="n">contributions</span><span class="p">[:,</span> <span class="p">:</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
 
         <span class="n">reasons</span> <span class="o">=</span> <span class="p">[]</span>
-        <span class="n">feature_names</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">booster</span><span class="p">,</span> <span class="s2">&quot;feature_names_in_&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+        <span class="n">feature_names</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">booster</span><span class="p">,</span> <span class="s2">"feature_names_in_"</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
 
         <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">score</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">preds</span><span class="p">):</span>
             <span class="n">sample_reasons</span> <span class="o">=</span> <span class="p">[]</span>
             <span class="n">is_rejected</span> <span class="o">=</span> <span class="p">(</span>
                 <span class="p">(</span><span class="n">score</span> <span class="o">&lt;</span> <span class="n">threshold</span><span class="p">)</span>
-                <span class="k">if</span> <span class="n">rejection_direction</span> <span class="o">==</span> <span class="s2">&quot;lower&quot;</span>
+                <span class="k">if</span> <span class="n">rejection_direction</span> <span class="o">==</span> <span class="s2">"lower"</span>
                 <span class="k">else</span> <span class="p">(</span><span class="n">score</span> <span class="o">&gt;</span> <span class="n">threshold</span><span class="p">)</span>
             <span class="p">)</span>
 
@@ -193,7 +193,7 @@
                 <span class="c1"># Identify contributors</span>
                 <span class="n">row_contribs</span> <span class="o">=</span> <span class="n">feature_contribs</span><span class="p">[</span><span class="n">i</span><span class="p">]</span>
 
-                <span class="k">if</span> <span class="n">rejection_direction</span> <span class="o">==</span> <span class="s2">&quot;lower&quot;</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">rejection_direction</span> <span class="o">==</span> <span class="s2">"lower"</span><span class="p">:</span>
                     <span class="c1"># Lowest values (most negative) drag score DOWN</span>
                     <span class="n">indices</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">argsort</span><span class="p">(</span><span class="n">row_contribs</span><span class="p">)[:</span><span class="n">n_codes</span><span class="p">]</span>
                 <span class="k">else</span><span class="p">:</span>
@@ -203,7 +203,7 @@
                 <span class="k">for</span> <span class="n">idx</span> <span class="ow">in</span> <span class="n">indices</span><span class="p">:</span>
                     <span class="n">val</span> <span class="o">=</span> <span class="n">row_contribs</span><span class="p">[</span><span class="n">idx</span><span class="p">]</span>
                     <span class="n">name</span> <span class="o">=</span> <span class="n">feature_names</span><span class="p">[</span><span class="n">idx</span><span class="p">]</span> <span class="k">if</span> <span class="n">feature_names</span> <span class="k">else</span> <span class="nb">str</span><span class="p">(</span><span class="n">idx</span><span class="p">)</span>
-                    <span class="n">sample_reasons</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">val</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+                    <span class="n">sample_reasons</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">val</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
 
             <span class="n">reasons</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">sample_reasons</span><span class="p">)</span>
 

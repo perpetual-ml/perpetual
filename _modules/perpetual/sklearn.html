@@ -5,7 +5,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>perpetual.sklearn &mdash; Perpetual 3.0.0-rc.2 documentation</title>
+  <title>perpetual.sklearn &mdash; Perpetual 2.2.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../../_static/custom.css?v=9cdd1368" />
@@ -13,7 +13,7 @@
   
       <script src="../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../_static/documentation_options.js?v=b3b49fdf"></script>
+      <script src="../../_static/documentation_options.js?v=b21de401"></script>
       <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
@@ -83,12 +83,12 @@
            <div itemprop="articleBody">
              
   <h1>Source code for perpetual.sklearn</h1><div class="highlight"><pre>
-<span></span><span class="sd">&quot;&quot;&quot;Scikit-learn compatible wrappers for the PerpetualBooster.</span>
+<span></span><span class="sd">"""Scikit-learn compatible wrappers for the PerpetualBooster.</span>
 
 <span class="sd">Provides `PerpetualClassifier`, `PerpetualRegressor`, and `PerpetualRanker`</span>
 <span class="sd">classes that follow the scikit-learn estimator API, enabling use with</span>
 <span class="sd">pipelines, grid search, and other scikit-learn utilities.</span>
-<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">"""</span>
 
 <span class="kn">import</span><span class="w"> </span><span class="nn">warnings</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">types</span><span class="w"> </span><span class="kn">import</span> <span class="n">FunctionType</span>
@@ -104,12 +104,12 @@
 <div class="viewcode-block" id="PerpetualClassifier">
 <a class="viewcode-back" href="../../api.html#perpetual.sklearn.PerpetualClassifier">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">PerpetualClassifier</span><span class="p">(</span><span class="n">PerpetualBooster</span><span class="p">,</span> <span class="n">ClassifierMixin</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    A scikit-learn compatible classifier based on PerpetualBooster.</span>
-<span class="sd">    Uses &#39;LogLoss&#39; as the default objective.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    Uses 'LogLoss' as the default objective.</span>
+<span class="sd">    """</span>
 
-    <span class="n">_estimator_type</span> <span class="o">=</span> <span class="s2">&quot;classifier&quot;</span>
+    <span class="n">_estimator_type</span> <span class="o">=</span> <span class="s2">"classifier"</span>
 
     <span class="c1"># Expose the objective explicitly in the __init__ signature to allow</span>
     <span class="c1"># scikit-learn to correctly discover and set it via set_params.</span>
@@ -120,7 +120,7 @@
         <span class="o">*</span><span class="p">,</span>
         <span class="n">objective</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span>
             <span class="nb">str</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">FunctionType</span><span class="p">,</span> <span class="n">FunctionType</span><span class="p">,</span> <span class="n">FunctionType</span><span class="p">]</span>
-        <span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;LogLoss&quot;</span><span class="p">,</span>
+        <span class="p">]</span> <span class="o">=</span> <span class="s2">"LogLoss"</span><span class="p">,</span>
         <span class="n">budget</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.5</span><span class="p">,</span>
         <span class="n">num_threads</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">monotone_constraints</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="nb">int</span><span class="p">],</span> <span class="kc">None</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -132,18 +132,18 @@
         <span class="c1"># Capture all parameters in a way that BaseEstimator can handle</span>
         <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
     <span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""</span>
 <span class="sd">        Gradient Boosting Machine with Perpetual Learning.</span>
 
-<span class="sd">        A self-generalizing gradient boosting machine that doesn&#39;t need hyperparameter</span>
+<span class="sd">        A self-generalizing gradient boosting machine that doesn't need hyperparameter</span>
 <span class="sd">        optimization. It automatically finds the best configuration based on the provided budget.</span>
 
 <span class="sd">        Parameters</span>
 <span class="sd">        ----------</span>
-<span class="sd">        objective : str or tuple, default=&quot;LogLoss&quot;</span>
+<span class="sd">        objective : str or tuple, default="LogLoss"</span>
 <span class="sd">            Learning objective function to be used for optimization. Valid options are:</span>
 
-<span class="sd">            - &quot;LogLoss&quot;: logistic loss for binary classification.</span>
+<span class="sd">            - "LogLoss": logistic loss for binary classification.</span>
 <span class="sd">            - custom objective: a tuple of (loss, gradient, initial_value) functions.</span>
 <span class="sd">              Each function should have the following signature:</span>
 
@@ -160,7 +160,7 @@
 <span class="sd">            Constraints to enforce a specific relationship between features and target.</span>
 <span class="sd">            Keys are feature indices or names, values are -1, 1, or 0.</span>
 <span class="sd">        force_children_to_bound_parent : bool, default=False</span>
-<span class="sd">            Whether to restrict children nodes to be within the parent&#39;s range.</span>
+<span class="sd">            Whether to restrict children nodes to be within the parent's range.</span>
 <span class="sd">        missing : float, default=np.nan</span>
 <span class="sd">            Value to consider as missing data.</span>
 <span class="sd">        allow_missing_splits : bool, default=True</span>
@@ -170,26 +170,26 @@
 <span class="sd">        terminate_missing_features : iterable, optional</span>
 <span class="sd">            Features for which missing branches will always be terminated if</span>
 <span class="sd">            ``create_missing_branch`` is True.</span>
-<span class="sd">        missing_node_treatment : str, default=&quot;None&quot;</span>
+<span class="sd">        missing_node_treatment : str, default="None"</span>
 <span class="sd">            How to handle weights for missing nodes if ``create_missing_branch`` is True.</span>
-<span class="sd">            Options: &quot;None&quot;, &quot;AssignToParent&quot;, &quot;AverageLeafWeight&quot;, &quot;AverageNodeWeight&quot;.</span>
+<span class="sd">            Options: "None", "AssignToParent", "AverageLeafWeight", "AverageNodeWeight".</span>
 <span class="sd">        log_iterations : int, default=0</span>
 <span class="sd">            Logging frequency (every N iterations). 0 disables logging.</span>
-<span class="sd">        feature_importance_method : str, default=&quot;Gain&quot;</span>
-<span class="sd">            Method for calculating feature importance. Options: &quot;Gain&quot;, &quot;Weight&quot;, &quot;Cover&quot;,</span>
-<span class="sd">            &quot;TotalGain&quot;, &quot;TotalCover&quot;.</span>
+<span class="sd">        feature_importance_method : str, default="Gain"</span>
+<span class="sd">            Method for calculating feature importance. Options: "Gain", "Weight", "Cover",</span>
+<span class="sd">            "TotalGain", "TotalCover".</span>
 <span class="sd">        **kwargs</span>
 <span class="sd">            Objective-specific parameters passed to the booster core:</span>
 
-<span class="sd">            - **quantile** (float): The target quantile for ``&quot;QuantileLoss&quot;`` and</span>
-<span class="sd">              ``&quot;AdaptiveHuberLoss&quot;``. Must be between 0 and 1. Default is 0.5.</span>
-<span class="sd">            - **delta** (float): The threshold parameter for ``&quot;HuberLoss&quot;``. Default is 1.0.</span>
-<span class="sd">            - **c** (float): The scale parameter for ``&quot;FairLoss&quot;``. Default is 1.0.</span>
-<span class="sd">            - **p** (float): The power parameter for ``&quot;TweedieLoss&quot;``. Must be between 1 and 2.</span>
+<span class="sd">            - **quantile** (float): The target quantile for ``"QuantileLoss"`` and</span>
+<span class="sd">              ``"AdaptiveHuberLoss"``. Must be between 0 and 1. Default is 0.5.</span>
+<span class="sd">            - **delta** (float): The threshold parameter for ``"HuberLoss"``. Default is 1.0.</span>
+<span class="sd">            - **c** (float): The scale parameter for ``"FairLoss"``. Default is 1.0.</span>
+<span class="sd">            - **p** (float): The power parameter for ``"TweedieLoss"``. Must be between 1 and 2.</span>
 <span class="sd">              Default is 1.5.</span>
 <span class="sd">        reset : bool, optional</span>
 <span class="sd">            Whether to reset the model or continue training on subsequent calls to fit.</span>
-<span class="sd">        categorical_features : str or iterable, default=&quot;auto&quot;</span>
+<span class="sd">        categorical_features : str or iterable, default="auto"</span>
 <span class="sd">            Feature indices or names to treat as categorical.</span>
 <span class="sd">        timeout : float, optional</span>
 <span class="sd">            Time limit for fitting in seconds.</span>
@@ -209,10 +209,10 @@
 <span class="sd">            Whether to save node statistics (required for calibration).</span>
 <span class="sd">        **kwargs</span>
 <span class="sd">            Arbitrary keyword arguments to be passed to the base class.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="c1"># Ensure the objective is one of the valid classification objectives</span>
         <span class="n">valid_objectives</span> <span class="o">=</span> <span class="p">{</span>
-            <span class="s2">&quot;LogLoss&quot;</span>
+            <span class="s2">"LogLoss"</span>
         <span class="p">}</span>  <span class="c1"># Assuming only LogLoss for classification for simplicity</span>
         <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">objective</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span> <span class="ow">and</span> <span class="n">objective</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">valid_objectives</span><span class="p">:</span>
             <span class="c1"># Custom objectives are allowed via the tuple form</span>
@@ -238,7 +238,7 @@
 <div class="viewcode-block" id="PerpetualClassifier.score">
 <a class="viewcode-back" href="../../api.html#perpetual.sklearn.PerpetualClassifier.score">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">score</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">X</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">sample_weight</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return the mean accuracy on the given test data and labels.</span>
+<span class="w">        </span><span class="sd">"""Return the mean accuracy on the given test data and labels.</span>
 
 <span class="sd">        Parameters</span>
 <span class="sd">        ----------</span>
@@ -253,7 +253,7 @@
 <span class="sd">        -------</span>
 <span class="sd">        float</span>
 <span class="sd">            Mean accuracy of ``self.predict(X)`` w.r.t. *y*.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="n">preds</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="n">X</span><span class="p">)</span>
         <span class="k">return</span> <span class="n">accuracy_score</span><span class="p">(</span><span class="n">y</span><span class="p">,</span> <span class="n">preds</span><span class="p">,</span> <span class="n">sample_weight</span><span class="o">=</span><span class="n">sample_weight</span><span class="p">)</span></div>
 
@@ -261,7 +261,7 @@
 <div class="viewcode-block" id="PerpetualClassifier.fit">
 <a class="viewcode-back" href="../../api.html#perpetual.sklearn.PerpetualClassifier.fit">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">fit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">X</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">sample_weight</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="o">**</span><span class="n">fit_params</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Self</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Fit the classifier on training data.</span>
+<span class="w">        </span><span class="sd">"""Fit the classifier on training data.</span>
 
 <span class="sd">        Parameters</span>
 <span class="sd">        ----------</span>
@@ -278,15 +278,15 @@
 <span class="sd">        -------</span>
 <span class="sd">        self</span>
 <span class="sd">            Fitted estimator.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
-        <span class="c1"># Check if objective is appropriate for classification if it&#39;s a string</span>
+<span class="sd">        """</span>
+        <span class="c1"># Check if objective is appropriate for classification if it's a string</span>
         <span class="k">if</span> <span class="p">(</span>
             <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">objective</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span>
-            <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">objective</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">[</span><span class="s2">&quot;LogLoss&quot;</span><span class="p">]</span>
-            <span class="ow">and</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">objective</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;Custom&quot;</span><span class="p">)</span>
+            <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">objective</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">[</span><span class="s2">"LogLoss"</span><span class="p">]</span>
+            <span class="ow">and</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">objective</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">"Custom"</span><span class="p">)</span>
         <span class="p">):</span>
             <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span>
-                <span class="sa">f</span><span class="s2">&quot;Objective &#39;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">objective</span><span class="si">}</span><span class="s2">&#39; is typically for regression/ranking but used in PerpetualClassifier. Consider &#39;LogLoss&#39;.&quot;</span>
+                <span class="sa">f</span><span class="s2">"Objective '</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">objective</span><span class="si">}</span><span class="s2">' is typically for regression/ranking but used in PerpetualClassifier. Consider 'LogLoss'."</span>
             <span class="p">)</span>
 
         <span class="c1"># In classification, the labels (classes_) are set in the base fit.</span>
@@ -299,12 +299,12 @@
 <div class="viewcode-block" id="PerpetualRegressor">
 <a class="viewcode-back" href="../../api.html#perpetual.sklearn.PerpetualRegressor">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">PerpetualRegressor</span><span class="p">(</span><span class="n">PerpetualBooster</span><span class="p">,</span> <span class="n">RegressorMixin</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    A scikit-learn compatible regressor based on PerpetualBooster.</span>
-<span class="sd">    Uses &#39;SquaredLoss&#39; as the default objective.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    Uses 'SquaredLoss' as the default objective.</span>
+<span class="sd">    """</span>
 
-    <span class="n">_estimator_type</span> <span class="o">=</span> <span class="s2">&quot;regressor&quot;</span>
+    <span class="n">_estimator_type</span> <span class="o">=</span> <span class="s2">"regressor"</span>
 
 <div class="viewcode-block" id="PerpetualRegressor.__init__">
 <a class="viewcode-back" href="../../api.html#perpetual.sklearn.PerpetualRegressor.__init__">[docs]</a>
@@ -313,7 +313,7 @@
         <span class="o">*</span><span class="p">,</span>
         <span class="n">objective</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span>
             <span class="nb">str</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">FunctionType</span><span class="p">,</span> <span class="n">FunctionType</span><span class="p">,</span> <span class="n">FunctionType</span><span class="p">]</span>
-        <span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;SquaredLoss&quot;</span><span class="p">,</span>
+        <span class="p">]</span> <span class="o">=</span> <span class="s2">"SquaredLoss"</span><span class="p">,</span>
         <span class="n">budget</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.5</span><span class="p">,</span>
         <span class="n">num_threads</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">monotone_constraints</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="nb">int</span><span class="p">],</span> <span class="kc">None</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -324,21 +324,21 @@
         <span class="n">seed</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span>
         <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
     <span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""</span>
 <span class="sd">        Gradient Boosting Machine with Perpetual Learning.</span>
 
-<span class="sd">        A self-generalizing gradient boosting machine that doesn&#39;t need hyperparameter</span>
+<span class="sd">        A self-generalizing gradient boosting machine that doesn't need hyperparameter</span>
 <span class="sd">        optimization. It automatically finds the best configuration based on the provided budget.</span>
 
 <span class="sd">        Parameters</span>
 <span class="sd">        ----------</span>
-<span class="sd">        objective : str or tuple, default=&quot;SquaredLoss&quot;</span>
+<span class="sd">        objective : str or tuple, default="SquaredLoss"</span>
 <span class="sd">            Learning objective function to be used for optimization. Valid options are:</span>
 
-<span class="sd">            - &quot;SquaredLoss&quot;: squared error for regression.</span>
-<span class="sd">            - &quot;QuantileLoss&quot;: quantile error for quantile regression.</span>
-<span class="sd">            - &quot;HuberLoss&quot;: Huber loss for robust regression.</span>
-<span class="sd">            - &quot;AdaptiveHuberLoss&quot;: adaptive Huber loss for robust regression.</span>
+<span class="sd">            - "SquaredLoss": squared error for regression.</span>
+<span class="sd">            - "QuantileLoss": quantile error for quantile regression.</span>
+<span class="sd">            - "HuberLoss": Huber loss for robust regression.</span>
+<span class="sd">            - "AdaptiveHuberLoss": adaptive Huber loss for robust regression.</span>
 <span class="sd">            - custom objective: a tuple of (loss, gradient, initial_value) functions.</span>
 <span class="sd">              Each function should have the following signature:</span>
 
@@ -355,7 +355,7 @@
 <span class="sd">            Constraints to enforce a specific relationship between features and target.</span>
 <span class="sd">            Keys are feature indices or names, values are -1, 1, or 0.</span>
 <span class="sd">        force_children_to_bound_parent : bool, default=False</span>
-<span class="sd">            Whether to restrict children nodes to be within the parent&#39;s range.</span>
+<span class="sd">            Whether to restrict children nodes to be within the parent's range.</span>
 <span class="sd">        missing : float, default=np.nan</span>
 <span class="sd">            Value to consider as missing data.</span>
 <span class="sd">        allow_missing_splits : bool, default=True</span>
@@ -365,26 +365,26 @@
 <span class="sd">        terminate_missing_features : iterable, optional</span>
 <span class="sd">            Features for which missing branches will always be terminated if</span>
 <span class="sd">            ``create_missing_branch`` is True.</span>
-<span class="sd">        missing_node_treatment : str, default=&quot;None&quot;</span>
+<span class="sd">        missing_node_treatment : str, default="None"</span>
 <span class="sd">            How to handle weights for missing nodes if ``create_missing_branch`` is True.</span>
-<span class="sd">            Options: &quot;None&quot;, &quot;AssignToParent&quot;, &quot;AverageLeafWeight&quot;, &quot;AverageNodeWeight&quot;.</span>
+<span class="sd">            Options: "None", "AssignToParent", "AverageLeafWeight", "AverageNodeWeight".</span>
 <span class="sd">        log_iterations : int, default=0</span>
 <span class="sd">            Logging frequency (every N iterations). 0 disables logging.</span>
-<span class="sd">        feature_importance_method : str, default=&quot;Gain&quot;</span>
-<span class="sd">            Method for calculating feature importance. Options: &quot;Gain&quot;, &quot;Weight&quot;, &quot;Cover&quot;,</span>
-<span class="sd">            &quot;TotalGain&quot;, &quot;TotalCover&quot;.</span>
+<span class="sd">        feature_importance_method : str, default="Gain"</span>
+<span class="sd">            Method for calculating feature importance. Options: "Gain", "Weight", "Cover",</span>
+<span class="sd">            "TotalGain", "TotalCover".</span>
 <span class="sd">        **kwargs</span>
 <span class="sd">            Objective-specific parameters passed to the booster core:</span>
 
-<span class="sd">            - **quantile** (float): The target quantile for ``&quot;QuantileLoss&quot;`` and</span>
-<span class="sd">              ``&quot;AdaptiveHuberLoss&quot;``. Must be between 0 and 1. Default is 0.5.</span>
-<span class="sd">            - **delta** (float): The threshold parameter for ``&quot;HuberLoss&quot;``. Default is 1.0.</span>
-<span class="sd">            - **c** (float): The scale parameter for ``&quot;FairLoss&quot;``. Default is 1.0.</span>
-<span class="sd">            - **p** (float): The power parameter for ``&quot;TweedieLoss&quot;``. Must be between 1 and 2.</span>
+<span class="sd">            - **quantile** (float): The target quantile for ``"QuantileLoss"`` and</span>
+<span class="sd">              ``"AdaptiveHuberLoss"``. Must be between 0 and 1. Default is 0.5.</span>
+<span class="sd">            - **delta** (float): The threshold parameter for ``"HuberLoss"``. Default is 1.0.</span>
+<span class="sd">            - **c** (float): The scale parameter for ``"FairLoss"``. Default is 1.0.</span>
+<span class="sd">            - **p** (float): The power parameter for ``"TweedieLoss"``. Must be between 1 and 2.</span>
 <span class="sd">              Default is 1.5.</span>
 <span class="sd">        reset : bool, optional</span>
 <span class="sd">            Whether to reset the model or continue training on subsequent calls to fit.</span>
-<span class="sd">        categorical_features : str or iterable, default=&quot;auto&quot;</span>
+<span class="sd">        categorical_features : str or iterable, default="auto"</span>
 <span class="sd">            Feature indices or names to treat as categorical.</span>
 <span class="sd">        timeout : float, optional</span>
 <span class="sd">            Time limit for fitting in seconds.</span>
@@ -404,13 +404,13 @@
 <span class="sd">            Whether to save node statistics (required for calibration).</span>
 <span class="sd">        **kwargs</span>
 <span class="sd">            Arbitrary keyword arguments to be passed to the base class.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="c1"># Enforce or warn about regression objectives</span>
         <span class="n">valid_objectives</span> <span class="o">=</span> <span class="p">{</span>
-            <span class="s2">&quot;SquaredLoss&quot;</span><span class="p">,</span>
-            <span class="s2">&quot;QuantileLoss&quot;</span><span class="p">,</span>
-            <span class="s2">&quot;HuberLoss&quot;</span><span class="p">,</span>
-            <span class="s2">&quot;AdaptiveHuberLoss&quot;</span><span class="p">,</span>
+            <span class="s2">"SquaredLoss"</span><span class="p">,</span>
+            <span class="s2">"QuantileLoss"</span><span class="p">,</span>
+            <span class="s2">"HuberLoss"</span><span class="p">,</span>
+            <span class="s2">"AdaptiveHuberLoss"</span><span class="p">,</span>
         <span class="p">}</span>
         <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">objective</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span> <span class="ow">and</span> <span class="n">objective</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">valid_objectives</span><span class="p">:</span>
             <span class="k">pass</span>  <span class="c1"># Allow for custom string or tuple objective</span>
@@ -433,7 +433,7 @@
 <div class="viewcode-block" id="PerpetualRegressor.fit">
 <a class="viewcode-back" href="../../api.html#perpetual.sklearn.PerpetualRegressor.fit">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">fit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">X</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">sample_weight</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="o">**</span><span class="n">fit_params</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Self</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Fit the regressor on training data.</span>
+<span class="w">        </span><span class="sd">"""Fit the regressor on training data.</span>
 
 <span class="sd">        Parameters</span>
 <span class="sd">        ----------</span>
@@ -450,21 +450,21 @@
 <span class="sd">        -------</span>
 <span class="sd">        self</span>
 <span class="sd">            Fitted estimator.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="c1"># For regression, we typically enforce len(self.classes_) == 0 after fit</span>
         <span class="k">if</span> <span class="p">(</span>
             <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">objective</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span>
             <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">objective</span>
             <span class="ow">not</span> <span class="ow">in</span> <span class="p">[</span>
-                <span class="s2">&quot;SquaredLoss&quot;</span><span class="p">,</span>
-                <span class="s2">&quot;QuantileLoss&quot;</span><span class="p">,</span>
-                <span class="s2">&quot;HuberLoss&quot;</span><span class="p">,</span>
-                <span class="s2">&quot;AdaptiveHuberLoss&quot;</span><span class="p">,</span>
+                <span class="s2">"SquaredLoss"</span><span class="p">,</span>
+                <span class="s2">"QuantileLoss"</span><span class="p">,</span>
+                <span class="s2">"HuberLoss"</span><span class="p">,</span>
+                <span class="s2">"AdaptiveHuberLoss"</span><span class="p">,</span>
             <span class="p">]</span>
-            <span class="ow">and</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">objective</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;Custom&quot;</span><span class="p">)</span>
+            <span class="ow">and</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">objective</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">"Custom"</span><span class="p">)</span>
         <span class="p">):</span>
             <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span>
-                <span class="sa">f</span><span class="s2">&quot;Objective &#39;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">objective</span><span class="si">}</span><span class="s2">&#39; may not be suitable for PerpetualRegressor. Consider &#39;SquaredLoss&#39; or a quantile/huber loss.&quot;</span>
+                <span class="sa">f</span><span class="s2">"Objective '</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">objective</span><span class="si">}</span><span class="s2">' may not be suitable for PerpetualRegressor. Consider 'SquaredLoss' or a quantile/huber loss."</span>
             <span class="p">)</span>
 
         <span class="k">return</span> <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">sample_weight</span><span class="o">=</span><span class="n">sample_weight</span><span class="p">,</span> <span class="o">**</span><span class="n">fit_params</span><span class="p">)</span></div>
@@ -473,7 +473,7 @@
 <div class="viewcode-block" id="PerpetualRegressor.score">
 <a class="viewcode-back" href="../../api.html#perpetual.sklearn.PerpetualRegressor.score">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">score</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">X</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">sample_weight</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return the coefficient of determination ($R^2$) of the prediction.</span>
+<span class="w">        </span><span class="sd">"""Return the coefficient of determination ($R^2$) of the prediction.</span>
 
 <span class="sd">        Parameters</span>
 <span class="sd">        ----------</span>
@@ -488,7 +488,7 @@
 <span class="sd">        -------</span>
 <span class="sd">        float</span>
 <span class="sd">            $R^2$ score of ``self.predict(X)`` w.r.t. *y*.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="n">preds</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="n">X</span><span class="p">)</span>
         <span class="k">return</span> <span class="n">r2_score</span><span class="p">(</span><span class="n">y</span><span class="p">,</span> <span class="n">preds</span><span class="p">,</span> <span class="n">sample_weight</span><span class="o">=</span><span class="n">sample_weight</span><span class="p">)</span></div>
 </div>
@@ -500,11 +500,11 @@
 <span class="k">class</span><span class="w"> </span><span class="nc">PerpetualRanker</span><span class="p">(</span>
     <span class="n">PerpetualBooster</span><span class="p">,</span> <span class="n">RegressorMixin</span>
 <span class="p">):</span>  <span class="c1"># Ranking models sometimes inherit from RegressorMixin for compatibility</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    A scikit-learn compatible ranker based on PerpetualBooster.</span>
-<span class="sd">    Uses &#39;ListNetLoss&#39; as the default objective.</span>
-<span class="sd">    Requires the &#39;group&#39; parameter to be passed to fit.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    Uses 'ListNetLoss' as the default objective.</span>
+<span class="sd">    Requires the 'group' parameter to be passed to fit.</span>
+<span class="sd">    """</span>
 
 <div class="viewcode-block" id="PerpetualRanker.__init__">
 <a class="viewcode-back" href="../../api.html#perpetual.sklearn.PerpetualRanker.__init__">[docs]</a>
@@ -513,7 +513,7 @@
         <span class="o">*</span><span class="p">,</span>
         <span class="n">objective</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span>
             <span class="nb">str</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">FunctionType</span><span class="p">,</span> <span class="n">FunctionType</span><span class="p">,</span> <span class="n">FunctionType</span><span class="p">]</span>
-        <span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;ListNetLoss&quot;</span><span class="p">,</span>
+        <span class="p">]</span> <span class="o">=</span> <span class="s2">"ListNetLoss"</span><span class="p">,</span>
         <span class="n">budget</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.5</span><span class="p">,</span>
         <span class="n">num_threads</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">monotone_constraints</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="nb">int</span><span class="p">],</span> <span class="kc">None</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -524,18 +524,18 @@
         <span class="n">seed</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span>
         <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
     <span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""</span>
 <span class="sd">        Gradient Boosting Machine with Perpetual Learning.</span>
 
-<span class="sd">        A self-generalizing gradient boosting machine that doesn&#39;t need hyperparameter</span>
+<span class="sd">        A self-generalizing gradient boosting machine that doesn't need hyperparameter</span>
 <span class="sd">        optimization. It automatically finds the best configuration based on the provided budget.</span>
 
 <span class="sd">        Parameters</span>
 <span class="sd">        ----------</span>
-<span class="sd">        objective : str or tuple, default=&quot;ListNetLoss&quot;</span>
+<span class="sd">        objective : str or tuple, default="ListNetLoss"</span>
 <span class="sd">            Learning objective function to be used for optimization. Valid options are:</span>
 
-<span class="sd">            - &quot;ListNetLoss&quot;: ListNet loss for ranking.</span>
+<span class="sd">            - "ListNetLoss": ListNet loss for ranking.</span>
 <span class="sd">            - custom objective: a tuple of (loss, gradient, initial_value) functions.</span>
 <span class="sd">              Each function should have the following signature:</span>
 
@@ -552,7 +552,7 @@
 <span class="sd">            Constraints to enforce a specific relationship between features and target.</span>
 <span class="sd">            Keys are feature indices or names, values are -1, 1, or 0.</span>
 <span class="sd">        force_children_to_bound_parent : bool, default=False</span>
-<span class="sd">            Whether to restrict children nodes to be within the parent&#39;s range.</span>
+<span class="sd">            Whether to restrict children nodes to be within the parent's range.</span>
 <span class="sd">        missing : float, default=np.nan</span>
 <span class="sd">            Value to consider as missing data.</span>
 <span class="sd">        allow_missing_splits : bool, default=True</span>
@@ -562,26 +562,26 @@
 <span class="sd">        terminate_missing_features : iterable, optional</span>
 <span class="sd">            Features for which missing branches will always be terminated if</span>
 <span class="sd">            ``create_missing_branch`` is True.</span>
-<span class="sd">        missing_node_treatment : str, default=&quot;None&quot;</span>
+<span class="sd">        missing_node_treatment : str, default="None"</span>
 <span class="sd">            How to handle weights for missing nodes if ``create_missing_branch`` is True.</span>
-<span class="sd">            Options: &quot;None&quot;, &quot;AssignToParent&quot;, &quot;AverageLeafWeight&quot;, &quot;AverageNodeWeight&quot;.</span>
+<span class="sd">            Options: "None", "AssignToParent", "AverageLeafWeight", "AverageNodeWeight".</span>
 <span class="sd">        log_iterations : int, default=0</span>
 <span class="sd">            Logging frequency (every N iterations). 0 disables logging.</span>
-<span class="sd">        feature_importance_method : str, default=&quot;Gain&quot;</span>
-<span class="sd">            Method for calculating feature importance. Options: &quot;Gain&quot;, &quot;Weight&quot;, &quot;Cover&quot;,</span>
-<span class="sd">            &quot;TotalGain&quot;, &quot;TotalCover&quot;.</span>
+<span class="sd">        feature_importance_method : str, default="Gain"</span>
+<span class="sd">            Method for calculating feature importance. Options: "Gain", "Weight", "Cover",</span>
+<span class="sd">            "TotalGain", "TotalCover".</span>
 <span class="sd">        **kwargs</span>
 <span class="sd">            Objective-specific parameters passed to the booster core:</span>
 
-<span class="sd">            - **quantile** (float): The target quantile for ``&quot;QuantileLoss&quot;`` and</span>
-<span class="sd">              ``&quot;AdaptiveHuberLoss&quot;``. Must be between 0 and 1. Default is 0.5.</span>
-<span class="sd">            - **delta** (float): The threshold parameter for ``&quot;HuberLoss&quot;``. Default is 1.0.</span>
-<span class="sd">            - **c** (float): The scale parameter for ``&quot;FairLoss&quot;``. Default is 1.0.</span>
-<span class="sd">            - **p** (float): The power parameter for ``&quot;TweedieLoss&quot;``. Must be between 1 and 2.</span>
+<span class="sd">            - **quantile** (float): The target quantile for ``"QuantileLoss"`` and</span>
+<span class="sd">              ``"AdaptiveHuberLoss"``. Must be between 0 and 1. Default is 0.5.</span>
+<span class="sd">            - **delta** (float): The threshold parameter for ``"HuberLoss"``. Default is 1.0.</span>
+<span class="sd">            - **c** (float): The scale parameter for ``"FairLoss"``. Default is 1.0.</span>
+<span class="sd">            - **p** (float): The power parameter for ``"TweedieLoss"``. Must be between 1 and 2.</span>
 <span class="sd">              Default is 1.5.</span>
 <span class="sd">        reset : bool, optional</span>
 <span class="sd">            Whether to reset the model or continue training on subsequent calls to fit.</span>
-<span class="sd">        categorical_features : str or iterable, default=&quot;auto&quot;</span>
+<span class="sd">        categorical_features : str or iterable, default="auto"</span>
 <span class="sd">            Feature indices or names to treat as categorical.</span>
 <span class="sd">        timeout : float, optional</span>
 <span class="sd">            Time limit for fitting in seconds.</span>
@@ -603,10 +603,10 @@
 <span class="sd">            Random seed for reproducibility.</span>
 <span class="sd">        **kwargs</span>
 <span class="sd">            Arbitrary keyword arguments to be passed to the base class.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
-        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">objective</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span> <span class="ow">and</span> <span class="n">objective</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">{</span><span class="s2">&quot;ListNetLoss&quot;</span><span class="p">}:</span>
+<span class="sd">        """</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">objective</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span> <span class="ow">and</span> <span class="n">objective</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">{</span><span class="s2">"ListNetLoss"</span><span class="p">}:</span>
             <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span>
-                <span class="sa">f</span><span class="s2">&quot;Objective &#39;</span><span class="si">{</span><span class="n">objective</span><span class="si">}</span><span class="s2">&#39; may not be suitable for PerpetualRanker. Consider &#39;ListNetLoss&#39;.&quot;</span>
+                <span class="sa">f</span><span class="s2">"Objective '</span><span class="si">{</span><span class="n">objective</span><span class="si">}</span><span class="s2">' may not be suitable for PerpetualRanker. Consider 'ListNetLoss'."</span>
             <span class="p">)</span>
 
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span>
@@ -626,7 +626,7 @@
 <div class="viewcode-block" id="PerpetualRanker.fit">
 <a class="viewcode-back" href="../../api.html#perpetual.sklearn.PerpetualRanker.fit">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">fit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">X</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">group</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">sample_weight</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="o">**</span><span class="n">fit_params</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Self</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Fit the ranker on training data.</span>
+<span class="w">        </span><span class="sd">"""Fit the ranker on training data.</span>
 
 <span class="sd">        Parameters</span>
 <span class="sd">        ----------</span>
@@ -636,7 +636,7 @@
 <span class="sd">            Target relevance scores.</span>
 <span class="sd">        group : array-like of int, optional</span>
 <span class="sd">            Group lengths used by the ranking objective.  **Required** when</span>
-<span class="sd">            ``objective=&quot;ListNetLoss&quot;``.</span>
+<span class="sd">            ``objective="ListNetLoss"``.</span>
 <span class="sd">        sample_weight : array-like of shape (n_samples,), optional</span>
 <span class="sd">            Individual weights for each sample.</span>
 <span class="sd">        **fit_params</span>
@@ -650,15 +650,15 @@
 <span class="sd">        Raises</span>
 <span class="sd">        ------</span>
 <span class="sd">        ValueError</span>
-<span class="sd">            If *group* is ``None`` and the objective is ``&quot;ListNetLoss&quot;``.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">            If *group* is ``None`` and the objective is ``"ListNetLoss"``.</span>
+<span class="sd">        """</span>
         <span class="k">if</span> <span class="p">(</span>
             <span class="n">group</span> <span class="ow">is</span> <span class="kc">None</span>
             <span class="ow">and</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">objective</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span>
-            <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">objective</span> <span class="o">==</span> <span class="s2">&quot;ListNetLoss&quot;</span>
+            <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">objective</span> <span class="o">==</span> <span class="s2">"ListNetLoss"</span>
         <span class="p">):</span>
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-                <span class="s2">&quot;The &#39;group&#39; parameter must be provided when using the &#39;ListNetLoss&#39; objective for ranking.&quot;</span>
+                <span class="s2">"The 'group' parameter must be provided when using the 'ListNetLoss' objective for ranking."</span>
             <span class="p">)</span>
 
         <span class="k">return</span> <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">sample_weight</span><span class="o">=</span><span class="n">sample_weight</span><span class="p">,</span> <span class="n">group</span><span class="o">=</span><span class="n">group</span><span class="p">,</span> <span class="o">**</span><span class="n">fit_params</span><span class="p">)</span></div>

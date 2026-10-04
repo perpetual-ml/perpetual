@@ -6,7 +6,7 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Advanced Drift Detection in Perpetual &mdash; Perpetual 3.0.0-rc.2 documentation</title>
+  <title>Advanced Drift Detection in Perpetual &mdash; Perpetual 2.2.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../_static/nbsphinx-code-cells.css?v=2aa19091" />
@@ -15,7 +15,7 @@
   
       <script src="../_static/jquery.js?v=5d32c60e"></script>
       <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../_static/documentation_options.js?v=b3b49fdf"></script>
+      <script src="../_static/documentation_options.js?v=b21de401"></script>
       <script src="../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
@@ -141,7 +141,7 @@
 <span class="kn">from</span><span class="w"> </span><span class="nn">sklearn.metrics.pairwise</span><span class="w"> </span><span class="kn">import</span> <span class="n">rbf_kernel</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">sklearn.model_selection</span><span class="w"> </span><span class="kn">import</span> <span class="n">train_test_split</span>
 
-<span class="n">warnings</span><span class="o">.</span><span class="n">filterwarnings</span><span class="p">(</span><span class="s2">&quot;ignore&quot;</span><span class="p">)</span>
+<span class="n">warnings</span><span class="o">.</span><span class="n">filterwarnings</span><span class="p">(</span><span class="s2">"ignore"</span><span class="p">)</span>
 </pre></div>
 </div>
 </div>
@@ -209,13 +209,13 @@
     <span class="n">X</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">test_size</span><span class="o">=</span><span class="mf">0.2</span><span class="p">,</span> <span class="n">random_state</span><span class="o">=</span><span class="mi">42</span>
 <span class="p">)</span>
 
-<span class="n">model</span> <span class="o">=</span> <span class="n">PerpetualBooster</span><span class="p">(</span><span class="n">objective</span><span class="o">=</span><span class="s2">&quot;SquaredLoss&quot;</span><span class="p">,</span> <span class="n">budget</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span> <span class="n">save_node_stats</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="n">model</span> <span class="o">=</span> <span class="n">PerpetualBooster</span><span class="p">(</span><span class="n">objective</span><span class="o">=</span><span class="s2">"SquaredLoss"</span><span class="p">,</span> <span class="n">budget</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span> <span class="n">save_node_stats</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="n">model</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">X_train</span><span class="p">,</span> <span class="n">y_train</span><span class="p">)</span>
 
 <span class="n">y_pred_train</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="n">X_train</span><span class="p">)</span>
 <span class="n">train_residuals</span> <span class="o">=</span> <span class="n">y_train</span> <span class="o">-</span> <span class="n">y_pred_train</span>
 
-<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Baseline MSE: </span><span class="si">{</span><span class="n">mean_squared_error</span><span class="p">(</span><span class="n">y_test</span><span class="p">,</span><span class="w"> </span><span class="n">model</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="n">X_test</span><span class="p">))</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Baseline MSE: </span><span class="si">{</span><span class="n">mean_squared_error</span><span class="p">(</span><span class="n">y_test</span><span class="p">,</span><span class="w"> </span><span class="n">model</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="n">X_test</span><span class="p">))</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
 </pre></div>
 </div>
 </div>
@@ -232,11 +232,11 @@
 
 <span class="k">for</span> <span class="n">level</span> <span class="ow">in</span> <span class="n">drift_levels</span><span class="p">:</span>
     <span class="n">X_curr</span> <span class="o">=</span> <span class="n">X_test</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
-    <span class="n">X_curr</span><span class="p">[</span><span class="s2">&quot;MedInc&quot;</span><span class="p">]</span> <span class="o">+=</span> <span class="n">level</span>  <span class="c1"># Inject drift</span>
+    <span class="n">X_curr</span><span class="p">[</span><span class="s2">"MedInc"</span><span class="p">]</span> <span class="o">+=</span> <span class="n">level</span>  <span class="c1"># Inject drift</span>
 
     <span class="c1"># Perpetual Unsupervised Metrics</span>
-    <span class="n">perp_data</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">calculate_drift</span><span class="p">(</span><span class="n">X_curr</span><span class="p">,</span> <span class="n">drift_type</span><span class="o">=</span><span class="s2">&quot;data&quot;</span><span class="p">)</span>
-    <span class="n">perp_concept</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">calculate_drift</span><span class="p">(</span><span class="n">X_curr</span><span class="p">,</span> <span class="n">drift_type</span><span class="o">=</span><span class="s2">&quot;concept&quot;</span><span class="p">)</span>
+    <span class="n">perp_data</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">calculate_drift</span><span class="p">(</span><span class="n">X_curr</span><span class="p">,</span> <span class="n">drift_type</span><span class="o">=</span><span class="s2">"data"</span><span class="p">)</span>
+    <span class="n">perp_concept</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">calculate_drift</span><span class="p">(</span><span class="n">X_curr</span><span class="p">,</span> <span class="n">drift_type</span><span class="o">=</span><span class="s2">"concept"</span><span class="p">)</span>
 
     <span class="c1"># Multivariate Benchmarks</span>
     <span class="n">energy</span> <span class="o">=</span> <span class="n">calculate_energy_distance</span><span class="p">(</span><span class="n">X_test</span><span class="p">,</span> <span class="n">X_curr</span><span class="p">)</span>
@@ -251,14 +251,14 @@
 
     <span class="n">results</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
         <span class="p">{</span>
-            <span class="s2">&quot;Level&quot;</span><span class="p">:</span> <span class="n">level</span><span class="p">,</span>
-            <span class="s2">&quot;Perp Data&quot;</span><span class="p">:</span> <span class="n">perp_data</span><span class="p">,</span>
-            <span class="s2">&quot;Perp Concept&quot;</span><span class="p">:</span> <span class="n">perp_concept</span><span class="p">,</span>
-            <span class="s2">&quot;Energy Distance&quot;</span><span class="p">:</span> <span class="n">energy</span><span class="p">,</span>
-            <span class="s2">&quot;Mahalanobis&quot;</span><span class="p">:</span> <span class="n">mahalanobis</span><span class="p">,</span>
-            <span class="s2">&quot;Adversarial AUC&quot;</span><span class="p">:</span> <span class="n">adv_auc</span><span class="p">,</span>
-            <span class="s2">&quot;Residual KS&quot;</span><span class="p">:</span> <span class="n">residual_ks</span><span class="p">,</span>
-            <span class="s2">&quot;MSE&quot;</span><span class="p">:</span> <span class="n">mse</span><span class="p">,</span>
+            <span class="s2">"Level"</span><span class="p">:</span> <span class="n">level</span><span class="p">,</span>
+            <span class="s2">"Perp Data"</span><span class="p">:</span> <span class="n">perp_data</span><span class="p">,</span>
+            <span class="s2">"Perp Concept"</span><span class="p">:</span> <span class="n">perp_concept</span><span class="p">,</span>
+            <span class="s2">"Energy Distance"</span><span class="p">:</span> <span class="n">energy</span><span class="p">,</span>
+            <span class="s2">"Mahalanobis"</span><span class="p">:</span> <span class="n">mahalanobis</span><span class="p">,</span>
+            <span class="s2">"Adversarial AUC"</span><span class="p">:</span> <span class="n">adv_auc</span><span class="p">,</span>
+            <span class="s2">"Residual KS"</span><span class="p">:</span> <span class="n">residual_ks</span><span class="p">,</span>
+            <span class="s2">"MSE"</span><span class="p">:</span> <span class="n">mse</span><span class="p">,</span>
         <span class="p">}</span>
     <span class="p">)</span>
 
@@ -290,52 +290,52 @@
 <span class="n">ax3</span> <span class="o">=</span> <span class="n">ax1</span><span class="o">.</span><span class="n">twinx</span><span class="p">()</span>
 <span class="n">ax4</span> <span class="o">=</span> <span class="n">ax1</span><span class="o">.</span><span class="n">twinx</span><span class="p">()</span>
 
-<span class="n">ax3</span><span class="o">.</span><span class="n">spines</span><span class="p">[</span><span class="s2">&quot;right&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">set_position</span><span class="p">((</span><span class="s2">&quot;outward&quot;</span><span class="p">,</span> <span class="mi">60</span><span class="p">))</span>
-<span class="n">ax4</span><span class="o">.</span><span class="n">spines</span><span class="p">[</span><span class="s2">&quot;right&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">set_position</span><span class="p">((</span><span class="s2">&quot;outward&quot;</span><span class="p">,</span> <span class="mi">120</span><span class="p">))</span>
+<span class="n">ax3</span><span class="o">.</span><span class="n">spines</span><span class="p">[</span><span class="s2">"right"</span><span class="p">]</span><span class="o">.</span><span class="n">set_position</span><span class="p">((</span><span class="s2">"outward"</span><span class="p">,</span> <span class="mi">60</span><span class="p">))</span>
+<span class="n">ax4</span><span class="o">.</span><span class="n">spines</span><span class="p">[</span><span class="s2">"right"</span><span class="p">]</span><span class="o">.</span><span class="n">set_position</span><span class="p">((</span><span class="s2">"outward"</span><span class="p">,</span> <span class="mi">120</span><span class="p">))</span>
 
 <span class="p">(</span><span class="n">p1</span><span class="p">,)</span> <span class="o">=</span> <span class="n">ax1</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span>
-    <span class="n">df_res</span><span class="p">[</span><span class="s2">&quot;Level&quot;</span><span class="p">],</span>
-    <span class="n">df_res</span><span class="p">[</span><span class="s2">&quot;Perp Data&quot;</span><span class="p">],</span>
-    <span class="n">label</span><span class="o">=</span><span class="s2">&quot;Perpetual Data Drift&quot;</span><span class="p">,</span>
-    <span class="n">marker</span><span class="o">=</span><span class="s2">&quot;o&quot;</span><span class="p">,</span>
-    <span class="n">color</span><span class="o">=</span><span class="s2">&quot;C0&quot;</span><span class="p">,</span>
+    <span class="n">df_res</span><span class="p">[</span><span class="s2">"Level"</span><span class="p">],</span>
+    <span class="n">df_res</span><span class="p">[</span><span class="s2">"Perp Data"</span><span class="p">],</span>
+    <span class="n">label</span><span class="o">=</span><span class="s2">"Perpetual Data Drift"</span><span class="p">,</span>
+    <span class="n">marker</span><span class="o">=</span><span class="s2">"o"</span><span class="p">,</span>
+    <span class="n">color</span><span class="o">=</span><span class="s2">"C0"</span><span class="p">,</span>
 <span class="p">)</span>
 <span class="p">(</span><span class="n">p2</span><span class="p">,)</span> <span class="o">=</span> <span class="n">ax2</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span>
-    <span class="n">df_res</span><span class="p">[</span><span class="s2">&quot;Level&quot;</span><span class="p">],</span>
-    <span class="n">df_res</span><span class="p">[</span><span class="s2">&quot;Energy Distance&quot;</span><span class="p">],</span>
-    <span class="n">label</span><span class="o">=</span><span class="s2">&quot;Energy Distance&quot;</span><span class="p">,</span>
-    <span class="n">marker</span><span class="o">=</span><span class="s2">&quot;s&quot;</span><span class="p">,</span>
-    <span class="n">color</span><span class="o">=</span><span class="s2">&quot;C1&quot;</span><span class="p">,</span>
+    <span class="n">df_res</span><span class="p">[</span><span class="s2">"Level"</span><span class="p">],</span>
+    <span class="n">df_res</span><span class="p">[</span><span class="s2">"Energy Distance"</span><span class="p">],</span>
+    <span class="n">label</span><span class="o">=</span><span class="s2">"Energy Distance"</span><span class="p">,</span>
+    <span class="n">marker</span><span class="o">=</span><span class="s2">"s"</span><span class="p">,</span>
+    <span class="n">color</span><span class="o">=</span><span class="s2">"C1"</span><span class="p">,</span>
 <span class="p">)</span>
 <span class="p">(</span><span class="n">p3</span><span class="p">,)</span> <span class="o">=</span> <span class="n">ax3</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span>
-    <span class="n">df_res</span><span class="p">[</span><span class="s2">&quot;Level&quot;</span><span class="p">],</span>
-    <span class="n">df_res</span><span class="p">[</span><span class="s2">&quot;Mahalanobis&quot;</span><span class="p">],</span>
-    <span class="n">label</span><span class="o">=</span><span class="s2">&quot;Mahalanobis Distance&quot;</span><span class="p">,</span>
-    <span class="n">marker</span><span class="o">=</span><span class="s2">&quot;^&quot;</span><span class="p">,</span>
-    <span class="n">color</span><span class="o">=</span><span class="s2">&quot;C2&quot;</span><span class="p">,</span>
+    <span class="n">df_res</span><span class="p">[</span><span class="s2">"Level"</span><span class="p">],</span>
+    <span class="n">df_res</span><span class="p">[</span><span class="s2">"Mahalanobis"</span><span class="p">],</span>
+    <span class="n">label</span><span class="o">=</span><span class="s2">"Mahalanobis Distance"</span><span class="p">,</span>
+    <span class="n">marker</span><span class="o">=</span><span class="s2">"^"</span><span class="p">,</span>
+    <span class="n">color</span><span class="o">=</span><span class="s2">"C2"</span><span class="p">,</span>
 <span class="p">)</span>
 <span class="p">(</span><span class="n">p4</span><span class="p">,)</span> <span class="o">=</span> <span class="n">ax4</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span>
-    <span class="n">df_res</span><span class="p">[</span><span class="s2">&quot;Level&quot;</span><span class="p">],</span>
-    <span class="n">df_res</span><span class="p">[</span><span class="s2">&quot;Adversarial AUC&quot;</span><span class="p">],</span>
-    <span class="n">label</span><span class="o">=</span><span class="s2">&quot;Adversarial AUC&quot;</span><span class="p">,</span>
-    <span class="n">marker</span><span class="o">=</span><span class="s2">&quot;d&quot;</span><span class="p">,</span>
-    <span class="n">color</span><span class="o">=</span><span class="s2">&quot;C3&quot;</span><span class="p">,</span>
+    <span class="n">df_res</span><span class="p">[</span><span class="s2">"Level"</span><span class="p">],</span>
+    <span class="n">df_res</span><span class="p">[</span><span class="s2">"Adversarial AUC"</span><span class="p">],</span>
+    <span class="n">label</span><span class="o">=</span><span class="s2">"Adversarial AUC"</span><span class="p">,</span>
+    <span class="n">marker</span><span class="o">=</span><span class="s2">"d"</span><span class="p">,</span>
+    <span class="n">color</span><span class="o">=</span><span class="s2">"C3"</span><span class="p">,</span>
 <span class="p">)</span>
 
-<span class="n">ax1</span><span class="o">.</span><span class="n">set_xlabel</span><span class="p">(</span><span class="s2">&quot;Drift Level (MedInc Shift)&quot;</span><span class="p">,</span> <span class="n">fontweight</span><span class="o">=</span><span class="s2">&quot;bold&quot;</span><span class="p">)</span>
-<span class="n">ax1</span><span class="o">.</span><span class="n">set_ylabel</span><span class="p">(</span><span class="s2">&quot;Perpetual Data Drift&quot;</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">&quot;C0&quot;</span><span class="p">)</span>
-<span class="n">ax2</span><span class="o">.</span><span class="n">set_ylabel</span><span class="p">(</span><span class="s2">&quot;Energy Distance&quot;</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">&quot;C1&quot;</span><span class="p">)</span>
-<span class="n">ax3</span><span class="o">.</span><span class="n">set_ylabel</span><span class="p">(</span><span class="s2">&quot;Mahalanobis Distance&quot;</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">&quot;C2&quot;</span><span class="p">)</span>
-<span class="n">ax4</span><span class="o">.</span><span class="n">set_ylabel</span><span class="p">(</span><span class="s2">&quot;Adversarial AUC&quot;</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">&quot;C3&quot;</span><span class="p">)</span>
+<span class="n">ax1</span><span class="o">.</span><span class="n">set_xlabel</span><span class="p">(</span><span class="s2">"Drift Level (MedInc Shift)"</span><span class="p">,</span> <span class="n">fontweight</span><span class="o">=</span><span class="s2">"bold"</span><span class="p">)</span>
+<span class="n">ax1</span><span class="o">.</span><span class="n">set_ylabel</span><span class="p">(</span><span class="s2">"Perpetual Data Drift"</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">"C0"</span><span class="p">)</span>
+<span class="n">ax2</span><span class="o">.</span><span class="n">set_ylabel</span><span class="p">(</span><span class="s2">"Energy Distance"</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">"C1"</span><span class="p">)</span>
+<span class="n">ax3</span><span class="o">.</span><span class="n">set_ylabel</span><span class="p">(</span><span class="s2">"Mahalanobis Distance"</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">"C2"</span><span class="p">)</span>
+<span class="n">ax4</span><span class="o">.</span><span class="n">set_ylabel</span><span class="p">(</span><span class="s2">"Adversarial AUC"</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">"C3"</span><span class="p">)</span>
 
-<span class="n">ax1</span><span class="o">.</span><span class="n">tick_params</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="s2">&quot;y&quot;</span><span class="p">,</span> <span class="n">colors</span><span class="o">=</span><span class="s2">&quot;C0&quot;</span><span class="p">)</span>
-<span class="n">ax2</span><span class="o">.</span><span class="n">tick_params</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="s2">&quot;y&quot;</span><span class="p">,</span> <span class="n">colors</span><span class="o">=</span><span class="s2">&quot;C1&quot;</span><span class="p">)</span>
-<span class="n">ax3</span><span class="o">.</span><span class="n">tick_params</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="s2">&quot;y&quot;</span><span class="p">,</span> <span class="n">colors</span><span class="o">=</span><span class="s2">&quot;C2&quot;</span><span class="p">)</span>
-<span class="n">ax4</span><span class="o">.</span><span class="n">tick_params</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="s2">&quot;y&quot;</span><span class="p">,</span> <span class="n">colors</span><span class="o">=</span><span class="s2">&quot;C3&quot;</span><span class="p">)</span>
+<span class="n">ax1</span><span class="o">.</span><span class="n">tick_params</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="s2">"y"</span><span class="p">,</span> <span class="n">colors</span><span class="o">=</span><span class="s2">"C0"</span><span class="p">)</span>
+<span class="n">ax2</span><span class="o">.</span><span class="n">tick_params</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="s2">"y"</span><span class="p">,</span> <span class="n">colors</span><span class="o">=</span><span class="s2">"C1"</span><span class="p">)</span>
+<span class="n">ax3</span><span class="o">.</span><span class="n">tick_params</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="s2">"y"</span><span class="p">,</span> <span class="n">colors</span><span class="o">=</span><span class="s2">"C2"</span><span class="p">)</span>
+<span class="n">ax4</span><span class="o">.</span><span class="n">tick_params</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="s2">"y"</span><span class="p">,</span> <span class="n">colors</span><span class="o">=</span><span class="s2">"C3"</span><span class="p">)</span>
 
 <span class="n">lines1</span> <span class="o">=</span> <span class="p">[</span><span class="n">p1</span><span class="p">,</span> <span class="n">p2</span><span class="p">,</span> <span class="n">p3</span><span class="p">,</span> <span class="n">p4</span><span class="p">]</span>
-<span class="n">ax1</span><span class="o">.</span><span class="n">legend</span><span class="p">(</span><span class="n">lines1</span><span class="p">,</span> <span class="p">[</span><span class="n">line</span><span class="o">.</span><span class="n">get_label</span><span class="p">()</span> <span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="n">lines1</span><span class="p">],</span> <span class="n">loc</span><span class="o">=</span><span class="s2">&quot;upper left&quot;</span><span class="p">)</span>
-<span class="n">ax1</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span><span class="s2">&quot;Data Drift Benchmark&quot;</span><span class="p">,</span> <span class="n">fontsize</span><span class="o">=</span><span class="mi">14</span><span class="p">,</span> <span class="n">fontweight</span><span class="o">=</span><span class="s2">&quot;bold&quot;</span><span class="p">)</span>
+<span class="n">ax1</span><span class="o">.</span><span class="n">legend</span><span class="p">(</span><span class="n">lines1</span><span class="p">,</span> <span class="p">[</span><span class="n">line</span><span class="o">.</span><span class="n">get_label</span><span class="p">()</span> <span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="n">lines1</span><span class="p">],</span> <span class="n">loc</span><span class="o">=</span><span class="s2">"upper left"</span><span class="p">)</span>
+<span class="n">ax1</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span><span class="s2">"Data Drift Benchmark"</span><span class="p">,</span> <span class="n">fontsize</span><span class="o">=</span><span class="mi">14</span><span class="p">,</span> <span class="n">fontweight</span><span class="o">=</span><span class="s2">"bold"</span><span class="p">)</span>
 <span class="n">ax1</span><span class="o">.</span><span class="n">grid</span><span class="p">(</span><span class="kc">True</span><span class="p">,</span> <span class="n">alpha</span><span class="o">=</span><span class="mf">0.3</span><span class="p">)</span>
 
 <span class="c1"># --- Graph 2: Concept Drift &amp; Performance Metrics ---</span>
@@ -343,36 +343,36 @@
 <span class="n">ax6</span> <span class="o">=</span> <span class="n">ax5</span><span class="o">.</span><span class="n">twinx</span><span class="p">()</span>
 <span class="n">ax7</span> <span class="o">=</span> <span class="n">ax5</span><span class="o">.</span><span class="n">twinx</span><span class="p">()</span>
 
-<span class="n">ax7</span><span class="o">.</span><span class="n">spines</span><span class="p">[</span><span class="s2">&quot;right&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">set_position</span><span class="p">((</span><span class="s2">&quot;outward&quot;</span><span class="p">,</span> <span class="mi">60</span><span class="p">))</span>
+<span class="n">ax7</span><span class="o">.</span><span class="n">spines</span><span class="p">[</span><span class="s2">"right"</span><span class="p">]</span><span class="o">.</span><span class="n">set_position</span><span class="p">((</span><span class="s2">"outward"</span><span class="p">,</span> <span class="mi">60</span><span class="p">))</span>
 
 <span class="p">(</span><span class="n">p5</span><span class="p">,)</span> <span class="o">=</span> <span class="n">ax5</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span>
-    <span class="n">df_res</span><span class="p">[</span><span class="s2">&quot;Level&quot;</span><span class="p">],</span>
-    <span class="n">df_res</span><span class="p">[</span><span class="s2">&quot;Perp Concept&quot;</span><span class="p">],</span>
-    <span class="n">label</span><span class="o">=</span><span class="s2">&quot;Perpetual Concept Drift&quot;</span><span class="p">,</span>
-    <span class="n">marker</span><span class="o">=</span><span class="s2">&quot;o&quot;</span><span class="p">,</span>
-    <span class="n">color</span><span class="o">=</span><span class="s2">&quot;C0&quot;</span><span class="p">,</span>
+    <span class="n">df_res</span><span class="p">[</span><span class="s2">"Level"</span><span class="p">],</span>
+    <span class="n">df_res</span><span class="p">[</span><span class="s2">"Perp Concept"</span><span class="p">],</span>
+    <span class="n">label</span><span class="o">=</span><span class="s2">"Perpetual Concept Drift"</span><span class="p">,</span>
+    <span class="n">marker</span><span class="o">=</span><span class="s2">"o"</span><span class="p">,</span>
+    <span class="n">color</span><span class="o">=</span><span class="s2">"C0"</span><span class="p">,</span>
 <span class="p">)</span>
 <span class="p">(</span><span class="n">p6</span><span class="p">,)</span> <span class="o">=</span> <span class="n">ax6</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span>
-    <span class="n">df_res</span><span class="p">[</span><span class="s2">&quot;Level&quot;</span><span class="p">],</span>
-    <span class="n">df_res</span><span class="p">[</span><span class="s2">&quot;Residual KS&quot;</span><span class="p">],</span>
-    <span class="n">label</span><span class="o">=</span><span class="s2">&quot;Residual KS Stat&quot;</span><span class="p">,</span>
-    <span class="n">marker</span><span class="o">=</span><span class="s2">&quot;s&quot;</span><span class="p">,</span>
-    <span class="n">color</span><span class="o">=</span><span class="s2">&quot;C1&quot;</span><span class="p">,</span>
+    <span class="n">df_res</span><span class="p">[</span><span class="s2">"Level"</span><span class="p">],</span>
+    <span class="n">df_res</span><span class="p">[</span><span class="s2">"Residual KS"</span><span class="p">],</span>
+    <span class="n">label</span><span class="o">=</span><span class="s2">"Residual KS Stat"</span><span class="p">,</span>
+    <span class="n">marker</span><span class="o">=</span><span class="s2">"s"</span><span class="p">,</span>
+    <span class="n">color</span><span class="o">=</span><span class="s2">"C1"</span><span class="p">,</span>
 <span class="p">)</span>
-<span class="p">(</span><span class="n">p7</span><span class="p">,)</span> <span class="o">=</span> <span class="n">ax7</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">df_res</span><span class="p">[</span><span class="s2">&quot;Level&quot;</span><span class="p">],</span> <span class="n">df_res</span><span class="p">[</span><span class="s2">&quot;MSE&quot;</span><span class="p">],</span> <span class="n">label</span><span class="o">=</span><span class="s2">&quot;MSE&quot;</span><span class="p">,</span> <span class="n">marker</span><span class="o">=</span><span class="s2">&quot;^&quot;</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">&quot;C2&quot;</span><span class="p">)</span>
+<span class="p">(</span><span class="n">p7</span><span class="p">,)</span> <span class="o">=</span> <span class="n">ax7</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">df_res</span><span class="p">[</span><span class="s2">"Level"</span><span class="p">],</span> <span class="n">df_res</span><span class="p">[</span><span class="s2">"MSE"</span><span class="p">],</span> <span class="n">label</span><span class="o">=</span><span class="s2">"MSE"</span><span class="p">,</span> <span class="n">marker</span><span class="o">=</span><span class="s2">"^"</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">"C2"</span><span class="p">)</span>
 
-<span class="n">ax5</span><span class="o">.</span><span class="n">set_xlabel</span><span class="p">(</span><span class="s2">&quot;Drift Level (MedInc Shift)&quot;</span><span class="p">,</span> <span class="n">fontweight</span><span class="o">=</span><span class="s2">&quot;bold&quot;</span><span class="p">)</span>
-<span class="n">ax5</span><span class="o">.</span><span class="n">set_ylabel</span><span class="p">(</span><span class="s2">&quot;Perpetual Concept Drift&quot;</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">&quot;C0&quot;</span><span class="p">)</span>
-<span class="n">ax6</span><span class="o">.</span><span class="n">set_ylabel</span><span class="p">(</span><span class="s2">&quot;Residual KS Stat&quot;</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">&quot;C1&quot;</span><span class="p">)</span>
-<span class="n">ax7</span><span class="o">.</span><span class="n">set_ylabel</span><span class="p">(</span><span class="s2">&quot;MSE&quot;</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">&quot;C2&quot;</span><span class="p">)</span>
+<span class="n">ax5</span><span class="o">.</span><span class="n">set_xlabel</span><span class="p">(</span><span class="s2">"Drift Level (MedInc Shift)"</span><span class="p">,</span> <span class="n">fontweight</span><span class="o">=</span><span class="s2">"bold"</span><span class="p">)</span>
+<span class="n">ax5</span><span class="o">.</span><span class="n">set_ylabel</span><span class="p">(</span><span class="s2">"Perpetual Concept Drift"</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">"C0"</span><span class="p">)</span>
+<span class="n">ax6</span><span class="o">.</span><span class="n">set_ylabel</span><span class="p">(</span><span class="s2">"Residual KS Stat"</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">"C1"</span><span class="p">)</span>
+<span class="n">ax7</span><span class="o">.</span><span class="n">set_ylabel</span><span class="p">(</span><span class="s2">"MSE"</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">"C2"</span><span class="p">)</span>
 
-<span class="n">ax5</span><span class="o">.</span><span class="n">tick_params</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="s2">&quot;y&quot;</span><span class="p">,</span> <span class="n">colors</span><span class="o">=</span><span class="s2">&quot;C0&quot;</span><span class="p">)</span>
-<span class="n">ax6</span><span class="o">.</span><span class="n">tick_params</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="s2">&quot;y&quot;</span><span class="p">,</span> <span class="n">colors</span><span class="o">=</span><span class="s2">&quot;C1&quot;</span><span class="p">)</span>
-<span class="n">ax7</span><span class="o">.</span><span class="n">tick_params</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="s2">&quot;y&quot;</span><span class="p">,</span> <span class="n">colors</span><span class="o">=</span><span class="s2">&quot;C2&quot;</span><span class="p">)</span>
+<span class="n">ax5</span><span class="o">.</span><span class="n">tick_params</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="s2">"y"</span><span class="p">,</span> <span class="n">colors</span><span class="o">=</span><span class="s2">"C0"</span><span class="p">)</span>
+<span class="n">ax6</span><span class="o">.</span><span class="n">tick_params</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="s2">"y"</span><span class="p">,</span> <span class="n">colors</span><span class="o">=</span><span class="s2">"C1"</span><span class="p">)</span>
+<span class="n">ax7</span><span class="o">.</span><span class="n">tick_params</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="s2">"y"</span><span class="p">,</span> <span class="n">colors</span><span class="o">=</span><span class="s2">"C2"</span><span class="p">)</span>
 
 <span class="n">lines2</span> <span class="o">=</span> <span class="p">[</span><span class="n">p5</span><span class="p">,</span> <span class="n">p6</span><span class="p">,</span> <span class="n">p7</span><span class="p">]</span>
-<span class="n">ax5</span><span class="o">.</span><span class="n">legend</span><span class="p">(</span><span class="n">lines2</span><span class="p">,</span> <span class="p">[</span><span class="n">line</span><span class="o">.</span><span class="n">get_label</span><span class="p">()</span> <span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="n">lines2</span><span class="p">],</span> <span class="n">loc</span><span class="o">=</span><span class="s2">&quot;upper left&quot;</span><span class="p">)</span>
-<span class="n">ax5</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span><span class="s2">&quot;Concept Drift Benchmark&quot;</span><span class="p">,</span> <span class="n">fontsize</span><span class="o">=</span><span class="mi">14</span><span class="p">,</span> <span class="n">fontweight</span><span class="o">=</span><span class="s2">&quot;bold&quot;</span><span class="p">)</span>
+<span class="n">ax5</span><span class="o">.</span><span class="n">legend</span><span class="p">(</span><span class="n">lines2</span><span class="p">,</span> <span class="p">[</span><span class="n">line</span><span class="o">.</span><span class="n">get_label</span><span class="p">()</span> <span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="n">lines2</span><span class="p">],</span> <span class="n">loc</span><span class="o">=</span><span class="s2">"upper left"</span><span class="p">)</span>
+<span class="n">ax5</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span><span class="s2">"Concept Drift Benchmark"</span><span class="p">,</span> <span class="n">fontsize</span><span class="o">=</span><span class="mi">14</span><span class="p">,</span> <span class="n">fontweight</span><span class="o">=</span><span class="s2">"bold"</span><span class="p">)</span>
 <span class="n">ax5</span><span class="o">.</span><span class="n">grid</span><span class="p">(</span><span class="kc">True</span><span class="p">,</span> <span class="n">alpha</span><span class="o">=</span><span class="mf">0.3</span><span class="p">)</span>
 
 <span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>

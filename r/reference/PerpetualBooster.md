@@ -7,7 +7,3 @@ PerpetualBooster object for creating and loading models.
 ``` r
 PerpetualBooster
 ```
-
-## Format
-
-An object of class `list` of length 2.

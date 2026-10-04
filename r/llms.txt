@@ -110,18 +110,18 @@ Housing](https://scikit-learn.org/stable/modules/generated/sklearn.datasets.fetc
 dataset (regression):
 
 | Perpetual budget | LightGBM n_estimators | Perpetual mse | LightGBM mse | Speed-up wall time | Speed-up cpu time |
-|:-----------------|:----------------------|:--------------|:-------------|:-------------------|:------------------|
-| 0.76             | 50                    | 0.201         | 0.201        | 72x                | 326x              |
-| 0.85             | 100                   | 0.196         | 0.196        | 113x               | 613x              |
-| 1.15             | 200                   | 0.190         | 0.190        | 405x               | 1985x             |
+|:---|:---|:---|:---|:---|:---|
+| 0.76 | 50 | 0.201 | 0.201 | 72x | 326x |
+| 0.85 | 100 | 0.196 | 0.196 | 113x | 613x |
+| 1.15 | 200 | 0.190 | 0.190 | 405x | 1985x |
 
 The following table summarizes the results for the [Pumpkin
 Seeds](https://www.openml.org/search?type=data&status=active&id=46951)
 dataset (classification):
 
 | Perpetual budget | LightGBM n_estimators | Perpetual auc | LightGBM auc | Speed-up wall time | Speed-up cpu time |
-|:-----------------|:----------------------|:--------------|:-------------|:-------------------|:------------------|
-| 1.0              | 100                   | 0.944         | 0.945        | 91x                | 184x              |
+|:---|:---|:---|:---|:---|:---|
+| 1.0 | 100 | 0.944 | 0.945 | 91x | 184x |
 
 The results can be reproduced using the scripts in the
 [examples](https://perpetual-ml.github.io/perpetual/r/package-python/examples)
@@ -138,19 +138,19 @@ classification tasks.
 
 The results are summarized in the following table for regression tasks:
 
-| OpenML Task                                              | Perpetual Training Duration | Perpetual Inference Duration | Perpetual RMSE | AutoGluon Training Duration | AutoGluon Inference Duration | AutoGluon RMSE |
-|:---------------------------------------------------------|:----------------------------|:-----------------------------|:---------------|:----------------------------|:-----------------------------|:---------------|
-| [Airlines_DepDelay_10M](https://www.openml.org/t/359929) | 518                         | 11.3                         | 29.0           | 520                         | 30.9                         | *28.8*         |
-| [bates_regr_100](https://www.openml.org/t/361940)        | 3421                        | 15.1                         | *1.084*        | OOM                         | OOM                          | OOM            |
-| [BNG(libras_move)](https://www.openml.org/t/7327)        | 1956                        | 4.2                          | *2.51*         | 1922                        | 97.6                         | 2.53           |
-| [BNG(satellite_image)](https://www.openml.org/t/7326)    | 334                         | 1.6                          | 0.731          | 337                         | 10.0                         | *0.721*        |
-| [COMET_MC](https://www.openml.org/t/14949)               | 44                          | 1.0                          | *0.0615*       | 47                          | 5.0                          | 0.0662         |
-| [friedman1](https://www.openml.org/t/361939)             | 275                         | 4.2                          | *1.047*        | 278                         | 5.1                          | 1.487          |
-| [poker](https://www.openml.org/t/10102)                  | 38                          | 0.6                          | *0.256*        | 41                          | 1.2                          | 0.722          |
-| [subset_higgs](https://www.openml.org/t/361955)          | 868                         | 10.6                         | *0.420*        | 870                         | 24.5                         | 0.421          |
-| [BNG(autoHorse)](https://www.openml.org/t/7319)          | 107                         | 1.1                          | *19.0*         | 107                         | 3.2                          | 20.5           |
-| [BNG(pbc)](https://www.openml.org/t/7318)                | 48                          | 0.6                          | *836.5*        | 51                          | 0.2                          | 957.1          |
-| average                                                  | 465                         | 3.9                          | \-             | 464                         | 19.7                         | \-             |
+| OpenML Task | Perpetual Training Duration | Perpetual Inference Duration | Perpetual RMSE | AutoGluon Training Duration | AutoGluon Inference Duration | AutoGluon RMSE |
+|:---|:---|:---|:---|:---|:---|:---|
+| [Airlines_DepDelay_10M](https://www.openml.org/t/359929) | 518 | 11.3 | 29.0 | 520 | 30.9 | *28.8* |
+| [bates_regr_100](https://www.openml.org/t/361940) | 3421 | 15.1 | *1.084* | OOM | OOM | OOM |
+| [BNG(libras_move)](https://www.openml.org/t/7327) | 1956 | 4.2 | *2.51* | 1922 | 97.6 | 2.53 |
+| [BNG(satellite_image)](https://www.openml.org/t/7326) | 334 | 1.6 | 0.731 | 337 | 10.0 | *0.721* |
+| [COMET_MC](https://www.openml.org/t/14949) | 44 | 1.0 | *0.0615* | 47 | 5.0 | 0.0662 |
+| [friedman1](https://www.openml.org/t/361939) | 275 | 4.2 | *1.047* | 278 | 5.1 | 1.487 |
+| [poker](https://www.openml.org/t/10102) | 38 | 0.6 | *0.256* | 41 | 1.2 | 0.722 |
+| [subset_higgs](https://www.openml.org/t/361955) | 868 | 10.6 | *0.420* | 870 | 24.5 | 0.421 |
+| [BNG(autoHorse)](https://www.openml.org/t/7319) | 107 | 1.1 | *19.0* | 107 | 3.2 | 20.5 |
+| [BNG(pbc)](https://www.openml.org/t/7318) | 48 | 0.6 | *836.5* | 51 | 0.2 | 957.1 |
+| average | 465 | 3.9 | \- | 464 | 19.7 | \- |
 
 PerpetualBooster outperformed AutoGluon on 8 out of 10 regression tasks,
 training equally fast and inferring 5.1x faster.
@@ -158,19 +158,19 @@ training equally fast and inferring 5.1x faster.
 The results are summarized in the following table for classification
 tasks:
 
-| OpenML Task                                             | Perpetual Training Duration | Perpetual Inference Duration | Perpetual AUC | AutoGluon Training Duration | AutoGluon Inference Duration | AutoGluon AUC |
-|:--------------------------------------------------------|:----------------------------|:-----------------------------|:--------------|:----------------------------|:-----------------------------|:--------------|
-| [BNG(spambase)](https://www.openml.org/t/146163)        | 70.1                        | 2.1                          | *0.671*       | 73.1                        | 3.7                          | 0.669         |
-| [BNG(trains)](https://www.openml.org/t/208)             | 89.5                        | 1.7                          | *0.996*       | 106.4                       | 2.4                          | 0.994         |
-| [breast](https://www.openml.org/t/361942)               | 13699.3                     | 97.7                         | *0.991*       | 13330.7                     | 79.7                         | 0.949         |
-| [Click_prediction_small](https://www.openml.org/t/7291) | 89.1                        | 1.0                          | *0.749*       | 101.0                       | 2.8                          | 0.703         |
-| [colon](https://www.openml.org/t/361938)                | 12435.2                     | 126.7                        | *0.997*       | 12356.2                     | 152.3                        | 0.997         |
-| [Higgs](https://www.openml.org/t/362113)                | 3485.3                      | 40.9                         | *0.843*       | 3501.4                      | 67.9                         | 0.816         |
-| [SEA(50000)](https://www.openml.org/t/230)              | 21.9                        | 0.2                          | *0.936*       | 25.6                        | 0.5                          | 0.935         |
-| [sf-police-incidents](https://www.openml.org/t/359994)  | 85.8                        | 1.5                          | *0.687*       | 99.4                        | 2.8                          | 0.659         |
-| [bates_classif_100](https://www.openml.org/t/361941)    | 11152.8                     | 50.0                         | *0.864*       | OOM                         | OOM                          | OOM           |
-| [prostate](https://www.openml.org/t/361945)             | 13699.9                     | 79.8                         | *0.987*       | OOM                         | OOM                          | OOM           |
-| average                                                 | 3747.0                      | 34.0                         | \-            | 3699.2                      | 39.0                         | \-            |
+| OpenML Task | Perpetual Training Duration | Perpetual Inference Duration | Perpetual AUC | AutoGluon Training Duration | AutoGluon Inference Duration | AutoGluon AUC |
+|:---|:---|:---|:---|:---|:---|:---|
+| [BNG(spambase)](https://www.openml.org/t/146163) | 70.1 | 2.1 | *0.671* | 73.1 | 3.7 | 0.669 |
+| [BNG(trains)](https://www.openml.org/t/208) | 89.5 | 1.7 | *0.996* | 106.4 | 2.4 | 0.994 |
+| [breast](https://www.openml.org/t/361942) | 13699.3 | 97.7 | *0.991* | 13330.7 | 79.7 | 0.949 |
+| [Click_prediction_small](https://www.openml.org/t/7291) | 89.1 | 1.0 | *0.749* | 101.0 | 2.8 | 0.703 |
+| [colon](https://www.openml.org/t/361938) | 12435.2 | 126.7 | *0.997* | 12356.2 | 152.3 | 0.997 |
+| [Higgs](https://www.openml.org/t/362113) | 3485.3 | 40.9 | *0.843* | 3501.4 | 67.9 | 0.816 |
+| [SEA(50000)](https://www.openml.org/t/230) | 21.9 | 0.2 | *0.936* | 25.6 | 0.5 | 0.935 |
+| [sf-police-incidents](https://www.openml.org/t/359994) | 85.8 | 1.5 | *0.687* | 99.4 | 2.8 | 0.659 |
+| [bates_classif_100](https://www.openml.org/t/361941) | 11152.8 | 50.0 | *0.864* | OOM | OOM | OOM |
+| [prostate](https://www.openml.org/t/361945) | 13699.9 | 79.8 | *0.987* | OOM | OOM | OOM |
+| average | 3747.0 | 34.0 | \- | 3699.2 | 39.0 | \- |
 
 PerpetualBooster outperformed AutoGluon on 10 out of 10 classification
 tasks, training equally fast and inferring 1.1x faster.
