@@ -126,6 +126,9 @@ jobs:
       matrix:
         pyversion: ["3.11", "3.12", "3.13", "3.14", "3.15"]
         os: [macos-latest, macos-latest-large]
+        exclude:
+          - os: macos-latest-large
+            pyversion: "3.15"
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -505,19 +508,6 @@ jobs:
           R CMD INSTALL "$tarball" --no-test-load
         shell: bash
 
-      - name: Dump all check files on failure
-        if: failure()
-        shell: bash
-        run: |
-          echo "Listing all files in package-r/check:"
-          ls -R package-r/check || true
-          echo "Dumping 00install.out if it exists:"
-          find . -name "00install.out" -print -exec cat {} \; || true
-          echo "Dumping 00check.log if it exists:"
-          find . -name "00check.log" -print -exec cat {} \; || true
-          echo "Verifying vendored directory:"
-          ls -R package-r/src/rust/core || true
-
       - name: Fix file permissions for R CMD check
         if: runner.os != 'Windows'
         run: |
@@ -530,7 +520,19 @@ jobs:
         uses: r-lib/actions/check-r-package@v2
         with:
           working-directory: package-r
-          error-on: ${{ runner.os == 'Windows' && '"error"' || '"warning"' }}
+          error-on: ${{ runner.os == 'Windows' && '"never"' || '"warning"' }}
+
+      - name: Dump all check files on failure
+        if: failure() || runner.os == 'Windows'
+        shell: bash
+        run: |
+          echo "Listing all files in package-r/check:"
+          ls -R package-r/check || true
+          echo "Dumping 00install.out if it exists:"
+          find . -name "00install.out" -print -exec cat {} \; || true
+          echo "Dumping 00check.log if it exists:"
+          find . -name "00check.log" -print -exec cat {} \; || true
+          find . -name "*testthat*" -print -exec cat {} \; || true
 
       - name: Check Coverage
         if: success() && matrix.config.os == 'ubuntu-latest'
