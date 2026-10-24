@@ -16,7 +16,7 @@ You can also install Perpetual via Conda:
 Requirements
 ------------
 
-* Python >= 3.10
+* Python >= 3.11
 * numpy
 * typing-extensions
 

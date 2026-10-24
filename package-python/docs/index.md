@@ -16,6 +16,7 @@ Info is logged while the model is being trained if the `log_iterations` paramete
 
 ```python
 import logging
+
 logging.basicConfig()
 logging.getLogger().setLevel(logging.INFO)
 
@@ -31,6 +32,7 @@ The log output can also be captured in a file also using the `logging.basicConfi
 
 ```python
 import logging
+
 logging.basicConfig(filename="training-info.log")
 logging.getLogger().setLevel(logging.INFO)
 

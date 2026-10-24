@@ -1,6 +1,7 @@
 [tool.ruff]
 # Set the line length to match Black.
 line-length = 88
+extend-exclude = ["*.ipynb"]
 
 [tool.ruff.lint]
 # E501: Line too long

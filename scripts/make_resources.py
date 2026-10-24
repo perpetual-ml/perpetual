@@ -120,7 +120,9 @@ if __name__ == "__main__":
     pd.Series(y_test).to_csv("resources/titanic_test_y.csv", index=False, header=False)
 
     # https://www.openml.org/search?type=data&id=546&sort=runs&status=active
-    df = fetch_openml(data_id=546)
+    # parser="liac-arff" avoids a scikit-learn/pandas>=3.1 incompatibility in the
+    # pandas ARFF parser; output is identical to parser="pandas".
+    df = fetch_openml(data_id=546, parser="liac-arff")
     X = df.data
     y = df.target
     (
@@ -137,7 +139,7 @@ if __name__ == "__main__":
     pd.Series(y).to_csv("resources/sensory_y.csv", index=False, header=False)
 
     # https://www.openml.org/search?type=data&id=43493&sort=runs&status=active
-    df = fetch_openml(data_id=43493)
+    df = fetch_openml(data_id=43493, parser="liac-arff")
     cols_to_drop = ["title", "authors", "votes"]
     data = df.data.drop(columns=cols_to_drop)
 

@@ -8,7 +8,7 @@ The repository comes with a predefined set of development tools in the `Makefile
 make init
 ```
 
-For development, it is assumed you have stable Rust installed, and at least Python 3.10.
+For development, it is assumed you have stable Rust installed, and at least Python 3.11.
 
 ### Running tests
 

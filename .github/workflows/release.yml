@@ -12,7 +12,7 @@ jobs:
   windows-build:
     strategy:
       matrix:
-        pyversion: ["3.10", "3.11", "3.12", "3.13", "3.14"]
+        pyversion: ["3.11", "3.12", "3.13", "3.14", "3.15"]
     runs-on: "windows-latest"
     steps:
       - uses: actions/checkout@v4
@@ -47,7 +47,7 @@ jobs:
   macos-build:
     strategy:
       matrix:
-        pyversion: ["3.11", "3.12", "3.13", "3.14"]
+        pyversion: ["3.11", "3.12", "3.13", "3.14", "3.15"]
         # macos-15-intel: Explicitly targeted as the Intel runner (Free).
         # macos-14: Explicitly targeted as the Apple Silicon runner (Free).
         os: [macos-15-intel, macos-14]
@@ -84,7 +84,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        pyversion: ["3.10", "3.11", "3.12", "3.13", "3.14"]
+        pyversion: ["3.11", "3.12", "3.13", "3.14", "3.15"]
     steps:
       - uses: actions/checkout@v4
       - name: Install latests stable Rust
@@ -120,7 +120,7 @@ jobs:
     runs-on: ubuntu-24.04-arm
     strategy:
       matrix:
-        pyversion: ["3.10", "3.11", "3.12", "3.13", "3.14"]
+        pyversion: ["3.11", "3.12", "3.13", "3.14", "3.15"]
     steps:
       - uses: actions/checkout@v4
       - name: Install latests stable Rust
