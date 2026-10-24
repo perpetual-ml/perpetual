@@ -49,7 +49,7 @@ jobs:
     needs: prepare-resources # This job waits for prepare-resources to complete
     strategy:
       matrix:
-        pyversion: ["3.10", "3.11", "3.12", "3.13", "3.14"]
+        pyversion: ["3.11", "3.12", "3.13", "3.14", "3.15"]
     runs-on: "windows-latest"
     steps:
       - uses: actions/checkout@v4
@@ -124,7 +124,7 @@ jobs:
     needs: prepare-resources
     strategy:
       matrix:
-        pyversion: ["3.11", "3.12", "3.13", "3.14"]
+        pyversion: ["3.11", "3.12", "3.13", "3.14", "3.15"]
         os: [macos-latest, macos-latest-large]
     runs-on: ${{ matrix.os }}
     steps:
@@ -201,7 +201,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        pyversion: ["3.10", "3.11", "3.12", "3.13", "3.14"]
+        pyversion: ["3.11", "3.12", "3.13", "3.14", "3.15"]
     steps:
       - uses: actions/checkout@v4
         with:
@@ -277,7 +277,7 @@ jobs:
     runs-on: ubuntu-24.04-arm
     strategy:
       matrix:
-        pyversion: ["3.10", "3.11", "3.12", "3.13", "3.14"]
+        pyversion: ["3.11", "3.12", "3.13", "3.14", "3.15"]
     steps:
       - uses: actions/checkout@v4
         with:
