@@ -442,14 +442,19 @@ jobs:
       - name: Install dependencies for resource creation (Fallback)
         if: steps.restore-resources.outputs.cache-hit != 'true'
         run: |
+          cp README.md package-python/README_PYTHON.md
+          cp LICENSE package-python/LICENSE
+          cp LICENSE package-r/LICENSE
           pip install numpy pandas seaborn scikit-learn toml
           cd package-python
           pip install -e .
           cd ..
+        shell: bash
       
       - name: Fallback build resources
         if: steps.restore-resources.outputs.cache-hit != 'true'
         run: python scripts/make_resources.py
+        shell: bash
 
       - name: Copy Resources for Tests
         run: |
