@@ -49,4 +49,16 @@ dev = [
     "pytest>=9.0.2",
 ]
 
+[tool.ruff]
+line-length = 88
+extend-exclude = ["*.ipynb"]
 
+[tool.ruff.lint]
+ignore = ["E501"]
+select = ["E4", "E7", "E9", "F", "I"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+line-ending = "auto"

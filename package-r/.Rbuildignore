@@ -5,6 +5,12 @@
 ^LICENSE$
 ^\.github$
 ^cran-comments\.md$
+^src/rust/target$
+^src/.*\.o$
+^src/.*\.so$
+^src/.*\.dll$
+^src/.*\.a$
+^src/.*\.pdb$
 
 
 
