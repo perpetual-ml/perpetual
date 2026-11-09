@@ -1,0 +1,432 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="./">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Blog &amp; Case Studies &mdash; Perpetual 2.4.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="_static/custom.css?v=9cdd1368" />
+
+  
+      <script src="_static/jquery.js?v=5d32c60e"></script>
+      <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="_static/documentation_options.js?v=4d935f96"></script>
+      <script src="_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
+      <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+      <script>window.MathJax = {"tex": {"inlineMath": [["$", "$"], ["\\(", "\\)"]], "processEscapes": true}, "options": {"ignoreHtmlClass": "tex2jax_ignore|mathjax_ignore|document", "processHtmlClass": "tex2jax_process|mathjax_process|math|output_area"}}</script>
+      <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@4/tex-mml-chtml.js"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Parameters Tuning" href="parameters_tuning.html" />
+    <link rel="prev" title="Architecture" href="architecture.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            Perpetual
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="api.html">API Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="causal_ml/index.html">Causal ML</a></li>
+<li class="toctree-l1"><a class="reference internal" href="calibration.html">Calibration and Uncertainty Quantification</a></li>
+<li class="toctree-l1"><a class="reference internal" href="drift_detection.html">Drift Detection</a></li>
+<li class="toctree-l1"><a class="reference internal" href="continual_learning.html">Continual Learning</a></li>
+<li class="toctree-l1"><a class="reference internal" href="explainability.html">Explainability</a></li>
+<li class="toctree-l1"><a class="reference internal" href="model_io_export.html">Model IO &amp; Export</a></li>
+<li class="toctree-l1"><a class="reference internal" href="tutorials/index.html">Tutorials</a></li>
+<li class="toctree-l1"><a class="reference internal" href="architecture.html">Architecture</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Blog &amp; Case Studies</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#how-perpetualbooster-works">How PerpetualBooster Works</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#x-faster-initial-training">100x Faster Initial Training</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#california-housing-regression">California Housing (Regression)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#forest-cover-types-classification">Forest Cover Types (Classification)</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#better-prediction-intervals-with-perpetual-learning">Better Prediction Intervals with Perpetual Learning</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#further-speed-up-with-continual-learning">Further Speed-Up with Continual Learning</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#optimum-business-decisioning-with-calibrated-probabilities">Optimum Business Decisioning with Calibrated Probabilities</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#financial-decision-framework-loan-default-case-study">Financial Decision Framework (Loan Default Case Study)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#probability-calibration-baseline">Probability Calibration Baseline</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#empirical-profit-comparison">Empirical Profit Comparison</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#profit-driven-lead-scoring">Profit-Driven Lead Scoring</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#financial-payoff-matrix-bank-marketing-case-study">Financial Payoff Matrix (Bank Marketing Case Study)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#campaign-profit-results">Campaign Profit Results</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="parameters_tuning.html">Parameters Tuning</a></li>
+<li class="toctree-l1"><a class="reference internal" href="faq.html">Frequently Asked Questions</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">Perpetual</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Blog &amp; Case Studies</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/case_studies.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="blog-case-studies">
+<h1>Blog &amp; Case Studies<a class="headerlink" href="#blog-case-studies" title="Link to this heading"></a></h1>
+<p>This section collects engineering deep-dives and empirical case studies exploring how <code class="docutils literal notranslate"><span class="pre">PerpetualBooster</span></code> eliminates hyperparameter optimization, accelerates continual training, improves uncertainty quantification, and drives optimal downstream decisions.</p>
+<nav class="contents local" id="on-this-page">
+<p class="topic-title">On this page</p>
+<ul class="simple">
+<li><p><a class="reference internal" href="#how-perpetualbooster-works" id="id7">How PerpetualBooster Works</a></p></li>
+<li><p><a class="reference internal" href="#x-faster-initial-training" id="id8">100x Faster Initial Training</a></p>
+<ul>
+<li><p><a class="reference internal" href="#california-housing-regression" id="id9">California Housing (Regression)</a></p></li>
+<li><p><a class="reference internal" href="#forest-cover-types-classification" id="id10">Forest Cover Types (Classification)</a></p></li>
+</ul>
+</li>
+<li><p><a class="reference internal" href="#better-prediction-intervals-with-perpetual-learning" id="id11">Better Prediction Intervals with Perpetual Learning</a></p></li>
+<li><p><a class="reference internal" href="#further-speed-up-with-continual-learning" id="id12">Further Speed-Up with Continual Learning</a></p></li>
+<li><p><a class="reference internal" href="#optimum-business-decisioning-with-calibrated-probabilities" id="id13">Optimum Business Decisioning with Calibrated Probabilities</a></p>
+<ul>
+<li><p><a class="reference internal" href="#financial-decision-framework-loan-default-case-study" id="id14">Financial Decision Framework (Loan Default Case Study)</a></p></li>
+<li><p><a class="reference internal" href="#probability-calibration-baseline" id="id15">Probability Calibration Baseline</a></p></li>
+<li><p><a class="reference internal" href="#empirical-profit-comparison" id="id16">Empirical Profit Comparison</a></p></li>
+</ul>
+</li>
+<li><p><a class="reference internal" href="#profit-driven-lead-scoring" id="id17">Profit-Driven Lead Scoring</a></p>
+<ul>
+<li><p><a class="reference internal" href="#financial-payoff-matrix-bank-marketing-case-study" id="id18">Financial Payoff Matrix (Bank Marketing Case Study)</a></p></li>
+<li><p><a class="reference internal" href="#campaign-profit-results" id="id19">Campaign Profit Results</a></p></li>
+</ul>
+</li>
+</ul>
+</nav>
+<hr class="docutils" />
+<section id="how-perpetualbooster-works">
+<h2><a class="toc-backref" href="#id7" role="doc-backlink">How PerpetualBooster Works</a><a class="headerlink" href="#how-perpetualbooster-works" title="Link to this heading"></a></h2>
+<p><code class="docutils literal notranslate"><span class="pre">PerpetualBooster</span></code> eliminates hyperparameter tuning by combining two internal control mechanisms controlled by a single <code class="docutils literal notranslate"><span class="pre">budget</span></code> parameter:</p>
+<ol class="arabic simple">
+<li><p><strong>Step Size Control (Forward-Tracking Tree Search)</strong>: Inspired by the Armijo–Goldstein condition in backtracking line search, Perpetual grows each tree until it achieves the smallest step that satisfies a target loss reduction proportional to <span class="math notranslate nohighlight">\(\alpha = 10^{-\text{budget}}\)</span>.</p></li>
+<li><p><strong>Generalization Control</strong>: At each candidate split, samples are partitioned into internal training and validation folds. Splits are only accepted when the out-of-fold validation loss reduction keeps pace with the training loss reduction (<span class="math notranslate nohighlight">\(\text{generalization} \geq 1.0\)</span>).</p></li>
+</ol>
+<p>For the full mathematical formulation and links to the Rust implementation, see <a class="reference internal" href="architecture.html#how-perpetual-works"><span class="std std-ref">PerpetualBooster Algorithm: How It Works</span></a> in <a class="reference internal" href="architecture.html"><span class="doc">Architecture</span></a>.</p>
+</section>
+<hr class="docutils" />
+<section id="x-faster-initial-training">
+<h2><a class="toc-backref" href="#id8" role="doc-backlink">100x Faster Initial Training</a><a class="headerlink" href="#x-faster-initial-training" title="Link to this heading"></a></h2>
+<p>Effective machine learning model training traditionally requires meticulous hyperparameter tuning (e.g., 100 trials with Optuna) to prevent overfitting. By replacing multi-trial tuning with a single training run governed by the <code class="docutils literal notranslate"><span class="pre">budget</span></code> parameter, <code class="docutils literal notranslate"><span class="pre">PerpetualBooster</span></code> achieves over <strong>100x speed-ups</strong> compared to tuned <cite>LightGBM</cite> pipelines while matching state-of-the-art accuracy on tabular benchmarks.</p>
+<section id="california-housing-regression">
+<h3><a class="toc-backref" href="#id9" role="doc-backlink">California Housing (Regression)</a><a class="headerlink" href="#california-housing-regression" title="Link to this heading"></a></h3>
+<p>On the <a class="reference external" href="https://scikit-learn.org/stable/datasets/real_world.html#california-housing-dataset">California Housing</a> dataset, <code class="docutils literal notranslate"><span class="pre">LightGBM</span></code> uses <code class="docutils literal notranslate"><span class="pre">n_estimators</span></code> (alongside Optuna hyperparameter search) to increase model capacity, whereas <code class="docutils literal notranslate"><span class="pre">PerpetualBooster</span></code> uses a single <code class="docutils literal notranslate"><span class="pre">budget</span></code> parameter. Across three accuracy tiers, <code class="docutils literal notranslate"><span class="pre">PerpetualBooster</span></code> exceeds tuned <code class="docutils literal notranslate"><span class="pre">LightGBM</span></code> speed by over 100x at equivalent test Mean Squared Error (MSE):</p>
+<table class="docutils align-default" id="id1">
+<caption><span class="caption-text">Table 1: California Housing (Regression) Dataset Results</span><a class="headerlink" href="#id1" title="Link to this table"></a></caption>
+<colgroup>
+<col style="width: 14.6%" />
+<col style="width: 17.5%" />
+<col style="width: 13.6%" />
+<col style="width: 13.6%" />
+<col style="width: 14.6%" />
+<col style="width: 14.6%" />
+<col style="width: 11.7%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Perpetual budget</p></th>
+<th class="head"><p>LightGBM n_estimators</p></th>
+<th class="head"><p>Perpetual MSE</p></th>
+<th class="head"><p>LightGBM MSE</p></th>
+<th class="head"><p>Perpetual CPU Time (s)</p></th>
+<th class="head"><p>LightGBM CPU Time (s)</p></th>
+<th class="head"><p>Speed-up</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>0.30</p></td>
+<td><p>100</p></td>
+<td><p>0.202</p></td>
+<td><p>0.203</p></td>
+<td><p>8.8</p></td>
+<td><p>982</p></td>
+<td><p><strong>112x</strong></p></td>
+</tr>
+<tr class="row-odd"><td><p>0.45</p></td>
+<td><p>200</p></td>
+<td><p>0.198</p></td>
+<td><p>0.198</p></td>
+<td><p>19.1</p></td>
+<td><p>2,554</p></td>
+<td><p><strong>134x</strong></p></td>
+</tr>
+<tr class="row-even"><td><p>0.60</p></td>
+<td><p>500</p></td>
+<td><p>0.197</p></td>
+<td><p>0.197</p></td>
+<td><p>40.9</p></td>
+<td><p>6,057</p></td>
+<td><p><strong>148x</strong></p></td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="forest-cover-types-classification">
+<h3><a class="toc-backref" href="#id10" role="doc-backlink">Forest Cover Types (Classification)</a><a class="headerlink" href="#forest-cover-types-classification" title="Link to this heading"></a></h3>
+<p>On the <a class="reference external" href="https://scikit-learn.org/stable/datasets/real_world.html#forest-covertypes">Forest Cover Types</a> classification benchmark, <code class="docutils literal notranslate"><span class="pre">PerpetualBooster</span></code> achieves <strong>76x faster</strong> execution speed compared to tuned <code class="docutils literal notranslate"><span class="pre">LightGBM</span></code> while maintaining equivalent log loss performance:</p>
+<table class="docutils align-default" id="id2">
+<caption><span class="caption-text">Table 2: Forest Cover Types (Classification) Dataset Results</span><a class="headerlink" href="#id2" title="Link to this table"></a></caption>
+<colgroup>
+<col style="width: 14.6%" />
+<col style="width: 17.5%" />
+<col style="width: 13.6%" />
+<col style="width: 13.6%" />
+<col style="width: 14.6%" />
+<col style="width: 14.6%" />
+<col style="width: 11.7%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Perpetual budget</p></th>
+<th class="head"><p>LightGBM n_estimators</p></th>
+<th class="head"><p>Perpetual Log Loss</p></th>
+<th class="head"><p>LightGBM Log Loss</p></th>
+<th class="head"><p>Perpetual CPU Time (s)</p></th>
+<th class="head"><p>LightGBM CPU Time (s)</p></th>
+<th class="head"><p>Speed-up</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>0.33</p></td>
+<td><p>100</p></td>
+<td><p>0.0886</p></td>
+<td><p>0.0857</p></td>
+<td><p>32.2</p></td>
+<td><p>2,464</p></td>
+<td><p><strong>76x</strong></p></td>
+</tr>
+</tbody>
+</table>
+</section>
+</section>
+<hr class="docutils" />
+<section id="better-prediction-intervals-with-perpetual-learning">
+<h2><a class="toc-backref" href="#id11" role="doc-backlink">Better Prediction Intervals with Perpetual Learning</a><a class="headerlink" href="#better-prediction-intervals-with-perpetual-learning" title="Link to this heading"></a></h2>
+<p>Uncertainty quantification via Conformalized Quantile Regression (CQR) provides rigorous prediction intervals with guaranteed coverage. Comparing <code class="docutils literal notranslate"><span class="pre">PerpetualBooster</span></code> against the CQR implementation in the open-source <a class="reference external" href="https://mapie.readthedocs.io/">MAPIE</a> package on the California Housing dataset (target coverage rate of <code class="docutils literal notranslate"><span class="pre">0.90</span></code>) shows that both methods surpass the target coverage rate, while <code class="docutils literal notranslate"><span class="pre">PerpetualBooster</span></code> achieves a <strong>35% reduction</strong> in average prediction interval width:</p>
+<table class="docutils align-default" id="id3">
+<caption><span class="caption-text">Perpetual CQR vs. MAPIE CQR (Target Coverage = 0.90)</span><a class="headerlink" href="#id3" title="Link to this table"></a></caption>
+<colgroup>
+<col style="width: 30.0%" />
+<col style="width: 20.0%" />
+<col style="width: 20.0%" />
+<col style="width: 30.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>CQR Method</p></th>
+<th class="head"><p>Target Coverage</p></th>
+<th class="head"><p>Actual Coverage</p></th>
+<th class="head"><p>Prediction Interval Average Width</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>MAPIE CQR</p></td>
+<td><p>0.900</p></td>
+<td><p>0.905</p></td>
+<td><p>2.222</p></td>
+</tr>
+<tr class="row-odd"><td><p><strong>Perpetual CQR</strong></p></td>
+<td><p><strong>0.900</strong></p></td>
+<td><p><strong>0.907</strong></p></td>
+<td><p><strong>1.450</strong></p></td>
+</tr>
+</tbody>
+</table>
+<p>See <a class="reference internal" href="calibration.html"><span class="doc">Calibration and Uncertainty Quantification</span></a> for details on post-hoc calibration and native prediction interval methods (<code class="docutils literal notranslate"><span class="pre">GRP</span></code>, <code class="docutils literal notranslate"><span class="pre">MinMax</span></code>, <code class="docutils literal notranslate"><span class="pre">WeightVariance</span></code>, and <code class="docutils literal notranslate"><span class="pre">Conformal</span></code>).</p>
+</section>
+<hr class="docutils" />
+<section id="further-speed-up-with-continual-learning">
+<h2><a class="toc-backref" href="#id12" role="doc-backlink">Further Speed-Up with Continual Learning</a><a class="headerlink" href="#further-speed-up-with-continual-learning" title="Link to this heading"></a></h2>
+<p>Beyond fast initial training, <code class="docutils literal notranslate"><span class="pre">PerpetualBooster</span></code> supports continual learning (<code class="docutils literal notranslate"><span class="pre">reset=False</span></code>), reducing cumulative training complexity across streaming batches from quadratic <span class="math notranslate nohighlight">\(O(n^2)\)</span> to linear <span class="math notranslate nohighlight">\(O(n)\)</span>.</p>
+<p>On the California Housing dataset split into 24 batches (initial fit on the first 12 batches of 10,320 rows, followed by 11 incremental batches of 860 rows each), continual learning maintains the same average test MSE (<code class="docutils literal notranslate"><span class="pre">0.197</span></code>) as retraining from scratch while progressively increasing cumulative speed-up from <strong>1.0x</strong> to <strong>2.6x</strong> by batch 11.</p>
+<p>See <a class="reference internal" href="continual_learning.html"><span class="doc">Continual Learning</span></a> for the full batch-by-batch benchmark table and code examples.</p>
+</section>
+<hr class="docutils" />
+<section id="optimum-business-decisioning-with-calibrated-probabilities">
+<h2><a class="toc-backref" href="#id13" role="doc-backlink">Optimum Business Decisioning with Calibrated Probabilities</a><a class="headerlink" href="#optimum-business-decisioning-with-calibrated-probabilities" title="Link to this heading"></a></h2>
+<p>In quantitative decision-making, the value of a model is determined not only by discrimination metrics (such as AUC or F1-score) but by how effectively its predicted probabilities translate into an optimal action that maximizes <strong>expected utility</strong>.</p>
+<section id="financial-decision-framework-loan-default-case-study">
+<h3><a class="toc-backref" href="#id14" role="doc-backlink">Financial Decision Framework (Loan Default Case Study)</a><a class="headerlink" href="#financial-decision-framework-loan-default-case-study" title="Link to this heading"></a></h3>
+<p>Using the publicly available <code class="docutils literal notranslate"><span class="pre">TVS_Loan_Default</span></code> dataset from OpenML (Data ID: <code class="docutils literal notranslate"><span class="pre">43743</span></code>), we define a business objective function that computes expected lending profit across candidate approval thresholds given <strong>Interest Rate</strong> (<code class="docutils literal notranslate"><span class="pre">0.12</span></code>), <strong>Exposure at Default (EAD)</strong> (<code class="docutils literal notranslate"><span class="pre">$10,000</span></code>), <strong>Cost Rate</strong> (<code class="docutils literal notranslate"><span class="pre">0.045</span></code>), and <strong>Loss Given Default (LGD)</strong> (<code class="docutils literal notranslate"><span class="pre">0.70</span></code>):</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">business_objective</span><span class="p">(</span><span class="n">y_true</span><span class="p">,</span> <span class="n">y_pred</span><span class="p">,</span> <span class="n">threshold</span><span class="p">):</span>
+    <span class="n">interest_rate</span> <span class="o">=</span> <span class="mf">0.12</span>
+    <span class="c1"># Approve loans where predicted default probability is below the threshold</span>
+    <span class="n">loan_status</span> <span class="o">=</span> <span class="n">y_true</span><span class="p">[</span><span class="n">y_pred</span> <span class="o">&lt;</span> <span class="n">threshold</span><span class="p">]</span>
+    <span class="n">ead</span> <span class="o">=</span> <span class="mi">10000</span>  <span class="c1"># Exposure at Default</span>
+    <span class="n">capital</span> <span class="o">=</span> <span class="n">ead</span> <span class="o">*</span> <span class="nb">len</span><span class="p">(</span><span class="n">loan_status</span><span class="p">)</span>  <span class="c1"># Total capital for normalization</span>
+    <span class="n">revenue</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">loan_status</span><span class="p">)</span> <span class="o">*</span> <span class="n">ead</span> <span class="o">*</span> <span class="n">interest_rate</span>
+    <span class="n">cost_rate</span> <span class="o">=</span> <span class="mf">0.045</span>  <span class="c1"># Cost percentage of EAD for each approved loan</span>
+    <span class="n">cost</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">loan_status</span><span class="p">)</span> <span class="o">*</span> <span class="n">ead</span> <span class="o">*</span> <span class="n">cost_rate</span>
+    <span class="n">lgd</span> <span class="o">=</span> <span class="mf">0.7</span>  <span class="c1"># Loss Given Default</span>
+    <span class="n">loss</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">loan_status</span><span class="p">)</span> <span class="o">*</span> <span class="n">ead</span> <span class="o">*</span> <span class="n">lgd</span>
+    <span class="n">profit</span> <span class="o">=</span> <span class="n">revenue</span> <span class="o">-</span> <span class="n">cost</span> <span class="o">-</span> <span class="n">loss</span>
+    <span class="n">margin</span> <span class="o">=</span> <span class="p">(</span><span class="n">profit</span> <span class="o">/</span> <span class="n">capital</span><span class="p">)</span> <span class="o">*</span> <span class="mi">100</span>  <span class="c1"># Normalize by total exposure</span>
+    <span class="k">return</span> <span class="n">profit</span><span class="p">,</span> <span class="n">margin</span>
+</pre></div>
+</div>
+</section>
+<section id="probability-calibration-baseline">
+<h3><a class="toc-backref" href="#id15" role="doc-backlink">Probability Calibration Baseline</a><a class="headerlink" href="#probability-calibration-baseline" title="Link to this heading"></a></h3>
+<p>Before optimizing the decision threshold, predicted probabilities must be well-calibrated (e.g., a predicted probability of <code class="docutils literal notranslate"><span class="pre">0.10</span></code> must correspond to a 10% observed default rate). Using scikit-learn’s <code class="docutils literal notranslate"><span class="pre">CalibratedClassifierCV</span></code> on a tuned <code class="docutils literal notranslate"><span class="pre">LightGBM</span></code> baseline:</p>
+<figure class="align-default" id="id4">
+<a class="reference internal image-reference" href="_images/lgbm_cal_results.png"><img alt="Calibration Plots and Histograms for LightGBM Model" src="_images/lgbm_cal_results.png" style="width: 100%;" />
+</a>
+<figcaption>
+<p><span class="caption-text">Calibration plots for uncalibrated LightGBM, LightGBM + Isotonic, and LightGBM + Sigmoid, illustrating the alignment between predicted probabilities and observed default frequencies.</span><a class="headerlink" href="#id4" title="Link to this image"></a></p>
+</figcaption>
+</figure>
+<table class="docutils align-default" id="id5">
+<caption><span class="caption-text">Expected Calibration Error (ECE) on Baseline LightGBM Variants</span><a class="headerlink" href="#id5" title="Link to this table"></a></caption>
+<colgroup>
+<col style="width: 50.0%" />
+<col style="width: 50.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Model Variant</p></th>
+<th class="head"><p>Expected Calibration Error (ECE)</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>Baseline LightGBM</p></td>
+<td><p>0.01021</p></td>
+</tr>
+<tr class="row-odd"><td><p><strong>LightGBM + Isotonic</strong></p></td>
+<td><p><strong>0.00622</strong></p></td>
+</tr>
+<tr class="row-even"><td><p>LightGBM + Sigmoid</p></td>
+<td><p>0.01569</p></td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="empirical-profit-comparison">
+<h3><a class="toc-backref" href="#id16" role="doc-backlink">Empirical Profit Comparison</a><a class="headerlink" href="#empirical-profit-comparison" title="Link to this heading"></a></h3>
+<p>Selecting the decision threshold on an independent validation set to maximize <code class="docutils literal notranslate"><span class="pre">business_objective</span></code> and evaluating on the reserved test set:</p>
+<ul class="simple">
+<li><p><strong>Calibrated LightGBM (Isotonic)</strong>: Optimal threshold of <code class="docutils literal notranslate"><span class="pre">0.104</span></code>, yielding a total expected profit of <strong>$5,912,750</strong>.</p></li>
+<li><p><strong>PerpetualBooster + Calibration &amp; Threshold Optimization</strong>: Yields a total expected profit of <strong>$5,988,250</strong>—a <strong>1.3% increase</strong> in expected financial return ($75,500 higher profit on the test cohort) over the calibrated LightGBM baseline.</p></li>
+</ul>
+</section>
+</section>
+<hr class="docutils" />
+<section id="profit-driven-lead-scoring">
+<h2><a class="toc-backref" href="#id17" role="doc-backlink">Profit-Driven Lead Scoring</a><a class="headerlink" href="#profit-driven-lead-scoring" title="Link to this heading"></a></h2>
+<p>Traditional classification pipelines optimize statistical metrics without accounting for asymmetric business costs and benefits. By incorporating explicit financial payoffs into threshold selection on calibrated <code class="docutils literal notranslate"><span class="pre">PerpetualBooster</span></code> probabilities, marketing campaigns can directly maximize net profit.</p>
+<section id="financial-payoff-matrix-bank-marketing-case-study">
+<h3><a class="toc-backref" href="#id18" role="doc-backlink">Financial Payoff Matrix (Bank Marketing Case Study)</a><a class="headerlink" href="#financial-payoff-matrix-bank-marketing-case-study" title="Link to this heading"></a></h3>
+<p>On the UCI <strong>Bank Marketing</strong> dataset, we evaluate campaign profit using the following per-lead financial parameters:</p>
+<table class="docutils align-default" id="id6">
+<caption><span class="caption-text">Lead Scoring Payoff Parameters</span><a class="headerlink" href="#id6" title="Link to this table"></a></caption>
+<colgroup>
+<col style="width: 25.0%" />
+<col style="width: 15.0%" />
+<col style="width: 60.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Outcome</p></th>
+<th class="head"><p>Value ($)</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><strong>True Positive (TP)</strong></p></td>
+<td><p>+$1,000</p></td>
+<td><p>Financial gain from a successful conversion (Good Lead → Customer).</p></td>
+</tr>
+<tr class="row-odd"><td><p><strong>False Positive (FP)</strong></p></td>
+<td><p>-$100</p></td>
+<td><p>Cost of sales time wasted on a non-converting lead (Bad Lead → Sales Effort).</p></td>
+</tr>
+<tr class="row-even"><td><p><strong>False Negative (FN)</strong></p></td>
+<td><p>-$500</p></td>
+<td><p>Opportunity cost of a missed conversion (Good Lead → No Sales Effort).</p></td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="campaign-profit-results">
+<h3><a class="toc-backref" href="#id19" role="doc-backlink">Campaign Profit Results</a><a class="headerlink" href="#campaign-profit-results" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p><strong>LightGBM + CalibratedClassifierCV</strong>: Achieves a total campaign profit of <strong>$733,200</strong>.</p></li>
+<li><p><strong>PerpetualBooster</strong>: Delivers a total campaign profit of <strong>$740,600</strong>—a <strong>1.0% increase</strong> in net campaign profitability on the same objective.</p></li>
+</ul>
+</section>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="architecture.html" class="btn btn-neutral float-left" title="Architecture" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="parameters_tuning.html" class="btn btn-neutral float-right" title="Parameters Tuning" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2026, Mutlu Simsek, Serkan Korkmaz, Pieter Pel.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

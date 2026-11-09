@@ -42,17 +42,93 @@ One of the key architectural features is the zero-copy interface for columnar da
 *   **Polars Integration**: When a Polars DataFrame is passed to `fit` or `predict`, Perpetual uses the `fit_columnar` path. This path reads the underlying memory buffers of the DataFrame directly from Rust without copying the data.
 *   **Numpy/Pandas**: Standard Numpy arrays and Pandas DataFrames are handled via the contiguous array interface, which may involve copying if the data is not already in the expected memory layout (e.g., C-contiguous vs F-contiguous).
 
-PerpetualBooster Algorithm
---------------------------
+.. _how-perpetual-works:
 
-The `PerpetualBooster` is a specialized implementation that removes the need for hyperparameter optimization.
+PerpetualBooster Algorithm: How It Works
+----------------------------------------
 
-Budget and Self-Generalization
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+``PerpetualBooster`` bypasses the need for hyperparameter optimization through two complementary mechanisms: **step size control** and **generalization control**. Instead of tuning learning rate, tree depth, and regularization parameters individually, Perpetual links them to a single ``budget`` parameter.
 
-Instead of tuning learning rate, tree depth, and other regularization parameters individually, Perpetual links them to a single **budget** parameter.
+Step Size Control
+~~~~~~~~~~~~~~~~~
 
-*   **Learning Rate (`eta`)**: The learning rate is deterministically calculated from the budget: :math:`\eta = 10^{-\text{budget}}`.
-*   **Stopping Criteria**: The algorithm monitors the generalization error of the trees during training. If the trees start to overfit (generalization capability drops below a threshold), the training stops early.
+Step size control is inspired by `backtracking line search <https://en.wikipedia.org/wiki/Backtracking_line_search>`_, with three key differences.
 
-For a comprehensive explanation of the self-generalization algorithm, please refer to our blog post: `How Perpetual Works <https://perpetual-ml.com/blog/how-perpetual-works>`_.
+In classical backtracking line search, the algorithm starts with a large step size and repeatedly shrinks it until the Armijo–Goldstein condition is satisfied—finding a large step size that achieves a sufficient decrease in the objective function:
+
+.. math::
+
+   f(x + \alpha p) \leq f(x) + \alpha c m
+
+1. **Forward-Tracking Tree Search (Smallest Sufficient Step)**: Instead of starting large and shrinking, Perpetual grows a decision tree split by split and checks the loss decrease after every split. Once the loss decrease exceeds the target threshold, tree growth stops for that boosting round and the algorithm moves to the next round. In other words, Perpetual takes the *smallest* step that achieves a target loss decrease at each boosting round, where :math:`\alpha` (the learning rate ``eta``) is calculated directly from the user-defined ``budget`` parameter:
+
+   .. math::
+
+      \alpha = 10^{-\text{budget}}
+
+2. **Constant Reference Slope**: Rather than recomputing :math:`m` at every boosting round, :math:`m` is kept constant and computed once prior to fitting using the initial base score (constant prediction :math:`\hat{y}`):
+
+   .. math::
+
+      m = \frac{1}{n} \sum_{i=1}^{n} \text{loss}(y_i, \hat{y})
+
+3. **Budget-Derived Control Parameter**: The control parameter :math:`c` is derived from the ``budget`` parameter using a geometric series relation:
+
+   .. math::
+
+      r = \frac{10}{\text{budget}}
+
+   .. math::
+
+      \text{reciprocals of powers} = \frac{r}{r - 1}
+
+   .. math::
+
+      \text{truncated series sum} = \text{reciprocals of powers} - \left(1 + \frac{1}{r}\right)
+
+   .. math::
+
+      c = \frac{1}{r} - \text{truncated series sum}
+
+See `src/booster/core.rs <https://github.com/perpetual-ml/perpetual/blob/main/src/booster/core.rs>`_ and `src/tree/core.rs <https://github.com/perpetual-ml/perpetual/blob/main/src/tree/core.rs>`_ for the implementation details.
+
+Generalization Control
+~~~~~~~~~~~~~~~~~~~~~~
+
+Alongside step size control, Perpetual uses **generalization control** at every candidate node split. Before evaluating splits, the node's samples are partitioned into internal training and validation folds. For each candidate split, Perpetual evaluates both the training loss reduction and the validation loss reduction using the second-order Taylor approximation:
+
+.. math::
+
+   \text{loss}_{\text{train}} = G_{\text{train}} w + \frac{1}{2} H_{\text{train}} w^2
+
+.. math::
+
+   w = -\frac{G_{\text{train}}}{H_{\text{train}}}
+
+.. math::
+
+   \text{loss}_{\text{valid}} = G_{\text{valid}} w + \frac{1}{2} H_{\text{valid}} w^2
+
+where :math:`G` is the sum of gradients, :math:`H` is the sum of hessians, and :math:`w` is the leaf weight derived from the training folds.
+
+Using the parent loss and the post-split training and validation losses, Perpetual computes the generalization ratio:
+
+.. math::
+
+   \text{generalization} = \frac{\text{loss}_{\text{parent}} - \text{loss}_{\text{train}}}{\text{loss}_{\text{parent}} - \text{loss}_{\text{valid}}}
+
+* **Accepted Split** (:math:`\text{generalization} \geq 1.0`): Both training and validation losses decrease relative to the parent node, indicating that the split generalizes to unseen data.
+* **Rejected Split** (:math:`\text{generalization} < 1.0`): The validation loss does not sufficiently improve (or increases) compared to the training loss reduction, so splitting is stopped to prevent overfitting.
+
+See `src/splitter.rs <https://github.com/perpetual-ml/perpetual/blob/main/src/splitter.rs>`_ for the detailed split evaluation implementation.
+
+How Step Size and Generalization Control Work Together
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Finding the right balance between fitting the data and avoiding overfitting is achieved by combining both mechanisms across the boosting process:
+
+* **Early Boosting Rounds**: Step size control dominates early on, because the initial splits significantly reduce the objective loss and reach the target step size threshold quickly.
+* **Later Boosting Rounds**: Generalization control becomes increasingly important as boosting progresses. Trees naturally become shallower as less generalizable signal remains in the residuals.
+* **Automatic Early Stopping**: If the algorithm encounters a very simple tree (a single split) with poor generalization (:math:`< 1.0`) three times, it automatically halts the boosting process.
+
+For more details on configuring the ``budget`` and related parameters, please refer to :doc:`parameters_tuning` and :doc:`case_studies`.

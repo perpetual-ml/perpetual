@@ -68,3 +68,119 @@ The example simulates a streaming scenario using the California Housing dataset 
 3. Compares **Continual Learning** (warm start) vs **Retraining** at each step.
 
 Results typically show that Continual Learning is significantly faster while maintaining competitive accuracy (MSE).
+
+Benchmark: Continual Learning vs. Retraining
+--------------------------------------------
+
+Using the California Housing dataset segmented into 24 batches, initial training is performed on the first 12 batches (10,320 samples), followed by incremental learning across 11 subsequent batches of 860 samples each. After each incremental step, the model is evaluated on the next batch and compared against a model retrained from scratch on the cumulative dataset.
+
+.. list-table:: Continual Learning vs. Retraining on California Housing
+   :header-rows: 1
+   :widths: 8 10 16 14 14 16 16 10
+
+   * - Batch #
+     - Batch Size
+     - Cumulative Data Size
+     - Continual CPU Time (s)
+     - Retraining CPU Time (s)
+     - Continual Cum. CPU Time (s)
+     - Retraining Cum. CPU Time (s)
+     - Speed-up
+   * - 0
+     - 10,320
+     - 10,320
+     - 28.6
+     - 30.2
+     - 28.6
+     - 30.2
+     - 1.0x
+   * - 1
+     - 860
+     - 11,180
+     - 22.3
+     - 31.3
+     - 50.9
+     - 61.5
+     - 1.2x
+   * - 2
+     - 860
+     - 12,040
+     - 17.6
+     - 37.2
+     - 68.5
+     - 98.7
+     - 1.4x
+   * - 3
+     - 860
+     - 12,900
+     - 11.5
+     - 33.9
+     - 80.0
+     - 132.6
+     - 1.7x
+   * - 4
+     - 860
+     - 13,760
+     - 10.4
+     - 36.6
+     - 90.4
+     - 169.2
+     - 1.9x
+   * - 5
+     - 860
+     - 14,620
+     - 11.1
+     - 41.2
+     - 101.5
+     - 210.4
+     - 2.1x
+   * - 6
+     - 860
+     - 15,480
+     - 12.5
+     - 40.6
+     - 114.0
+     - 251.0
+     - 2.2x
+   * - 7
+     - 860
+     - 16,340
+     - 14.2
+     - 46.9
+     - 128.2
+     - 297.9
+     - 2.3x
+   * - 8
+     - 860
+     - 17,200
+     - 19.6
+     - 49.1
+     - 147.8
+     - 347.0
+     - 2.3x
+   * - 9
+     - 860
+     - 18,060
+     - 13.3
+     - 57.0
+     - 161.1
+     - 404.0
+     - 2.5x
+   * - 10
+     - 860
+     - 18,920
+     - 17.4
+     - 49.4
+     - 178.5
+     - 453.4
+     - 2.5x
+   * - 11
+     - 860
+     - 19,780
+     - 19.6
+     - 60.0
+     - 198.1
+     - 513.4
+     - 2.6x
+
+Across all incremental updates, continual learning maintains the same average test Mean Squared Error (MSE of ``0.197``) as full retraining while exhibiting near-constant per-batch CPU time and linear :math:`O(n)` cumulative training time compared to the quadratic :math:`O(n^2)` growth of retraining from scratch.

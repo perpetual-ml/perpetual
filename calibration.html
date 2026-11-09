@@ -6,7 +6,7 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Calibration and Uncertainty Quantification &mdash; Perpetual 2.3.0 documentation</title>
+  <title>Calibration and Uncertainty Quantification &mdash; Perpetual 2.4.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="_static/custom.css?v=9cdd1368" />
@@ -14,7 +14,7 @@
   
       <script src="_static/jquery.js?v=5d32c60e"></script>
       <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="_static/documentation_options.js?v=c3c8ae58"></script>
+      <script src="_static/documentation_options.js?v=4d935f96"></script>
       <script src="_static/doctools.js?v=fd6eb6e6"></script>
       <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
@@ -64,6 +64,7 @@
 </li>
 <li class="toctree-l2"><a class="reference internal" href="#raw-prediction-distributions">Raw Prediction Distributions</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#why-perpetual-is-better">Why Perpetual is Better</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#benchmark-prediction-intervals-perpetual-cqr-vs-mapie-cqr">Benchmark: Prediction Intervals (Perpetual CQR vs. MAPIE CQR)</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#tutorials">Tutorials</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#next-steps">Next Steps</a></li>
 </ul>
@@ -74,6 +75,7 @@
 <li class="toctree-l1"><a class="reference internal" href="model_io_export.html">Model IO &amp; Export</a></li>
 <li class="toctree-l1"><a class="reference internal" href="tutorials/index.html">Tutorials</a></li>
 <li class="toctree-l1"><a class="reference internal" href="architecture.html">Architecture</a></li>
+<li class="toctree-l1"><a class="reference internal" href="case_studies.html">Blog &amp; Case Studies</a></li>
 <li class="toctree-l1"><a class="reference internal" href="parameters_tuning.html">Parameters Tuning</a></li>
 <li class="toctree-l1"><a class="reference internal" href="faq.html">Frequently Asked Questions</a></li>
 </ul>
@@ -186,6 +188,39 @@
 <li><p><strong>API Simplicity</strong>: A single <code class="docutils literal notranslate"><span class="pre">calibrate()</span></code> method handles everything. The booster automatically detects the task (classification vs regression) and chooses the most appropriate internal engine. For Conformal calibration, you can also use the explicit <code class="docutils literal notranslate"><span class="pre">calibrate_conformal()</span></code> method if you need to provide the training set again.</p></li>
 <li><p><strong>Multi-level Support</strong>: You can pass a list of alpha levels to <code class="docutils literal notranslate"><span class="pre">calibrate()</span></code> and receive all corresponding intervals or sets in a single prediction call. Since the internal methods (GRP, MinMax, WeightVariance) are extremely efficient and don’t require re-training, providing tens or many alphas comes with virtually no additional computational cost.</p></li>
 </ol>
+</section>
+<section id="benchmark-prediction-intervals-perpetual-cqr-vs-mapie-cqr">
+<h2>Benchmark: Prediction Intervals (Perpetual CQR vs. MAPIE CQR)<a class="headerlink" href="#benchmark-prediction-intervals-perpetual-cqr-vs-mapie-cqr" title="Link to this heading"></a></h2>
+<p>On the California Housing dataset at a target coverage rate of <code class="docutils literal notranslate"><span class="pre">0.90</span></code>, both MAPIE Conformalized Quantile Regression (CQR) and Perpetual CQR surpass the target coverage rate. Notably, Perpetual achieves a <strong>35% reduction</strong> in the average width of prediction intervals:</p>
+<table class="docutils align-default" id="id2">
+<caption><span class="caption-text">Perpetual CQR vs. MAPIE CQR (California Housing)</span><a class="headerlink" href="#id2" title="Link to this table"></a></caption>
+<colgroup>
+<col style="width: 30.0%" />
+<col style="width: 20.0%" />
+<col style="width: 20.0%" />
+<col style="width: 30.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>CQR Method</p></th>
+<th class="head"><p>Target Coverage</p></th>
+<th class="head"><p>Actual Coverage</p></th>
+<th class="head"><p>Prediction Interval Average Width</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>MAPIE CQR</p></td>
+<td><p>0.900</p></td>
+<td><p>0.905</p></td>
+<td><p>2.222</p></td>
+</tr>
+<tr class="row-odd"><td><p><strong>Perpetual CQR</strong></p></td>
+<td><p><strong>0.900</strong></p></td>
+<td><p><strong>0.907</strong></p></td>
+<td><p><strong>1.450</strong></p></td>
+</tr>
+</tbody>
+</table>
+<p>See <a class="reference internal" href="case_studies.html"><span class="doc">Blog &amp; Case Studies</span></a> for additional calibration and decision-making benchmarks.</p>
 </section>
 <section id="tutorials">
 <h2>Tutorials<a class="headerlink" href="#tutorials" title="Link to this heading"></a></h2>

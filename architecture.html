@@ -6,7 +6,7 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Architecture &mdash; Perpetual 2.3.0 documentation</title>
+  <title>Architecture &mdash; Perpetual 2.4.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="_static/custom.css?v=9cdd1368" />
@@ -14,7 +14,7 @@
   
       <script src="_static/jquery.js?v=5d32c60e"></script>
       <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="_static/documentation_options.js?v=c3c8ae58"></script>
+      <script src="_static/documentation_options.js?v=4d935f96"></script>
       <script src="_static/doctools.js?v=fd6eb6e6"></script>
       <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
@@ -23,7 +23,7 @@
     <script src="_static/js/theme.js"></script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
-    <link rel="next" title="Parameters Tuning" href="parameters_tuning.html" />
+    <link rel="next" title="Blog &amp; Case Studies" href="case_studies.html" />
     <link rel="prev" title="PerpetualBooster Objectives Tutorial" href="tutorials/objectives_tutorial.html" /> 
 </head>
 
@@ -69,12 +69,15 @@
 <li class="toctree-l3"><a class="reference internal" href="#zero-copy-data-transfer">Zero-Copy Data Transfer</a></li>
 </ul>
 </li>
-<li class="toctree-l2"><a class="reference internal" href="#perpetualbooster-algorithm">PerpetualBooster Algorithm</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="#budget-and-self-generalization">Budget and Self-Generalization</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#perpetualbooster-algorithm-how-it-works">PerpetualBooster Algorithm: How It Works</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#step-size-control">Step Size Control</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#generalization-control">Generalization Control</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#how-step-size-and-generalization-control-work-together">How Step Size and Generalization Control Work Together</a></li>
 </ul>
 </li>
 </ul>
 </li>
+<li class="toctree-l1"><a class="reference internal" href="case_studies.html">Blog &amp; Case Studies</a></li>
 <li class="toctree-l1"><a class="reference internal" href="parameters_tuning.html">Parameters Tuning</a></li>
 <li class="toctree-l1"><a class="reference internal" href="faq.html">Frequently Asked Questions</a></li>
 </ul>
@@ -143,17 +146,65 @@
 </ul>
 </section>
 </section>
-<section id="perpetualbooster-algorithm">
-<h2>PerpetualBooster Algorithm<a class="headerlink" href="#perpetualbooster-algorithm" title="Link to this heading"></a></h2>
-<p>The <cite>PerpetualBooster</cite> is a specialized implementation that removes the need for hyperparameter optimization.</p>
-<section id="budget-and-self-generalization">
-<h3>Budget and Self-Generalization<a class="headerlink" href="#budget-and-self-generalization" title="Link to this heading"></a></h3>
-<p>Instead of tuning learning rate, tree depth, and other regularization parameters individually, Perpetual links them to a single <strong>budget</strong> parameter.</p>
+<section id="perpetualbooster-algorithm-how-it-works">
+<span id="how-perpetual-works"></span><h2>PerpetualBooster Algorithm: How It Works<a class="headerlink" href="#perpetualbooster-algorithm-how-it-works" title="Link to this heading"></a></h2>
+<p><code class="docutils literal notranslate"><span class="pre">PerpetualBooster</span></code> bypasses the need for hyperparameter optimization through two complementary mechanisms: <strong>step size control</strong> and <strong>generalization control</strong>. Instead of tuning learning rate, tree depth, and regularization parameters individually, Perpetual links them to a single <code class="docutils literal notranslate"><span class="pre">budget</span></code> parameter.</p>
+<section id="step-size-control">
+<h3>Step Size Control<a class="headerlink" href="#step-size-control" title="Link to this heading"></a></h3>
+<p>Step size control is inspired by <a class="reference external" href="https://en.wikipedia.org/wiki/Backtracking_line_search">backtracking line search</a>, with three key differences.</p>
+<p>In classical backtracking line search, the algorithm starts with a large step size and repeatedly shrinks it until the Armijo–Goldstein condition is satisfied—finding a large step size that achieves a sufficient decrease in the objective function:</p>
+<div class="math notranslate nohighlight">
+\[f(x + \alpha p) \leq f(x) + \alpha c m\]</div>
+<ol class="arabic">
+<li><p><strong>Forward-Tracking Tree Search (Smallest Sufficient Step)</strong>: Instead of starting large and shrinking, Perpetual grows a decision tree split by split and checks the loss decrease after every split. Once the loss decrease exceeds the target threshold, tree growth stops for that boosting round and the algorithm moves to the next round. In other words, Perpetual takes the <em>smallest</em> step that achieves a target loss decrease at each boosting round, where <span class="math notranslate nohighlight">\(\alpha\)</span> (the learning rate <code class="docutils literal notranslate"><span class="pre">eta</span></code>) is calculated directly from the user-defined <code class="docutils literal notranslate"><span class="pre">budget</span></code> parameter:</p>
+<div class="math notranslate nohighlight">
+\[\alpha = 10^{-\text{budget}}\]</div>
+</li>
+<li><p><strong>Constant Reference Slope</strong>: Rather than recomputing <span class="math notranslate nohighlight">\(m\)</span> at every boosting round, <span class="math notranslate nohighlight">\(m\)</span> is kept constant and computed once prior to fitting using the initial base score (constant prediction <span class="math notranslate nohighlight">\(\hat{y}\)</span>):</p>
+<div class="math notranslate nohighlight">
+\[m = \frac{1}{n} \sum_{i=1}^{n} \text{loss}(y_i, \hat{y})\]</div>
+</li>
+<li><p><strong>Budget-Derived Control Parameter</strong>: The control parameter <span class="math notranslate nohighlight">\(c\)</span> is derived from the <code class="docutils literal notranslate"><span class="pre">budget</span></code> parameter using a geometric series relation:</p>
+<div class="math notranslate nohighlight">
+\[r = \frac{10}{\text{budget}}\]</div>
+<div class="math notranslate nohighlight">
+\[\text{reciprocals of powers} = \frac{r}{r - 1}\]</div>
+<div class="math notranslate nohighlight">
+\[\text{truncated series sum} = \text{reciprocals of powers} - \left(1 + \frac{1}{r}\right)\]</div>
+<div class="math notranslate nohighlight">
+\[c = \frac{1}{r} - \text{truncated series sum}\]</div>
+</li>
+</ol>
+<p>See <a class="reference external" href="https://github.com/perpetual-ml/perpetual/blob/main/src/booster/core.rs">src/booster/core.rs</a> and <a class="reference external" href="https://github.com/perpetual-ml/perpetual/blob/main/src/tree/core.rs">src/tree/core.rs</a> for the implementation details.</p>
+</section>
+<section id="generalization-control">
+<h3>Generalization Control<a class="headerlink" href="#generalization-control" title="Link to this heading"></a></h3>
+<p>Alongside step size control, Perpetual uses <strong>generalization control</strong> at every candidate node split. Before evaluating splits, the node’s samples are partitioned into internal training and validation folds. For each candidate split, Perpetual evaluates both the training loss reduction and the validation loss reduction using the second-order Taylor approximation:</p>
+<div class="math notranslate nohighlight">
+\[\text{loss}_{\text{train}} = G_{\text{train}} w + \frac{1}{2} H_{\text{train}} w^2\]</div>
+<div class="math notranslate nohighlight">
+\[w = -\frac{G_{\text{train}}}{H_{\text{train}}}\]</div>
+<div class="math notranslate nohighlight">
+\[\text{loss}_{\text{valid}} = G_{\text{valid}} w + \frac{1}{2} H_{\text{valid}} w^2\]</div>
+<p>where <span class="math notranslate nohighlight">\(G\)</span> is the sum of gradients, <span class="math notranslate nohighlight">\(H\)</span> is the sum of hessians, and <span class="math notranslate nohighlight">\(w\)</span> is the leaf weight derived from the training folds.</p>
+<p>Using the parent loss and the post-split training and validation losses, Perpetual computes the generalization ratio:</p>
+<div class="math notranslate nohighlight">
+\[\text{generalization} = \frac{\text{loss}_{\text{parent}} - \text{loss}_{\text{train}}}{\text{loss}_{\text{parent}} - \text{loss}_{\text{valid}}}\]</div>
 <ul class="simple">
-<li><p><strong>Learning Rate (`eta`)</strong>: The learning rate is deterministically calculated from the budget: <span class="math notranslate nohighlight">\(\eta = 10^{-\text{budget}}\)</span>.</p></li>
-<li><p><strong>Stopping Criteria</strong>: The algorithm monitors the generalization error of the trees during training. If the trees start to overfit (generalization capability drops below a threshold), the training stops early.</p></li>
+<li><p><strong>Accepted Split</strong> (<span class="math notranslate nohighlight">\(\text{generalization} \geq 1.0\)</span>): Both training and validation losses decrease relative to the parent node, indicating that the split generalizes to unseen data.</p></li>
+<li><p><strong>Rejected Split</strong> (<span class="math notranslate nohighlight">\(\text{generalization} &lt; 1.0\)</span>): The validation loss does not sufficiently improve (or increases) compared to the training loss reduction, so splitting is stopped to prevent overfitting.</p></li>
 </ul>
-<p>For a comprehensive explanation of the self-generalization algorithm, please refer to our blog post: <a class="reference external" href="https://perpetual-ml.com/blog/how-perpetual-works">How Perpetual Works</a>.</p>
+<p>See <a class="reference external" href="https://github.com/perpetual-ml/perpetual/blob/main/src/splitter.rs">src/splitter.rs</a> for the detailed split evaluation implementation.</p>
+</section>
+<section id="how-step-size-and-generalization-control-work-together">
+<h3>How Step Size and Generalization Control Work Together<a class="headerlink" href="#how-step-size-and-generalization-control-work-together" title="Link to this heading"></a></h3>
+<p>Finding the right balance between fitting the data and avoiding overfitting is achieved by combining both mechanisms across the boosting process:</p>
+<ul class="simple">
+<li><p><strong>Early Boosting Rounds</strong>: Step size control dominates early on, because the initial splits significantly reduce the objective loss and reach the target step size threshold quickly.</p></li>
+<li><p><strong>Later Boosting Rounds</strong>: Generalization control becomes increasingly important as boosting progresses. Trees naturally become shallower as less generalizable signal remains in the residuals.</p></li>
+<li><p><strong>Automatic Early Stopping</strong>: If the algorithm encounters a very simple tree (a single split) with poor generalization (<span class="math notranslate nohighlight">\(&lt; 1.0\)</span>) three times, it automatically halts the boosting process.</p></li>
+</ul>
+<p>For more details on configuring the <code class="docutils literal notranslate"><span class="pre">budget</span></code> and related parameters, please refer to <a class="reference internal" href="parameters_tuning.html"><span class="doc">Parameters Tuning</span></a> and <a class="reference internal" href="case_studies.html"><span class="doc">Blog &amp; Case Studies</span></a>.</p>
 </section>
 </section>
 </section>
@@ -163,7 +214,7 @@
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
         <a href="tutorials/objectives_tutorial.html" class="btn btn-neutral float-left" title="PerpetualBooster Objectives Tutorial" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
-        <a href="parameters_tuning.html" class="btn btn-neutral float-right" title="Parameters Tuning" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="case_studies.html" class="btn btn-neutral float-right" title="Blog &amp; Case Studies" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 
   <hr/>

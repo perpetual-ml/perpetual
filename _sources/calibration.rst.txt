@@ -92,6 +92,30 @@ Why Perpetual is Better
 4. **API Simplicity**: A single ``calibrate()`` method handles everything. The booster automatically detects the task (classification vs regression) and chooses the most appropriate internal engine. For Conformal calibration, you can also use the explicit ``calibrate_conformal()`` method if you need to provide the training set again.
 5. **Multi-level Support**: You can pass a list of alpha levels to ``calibrate()`` and receive all corresponding intervals or sets in a single prediction call. Since the internal methods (GRP, MinMax, WeightVariance) are extremely efficient and don't require re-training, providing tens or many alphas comes with virtually no additional computational cost.
 
+Benchmark: Prediction Intervals (Perpetual CQR vs. MAPIE CQR)
+-------------------------------------------------------------
+
+On the California Housing dataset at a target coverage rate of ``0.90``, both MAPIE Conformalized Quantile Regression (CQR) and Perpetual CQR surpass the target coverage rate. Notably, Perpetual achieves a **35% reduction** in the average width of prediction intervals:
+
+.. list-table:: Perpetual CQR vs. MAPIE CQR (California Housing)
+   :header-rows: 1
+   :widths: 30 20 20 30
+
+   * - CQR Method
+     - Target Coverage
+     - Actual Coverage
+     - Prediction Interval Average Width
+   * - MAPIE CQR
+     - 0.900
+     - 0.905
+     - 2.222
+   * - **Perpetual CQR**
+     - **0.900**
+     - **0.907**
+     - **1.450**
+
+See :doc:`case_studies` for additional calibration and decision-making benchmarks.
+
 Tutorials
 ---------
 

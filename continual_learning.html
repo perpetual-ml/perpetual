@@ -6,7 +6,7 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Continual Learning &mdash; Perpetual 2.3.0 documentation</title>
+  <title>Continual Learning &mdash; Perpetual 2.4.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="_static/custom.css?v=9cdd1368" />
@@ -14,10 +14,12 @@
   
       <script src="_static/jquery.js?v=5d32c60e"></script>
       <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="_static/documentation_options.js?v=c3c8ae58"></script>
+      <script src="_static/documentation_options.js?v=4d935f96"></script>
       <script src="_static/doctools.js?v=fd6eb6e6"></script>
       <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+      <script>window.MathJax = {"tex": {"inlineMath": [["$", "$"], ["\\(", "\\)"]], "processEscapes": true}, "options": {"ignoreHtmlClass": "tex2jax_ignore|mathjax_ignore|document", "processHtmlClass": "tex2jax_process|mathjax_process|math|output_area"}}</script>
+      <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@4/tex-mml-chtml.js"></script>
     <script src="_static/js/theme.js"></script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
@@ -57,12 +59,14 @@
 <li class="toctree-l2"><a class="reference internal" href="#warm-start-vs-retraining">Warm Start vs Retraining</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#performance-considerations">Performance Considerations</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#example">Example</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#benchmark-continual-learning-vs-retraining">Benchmark: Continual Learning vs. Retraining</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="explainability.html">Explainability</a></li>
 <li class="toctree-l1"><a class="reference internal" href="model_io_export.html">Model IO &amp; Export</a></li>
 <li class="toctree-l1"><a class="reference internal" href="tutorials/index.html">Tutorials</a></li>
 <li class="toctree-l1"><a class="reference internal" href="architecture.html">Architecture</a></li>
+<li class="toctree-l1"><a class="reference internal" href="case_studies.html">Blog &amp; Case Studies</a></li>
 <li class="toctree-l1"><a class="reference internal" href="parameters_tuning.html">Parameters Tuning</a></li>
 <li class="toctree-l1"><a class="reference internal" href="faq.html">Frequently Asked Questions</a></li>
 </ul>
@@ -153,6 +157,145 @@
 <li><p>Compares <strong>Continual Learning</strong> (warm start) vs <strong>Retraining</strong> at each step.</p></li>
 </ol>
 <p>Results typically show that Continual Learning is significantly faster while maintaining competitive accuracy (MSE).</p>
+</section>
+<section id="benchmark-continual-learning-vs-retraining">
+<h2>Benchmark: Continual Learning vs. Retraining<a class="headerlink" href="#benchmark-continual-learning-vs-retraining" title="Link to this heading"></a></h2>
+<p>Using the California Housing dataset segmented into 24 batches, initial training is performed on the first 12 batches (10,320 samples), followed by incremental learning across 11 subsequent batches of 860 samples each. After each incremental step, the model is evaluated on the next batch and compared against a model retrained from scratch on the cumulative dataset.</p>
+<table class="docutils align-default" id="id1">
+<caption><span class="caption-text">Continual Learning vs. Retraining on California Housing</span><a class="headerlink" href="#id1" title="Link to this table"></a></caption>
+<colgroup>
+<col style="width: 7.7%" />
+<col style="width: 9.6%" />
+<col style="width: 15.4%" />
+<col style="width: 13.5%" />
+<col style="width: 13.5%" />
+<col style="width: 15.4%" />
+<col style="width: 15.4%" />
+<col style="width: 9.6%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Batch #</p></th>
+<th class="head"><p>Batch Size</p></th>
+<th class="head"><p>Cumulative Data Size</p></th>
+<th class="head"><p>Continual CPU Time (s)</p></th>
+<th class="head"><p>Retraining CPU Time (s)</p></th>
+<th class="head"><p>Continual Cum. CPU Time (s)</p></th>
+<th class="head"><p>Retraining Cum. CPU Time (s)</p></th>
+<th class="head"><p>Speed-up</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>0</p></td>
+<td><p>10,320</p></td>
+<td><p>10,320</p></td>
+<td><p>28.6</p></td>
+<td><p>30.2</p></td>
+<td><p>28.6</p></td>
+<td><p>30.2</p></td>
+<td><p>1.0x</p></td>
+</tr>
+<tr class="row-odd"><td><p>1</p></td>
+<td><p>860</p></td>
+<td><p>11,180</p></td>
+<td><p>22.3</p></td>
+<td><p>31.3</p></td>
+<td><p>50.9</p></td>
+<td><p>61.5</p></td>
+<td><p>1.2x</p></td>
+</tr>
+<tr class="row-even"><td><p>2</p></td>
+<td><p>860</p></td>
+<td><p>12,040</p></td>
+<td><p>17.6</p></td>
+<td><p>37.2</p></td>
+<td><p>68.5</p></td>
+<td><p>98.7</p></td>
+<td><p>1.4x</p></td>
+</tr>
+<tr class="row-odd"><td><p>3</p></td>
+<td><p>860</p></td>
+<td><p>12,900</p></td>
+<td><p>11.5</p></td>
+<td><p>33.9</p></td>
+<td><p>80.0</p></td>
+<td><p>132.6</p></td>
+<td><p>1.7x</p></td>
+</tr>
+<tr class="row-even"><td><p>4</p></td>
+<td><p>860</p></td>
+<td><p>13,760</p></td>
+<td><p>10.4</p></td>
+<td><p>36.6</p></td>
+<td><p>90.4</p></td>
+<td><p>169.2</p></td>
+<td><p>1.9x</p></td>
+</tr>
+<tr class="row-odd"><td><p>5</p></td>
+<td><p>860</p></td>
+<td><p>14,620</p></td>
+<td><p>11.1</p></td>
+<td><p>41.2</p></td>
+<td><p>101.5</p></td>
+<td><p>210.4</p></td>
+<td><p>2.1x</p></td>
+</tr>
+<tr class="row-even"><td><p>6</p></td>
+<td><p>860</p></td>
+<td><p>15,480</p></td>
+<td><p>12.5</p></td>
+<td><p>40.6</p></td>
+<td><p>114.0</p></td>
+<td><p>251.0</p></td>
+<td><p>2.2x</p></td>
+</tr>
+<tr class="row-odd"><td><p>7</p></td>
+<td><p>860</p></td>
+<td><p>16,340</p></td>
+<td><p>14.2</p></td>
+<td><p>46.9</p></td>
+<td><p>128.2</p></td>
+<td><p>297.9</p></td>
+<td><p>2.3x</p></td>
+</tr>
+<tr class="row-even"><td><p>8</p></td>
+<td><p>860</p></td>
+<td><p>17,200</p></td>
+<td><p>19.6</p></td>
+<td><p>49.1</p></td>
+<td><p>147.8</p></td>
+<td><p>347.0</p></td>
+<td><p>2.3x</p></td>
+</tr>
+<tr class="row-odd"><td><p>9</p></td>
+<td><p>860</p></td>
+<td><p>18,060</p></td>
+<td><p>13.3</p></td>
+<td><p>57.0</p></td>
+<td><p>161.1</p></td>
+<td><p>404.0</p></td>
+<td><p>2.5x</p></td>
+</tr>
+<tr class="row-even"><td><p>10</p></td>
+<td><p>860</p></td>
+<td><p>18,920</p></td>
+<td><p>17.4</p></td>
+<td><p>49.4</p></td>
+<td><p>178.5</p></td>
+<td><p>453.4</p></td>
+<td><p>2.5x</p></td>
+</tr>
+<tr class="row-odd"><td><p>11</p></td>
+<td><p>860</p></td>
+<td><p>19,780</p></td>
+<td><p>19.6</p></td>
+<td><p>60.0</p></td>
+<td><p>198.1</p></td>
+<td><p>513.4</p></td>
+<td><p>2.6x</p></td>
+</tr>
+</tbody>
+</table>
+<p>Across all incremental updates, continual learning maintains the same average test Mean Squared Error (MSE of <code class="docutils literal notranslate"><span class="pre">0.197</span></code>) as full retraining while exhibiting near-constant per-batch CPU time and linear <span class="math notranslate nohighlight">\(O(n)\)</span> cumulative training time compared to the quadratic <span class="math notranslate nohighlight">\(O(n^2)\)</span> growth of retraining from scratch.</p>
 </section>
 </section>
 

@@ -12,7 +12,7 @@ Version](https://img.shields.io/conda/v/conda-forge/perpetual?label=conda-forge&
 [![Crates.io
 Version](https://img.shields.io/crates/v/perpetual?logo=rust&logoColor=white)](https://crates.io/crates/perpetual)
 [![R-Universe
-status](https://img.shields.io/badge/dynamic/json?url=https://perpetual-ml.r-universe.dev/api/packages/perpetual&query=%24.Version&label=r-universe&logo=R&logoColor=white&color=brightgreen)](https://perpetual-ml.r-universe.dev/perpetual)
+status](https://img.shields.io/badge/dynamic/json?url=https://perpetual-ml.r-universe.dev/api/packages/perpetual&query=$.Version&label=r-universe&logo=R&logoColor=white&color=brightgreen)](https://perpetual-ml.r-universe.dev/perpetual)
 [![Static
 Badge](https://img.shields.io/badge/join-discord-blue?logo=discord)](https://discord.gg/AyUK7rr6wy)
 [![PyPI -
@@ -192,28 +192,9 @@ for the guideline.
 
 PerpetualBooster prevents overfitting with a generalization algorithm.
 The paper is work-in-progress to explain how the algorithm works. Check
-our [blog post](https://perpetual-ml.com/blog/how-perpetual-works) for a
-high level introduction to the algorithm.
-
-## Perpetual ML Suite
-
-The **Perpetual ML Suite** is a comprehensive, batteries-included ML
-platform designed to deliver maximum predictive power with minimal
-effort. It allows you to track experiments, monitor metrics, and manage
-model drift through an intuitive interface.
-
-For a fully managed, **serverless ML experience**, visit
-[app.perpetual-ml.com](https://app.perpetual-ml.com).
-
-- **Serverless Marimo Notebooks**: Run interactive, reactive notebooks
-  without managing any infrastructure.
-- **Serverless ML Endpoints**: One-click deployment of models as
-  production-ready endpoints for real-time inference.
-
-Perpetual is also designed to live where your data lives. It is
-available as a native application on the [Snowflake
-Marketplace](https://app.snowflake.com/marketplace/listing/GZSYZX0EMJ/perpetual-ml-perpetual-ml-suite),
-with support for Databricks and other major data warehouses coming soon.
+our
+[documentation](https://perpetual-ml.github.io/perpetual/architecture.html#how-perpetual-works)
+for a high level introduction to the algorithm.
 
 # Package index
 
