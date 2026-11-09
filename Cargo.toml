@@ -6,7 +6,7 @@ members = [
 
 [package]
 name = "perpetual"
-version = "2.3.0"
+version = "2.4.0"
 edition = "2024"
 authors = ["Mutlu Simsek <mutlusims3k@gmail.com>", "Serkan Korkmaz <serkor1@duck.com>", "Pieter Pel <pelpieter@gmail.com>"]
 homepage = "https://perpetual-ml.github.io/perpetual"

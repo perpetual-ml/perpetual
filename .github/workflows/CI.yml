@@ -442,6 +442,12 @@ jobs:
         with:
           python-version: "3.11"
 
+      - name: Setup uv for resource generation (Fallback)
+        if: steps.restore-resources.outputs.cache-hit != 'true'
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
       - name: Install dependencies for resource creation (Fallback)
         if: steps.restore-resources.outputs.cache-hit != 'true'
         run: |
