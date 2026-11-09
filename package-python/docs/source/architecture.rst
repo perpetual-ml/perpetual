@@ -55,4 +55,4 @@ Instead of tuning learning rate, tree depth, and other regularization parameters
 *   **Learning Rate (`eta`)**: The learning rate is deterministically calculated from the budget: :math:`\eta = 10^{-\text{budget}}`.
 *   **Stopping Criteria**: The algorithm monitors the generalization error of the trees during training. If the trees start to overfit (generalization capability drops below a threshold), the training stops early.
 
-For a comprehensive explanation of the self-generalization algorithm, please refer to our blog post: `How Perpetual Works <https://perpetual-ml.com/blog/how-perpetual-works>`_.
+For more details on configuring the budget and related parameters, please refer to :doc:`parameters_tuning`.

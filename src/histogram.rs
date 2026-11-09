@@ -498,32 +498,43 @@ impl<'a> NodeHistogram<'a> {
     /// Calculate the histogram matrix, for a child, given the parent histogram
     /// matrix, and the other child histogram matrix. This should be used
     /// when the node has only two possible splits, left and right.
+    ///
+    /// The histogram at `update_num` is overwritten with
+    /// `hist_tree[root_num] - hist_tree[child_num]`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if any of `root_num`, `child_num` or `update_num` is out of
+    /// bounds for `hist_tree`, or if `update_num` is equal to `root_num` or
+    /// `child_num` (the destination histogram must not alias a source).
     pub fn from_parent_child(hist_tree: &[NodeHistogram], root_num: usize, child_num: usize, update_num: usize) {
-        unsafe {
-            let root_hist = &hist_tree.get_unchecked(root_num).data;
-            let child_hist = &hist_tree.get_unchecked(child_num).data;
-            let update_hist = &hist_tree.get_unchecked(update_num).data;
+        check_node_indices(hist_tree.len(), &[root_num, child_num], update_num);
 
-            root_hist
-                .iter()
-                .zip(child_hist.iter())
-                .zip(update_hist.iter())
-                .for_each(|((root_feat_hist, child_feat_hist), update_feat_hist)| {
-                    root_feat_hist
-                        .data
-                        .iter()
-                        .zip(child_feat_hist.data.iter())
-                        .zip(update_feat_hist.data.iter())
-                        .for_each(|((root_bin, child_bin), update_bin)| {
-                            Bin::from_parent_child(root_bin.get(), child_bin.get(), update_bin.get())
-                        })
-                });
-        }
+        let root_hist = &hist_tree[root_num].data;
+        let child_hist = &hist_tree[child_num].data;
+        let update_hist = &hist_tree[update_num].data;
+
+        root_hist
+            .iter()
+            .zip(child_hist.iter())
+            .zip(update_hist.iter())
+            .for_each(|((root_feat_hist, child_feat_hist), update_feat_hist)| {
+                subtract_feature_child(root_feat_hist, child_feat_hist, update_feat_hist)
+            });
     }
 
     /// Calculate the histogram matrix for a child, given the parent histogram
     /// and two other child histograms. This should be used with the node has
     /// three possible split paths, right, left, and missing.
+    ///
+    /// The histogram at `update_num` is overwritten with
+    /// `hist_tree[root_num] - hist_tree[first_num] - hist_tree[second_num]`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if any of `root_num`, `first_num`, `second_num` or `update_num`
+    /// is out of bounds for `hist_tree`, or if `update_num` is equal to any of
+    /// the other indices (the destination histogram must not alias a source).
     pub fn from_parent_two_children(
         hist_tree: &[NodeHistogram],
         root_num: usize,
@@ -531,37 +542,98 @@ impl<'a> NodeHistogram<'a> {
         second_num: usize,
         update_num: usize,
     ) {
-        unsafe {
-            let root_hist = &hist_tree.get_unchecked(root_num).data;
-            let first_hist = &hist_tree.get_unchecked(first_num).data;
-            let second_hist = &hist_tree.get_unchecked(second_num).data;
-            let update_hist = &hist_tree.get_unchecked(update_num).data;
+        check_node_indices(hist_tree.len(), &[root_num, first_num, second_num], update_num);
 
-            root_hist
-                .iter()
-                .zip(first_hist.iter())
-                .zip(second_hist.iter())
-                .zip(update_hist.iter())
-                .for_each(
-                    |(((root_feat_hist, first_feat_hist), second_feat_hist), update_feat_hist)| {
-                        root_feat_hist
-                            .data
-                            .iter()
-                            .zip(first_feat_hist.data.iter())
-                            .zip(second_feat_hist.data.iter())
-                            .zip(update_feat_hist.data.iter())
-                            .for_each(|(((root_bin, first_bin), second_bin), update_bin)| {
-                                Bin::from_parent_two_children(
-                                    root_bin.get(),
-                                    first_bin.get(),
-                                    second_bin.get(),
-                                    update_bin.get(),
-                                )
-                            })
-                    },
-                );
-        }
+        let root_hist = &hist_tree[root_num].data;
+        let first_hist = &hist_tree[first_num].data;
+        let second_hist = &hist_tree[second_num].data;
+        let update_hist = &hist_tree[update_num].data;
+
+        root_hist
+            .iter()
+            .zip(first_hist.iter())
+            .zip(second_hist.iter())
+            .zip(update_hist.iter())
+            .for_each(
+                |(((root_feat_hist, first_feat_hist), second_feat_hist), update_feat_hist)| {
+                    subtract_feature_two_children(root_feat_hist, first_feat_hist, second_feat_hist, update_feat_hist)
+                },
+            );
     }
+}
+
+/// Validate node indices used by the histogram subtraction routines.
+///
+/// All indices must be in bounds for a histogram tree of length
+/// `hist_tree_len`, and `update_num` (the destination that gets written to)
+/// must not alias any of the `sources` (which are only read from). Upholding
+/// both conditions is what makes the internal raw-pointer bin arithmetic sound.
+#[inline]
+fn check_node_indices(hist_tree_len: usize, sources: &[usize], update_num: usize) {
+    for &num in sources.iter().chain(std::iter::once(&update_num)) {
+        assert!(
+            num < hist_tree_len,
+            "histogram node index {num} is out of bounds for a histogram tree of length {hist_tree_len}"
+        );
+    }
+    assert!(
+        !sources.contains(&update_num),
+        "destination histogram node index {update_num} must differ from the source node indices {sources:?}"
+    );
+}
+
+/// Set every bin of `update` to `parent - child`, bin by bin.
+///
+/// Panics if `update` shares any bin with `parent` or `child`.
+#[inline]
+fn subtract_feature_child(parent: &FeatureHistogram, child: &FeatureHistogram, update: &FeatureHistogram) {
+    parent
+        .data
+        .iter()
+        .zip(child.data.iter())
+        .zip(update.data.iter())
+        .for_each(|((parent_bin, child_bin), update_bin)| {
+            assert!(
+                !std::ptr::eq(parent_bin, update_bin) && !std::ptr::eq(child_bin, update_bin),
+                "destination bin must not alias source bins"
+            );
+            // SAFETY: the pointers come from live `UnsafeCell`s so they are
+            // valid and non-null, and the destination bin is distinct from
+            // the source bins.
+            unsafe { Bin::from_parent_child(parent_bin.get(), child_bin.get(), update_bin.get()) }
+        });
+}
+
+/// Set every bin of `update` to `parent - first - second`, bin by bin.
+///
+/// Panics if `update` shares any bin with `parent`, `first` or `second`.
+#[inline]
+fn subtract_feature_two_children(
+    parent: &FeatureHistogram,
+    first: &FeatureHistogram,
+    second: &FeatureHistogram,
+    update: &FeatureHistogram,
+) {
+    parent
+        .data
+        .iter()
+        .zip(first.data.iter())
+        .zip(second.data.iter())
+        .zip(update.data.iter())
+        .for_each(|(((parent_bin, first_bin), second_bin), update_bin)| {
+            assert!(
+                !std::ptr::eq(parent_bin, update_bin)
+                    && !std::ptr::eq(first_bin, update_bin)
+                    && !std::ptr::eq(second_bin, update_bin),
+                "destination bin must not alias source bins"
+            );
+            // SAFETY: the pointers come from live `UnsafeCell`s so they are
+            // valid and non-null, and the destination bin is distinct from
+            // the source bins.
+            unsafe {
+                Bin::from_parent_two_children(parent_bin.get(), first_bin.get(), second_bin.get(), update_bin.get())
+            }
+        });
 }
 
 /// Update the cut values in the histogram.
@@ -598,29 +670,25 @@ pub fn update_histogram(
     // The FeatureHistogram::update reads grad[index[k]] directly.
     let sorted_grad = grad;
     let sorted_hess = hess;
+    let node_index = &index[start..stop];
+    let n_samples = node_index.len();
 
-    unsafe {
-        let n_samples = stop - start;
-        // For small nodes, the Rayon scope overhead (~1-5μs per scope) exceeds
-        // the parallelism benefit. Skip parallelism when there are fewer than
-        // 512 samples to process per feature.
-        if pool.current_num_threads() > 1 && n_samples >= 512 {
-            pool.scope(|s| {
-                for (i, &col) in col_index.iter().enumerate().take(hist.data.len()) {
-                    let h = hist.data.get_unchecked(i);
-                    let feature = data.get_col(col); // Use the value 'col' directly
-                    s.spawn(|_| {
-                        h.update(feature, sorted_grad, sorted_hess, &index[start..stop]);
-                    });
-                }
-            });
-        } else {
-            col_index.iter().enumerate().for_each(|(i, col)| {
-                hist.data
-                    .get_unchecked(i)
-                    .update(data.get_col(*col), sorted_grad, sorted_hess, &index[start..stop]);
-            });
-        }
+    // For small nodes, the Rayon scope overhead (~1-5μs per scope) exceeds
+    // the parallelism benefit. Skip parallelism when there are fewer than
+    // 512 samples to process per feature.
+    if pool.current_num_threads() > 1 && n_samples >= 512 {
+        pool.scope(|s| {
+            for (&col, h) in col_index.iter().zip(hist.data.iter()) {
+                let feature = data.get_col(col); // Use the value 'col' directly
+                s.spawn(move |_| unsafe {
+                    h.update(feature, sorted_grad, sorted_hess, node_index);
+                });
+            }
+        });
+    } else {
+        col_index.iter().zip(hist.data.iter()).for_each(|(&col, h)| unsafe {
+            h.update(data.get_col(col), sorted_grad, sorted_hess, node_index);
+        });
     }
 }
 
@@ -634,8 +702,11 @@ pub fn update_histogram(
 ///
 /// # Safety
 /// Same requirements as `update_histogram` plus:
-/// - `parent_num`, `child_num`, and `update_num` must be valid indices into `hist_tree`.
 /// - The parent histogram must already be populated.
+///
+/// # Panics
+/// Panics if `parent_num`, `child_num` or `update_num` is out of bounds for
+/// `hist_tree`, or if `update_num` is equal to `parent_num` or `child_num`.
 #[allow(clippy::too_many_arguments)]
 pub fn update_histogram_and_subtract(
     hist_tree: &[NodeHistogram],
@@ -654,44 +725,40 @@ pub fn update_histogram_and_subtract(
     let sorted_grad = grad;
     let sorted_hess = hess;
 
-    unsafe {
-        let child_hist = hist_tree.get_unchecked(child_num);
-        let parent_hist = hist_tree.get_unchecked(parent_num);
-        let update_hist = hist_tree.get_unchecked(update_num);
-        let n_samples = stop - start;
+    check_node_indices(hist_tree.len(), &[parent_num, child_num], update_num);
+    let child_hist = &hist_tree[child_num];
+    let parent_hist = &hist_tree[parent_num];
+    let update_hist = &hist_tree[update_num];
+    let node_index = &index[start..stop];
+    let n_samples = node_index.len();
 
-        if pool.current_num_threads() > 1 && n_samples >= 512 {
-            pool.scope(|s| {
-                for (i, &col) in col_index.iter().enumerate().take(child_hist.data.len()) {
-                    let ch = child_hist.data.get_unchecked(i);
-                    let ph = parent_hist.data.get_unchecked(i);
-                    let uh = update_hist.data.get_unchecked(i);
-                    let feature = data.get_col(col);
-                    s.spawn(move |_| {
-                        // Step 1: Build child histogram
-                        ch.update(feature, sorted_grad, sorted_hess, &index[start..stop]);
-                        // Step 2: Derive sibling histogram via subtraction
-                        // (cache-local: child histogram data is still hot in L1)
-                        ph.data.iter().zip(ch.data.iter()).zip(uh.data.iter()).for_each(
-                            |((parent_cell, child_cell), update_cell)| {
-                                Bin::from_parent_child(parent_cell.get(), child_cell.get(), update_cell.get())
-                            },
-                        );
-                    });
-                }
+    if pool.current_num_threads() > 1 && n_samples >= 512 {
+        pool.scope(|s| {
+            for (((&col, ch), ph), uh) in col_index
+                .iter()
+                .zip(child_hist.data.iter())
+                .zip(parent_hist.data.iter())
+                .zip(update_hist.data.iter())
+            {
+                let feature = data.get_col(col);
+                s.spawn(move |_| {
+                    // Step 1: Build child histogram
+                    unsafe { ch.update(feature, sorted_grad, sorted_hess, node_index) };
+                    // Step 2: Derive sibling histogram via subtraction
+                    // (cache-local: child histogram data is still hot in L1)
+                    subtract_feature_child(ph, ch, uh);
+                });
+            }
+        });
+    } else {
+        // Sequential fallback: build child histogram then subtract
+        col_index
+            .iter()
+            .zip(child_hist.data.iter())
+            .for_each(|(&col, ch)| unsafe {
+                ch.update(data.get_col(col), sorted_grad, sorted_hess, node_index);
             });
-        } else {
-            // Sequential fallback: build child histogram then subtract
-            col_index.iter().enumerate().for_each(|(i, col)| {
-                child_hist.data.get_unchecked(i).update(
-                    data.get_col(*col),
-                    sorted_grad,
-                    sorted_hess,
-                    &index[start..stop],
-                );
-            });
-            NodeHistogram::from_parent_child(hist_tree, parent_num, child_num, update_num);
-        }
+        NodeHistogram::from_parent_child(hist_tree, parent_num, child_num, update_num);
     }
 }
 
@@ -701,6 +768,10 @@ pub fn update_histogram_and_subtract(
 /// Used when a node splits into 3 children (left, right, missing-branch).
 /// The two smaller children get their histograms built from data, and the
 /// largest child's histogram is derived as parent - first - second.
+///
+/// # Panics
+/// Panics if `parent_num`, `first_num`, `second_num` or `update_num` is out of
+/// bounds for `hist_tree`, or if `update_num` is equal to any of the others.
 #[allow(clippy::too_many_arguments)]
 pub fn update_two_histograms_and_subtract(
     hist_tree: &[NodeHistogram],
@@ -722,55 +793,48 @@ pub fn update_two_histograms_and_subtract(
     let sorted_grad = grad;
     let sorted_hess = hess;
 
-    unsafe {
-        let first_hist = hist_tree.get_unchecked(first_num);
-        let second_hist = hist_tree.get_unchecked(second_num);
-        let parent_hist = hist_tree.get_unchecked(parent_num);
-        let update_hist = hist_tree.get_unchecked(update_num);
-        let n_samples = (first_stop - first_start) + (second_stop - second_start);
+    check_node_indices(hist_tree.len(), &[parent_num, first_num, second_num], update_num);
+    let first_hist = &hist_tree[first_num];
+    let second_hist = &hist_tree[second_num];
+    let parent_hist = &hist_tree[parent_num];
+    let update_hist = &hist_tree[update_num];
+    let first_index = &index[first_start..first_stop];
+    let second_index = &index[second_start..second_stop];
+    let n_samples = first_index.len() + second_index.len();
 
-        if pool.current_num_threads() > 1 && n_samples >= 512 {
-            pool.scope(|s| {
-                for (i, &col) in col_index.iter().enumerate().take(first_hist.data.len()) {
-                    let fh = first_hist.data.get_unchecked(i);
-                    let sh = second_hist.data.get_unchecked(i);
-                    let ph = parent_hist.data.get_unchecked(i);
-                    let uh = update_hist.data.get_unchecked(i);
-                    let feature = data.get_col(col);
-                    s.spawn(move |_| {
-                        // Build both children's histograms
-                        fh.update(feature, sorted_grad, sorted_hess, &index[first_start..first_stop]);
-                        sh.update(feature, sorted_grad, sorted_hess, &index[second_start..second_stop]);
-                        // Derive largest child via: update = parent - first - second
-                        ph.data
-                            .iter()
-                            .zip(fh.data.iter())
-                            .zip(sh.data.iter())
-                            .zip(uh.data.iter())
-                            .for_each(|(((pc, fc), sc), uc)| {
-                                Bin::from_parent_two_children(pc.get(), fc.get(), sc.get(), uc.get())
-                            });
-                    });
-                }
+    if pool.current_num_threads() > 1 && n_samples >= 512 {
+        pool.scope(|s| {
+            for ((((&col, fh), sh), ph), uh) in col_index
+                .iter()
+                .zip(first_hist.data.iter())
+                .zip(second_hist.data.iter())
+                .zip(parent_hist.data.iter())
+                .zip(update_hist.data.iter())
+            {
+                let feature = data.get_col(col);
+                s.spawn(move |_| {
+                    // Build both children's histograms
+                    unsafe {
+                        fh.update(feature, sorted_grad, sorted_hess, first_index);
+                        sh.update(feature, sorted_grad, sorted_hess, second_index);
+                    }
+                    // Derive largest child via: update = parent - first - second
+                    subtract_feature_two_children(ph, fh, sh, uh);
+                });
+            }
+        });
+    } else {
+        // Sequential fallback
+        col_index
+            .iter()
+            .zip(first_hist.data.iter())
+            .zip(second_hist.data.iter())
+            .for_each(|((&col, fh), sh)| unsafe {
+                let feature = data.get_col(col);
+                fh.update(feature, sorted_grad, sorted_hess, first_index);
+                sh.update(feature, sorted_grad, sorted_hess, second_index);
             });
-        } else {
-            // Sequential fallback
-            col_index.iter().enumerate().for_each(|(i, col)| {
-                first_hist.data.get_unchecked(i).update(
-                    data.get_col(*col),
-                    sorted_grad,
-                    sorted_hess,
-                    &index[first_start..first_stop],
-                );
-                second_hist.data.get_unchecked(i).update(
-                    data.get_col(*col),
-                    sorted_grad,
-                    sorted_hess,
-                    &index[second_start..second_stop],
-                );
-            });
-            NodeHistogram::from_parent_two_children(hist_tree, parent_num, first_num, second_num, update_num);
-        }
+        NodeHistogram::from_parent_two_children(hist_tree, parent_num, first_num, second_num, update_num);
     }
 }
 
@@ -1149,5 +1213,124 @@ mod tests {
                 + u_bin.g_folded.iter().sum::<f32>(),
             epsilon = 1e-4
         );
+    }
+
+    // Regression tests for https://github.com/perpetual-ml/perpetual/issues/34:
+    // invalid node indices must panic instead of causing undefined behavior.
+
+    #[test]
+    #[should_panic(expected = "out of bounds")]
+    fn test_from_parent_child_out_of_bounds_panics() {
+        let mut arena = HistogramArena::from_fixed(10, 1, false, 3);
+        let hist_tree = arena.as_node_histograms();
+        NodeHistogram::from_parent_child(&hist_tree, 9999, 9999, 9999);
+    }
+
+    #[test]
+    #[should_panic(expected = "out of bounds")]
+    fn test_from_parent_child_update_out_of_bounds_panics() {
+        let mut arena = HistogramArena::from_fixed(10, 1, false, 3);
+        let hist_tree = arena.as_node_histograms();
+        NodeHistogram::from_parent_child(&hist_tree, 0, 1, 3);
+    }
+
+    #[test]
+    #[should_panic(expected = "out of bounds")]
+    fn test_from_parent_two_children_out_of_bounds_panics() {
+        let mut arena = HistogramArena::from_fixed(10, 1, false, 4);
+        let hist_tree = arena.as_node_histograms();
+        NodeHistogram::from_parent_two_children(&hist_tree, 0, 1, 9999, 3);
+    }
+
+    #[test]
+    #[should_panic(expected = "must differ")]
+    fn test_from_parent_child_aliasing_panics() {
+        let mut arena = HistogramArena::from_fixed(10, 1, false, 3);
+        let hist_tree = arena.as_node_histograms();
+        NodeHistogram::from_parent_child(&hist_tree, 0, 1, 0);
+    }
+
+    #[test]
+    #[should_panic(expected = "must differ")]
+    fn test_from_parent_two_children_aliasing_panics() {
+        let mut arena = HistogramArena::from_fixed(10, 1, false, 4);
+        let hist_tree = arena.as_node_histograms();
+        NodeHistogram::from_parent_two_children(&hist_tree, 0, 1, 2, 2);
+    }
+
+    #[test]
+    #[should_panic(expected = "destination bin must not alias source bins")]
+    fn test_from_parent_child_shared_bins_panics() {
+        use crate::bin::Bin;
+        use std::cell::UnsafeCell;
+
+        let shared_bins = [UnsafeCell::new(Bin::empty(0, f64::NAN))];
+        let child_bins = [UnsafeCell::new(Bin::empty(0, f64::NAN))];
+        let hist_tree = vec![
+            NodeHistogram {
+                data: vec![FeatureHistogram { data: &shared_bins }],
+            },
+            NodeHistogram {
+                data: vec![FeatureHistogram { data: &child_bins }],
+            },
+            NodeHistogram {
+                data: vec![FeatureHistogram { data: &shared_bins }],
+            },
+        ];
+        NodeHistogram::from_parent_child(&hist_tree, 0, 1, 2);
+    }
+
+    #[test]
+    #[should_panic(expected = "out of bounds")]
+    fn test_update_histogram_and_subtract_out_of_bounds_panics() {
+        use crate::histogram::update_histogram_and_subtract;
+        let data_vec: Vec<f64> = (0..10).map(|i| i as f64).collect();
+        let data = Matrix::new(&data_vec, 10, 1);
+        let b = bin_matrix(&data, None, 10, f64::NAN, None).unwrap();
+        let bdata = Matrix::new(&b.binned_data, data.rows, data.cols);
+        let g = vec![0.0_f32; 10];
+        let col_index = vec![0];
+        let mut arena = HistogramArena::from_cuts(&b.cuts, &col_index, true, 3);
+        let hist_tree = arena.as_node_histograms();
+        let pool = ThreadPoolBuilder::new().num_threads(1).build().unwrap();
+        update_histogram_and_subtract(
+            &hist_tree,
+            0,
+            1,
+            9999,
+            0,
+            10,
+            &bdata,
+            &g,
+            None,
+            &bdata.index,
+            &col_index,
+            &pool,
+        );
+    }
+
+    #[test]
+    fn test_from_parent_child_values() {
+        let mut arena = HistogramArena::from_fixed(4, 2, false, 3);
+        let hist_tree = arena.as_node_histograms();
+        for (node, scale) in [(0usize, 10.0_f32), (1, 3.0)] {
+            for feat in hist_tree[node].data.iter() {
+                for cell in feat.data.iter() {
+                    let bin = unsafe { cell.get().as_mut().unwrap() };
+                    bin.g_folded = [scale; 5];
+                    bin.h_folded = [scale * 2.0; 5];
+                    bin.counts = [scale as u32; 5];
+                }
+            }
+        }
+        NodeHistogram::from_parent_child(&hist_tree, 0, 1, 2);
+        for feat in hist_tree[2].data.iter() {
+            for cell in feat.data.iter() {
+                let bin = unsafe { cell.get().as_ref().unwrap() };
+                assert_eq!(bin.g_folded, [7.0; 5]);
+                assert_eq!(bin.h_folded, [14.0; 5]);
+                assert_eq!(bin.counts, [7; 5]);
+            }
+        }
     }
 }
