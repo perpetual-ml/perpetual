@@ -448,7 +448,7 @@ jobs:
           cp README.md package-python/README_PYTHON.md
           cp LICENSE package-python/LICENSE
           cp LICENSE package-r/LICENSE
-          pip install numpy pandas seaborn scikit-learn toml
+          pip install uv numpy pandas seaborn scikit-learn toml
           cd package-python
           pip install -e .
           cd ..

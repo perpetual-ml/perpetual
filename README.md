@@ -140,15 +140,4 @@ Contributions are welcome. Check <a href="./CONTRIBUTING.md" target="_blank">CON
 
 ## Paper
 
-PerpetualBooster prevents overfitting with a generalization algorithm. The paper is work-in-progress to explain how the algorithm works. Check our <a href="https://perpetual-ml.com/blog/how-perpetual-works" target="_blank">blog post</a> for a high level introduction to the algorithm.
-
-## Perpetual ML Suite
-
-The **Perpetual ML Suite** is a comprehensive, batteries-included ML platform designed to deliver maximum predictive power with minimal effort. It allows you to track experiments, monitor metrics, and manage model drift through an intuitive interface.
-
-For a fully managed, **serverless ML experience**, visit <a href="https://app.perpetual-ml.com" target="_blank">app.perpetual-ml.com</a>.
-
-- **Serverless Marimo Notebooks**: Run interactive, reactive notebooks without managing any infrastructure.
-- **Serverless ML Endpoints**: One-click deployment of models as production-ready endpoints for real-time inference.
-
-Perpetual is also designed to live where your data lives. It is available as a native application on the <a href="https://app.snowflake.com/marketplace/listing/GZSYZX0EMJ/perpetual-ml-perpetual-ml-suite" target="_blank">Snowflake Marketplace</a>, with support for Databricks and other major data warehouses coming soon.
+PerpetualBooster prevents overfitting with a generalization algorithm. The paper is work-in-progress to explain how the algorithm works. Check our <a href="https://perpetual-ml.github.io/perpetual/architecture.html#how-perpetual-works" target="_blank">documentation</a> for a high level introduction to the algorithm.
