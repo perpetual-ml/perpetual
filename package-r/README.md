@@ -119,4 +119,4 @@ Contributions are welcome. Check <a href="./CONTRIBUTING.md" target="_blank">CON
 
 ## Paper
 
-PerpetualBooster prevents overfitting with a generalization algorithm. The paper is work-in-progress to explain how the algorithm works. Check our <a href="https://perpetual-ml.github.io/perpetual/architecture.html" target="_blank">documentation</a> for a high level introduction to the algorithm.
+PerpetualBooster prevents overfitting with a generalization algorithm. The paper is work-in-progress to explain how the algorithm works. Check our <a href="https://perpetual-ml.github.io/perpetual/architecture.html#how-perpetual-works" target="_blank">documentation</a> for a high level introduction to the algorithm.

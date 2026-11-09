@@ -42,6 +42,7 @@ Key Features
    model_io_export
    tutorials/index
    architecture
+   case_studies
    parameters_tuning
    faq
 
