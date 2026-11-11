@@ -1,0 +1,178 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Better Prediction Intervals with Perpetual Learning &mdash; Perpetual 2.4.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="../_static/custom.css?v=9cdd1368" />
+
+  
+      <script src="../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../_static/documentation_options.js?v=4d935f96"></script>
+      <script src="../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
+      <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Further Speed-Up with Continual Learning" href="continual.html" />
+    <link rel="prev" title="100x Faster Initial Training" href="performance.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            Perpetual
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../api.html">API Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../causal_ml/index.html">Causal ML</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../calibration.html">Calibration and Uncertainty Quantification</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../drift_detection.html">Drift Detection</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../continual_learning.html">Continual Learning</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../explainability.html">Explainability</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../model_io_export.html">Model IO &amp; Export</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tutorials/index.html">Tutorials</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../architecture.html">Architecture</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Blog</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="how_perpetual_works.html">How PerpetualBooster Works</a></li>
+<li class="toctree-l2"><a class="reference internal" href="performance.html">100x Faster Initial Training</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">Better Prediction Intervals with Perpetual Learning</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#perpetual-cqr-vs-mapie-cqr">Perpetual CQR vs. MAPIE CQR</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#conclusion">Conclusion</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="continual.html">Further Speed-Up with Continual Learning</a></li>
+<li class="toctree-l2"><a class="reference internal" href="decisioning.html">Optimum Business Decisioning with Calibrated Probabilities</a></li>
+<li class="toctree-l2"><a class="reference internal" href="scoring.html">Profit-Driven Lead Scoring</a></li>
+<li class="toctree-l2"><a class="reference internal" href="index.html#articles-overview">Articles Overview</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../case_studies.html">Blog &amp; Case Studies</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../parameters_tuning.html">Parameters Tuning</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../faq.html">Frequently Asked Questions</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">Perpetual</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="index.html">Blog &amp; Case Studies</a></li>
+      <li class="breadcrumb-item active">Better Prediction Intervals with Perpetual Learning</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/blog/confidence.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="better-prediction-intervals-with-perpetual-learning">
+<h1>Better Prediction Intervals with Perpetual Learning<a class="headerlink" href="#better-prediction-intervals-with-perpetual-learning" title="Link to this heading"></a></h1>
+<p><em>Published: January 23, 2025 — A case study showing how to achieve tighter, well-calibrated prediction intervals with Perpetual.</em></p>
+<p>This case study explores the advantages of Perpetual Learning for uncertainty quantification—significantly accelerating the learning process while delivering superior prediction intervals compared to traditional methods. Specifically, we compare Conformalized Quantile Regression (CQR) implemented with <code class="docutils literal notranslate"><span class="pre">PerpetualBooster</span></code> against the CQR implementation within the <a class="reference external" href="https://mapie.readthedocs.io/">MAPIE</a> open-source package.</p>
+<section id="perpetual-cqr-vs-mapie-cqr">
+<h2>Perpetual CQR vs. MAPIE CQR<a class="headerlink" href="#perpetual-cqr-vs-mapie-cqr" title="Link to this heading"></a></h2>
+<p>Table 1 summarizes the comparison results for a target coverage rate of <code class="docutils literal notranslate"><span class="pre">0.90</span></code> using the California Housing dataset. Both MAPIE CQR and Perpetual CQR surpass the target coverage rate, demonstrating their empirical validity. Notably, <strong>Perpetual CQR achieves a 35% reduction in the average width of prediction intervals</strong>, indicating a substantial improvement in interval sharpness and informational value.</p>
+<table class="docutils align-default" id="id1">
+<caption><span class="caption-text">Table 1: Perpetual CQR vs. MAPIE CQR (Target Coverage = 0.90)</span><a class="headerlink" href="#id1" title="Link to this table"></a></caption>
+<colgroup>
+<col style="width: 30.0%" />
+<col style="width: 20.0%" />
+<col style="width: 20.0%" />
+<col style="width: 30.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>CQR Method</p></th>
+<th class="head"><p>Target Coverage</p></th>
+<th class="head"><p>Actual Coverage</p></th>
+<th class="head"><p>Prediction Interval Average Width</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>MAPIE CQR</p></td>
+<td><p>0.900</p></td>
+<td><p>0.905</p></td>
+<td><p>2.222</p></td>
+</tr>
+<tr class="row-odd"><td><p><strong>Perpetual CQR</strong></p></td>
+<td><p><strong>0.900</strong></p></td>
+<td><p><strong>0.907</strong></p></td>
+<td><p><strong>1.450</strong></p></td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="conclusion">
+<h2>Conclusion<a class="headerlink" href="#conclusion" title="Link to this heading"></a></h2>
+<p>These findings highlight the substantial benefits of Perpetual Learning for uncertainty quantification and conformal prediction. By enabling faster training and narrower prediction intervals—alongside built-in post-hoc calibration methods (<code class="docutils literal notranslate"><span class="pre">GRP</span></code>, <code class="docutils literal notranslate"><span class="pre">MinMax</span></code>, <code class="docutils literal notranslate"><span class="pre">WeightVariance</span></code>, and <code class="docutils literal notranslate"><span class="pre">Conformal</span></code>)—<code class="docutils literal notranslate"><span class="pre">PerpetualBooster</span></code> empowers practitioners to make more informed and reliable decisions based on their data.</p>
+<p>See <a class="reference internal" href="../calibration.html"><span class="doc">Calibration and Uncertainty Quantification</span></a> for complete API details and code examples for prediction intervals and probability calibration.</p>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="performance.html" class="btn btn-neutral float-left" title="100x Faster Initial Training" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="continual.html" class="btn btn-neutral float-right" title="Further Speed-Up with Continual Learning" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2026, Mutlu Simsek, Serkan Korkmaz, Pieter Pel.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

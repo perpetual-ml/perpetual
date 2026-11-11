@@ -23,7 +23,7 @@
     <script src="_static/js/theme.js"></script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
-    <link rel="next" title="Blog &amp; Case Studies" href="case_studies.html" />
+    <link rel="next" title="Blog &amp; Case Studies" href="blog/index.html" />
     <link rel="prev" title="PerpetualBooster Objectives Tutorial" href="tutorials/objectives_tutorial.html" /> 
 </head>
 
@@ -77,6 +77,7 @@
 </li>
 </ul>
 </li>
+<li class="toctree-l1"><a class="reference internal" href="blog/index.html">Blog</a></li>
 <li class="toctree-l1"><a class="reference internal" href="case_studies.html">Blog &amp; Case Studies</a></li>
 <li class="toctree-l1"><a class="reference internal" href="parameters_tuning.html">Parameters Tuning</a></li>
 <li class="toctree-l1"><a class="reference internal" href="faq.html">Frequently Asked Questions</a></li>
@@ -194,6 +195,13 @@
 <li><p><strong>Accepted Split</strong> (<span class="math notranslate nohighlight">\(\text{generalization} \geq 1.0\)</span>): Both training and validation losses decrease relative to the parent node, indicating that the split generalizes to unseen data.</p></li>
 <li><p><strong>Rejected Split</strong> (<span class="math notranslate nohighlight">\(\text{generalization} &lt; 1.0\)</span>): The validation loss does not sufficiently improve (or increases) compared to the training loss reduction, so splitting is stopped to prevent overfitting.</p></li>
 </ul>
+<figure class="align-default" id="id1">
+<a class="reference internal image-reference" href="_images/how_perpetual_works_generalization.png"><img alt="Accepted vs. Rejected Node Split Generalization Comparison" src="_images/how_perpetual_works_generalization.png" style="width: 100%;" />
+</a>
+<figcaption>
+<p><span class="caption-text">Left: Accepted node split (<span class="math notranslate nohighlight">\(\text{generalization} &gt; 1.0\)</span>), where both training and validation losses decrease. Right: Rejected node split (<span class="math notranslate nohighlight">\(\text{generalization} &lt; 1.0\)</span>), where validation loss increases after splitting.</span><a class="headerlink" href="#id1" title="Link to this image"></a></p>
+</figcaption>
+</figure>
 <p>See <a class="reference external" href="https://github.com/perpetual-ml/perpetual/blob/main/src/splitter.rs">src/splitter.rs</a> for the detailed split evaluation implementation.</p>
 </section>
 <section id="how-step-size-and-generalization-control-work-together">
@@ -204,7 +212,7 @@
 <li><p><strong>Later Boosting Rounds</strong>: Generalization control becomes increasingly important as boosting progresses. Trees naturally become shallower as less generalizable signal remains in the residuals.</p></li>
 <li><p><strong>Automatic Early Stopping</strong>: If the algorithm encounters a very simple tree (a single split) with poor generalization (<span class="math notranslate nohighlight">\(&lt; 1.0\)</span>) three times, it automatically halts the boosting process.</p></li>
 </ul>
-<p>For more details on configuring the <code class="docutils literal notranslate"><span class="pre">budget</span></code> and related parameters, please refer to <a class="reference internal" href="parameters_tuning.html"><span class="doc">Parameters Tuning</span></a> and <a class="reference internal" href="case_studies.html"><span class="doc">Blog &amp; Case Studies</span></a>.</p>
+<p>For more details on configuring the <code class="docutils literal notranslate"><span class="pre">budget</span></code> and related parameters, please refer to <a class="reference internal" href="parameters_tuning.html"><span class="doc">Parameters Tuning</span></a>, <a class="reference internal" href="blog/how_perpetual_works.html"><span class="doc">How PerpetualBooster Works</span></a>, and <a class="reference internal" href="case_studies.html"><span class="doc">Blog &amp; Case Studies</span></a>.</p>
 </section>
 </section>
 </section>
@@ -214,7 +222,7 @@
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
         <a href="tutorials/objectives_tutorial.html" class="btn btn-neutral float-left" title="PerpetualBooster Objectives Tutorial" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
-        <a href="case_studies.html" class="btn btn-neutral float-right" title="Blog &amp; Case Studies" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="blog/index.html" class="btn btn-neutral float-right" title="Blog &amp; Case Studies" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 
   <hr/>

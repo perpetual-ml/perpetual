@@ -15,4 +15,10 @@ The most important parameter in Perpetual is ``budget``.
 How it works
 ------------
 
-Perpetual automatically adjusts the learning rate (eta) and stopping criteria based on the budget. As you increase the budget, the algorithm becomes more conservative, adding more trees with smaller step sizes.
+Perpetual automatically adjusts the learning rate (:math:`\alpha = 10^{-\text{budget}}`) and stopping criteria based on the ``budget``. As you increase the ``budget``, the algorithm takes smaller steps per boosting round while evaluating out-of-fold split generalization (:math:`\text{generalization} \geq 1.0`) at every candidate split.
+
+For the full mathematical derivation and empirical speed/accuracy benchmarks across budgets, see:
+
+* :doc:`blog/how_perpetual_works`
+* :doc:`blog/performance`
+* :ref:`how-perpetual-works` in :doc:`architecture`

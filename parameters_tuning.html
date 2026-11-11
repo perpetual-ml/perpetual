@@ -18,6 +18,8 @@
       <script src="_static/doctools.js?v=fd6eb6e6"></script>
       <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+      <script>window.MathJax = {"tex": {"inlineMath": [["$", "$"], ["\\(", "\\)"]], "processEscapes": true}, "options": {"ignoreHtmlClass": "tex2jax_ignore|mathjax_ignore|document", "processHtmlClass": "tex2jax_process|mathjax_process|math|output_area"}}</script>
+      <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@4/tex-mml-chtml.js"></script>
     <script src="_static/js/theme.js"></script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
@@ -57,6 +59,7 @@
 <li class="toctree-l1"><a class="reference internal" href="model_io_export.html">Model IO &amp; Export</a></li>
 <li class="toctree-l1"><a class="reference internal" href="tutorials/index.html">Tutorials</a></li>
 <li class="toctree-l1"><a class="reference internal" href="architecture.html">Architecture</a></li>
+<li class="toctree-l1"><a class="reference internal" href="blog/index.html">Blog</a></li>
 <li class="toctree-l1"><a class="reference internal" href="case_studies.html">Blog &amp; Case Studies</a></li>
 <li class="toctree-l1 current"><a class="current reference internal" href="#">Parameters Tuning</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="#the-budget-parameter">The Budget Parameter</a></li>
@@ -109,7 +112,13 @@
 </section>
 <section id="how-it-works">
 <h2>How it works<a class="headerlink" href="#how-it-works" title="Link to this heading"></a></h2>
-<p>Perpetual automatically adjusts the learning rate (eta) and stopping criteria based on the budget. As you increase the budget, the algorithm becomes more conservative, adding more trees with smaller step sizes.</p>
+<p>Perpetual automatically adjusts the learning rate (<span class="math notranslate nohighlight">\(\alpha = 10^{-\text{budget}}\)</span>) and stopping criteria based on the <code class="docutils literal notranslate"><span class="pre">budget</span></code>. As you increase the <code class="docutils literal notranslate"><span class="pre">budget</span></code>, the algorithm takes smaller steps per boosting round while evaluating out-of-fold split generalization (<span class="math notranslate nohighlight">\(\text{generalization} \geq 1.0\)</span>) at every candidate split.</p>
+<p>For the full mathematical derivation and empirical speed/accuracy benchmarks across budgets, see:</p>
+<ul class="simple">
+<li><p><a class="reference internal" href="blog/how_perpetual_works.html"><span class="doc">How PerpetualBooster Works</span></a></p></li>
+<li><p><a class="reference internal" href="blog/performance.html"><span class="doc">100x Faster Initial Training</span></a></p></li>
+<li><p><a class="reference internal" href="architecture.html#how-perpetual-works"><span class="std std-ref">PerpetualBooster Algorithm: How It Works</span></a> in <a class="reference internal" href="architecture.html"><span class="doc">Architecture</span></a></p></li>
+</ul>
 </section>
 </section>
 

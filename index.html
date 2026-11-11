@@ -18,6 +18,8 @@
       <script src="_static/doctools.js?v=fd6eb6e6"></script>
       <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+      <script>window.MathJax = {"tex": {"inlineMath": [["$", "$"], ["\\(", "\\)"]], "processEscapes": true}, "options": {"ignoreHtmlClass": "tex2jax_ignore|mathjax_ignore|document", "processHtmlClass": "tex2jax_process|mathjax_process|math|output_area"}}</script>
+      <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@4/tex-mml-chtml.js"></script>
     <script src="_static/js/theme.js"></script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
@@ -56,6 +58,7 @@
 <li class="toctree-l1"><a class="reference internal" href="model_io_export.html">Model IO &amp; Export</a></li>
 <li class="toctree-l1"><a class="reference internal" href="tutorials/index.html">Tutorials</a></li>
 <li class="toctree-l1"><a class="reference internal" href="architecture.html">Architecture</a></li>
+<li class="toctree-l1"><a class="reference internal" href="blog/index.html">Blog</a></li>
 <li class="toctree-l1"><a class="reference internal" href="case_studies.html">Blog &amp; Case Studies</a></li>
 <li class="toctree-l1"><a class="reference internal" href="parameters_tuning.html">Parameters Tuning</a></li>
 <li class="toctree-l1"><a class="reference internal" href="faq.html">Frequently Asked Questions</a></li>
@@ -89,20 +92,126 @@
 <h1>Perpetual Documentation<a class="headerlink" href="#perpetual-documentation" title="Link to this heading"></a></h1>
 <a class="perp-logo reference internal image-reference" href="_images/perp_logo.png"><img alt="Perpetual Logo" class="align-left perp-logo" src="_images/perp_logo.png" style="width: 100px;" />
 </a>
-<div style="clear: both;"></div><p>Perpetual is a self-generalizing gradient boosting machine that doesn’t need hyperparameter optimization. It is designed to be easy to use while providing state-of-the-art predictive performance.</p>
-<section id="key-features">
-<h2>Key Features<a class="headerlink" href="#key-features" title="Link to this heading"></a></h2>
+<div style="clear: both;"></div><p><strong>Perpetual</strong> is a self-generalizing gradient boosting machine (GBM) implemented in Rust with native Python and R bindings. Unlike traditional gradient boosting libraries (such as LightGBM, XGBoost, and CatBoost) that require extensive hyperparameter optimization across learning rate, tree depth, and regularization parameters, <code class="docutils literal notranslate"><span class="pre">PerpetualBooster</span></code> automatically controls step size and node-split generalization via a single intuitive <code class="docutils literal notranslate"><span class="pre">budget</span></code> parameter.</p>
+<section id="quick-links">
+<h2>Quick Links<a class="headerlink" href="#quick-links" title="Link to this heading"></a></h2>
 <ul class="simple">
-<li><p><strong>Hyperparameter-Free Learning</strong>: Achieves optimal accuracy in a single run via a simple <code class="docutils literal notranslate"><span class="pre">budget</span></code> parameter, eliminating the need for time-consuming hyperparameter optimization.</p></li>
-<li><p><strong>High-Performance Rust Core</strong>: Blazing-fast training and inference with a native Rust core, zero-copy support for Polars/Arrow data, and robust Python &amp; R bindings.</p></li>
-<li><p><strong>Comprehensive Objectives</strong>: Fully supports Classification (Binary &amp; Multi-class), Regression, and Ranking tasks.</p></li>
-<li><p><strong>Advanced Tree Features</strong>: Natively handles categorical variables, learnable missing value splits, monotonic constraints, and feature interaction constraints.</p></li>
-<li><p><strong>Built-in Causal ML</strong>: Out-of-the-box support for causal machine learning to estimate treatment effects.</p></li>
-<li><p><strong>Robust Drift Monitoring</strong>: Built-in capabilities to monitor both data drift and concept drift without requiring ground truth labels or model retraining.</p></li>
-<li><p><strong>Continual Learning</strong>: Built-in continual learning capabilities that significantly reduce computational time from O(n²) to O(n).</p></li>
-<li><p><strong>Native Calibration</strong>: Built-in calibration features to predict fully calibrated distributions (marginal coverage) and conditional coverage without retraining.</p></li>
-<li><p><strong>Explainability</strong>: Easily interpret model decisions using built-in feature importance, partial dependence plots, and Shapley (SHAP) values.</p></li>
-<li><p><strong>Production Ready &amp; Interoperable</strong>: Ready for production applications; seamlessly export models to industry-standard XGBoost or ONNX formats for straightforward deployment.</p></li>
+<li><p><strong>Python Package</strong>: <a class="reference external" href="https://pypi.org/project/perpetual/">PyPI (perpetual)</a> | <a class="reference internal" href="installation.html"><span class="doc">Installation</span></a> | <a class="reference internal" href="quickstart.html"><span class="doc">Quickstart</span></a> | <a class="reference internal" href="api.html"><span class="doc">Python API Reference</span></a></p></li>
+<li><p><strong>R Package</strong>: <a class="reference external" href="https://perpetual-ml.github.io/perpetual/r/">R Documentation (pkgdown)</a> | <a class="reference external" href="https://github.com/perpetual-ml/perpetual/tree/main/package-r">R Source (package-r)</a></p></li>
+<li><p><strong>Rust Crate</strong>: <a class="reference external" href="https://crates.io/crates/perpetual">crates.io (perpetual)</a> | <a class="reference external" href="https://docs.rs/perpetual">Rust API Docs (docs.rs)</a></p></li>
+<li><p><strong>Source &amp; Community</strong>: <a class="reference external" href="https://github.com/perpetual-ml/perpetual">GitHub Repository</a> | <a class="reference external" href="https://discord.gg/c23eezw379">Discord Community</a> | <a class="reference external" href="https://www.linkedin.com/company/perpetual-ml/">LinkedIn</a> | Contact: <a class="reference external" href="mailto:mutlusims3k&#37;&#52;&#48;gmail&#46;com">mutlusims3k<span>&#64;</span>gmail<span>&#46;</span>com</a></p></li>
+</ul>
+</section>
+<section id="key-capabilities">
+<h2>Key Capabilities<a class="headerlink" href="#key-capabilities" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p><strong>Hyperparameter-Free Learning</strong>: Achieves state-of-the-art accuracy in a single training run via a simple <code class="docutils literal notranslate"><span class="pre">budget</span></code> parameter, eliminating multi-trial hyperparameter tuning (see <a class="reference internal" href="blog/how_perpetual_works.html"><span class="doc">How PerpetualBooster Works</span></a>).</p></li>
+<li><p><strong>High-Performance Rust Core</strong>: Parallelized histogram construction, split finding, and inference powered by Rust and Rayon, with zero-copy support for Polars/Arrow columnar data and native Python &amp; R bindings.</p></li>
+<li><p><strong>Comprehensive Objectives</strong>: Supports Binary &amp; Multi-class Classification, Regression (Squared, Absolute, Huber, Quantile, Poisson, Gamma, Tweedie, MAPE), and Learning-to-Rank (ListNet), as well as custom user-defined objectives.</p></li>
+<li><p><strong>Advanced Tree Features</strong>: Natively handles categorical variables, learnable missing value branches, monotonic constraints, and feature interaction constraints.</p></li>
+<li><p><strong>Continual Learning</strong>: Built-in warm-start continual learning (<code class="docutils literal notranslate"><span class="pre">reset=False</span></code>) that updates models incrementally as new batches arrive, reducing cumulative training complexity from quadratic <span class="math notranslate nohighlight">\(O(n^2)\)</span> to linear <span class="math notranslate nohighlight">\(O(n)\)</span> without sacrificing accuracy (see <a class="reference internal" href="continual_learning.html"><span class="doc">Continual Learning</span></a> and <a class="reference internal" href="blog/continual.html"><span class="doc">Further Speed-Up with Continual Learning</span></a>).</p></li>
+<li><p><strong>Native Calibration &amp; Prediction Intervals</strong>: Predict calibrated probabilities and rigorous prediction intervals (Conformalized Quantile Regression, GRP, MinMax, WeightVariance) that achieve 35% narrower intervals than MAPIE at matching coverage (see <a class="reference internal" href="calibration.html"><span class="doc">Calibration and Uncertainty Quantification</span></a> and <a class="reference internal" href="blog/confidence.html"><span class="doc">Better Prediction Intervals with Perpetual Learning</span></a>).</p></li>
+<li><p><strong>Robust Drift Monitoring</strong>: Monitor both data drift and concept drift directly from model tree topology without requiring ground-truth labels or retraining (see <a class="reference internal" href="drift_detection.html"><span class="doc">Drift Detection</span></a>).</p></li>
+<li><p><strong>Built-in Causal ML</strong>: Out-of-the-box Uplift Modeling, Meta-Learners (S-, T-, X-, R-, DR-Learner), Double Machine Learning (DML), and Structural Policy Learning (see <a class="reference internal" href="causal_ml/index.html"><span class="doc">Causal ML</span></a>).</p></li>
+<li><p><strong>Explainability &amp; Interoperability</strong>: Compute feature importances, partial dependence plots, and exact TreeSHAP values (<a class="reference internal" href="explainability.html"><span class="doc">Explainability</span></a>), and export models to industry-standard XGBoost or ONNX formats (<a class="reference internal" href="model_io_export.html"><span class="doc">Model IO &amp; Export</span></a>).</p></li>
+</ul>
+</section>
+<section id="benchmark-highlights">
+<h2>Benchmark Highlights<a class="headerlink" href="#benchmark-highlights" title="Link to this heading"></a></h2>
+<section id="automl-benchmark-104-classification-datasets">
+<h3>AutoML Benchmark (104 Classification Datasets)<a class="headerlink" href="#automl-benchmark-104-classification-datasets" title="Link to this heading"></a></h3>
+<p>Tested on the top 104 classification datasets from the <a class="reference external" href="https://openml.github.io/automlbenchmark/">OpenML AutoML Benchmark</a> (<a class="reference external" href="https://github.com/perpetual-ml/perpetual/blob/main/package-python/examples/automlbenchmark.py">AutoML benchmark script</a>), <code class="docutils literal notranslate"><span class="pre">PerpetualBooster</span></code> trains <strong>3.1x faster</strong> on average than <code class="docutils literal notranslate"><span class="pre">AutoGluon</span></code> (<cite>best_quality</cite> preset, single 5-fold model) at identical ROC AUC:</p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 30.0%" />
+<col style="width: 20.0%" />
+<col style="width: 20.0%" />
+<col style="width: 30.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Model</p></th>
+<th class="head"><p>Budget / Time Limit</p></th>
+<th class="head"><p>Mean ROC AUC</p></th>
+<th class="head"><p>Mean Fit Duration (s)</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>AutoGluon</p></td>
+<td><p>900s limit</p></td>
+<td><p>0.903</p></td>
+<td><p>39.2</p></td>
+</tr>
+<tr class="row-odd"><td><p><strong>Perpetual</strong></p></td>
+<td><p><strong>budget = 1.0</strong></p></td>
+<td><p><strong>0.903</strong></p></td>
+<td><p><strong>12.5 (3.1x faster)</strong></p></td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="initial-training-speed-vs-tuned-lightgbm-100-optuna-trials">
+<h3>Initial Training Speed vs. Tuned LightGBM (100 Optuna Trials)<a class="headerlink" href="#initial-training-speed-vs-tuned-lightgbm-100-optuna-trials" title="Link to this heading"></a></h3>
+<p>By replacing 100 trials of hyperparameter optimization with a single <code class="docutils literal notranslate"><span class="pre">budget</span></code> run, <code class="docutils literal notranslate"><span class="pre">PerpetualBooster</span></code> achieves <strong>76x–148x speed-ups</strong> at matching test accuracy (see <a class="reference internal" href="blog/performance.html"><span class="doc">100x Faster Initial Training</span></a>):</p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 28.0%" />
+<col style="width: 14.0%" />
+<col style="width: 14.0%" />
+<col style="width: 14.0%" />
+<col style="width: 15.0%" />
+<col style="width: 15.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Dataset (Task)</p></th>
+<th class="head"><p>Perpetual Budget</p></th>
+<th class="head"><p>Perpetual Loss</p></th>
+<th class="head"><p>LightGBM Loss</p></th>
+<th class="head"><p>Perpetual CPU Time</p></th>
+<th class="head"><p>Speed-Up vs. LightGBM</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>California Housing (Regression, MSE)</p></td>
+<td><p>0.30</p></td>
+<td><p>0.202</p></td>
+<td><p>0.203</p></td>
+<td><p>8.8s (vs. 982s)</p></td>
+<td><p><strong>112x</strong></p></td>
+</tr>
+<tr class="row-odd"><td><p>California Housing (Regression, MSE)</p></td>
+<td><p>0.45</p></td>
+<td><p>0.198</p></td>
+<td><p>0.198</p></td>
+<td><p>19.1s (vs. 2,554s)</p></td>
+<td><p><strong>134x</strong></p></td>
+</tr>
+<tr class="row-even"><td><p>California Housing (Regression, MSE)</p></td>
+<td><p>0.60</p></td>
+<td><p>0.197</p></td>
+<td><p>0.197</p></td>
+<td><p>40.9s (vs. 6,057s)</p></td>
+<td><p><strong>148x</strong></p></td>
+</tr>
+<tr class="row-odd"><td><p>Forest Cover Types (Classification, Log Loss)</p></td>
+<td><p>0.33</p></td>
+<td><p>0.0886</p></td>
+<td><p>0.0857</p></td>
+<td><p>32.2s (vs. 2,464s)</p></td>
+<td><p><strong>76x</strong></p></td>
+</tr>
+</tbody>
+</table>
+</section>
+</section>
+<section id="featured-blog-posts-case-studies">
+<h2>Featured Blog Posts &amp; Case Studies<a class="headerlink" href="#featured-blog-posts-case-studies" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p><a class="reference internal" href="blog/how_perpetual_works.html"><span class="doc">How PerpetualBooster Works</span></a> — How step size control and generalization control eliminate hyperparameter tuning.</p></li>
+<li><p><a class="reference internal" href="blog/performance.html"><span class="doc">100x Faster Initial Training</span></a> — Achieving 100x faster training than Optuna-tuned LightGBM pipelines.</p></li>
+<li><p><a class="reference internal" href="blog/confidence.html"><span class="doc">Better Prediction Intervals with Perpetual Learning</span></a> — 35% tighter prediction intervals with Perpetual Conformalized Quantile Regression (CQR) vs. MAPIE.</p></li>
+<li><p><a class="reference internal" href="blog/continual.html"><span class="doc">Further Speed-Up with Continual Learning</span></a> — Reducing cumulative streaming training time from <span class="math notranslate nohighlight">\(O(n^2)\)</span> to <span class="math notranslate nohighlight">\(O(n)\)</span>.</p></li>
+<li><p><a class="reference internal" href="blog/decisioning.html"><span class="doc">Optimum Business Decisioning with Calibrated Probabilities</span></a> — Maximizing lending profitability with calibrated probabilities on OpenML <code class="docutils literal notranslate"><span class="pre">TVS_Loan_Default</span></code>.</p></li>
+<li><p><a class="reference internal" href="blog/scoring.html"><span class="doc">Profit-Driven Lead Scoring</span></a> — Profit-driven lead scoring on the UCI Bank Marketing dataset.</p></li>
 </ul>
 <div class="toctree-wrapper compound">
 <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
@@ -209,6 +318,16 @@
 <li class="toctree-l2"><a class="reference internal" href="architecture.html#perpetualbooster-algorithm-how-it-works">PerpetualBooster Algorithm: How It Works</a></li>
 </ul>
 </li>
+<li class="toctree-l1"><a class="reference internal" href="blog/index.html">Blog</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="blog/how_perpetual_works.html">How PerpetualBooster Works</a></li>
+<li class="toctree-l2"><a class="reference internal" href="blog/performance.html">100x Faster Initial Training</a></li>
+<li class="toctree-l2"><a class="reference internal" href="blog/confidence.html">Better Prediction Intervals with Perpetual Learning</a></li>
+<li class="toctree-l2"><a class="reference internal" href="blog/continual.html">Further Speed-Up with Continual Learning</a></li>
+<li class="toctree-l2"><a class="reference internal" href="blog/decisioning.html">Optimum Business Decisioning with Calibrated Probabilities</a></li>
+<li class="toctree-l2"><a class="reference internal" href="blog/scoring.html">Profit-Driven Lead Scoring</a></li>
+<li class="toctree-l2"><a class="reference internal" href="blog/index.html#articles-overview">Articles Overview</a></li>
+</ul>
+</li>
 <li class="toctree-l1"><a class="reference internal" href="case_studies.html">Blog &amp; Case Studies</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="case_studies.html#how-perpetualbooster-works">How PerpetualBooster Works</a></li>
 <li class="toctree-l2"><a class="reference internal" href="case_studies.html#x-faster-initial-training">100x Faster Initial Training</a></li>
@@ -225,25 +344,28 @@
 </li>
 <li class="toctree-l1"><a class="reference internal" href="faq.html">Frequently Asked Questions</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="faq.html#how-do-i-choose-the-best-budget">How do I choose the best budget?</a></li>
-<li class="toctree-l2"><a class="reference internal" href="faq.html#does-perpetual-support-categorical-features">Does Perpetual support categorical features?</a></li>
-<li class="toctree-l2"><a class="reference internal" href="faq.html#is-perpetual-faster-than-xgboost">Is Perpetual faster than XGBoost?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="faq.html#how-does-perpetual-prevent-overfitting-without-a-separate-validation-set">How does Perpetual prevent overfitting without a separate validation set?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="faq.html#does-perpetual-support-categorical-features-and-missing-values">Does Perpetual support categorical features and missing values?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="faq.html#is-perpetual-faster-than-lightgbm-xgboost-and-autogluon">Is Perpetual faster than LightGBM, XGBoost, and AutoGluon?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="faq.html#how-do-i-update-a-trained-model-on-new-batches-of-data">How do I update a trained model on new batches of data?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="faq.html#what-languages-are-supported">What languages are supported?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="faq.html#how-can-i-get-help-report-issues-or-contact-the-maintainer">How can I get help, report issues, or contact the maintainer?</a></li>
 </ul>
 </li>
 </ul>
 </div>
 </section>
-<section id="api-reference">
-<h2>API Reference<a class="headerlink" href="#api-reference" title="Link to this heading"></a></h2>
-<p>See the <a class="reference internal" href="api.html"><span class="doc">API Reference</span></a> for the detailed API reference.</p>
-</section>
-</section>
-<section id="indices-and-tables">
-<h1>Indices and tables<a class="headerlink" href="#indices-and-tables" title="Link to this heading"></a></h1>
+<section id="api-reference-indices">
+<h2>API Reference &amp; Indices<a class="headerlink" href="#api-reference-indices" title="Link to this heading"></a></h2>
 <ul class="simple">
+<li><p><a class="reference internal" href="api.html"><span class="doc">Python API Reference</span></a></p></li>
+<li><p><a class="reference external" href="https://perpetual-ml.github.io/perpetual/r/">R Package Documentation</a></p></li>
+<li><p><a class="reference external" href="https://docs.rs/perpetual">Rust Crate Documentation (docs.rs)</a></p></li>
 <li><p><a class="reference internal" href="genindex.html"><span class="std std-ref">Index</span></a></p></li>
 <li><p><a class="reference internal" href="py-modindex.html"><span class="std std-ref">Module Index</span></a></p></li>
 <li><p><a class="reference internal" href="search.html"><span class="std std-ref">Search Page</span></a></p></li>
 </ul>
+</section>
 </section>
 
 

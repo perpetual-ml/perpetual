@@ -1,0 +1,207 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>How PerpetualBooster Works &mdash; Perpetual 2.4.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="../_static/custom.css?v=9cdd1368" />
+
+  
+      <script src="../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../_static/documentation_options.js?v=4d935f96"></script>
+      <script src="../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
+      <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+      <script>window.MathJax = {"tex": {"inlineMath": [["$", "$"], ["\\(", "\\)"]], "processEscapes": true}, "options": {"ignoreHtmlClass": "tex2jax_ignore|mathjax_ignore|document", "processHtmlClass": "tex2jax_process|mathjax_process|math|output_area"}}</script>
+      <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@4/tex-mml-chtml.js"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="100x Faster Initial Training" href="performance.html" />
+    <link rel="prev" title="Blog &amp; Case Studies" href="index.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            Perpetual
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../api.html">API Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../causal_ml/index.html">Causal ML</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../calibration.html">Calibration and Uncertainty Quantification</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../drift_detection.html">Drift Detection</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../continual_learning.html">Continual Learning</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../explainability.html">Explainability</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../model_io_export.html">Model IO &amp; Export</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tutorials/index.html">Tutorials</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../architecture.html">Architecture</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Blog</a><ul class="current">
+<li class="toctree-l2 current"><a class="current reference internal" href="#">How PerpetualBooster Works</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#step-size-control">Step Size Control</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#generalization-control">Generalization Control</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#conclusion">Conclusion</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="performance.html">100x Faster Initial Training</a></li>
+<li class="toctree-l2"><a class="reference internal" href="confidence.html">Better Prediction Intervals with Perpetual Learning</a></li>
+<li class="toctree-l2"><a class="reference internal" href="continual.html">Further Speed-Up with Continual Learning</a></li>
+<li class="toctree-l2"><a class="reference internal" href="decisioning.html">Optimum Business Decisioning with Calibrated Probabilities</a></li>
+<li class="toctree-l2"><a class="reference internal" href="scoring.html">Profit-Driven Lead Scoring</a></li>
+<li class="toctree-l2"><a class="reference internal" href="index.html#articles-overview">Articles Overview</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../case_studies.html">Blog &amp; Case Studies</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../parameters_tuning.html">Parameters Tuning</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../faq.html">Frequently Asked Questions</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">Perpetual</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="index.html">Blog &amp; Case Studies</a></li>
+      <li class="breadcrumb-item active">How PerpetualBooster Works</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/blog/how_perpetual_works.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="how-perpetualbooster-works">
+<h1>How PerpetualBooster Works<a class="headerlink" href="#how-perpetualbooster-works" title="Link to this heading"></a></h1>
+<p><em>Published: July 19, 2025 — A deep dive on how the algorithm eliminates hyperparameter optimization.</em></p>
+<p>This article dives into the inner workings of <code class="docutils literal notranslate"><span class="pre">PerpetualBooster</span></code>, a gradient boosting machine that bypasses the need for hyperparameter optimization. It achieves this with two complementary techniques: <strong>step size control</strong> and <strong>generalization control</strong>. The following sections explore how these methods are implemented within the algorithm itself.</p>
+<section id="step-size-control">
+<h2>Step Size Control<a class="headerlink" href="#step-size-control" title="Link to this heading"></a></h2>
+<p>Step size control is similar to <a class="reference external" href="https://en.wikipedia.org/wiki/Backtracking_line_search">backtracking line search</a> with three key differences.</p>
+<p>In backtracking line search, the algorithm starts with a very large step size and the step size is repeatedly shrunk until the Armijo–Goldstein condition is fulfilled. In other words, it tries to find a large step size with a sufficient decrease of the objective function by decreasing the step size iteratively:</p>
+<div class="math notranslate nohighlight">
+\[f(x + \alpha p) \leq f(x) + \alpha c m\]</div>
+<ol class="arabic">
+<li><p><strong>Forward-Tracking Tree Search (Smallest Sufficient Step)</strong></p>
+<p>The first key difference is that we are trying to find the <em>smallest</em> step (instead of the largest) to satisfy the condition. We grow the tree split by split and check the loss decrease after every split. If the loss decrease exceeds a certain threshold, we stop growing the tree and continue with the next boosting round. In other words, we are trying to take the smallest step which achieves a target loss decrease at each boosting round. This can be called <em>forward-tracking tree search</em>, where <span class="math notranslate nohighlight">\(\alpha\)</span> is calculated from the user-defined <code class="docutils literal notranslate"><span class="pre">budget</span></code> parameter:</p>
+<div class="math notranslate nohighlight">
+\[\alpha = 10^{-\text{budget}}\]</div>
+</li>
+<li><p><strong>Constant Reference Slope</strong></p>
+<p>The second key difference is that the <span class="math notranslate nohighlight">\(m\)</span> parameter is kept constant instead of updating at every step (at every boosting round). <span class="math notranslate nohighlight">\(m\)</span> is calculated before the fitting process using the base score (initial constant prediction <span class="math notranslate nohighlight">\(\hat{y}\)</span>):</p>
+<div class="math notranslate nohighlight">
+\[m = \frac{1}{n} \sum_{i=1}^{n} \text{loss}(y_i, \hat{y})\]</div>
+</li>
+<li><p><strong>Budget-Derived Control Parameter</strong></p>
+<p>The third key difference is that the control parameter <span class="math notranslate nohighlight">\(c\)</span> is calculated from the <code class="docutils literal notranslate"><span class="pre">budget</span></code> parameter using the following geometric series formula:</p>
+<div class="math notranslate nohighlight">
+\[r = \frac{10}{\text{budget}}\]</div>
+<div class="math notranslate nohighlight">
+\[\text{reciprocals of powers} = \frac{r}{r - 1}\]</div>
+<div class="math notranslate nohighlight">
+\[\text{truncated series sum} = \text{reciprocals of powers} - \left(1 + \frac{1}{r}\right)\]</div>
+<div class="math notranslate nohighlight">
+\[c = \frac{1}{r} - \text{truncated series sum}\]</div>
+</li>
+</ol>
+<p>You can inspect <a class="reference external" href="https://github.com/perpetual-ml/perpetual/blob/main/src/booster/core.rs">src/booster/core.rs</a> and <a class="reference external" href="https://github.com/perpetual-ml/perpetual/blob/main/src/tree/core.rs">src/tree/core.rs</a> to review the implementation.</p>
+</section>
+<section id="generalization-control">
+<h2>Generalization Control<a class="headerlink" href="#generalization-control" title="Link to this heading"></a></h2>
+<p>The second technique used to eliminate hyperparameter optimization alongside step size control is <strong>generalization control</strong>. Before each node split, the data is partitioned into internal training and validation folds. We calculate not only the training loss but also the validation loss using the separate validation set:</p>
+<div class="math notranslate nohighlight">
+\[\text{loss}_{\text{train}} = G_{\text{train}} w + \frac{1}{2} H_{\text{train}} w^2\]</div>
+<div class="math notranslate nohighlight">
+\[w = -\frac{G_{\text{train}}}{H_{\text{train}}}\]</div>
+<div class="math notranslate nohighlight">
+\[\text{loss}_{\text{valid}} = G_{\text{valid}} w + \frac{1}{2} H_{\text{valid}} w^2\]</div>
+<p>where <span class="math notranslate nohighlight">\(G\)</span> is the sum of the gradient values, <span class="math notranslate nohighlight">\(H\)</span> is the sum of the hessian values, and <span class="math notranslate nohighlight">\(w\)</span> is the leaf weight term.</p>
+<p>Using the training and validation losses, we calculate the generalization term:</p>
+<div class="math notranslate nohighlight">
+\[\text{generalization} = \frac{\text{loss}_{\text{parent}} - \text{loss}_{\text{train}}}{\text{loss}_{\text{parent}} - \text{loss}_{\text{valid}}}\]</div>
+<p>We allow the node to split if <code class="docutils literal notranslate"><span class="pre">generalization</span></code> is greater than or equal to <code class="docutils literal notranslate"><span class="pre">1.0</span></code> and stop splitting if <code class="docutils literal notranslate"><span class="pre">generalization</span></code> is less than <code class="docutils literal notranslate"><span class="pre">1.0</span></code>. In other words, we check whether the validation loss decreases relative to the parent loss when making the split. The following charts depict this graphically:</p>
+<figure class="align-default" id="id1">
+<a class="reference internal image-reference" href="../_images/how_perpetual_works_generalization.png"><img alt="Generalization Control: Accepted vs. Rejected Split" src="../_images/how_perpetual_works_generalization.png" style="width: 100%;" />
+</a>
+<figcaption>
+<p><span class="caption-text">Left: Accepted split where both training loss (4.3 → 3.3) and validation loss (4.3 → 3.5) decrease (<span class="math notranslate nohighlight">\(\text{generalization} \geq 1.0\)</span>). Right: Rejected split where training loss decreases (4.3 → 3.3) but validation loss increases (4.3 → 4.8) (<span class="math notranslate nohighlight">\(\text{generalization} &lt; 1.0\)</span>).</span><a class="headerlink" href="#id1" title="Link to this image"></a></p>
+</figcaption>
+</figure>
+<p>See <a class="reference external" href="https://github.com/perpetual-ml/perpetual/blob/main/src/splitter.rs">src/splitter.rs</a> for the detailed split evaluation implementation.</p>
+</section>
+<section id="conclusion">
+<h2>Conclusion<a class="headerlink" href="#conclusion" title="Link to this heading"></a></h2>
+<p>Finding the right balance between fitting the data and avoiding overfitting is crucial for decision tree learning. This is achieved through two control mechanisms: <strong>step size control</strong> and <strong>generalization control</strong>:</p>
+<ul class="simple">
+<li><p><strong>Step size control</strong> shines early on. Since the initial splits significantly reduce the loss (error), it is most impactful in the first boosting rounds.</p></li>
+<li><p><strong>Generalization control</strong> becomes more important later. As boosting progresses, trees naturally tend to become shallower because there is less generalizable signal left to learn from the data.</p></li>
+<li><p><strong>Built-in stopping mechanism</strong>: If the algorithm encounters a very simple tree (one split) with poor generalization (less than <code class="docutils literal notranslate"><span class="pre">1.0</span></code>) three times, it automatically halts the boosting process.</p></li>
+</ul>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="index.html" class="btn btn-neutral float-left" title="Blog &amp; Case Studies" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="performance.html" class="btn btn-neutral float-right" title="100x Faster Initial Training" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2026, Mutlu Simsek, Serkan Korkmaz, Pieter Pel.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

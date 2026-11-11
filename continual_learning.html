@@ -66,6 +66,7 @@
 <li class="toctree-l1"><a class="reference internal" href="model_io_export.html">Model IO &amp; Export</a></li>
 <li class="toctree-l1"><a class="reference internal" href="tutorials/index.html">Tutorials</a></li>
 <li class="toctree-l1"><a class="reference internal" href="architecture.html">Architecture</a></li>
+<li class="toctree-l1"><a class="reference internal" href="blog/index.html">Blog</a></li>
 <li class="toctree-l1"><a class="reference internal" href="case_studies.html">Blog &amp; Case Studies</a></li>
 <li class="toctree-l1"><a class="reference internal" href="parameters_tuning.html">Parameters Tuning</a></li>
 <li class="toctree-l1"><a class="reference internal" href="faq.html">Frequently Asked Questions</a></li>
@@ -296,6 +297,21 @@
 </tbody>
 </table>
 <p>Across all incremental updates, continual learning maintains the same average test Mean Squared Error (MSE of <code class="docutils literal notranslate"><span class="pre">0.197</span></code>) as full retraining while exhibiting near-constant per-batch CPU time and linear <span class="math notranslate nohighlight">\(O(n)\)</span> cumulative training time compared to the quadratic <span class="math notranslate nohighlight">\(O(n^2)\)</span> growth of retraining from scratch.</p>
+<figure class="align-default" id="id2">
+<a class="reference internal image-reference" href="_images/continual_cpu_time.png"><img alt="Per-Batch CPU Time for Continual Learning vs. Retraining" src="_images/continual_cpu_time.png" style="width: 90%;" />
+</a>
+<figcaption>
+<p><span class="caption-text">Per-batch CPU time across batches 0–11. Continual learning stays roughly constant per batch, whereas retraining CPU time increases linearly with cumulative data size.</span><a class="headerlink" href="#id2" title="Link to this image"></a></p>
+</figcaption>
+</figure>
+<figure class="align-default" id="id3">
+<a class="reference internal image-reference" href="_images/continual_cum_cpu_time.png"><img alt="Cumulative CPU Time for Continual Learning vs. Retraining" src="_images/continual_cum_cpu_time.png" style="width: 90%;" />
+</a>
+<figcaption>
+<p><span class="caption-text">Cumulative CPU time across batches 0–11, demonstrating linear <span class="math notranslate nohighlight">\(O(n)\)</span> scaling for continual learning vs. quadratic <span class="math notranslate nohighlight">\(O(n^2)\)</span> scaling for retraining.</span><a class="headerlink" href="#id3" title="Link to this image"></a></p>
+</figcaption>
+</figure>
+<p>See <a class="reference internal" href="blog/continual.html"><span class="doc">Further Speed-Up with Continual Learning</span></a> for the full benchmark article.</p>
 </section>
 </section>
 

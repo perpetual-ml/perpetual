@@ -18,6 +18,8 @@
       <script src="_static/doctools.js?v=fd6eb6e6"></script>
       <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+      <script>window.MathJax = {"tex": {"inlineMath": [["$", "$"], ["\\(", "\\)"]], "processEscapes": true}, "options": {"ignoreHtmlClass": "tex2jax_ignore|mathjax_ignore|document", "processHtmlClass": "tex2jax_process|mathjax_process|math|output_area"}}</script>
+      <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@4/tex-mml-chtml.js"></script>
     <script src="_static/js/theme.js"></script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
@@ -56,12 +58,17 @@
 <li class="toctree-l1"><a class="reference internal" href="model_io_export.html">Model IO &amp; Export</a></li>
 <li class="toctree-l1"><a class="reference internal" href="tutorials/index.html">Tutorials</a></li>
 <li class="toctree-l1"><a class="reference internal" href="architecture.html">Architecture</a></li>
+<li class="toctree-l1"><a class="reference internal" href="blog/index.html">Blog</a></li>
 <li class="toctree-l1"><a class="reference internal" href="case_studies.html">Blog &amp; Case Studies</a></li>
 <li class="toctree-l1"><a class="reference internal" href="parameters_tuning.html">Parameters Tuning</a></li>
 <li class="toctree-l1 current"><a class="current reference internal" href="#">Frequently Asked Questions</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="#how-do-i-choose-the-best-budget">How do I choose the best budget?</a></li>
-<li class="toctree-l2"><a class="reference internal" href="#does-perpetual-support-categorical-features">Does Perpetual support categorical features?</a></li>
-<li class="toctree-l2"><a class="reference internal" href="#is-perpetual-faster-than-xgboost">Is Perpetual faster than XGBoost?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#how-does-perpetual-prevent-overfitting-without-a-separate-validation-set">How does Perpetual prevent overfitting without a separate validation set?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#does-perpetual-support-categorical-features-and-missing-values">Does Perpetual support categorical features and missing values?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#is-perpetual-faster-than-lightgbm-xgboost-and-autogluon">Is Perpetual faster than LightGBM, XGBoost, and AutoGluon?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#how-do-i-update-a-trained-model-on-new-batches-of-data">How do I update a trained model on new batches of data?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#what-languages-are-supported">What languages are supported?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#how-can-i-get-help-report-issues-or-contact-the-maintainer">How can I get help, report issues, or contact the maintainer?</a></li>
 </ul>
 </li>
 </ul>
@@ -94,15 +101,40 @@
 <h1>Frequently Asked Questions<a class="headerlink" href="#frequently-asked-questions" title="Link to this heading"></a></h1>
 <section id="how-do-i-choose-the-best-budget">
 <h2>How do I choose the best budget?<a class="headerlink" href="#how-do-i-choose-the-best-budget" title="Link to this heading"></a></h2>
-<p>Start with the default budget of 0.5. If you need more accuracy and have time for longer training, increase it to 1.0 or higher. For quick experiments, 0.1 or 0.2 may be enough.</p>
+<p>Start with the default budget of <code class="docutils literal notranslate"><span class="pre">0.5</span></code>. If you need higher accuracy and can allocate more training time, increase <code class="docutils literal notranslate"><span class="pre">budget</span></code> to <code class="docutils literal notranslate"><span class="pre">1.0</span></code> or higher. For rapid prototyping, <code class="docutils literal notranslate"><span class="pre">0.1</span></code> to <code class="docutils literal notranslate"><span class="pre">0.3</span></code> is often sufficient. Because <code class="docutils literal notranslate"><span class="pre">budget</span></code> controls both step size (<span class="math notranslate nohighlight">\(\alpha = 10^{-\text{budget}}\)</span>) and internal generalization thresholds, increasing <code class="docutils literal notranslate"><span class="pre">budget</span></code> monotonically increases model capacity until the internal generalization control automatically halts splitting.</p>
 </section>
-<section id="does-perpetual-support-categorical-features">
-<h2>Does Perpetual support categorical features?<a class="headerlink" href="#does-perpetual-support-categorical-features" title="Link to this heading"></a></h2>
-<p>Yes, you can specify categorical features via the <code class="docutils literal notranslate"><span class="pre">categorical_features</span></code> parameter. Perpetual handles them internally without requiring one-hot encoding.</p>
+<section id="how-does-perpetual-prevent-overfitting-without-a-separate-validation-set">
+<h2>How does Perpetual prevent overfitting without a separate validation set?<a class="headerlink" href="#how-does-perpetual-prevent-overfitting-without-a-separate-validation-set" title="Link to this heading"></a></h2>
+<p>At every candidate node split, <code class="docutils literal notranslate"><span class="pre">PerpetualBooster</span></code> partitions node samples into internal training and validation folds and evaluates the second-order Taylor loss reduction on both. A split is only accepted when the validation loss reduction keeps pace with the training loss reduction (<span class="math notranslate nohighlight">\(\text{generalization} \geq 1.0\)</span>). See <a class="reference internal" href="blog/how_perpetual_works.html"><span class="doc">How PerpetualBooster Works</span></a> and <a class="reference internal" href="architecture.html#how-perpetual-works"><span class="std std-ref">PerpetualBooster Algorithm: How It Works</span></a> in <a class="reference internal" href="architecture.html"><span class="doc">Architecture</span></a> for details.</p>
 </section>
-<section id="is-perpetual-faster-than-xgboost">
-<h2>Is Perpetual faster than XGBoost?<a class="headerlink" href="#is-perpetual-faster-than-xgboost" title="Link to this heading"></a></h2>
-<p>Perpetual is optimized for CPU performance using Rust. While speed depends on the dataset and hardware, Perpetual is designed to be highly competitive while eliminating the HPO phase, which often takes much more time than a single training run.</p>
+<section id="does-perpetual-support-categorical-features-and-missing-values">
+<h2>Does Perpetual support categorical features and missing values?<a class="headerlink" href="#does-perpetual-support-categorical-features-and-missing-values" title="Link to this heading"></a></h2>
+<p>Yes. You can specify categorical columns via the <code class="docutils literal notranslate"><span class="pre">categorical_features</span></code> parameter without one-hot encoding. Missing values (<code class="docutils literal notranslate"><span class="pre">NaN</span></code> / <code class="docutils literal notranslate"><span class="pre">None</span></code>) are also handled natively during split finding via learnable missing branches.</p>
+</section>
+<section id="is-perpetual-faster-than-lightgbm-xgboost-and-autogluon">
+<h2>Is Perpetual faster than LightGBM, XGBoost, and AutoGluon?<a class="headerlink" href="#is-perpetual-faster-than-lightgbm-xgboost-and-autogluon" title="Link to this heading"></a></h2>
+<p><code class="docutils literal notranslate"><span class="pre">PerpetualBooster</span></code> is implemented in Rust with Rayon data parallelism. Because it eliminates multi-trial hyperparameter optimization (such as running 100 Optuna trials), end-to-end training is <strong>76x–148x faster</strong> than tuned LightGBM pipelines at matching accuracy (<a class="reference internal" href="blog/performance.html"><span class="doc">100x Faster Initial Training</span></a>) and <strong>3.1x faster</strong> on average than AutoGluon across the 104 OpenML AutoML benchmark classification datasets.</p>
+</section>
+<section id="how-do-i-update-a-trained-model-on-new-batches-of-data">
+<h2>How do I update a trained model on new batches of data?<a class="headerlink" href="#how-do-i-update-a-trained-model-on-new-batches-of-data" title="Link to this heading"></a></h2>
+<p>Initialize <code class="docutils literal notranslate"><span class="pre">PerpetualBooster(reset=False)</span></code> and call <code class="docutils literal notranslate"><span class="pre">fit</span></code> with the cumulative dataset as new batches arrive. Perpetual reuses existing trees and only fits new trees to the residual errors, reducing cumulative training complexity from <span class="math notranslate nohighlight">\(O(n^2)\)</span> to <span class="math notranslate nohighlight">\(O(n)\)</span>. See <a class="reference internal" href="continual_learning.html"><span class="doc">Continual Learning</span></a> and <a class="reference internal" href="blog/continual.html"><span class="doc">Further Speed-Up with Continual Learning</span></a>.</p>
+</section>
+<section id="what-languages-are-supported">
+<h2>What languages are supported?<a class="headerlink" href="#what-languages-are-supported" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p><strong>Python</strong>: <a class="reference external" href="https://pypi.org/project/perpetual/">perpetual on PyPI</a> (<a class="reference internal" href="api.html"><span class="doc">Python API Reference</span></a>)</p></li>
+<li><p><strong>R</strong>: <a class="reference external" href="https://perpetual-ml.github.io/perpetual/r/">perpetual R package</a></p></li>
+<li><p><strong>Rust</strong>: <a class="reference external" href="https://crates.io/crates/perpetual">perpetual crate on crates.io</a> (<a class="reference external" href="https://docs.rs/perpetual">docs.rs</a>)</p></li>
+</ul>
+</section>
+<section id="how-can-i-get-help-report-issues-or-contact-the-maintainer">
+<h2>How can I get help, report issues, or contact the maintainer?<a class="headerlink" href="#how-can-i-get-help-report-issues-or-contact-the-maintainer" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p><strong>GitHub Issues &amp; Discussions</strong>: <a class="reference external" href="https://github.com/perpetual-ml/perpetual/issues">perpetual-ml/perpetual</a></p></li>
+<li><p><strong>Discord</strong>: <a class="reference external" href="https://discord.gg/c23eezw379">Join the Perpetual ML Discord</a></p></li>
+<li><p><strong>LinkedIn</strong>: <a class="reference external" href="https://www.linkedin.com/company/perpetual-ml/">Perpetual ML on LinkedIn</a></p></li>
+<li><p><strong>Email</strong>: <a class="reference external" href="mailto:mutlusims3k&#37;&#52;&#48;gmail&#46;com">mutlusims3k<span>&#64;</span>gmail<span>&#46;</span>com</a></p></li>
+</ul>
 </section>
 </section>
 

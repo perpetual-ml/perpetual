@@ -25,7 +25,7 @@ Coverage](https://img.shields.io/codecov/c/github/perpetual-ml/perpetual?flag=py
 Coverage](https://img.shields.io/codecov/c/github/perpetual-ml/perpetual?flag=rust&label=codecov%20rust)](https://app.codecov.io/gh/perpetual-ml/perpetual)
 [![R
 Coverage](https://img.shields.io/codecov/c/github/perpetual-ml/perpetual?flag=r&label=codecov%20r)](https://app.codecov.io/gh/perpetual-ml/perpetual)
-[![License](https://img.shields.io/github/license/perpetual-ml/perpetual)](https://perpetual-ml.github.io/perpetual/r/LICENSE)
+[![License](https://img.shields.io/github/license/perpetual-ml/perpetual)](https://github.com/perpetual-ml/perpetual/blob/main/LICENSE)
 
 PerpetualBooster is a gradient boosting machine (GBM) that doesn’t need
 hyperparameter optimization unlike other GBMs. Similar to AutoML
@@ -124,7 +124,7 @@ dataset (classification):
 | 1.0 | 100 | 0.944 | 0.945 | 91x | 184x |
 
 The results can be reproduced using the scripts in the
-[examples](https://perpetual-ml.github.io/perpetual/r/package-python/examples)
+[examples](https://github.com/perpetual-ml/perpetual/tree/main/package-python/examples)
 folder.
 
 ### PerpetualBooster vs. AutoGluon
@@ -185,7 +185,7 @@ fork](https://github.com/deadsoul44/automlbenchmark).
 ## Contribution
 
 Contributions are welcome. Check
-[CONTRIBUTING.md](https://perpetual-ml.github.io/perpetual/r/CONTRIBUTING.md)
+[CONTRIBUTING.md](https://github.com/perpetual-ml/perpetual/blob/main/CONTRIBUTING.md)
 for the guideline.
 
 ## Paper
