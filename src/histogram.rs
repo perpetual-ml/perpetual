@@ -376,15 +376,24 @@ impl HistogramArena {
             }
         }
 
-        // Parallel init of num/cut_value across all nodes.
+        // Parallel init of num/cut_value across all nodes when running on a multi-thread pool.
         // This triggers page faults in parallel across rayon threads,
         // parallelizing the OS overhead of backing virtual memory with physical pages.
-        bins.par_chunks_mut(bins_per_node).for_each(|node_bins| {
-            for (bin, (&num, &cv)) in node_bins.iter_mut().zip(template_num.iter().zip(template_cv.iter())) {
-                bin.num = num;
-                bin.cut_value = cv;
-            }
-        });
+        if rayon::current_thread_index().is_some() && rayon::current_num_threads() <= 1 {
+            bins.chunks_mut(bins_per_node).for_each(|node_bins| {
+                for (bin, (&num, &cv)) in node_bins.iter_mut().zip(template_num.iter().zip(template_cv.iter())) {
+                    bin.num = num;
+                    bin.cut_value = cv;
+                }
+            });
+        } else {
+            bins.par_chunks_mut(bins_per_node).for_each(|node_bins| {
+                for (bin, (&num, &cv)) in node_bins.iter_mut().zip(template_num.iter().zip(template_cv.iter())) {
+                    bin.num = num;
+                    bin.cut_value = cv;
+                }
+            });
+        }
 
         HistogramArena {
             bins,
@@ -415,13 +424,22 @@ impl HistogramArena {
             }
         }
 
-        // Parallel init of num/cut_value
-        bins.par_chunks_mut(bins_per_node).for_each(|node_bins| {
-            for (bin, (&num, &cv)) in node_bins.iter_mut().zip(template_num.iter().zip(template_cv.iter())) {
-                bin.num = num;
-                bin.cut_value = cv;
-            }
-        });
+        // Parallel init of num/cut_value when running on a multi-thread pool.
+        if rayon::current_thread_index().is_some() && rayon::current_num_threads() <= 1 {
+            bins.chunks_mut(bins_per_node).for_each(|node_bins| {
+                for (bin, (&num, &cv)) in node_bins.iter_mut().zip(template_num.iter().zip(template_cv.iter())) {
+                    bin.num = num;
+                    bin.cut_value = cv;
+                }
+            });
+        } else {
+            bins.par_chunks_mut(bins_per_node).for_each(|node_bins| {
+                for (bin, (&num, &cv)) in node_bins.iter_mut().zip(template_num.iter().zip(template_cv.iter())) {
+                    bin.num = num;
+                    bin.cut_value = cv;
+                }
+            });
+        }
 
         HistogramArena {
             bins,
