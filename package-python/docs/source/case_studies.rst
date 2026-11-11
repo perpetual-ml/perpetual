@@ -1,7 +1,16 @@
 Blog & Case Studies
 ===================
 
-This section collects engineering deep-dives and empirical case studies exploring how ``PerpetualBooster`` eliminates hyperparameter optimization, accelerates continual training, improves uncertainty quantification, and drives optimal downstream decisions.
+This section summarizes the engineering deep-dives and empirical case studies from the Perpetual ML blog, exploring how ``PerpetualBooster`` eliminates hyperparameter optimization, accelerates continual training, improves uncertainty quantification, and drives optimal downstream decisions.
+
+For the full, unabridged articles, see the :doc:`Blog Index <blog/index>`:
+
+* :doc:`blog/how_perpetual_works` — Full derivation of step size control and generalization control with interactive split examples.
+* :doc:`blog/performance` — Detailed benchmarks on California Housing (up to 148x faster) and Forest Cover Types (76x faster).
+* :doc:`blog/confidence` — Conformalized Quantile Regression (CQR) comparison against MAPIE (35% narrower intervals).
+* :doc:`blog/continual` — Streaming continual learning benchmarks showing :math:`O(n)` vs. :math:`O(n^2)` cumulative CPU time.
+* :doc:`blog/decisioning` — Expected utility maximization and probability calibration on the OpenML ``TVS_Loan_Default`` dataset.
+* :doc:`blog/scoring` — Profit-driven lead scoring and campaign optimization on the UCI Bank Marketing dataset.
 
 .. contents:: On this page
    :local:
@@ -17,7 +26,13 @@ How PerpetualBooster Works
 1. **Step Size Control (Forward-Tracking Tree Search)**: Inspired by the Armijo–Goldstein condition in backtracking line search, Perpetual grows each tree until it achieves the smallest step that satisfies a target loss reduction proportional to :math:`\alpha = 10^{-\text{budget}}`.
 2. **Generalization Control**: At each candidate split, samples are partitioned into internal training and validation folds. Splits are only accepted when the out-of-fold validation loss reduction keeps pace with the training loss reduction (:math:`\text{generalization} \geq 1.0`).
 
-For the full mathematical formulation and links to the Rust implementation, see :ref:`how-perpetual-works` in :doc:`architecture`.
+.. figure:: _static/how_perpetual_works_generalization.png
+   :alt: Accepted vs. Rejected Node Split Generalization Comparison
+   :width: 100%
+
+   Left: Accepted node split (:math:`\text{generalization} > 1.0`), where both training and validation losses decrease. Right: Rejected node split (:math:`\text{generalization} < 1.0`), where validation loss increases after splitting.
+
+For the full article and mathematical formulation, see :doc:`blog/how_perpetual_works` and :ref:`how-perpetual-works` in :doc:`architecture`.
 
 ----
 
@@ -123,7 +138,19 @@ Beyond fast initial training, ``PerpetualBooster`` supports continual learning (
 
 On the California Housing dataset split into 24 batches (initial fit on the first 12 batches of 10,320 rows, followed by 11 incremental batches of 860 rows each), continual learning maintains the same average test MSE (``0.197``) as retraining from scratch while progressively increasing cumulative speed-up from **1.0x** to **2.6x** by batch 11.
 
-See :doc:`continual_learning` for the full batch-by-batch benchmark table and code examples.
+.. figure:: _static/continual_cpu_time.png
+   :alt: Per-Batch CPU Time for Continual Learning vs. Retraining
+   :width: 90%
+
+   Per-batch CPU time across batches 0–11.
+
+.. figure:: _static/continual_cum_cpu_time.png
+   :alt: Cumulative CPU Time for Continual Learning vs. Retraining
+   :width: 90%
+
+   Cumulative CPU time across batches 0–11 (:math:`O(n)` continual learning vs. :math:`O(n^2)` retraining).
+
+See :doc:`blog/continual` and :doc:`continual_learning` for the full batch-by-batch benchmark table and code examples.
 
 ----
 

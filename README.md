@@ -19,7 +19,7 @@
 <a href="https://app.codecov.io/gh/perpetual-ml/perpetual" target="_blank"><img src="https://img.shields.io/codecov/c/github/perpetual-ml/perpetual?flag=python&label=codecov%20python" alt="Python Coverage"></a>
 <a href="https://app.codecov.io/gh/perpetual-ml/perpetual" target="_blank"><img src="https://img.shields.io/codecov/c/github/perpetual-ml/perpetual?flag=rust&label=codecov%20rust" alt="Rust Coverage"></a>
 <a href="https://app.codecov.io/gh/perpetual-ml/perpetual" target="_blank"><img src="https://img.shields.io/codecov/c/github/perpetual-ml/perpetual?flag=r&label=codecov%20r" alt="R Coverage"></a>
-<a href="./LICENSE" target="_blank"><img src="https://img.shields.io/github/license/perpetual-ml/perpetual" alt="License"></a>
+<a href="https://github.com/perpetual-ml/perpetual/blob/main/LICENSE" target="_blank"><img src="https://img.shields.io/github/license/perpetual-ml/perpetual" alt="License"></a>
 
 </div>
 
@@ -45,9 +45,9 @@ Perpetual is built in Rust and provides high-performance bindings for Python and
 <!-- markdownlint-disable MD060 -->
 | Language   | Installation                                                            | Documentation                                                                       | Source                                                        | Package                                                                                                                                                             |
 | :--------- | :---------------------------------------------------------------------- | :---------------------------------------------------------------------------------- | :------------------------------------------------------------ | :---------------------------------------------------------------------------------------------------------------------------------- |
-| **Python** | `pip install perpetual`<br><br>`conda install -c conda-forge perpetual` | <a href="https://perpetual-ml.github.io/perpetual" target="_blank">Python API</a>   | <a href="./package-python" target="_blank">`package-python`</a> | <a href="https://pypi.org/project/perpetual" target="_blank">PyPI</a><br><br><a href="https://anaconda.org/conda-forge/perpetual" target="_blank">Conda Forge</a>   |
-| **Rust**   | `cargo add perpetual`                                                   | <a href="https://docs.rs/perpetual" target="_blank">docs.rs</a>                     | <a href="./src" target="_blank">`src`</a>                     | <a href="https://crates.io/crates/perpetual" target="_blank">crates.io</a>                                                          |
-| **R**      | `install.packages("perpetual")`                                         | <a href="https://perpetual-ml.github.io/perpetual/r" target="_blank">pkgdown Site</a> | <a href="./package-r" target="_blank">`package-r`</a>         | <a href="https://perpetual-ml.r-universe.dev/perpetual" target="_blank">R-universe</a>                                              |
+| **Python** | `pip install perpetual`<br><br>`conda install -c conda-forge perpetual` | <a href="https://perpetual-ml.github.io/perpetual" target="_blank">Python API</a>   | <a href="https://github.com/perpetual-ml/perpetual/tree/main/package-python" target="_blank">`package-python`</a> | <a href="https://pypi.org/project/perpetual" target="_blank">PyPI</a><br><br><a href="https://anaconda.org/conda-forge/perpetual" target="_blank">Conda Forge</a>   |
+| **Rust**   | `cargo add perpetual`                                                   | <a href="https://docs.rs/perpetual" target="_blank">docs.rs</a>                     | <a href="https://github.com/perpetual-ml/perpetual/tree/main/src" target="_blank">`src`</a>                     | <a href="https://crates.io/crates/perpetual" target="_blank">crates.io</a>                                                          |
+| **R**      | `install.packages("perpetual")`                                         | <a href="https://perpetual-ml.github.io/perpetual/r" target="_blank">pkgdown Site</a> | <a href="https://github.com/perpetual-ml/perpetual/tree/main/package-r" target="_blank">`package-r`</a>         | <a href="https://perpetual-ml.r-universe.dev/perpetual" target="_blank">R-universe</a>                                              |
 
 ### Optional Dependencies
 
@@ -88,7 +88,7 @@ The following table summarizes the results for the <a href="https://www.openml.o
 | :--------------- | :-------------------- | :----------------- | :---------------- | :----------------- | :---------------- |
 | 1.0              | 100                   | 0.944              | 0.945             | 91x                | 184x              |
 
-The results can be reproduced using the scripts in the <a href="./package-python/examples" target="_blank">examples</a> folder.
+The results can be reproduced using the scripts in the <a href="https://github.com/perpetual-ml/perpetual/tree/main/package-python/examples" target="_blank">examples</a> folder.
 
 ### PerpetualBooster vs. AutoGluon
 
@@ -136,7 +136,7 @@ The results can be reproduced using the <a href="https://github.com/deadsoul44/a
 
 ## Contribution
 
-Contributions are welcome. Check <a href="./CONTRIBUTING.md" target="_blank">CONTRIBUTING.md</a> for the guideline.
+Contributions are welcome. Check <a href="https://github.com/perpetual-ml/perpetual/blob/main/CONTRIBUTING.md" target="_blank">CONTRIBUTING.md</a> for the guideline.
 
 ## Paper
 

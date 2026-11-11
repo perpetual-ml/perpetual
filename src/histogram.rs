@@ -582,31 +582,45 @@ fn check_node_indices(hist_tree_len: usize, sources: &[usize], update_num: usize
     );
 }
 
+/// Returns `true` if the memory regions backing the two bin slices overlap.
+///
+/// This is an O(1) check on the slice address ranges, so it can be done once
+/// per feature histogram instead of once per bin in the hot subtraction loop.
+#[inline(always)]
+fn bins_overlap(a: &[UnsafeCell<Bin>], b: &[UnsafeCell<Bin>]) -> bool {
+    let a = a.as_ptr_range();
+    let b = b.as_ptr_range();
+    a.start < b.end && b.start < a.end
+}
+
 /// Set every bin of `update` to `parent - child`, bin by bin.
 ///
-/// Panics if `update` shares any bin with `parent` or `child`.
+/// Panics if the bins of `update` overlap the bins of `parent` or `child`.
 #[inline]
 fn subtract_feature_child(parent: &FeatureHistogram, child: &FeatureHistogram, update: &FeatureHistogram) {
+    // A single range check per feature (instead of per bin) keeps the inner
+    // loop identical to the unchecked version, so there is no hot-path cost.
+    assert!(
+        !bins_overlap(parent.data, update.data) && !bins_overlap(child.data, update.data),
+        "destination bin must not alias source bins"
+    );
     parent
         .data
         .iter()
         .zip(child.data.iter())
         .zip(update.data.iter())
         .for_each(|((parent_bin, child_bin), update_bin)| {
-            assert!(
-                !std::ptr::eq(parent_bin, update_bin) && !std::ptr::eq(child_bin, update_bin),
-                "destination bin must not alias source bins"
-            );
             // SAFETY: the pointers come from live `UnsafeCell`s so they are
-            // valid and non-null, and the destination bin is distinct from
-            // the source bins.
+            // valid and non-null, and the destination bins do not overlap the
+            // source bins (checked above).
             unsafe { Bin::from_parent_child(parent_bin.get(), child_bin.get(), update_bin.get()) }
         });
 }
 
 /// Set every bin of `update` to `parent - first - second`, bin by bin.
 ///
-/// Panics if `update` shares any bin with `parent`, `first` or `second`.
+/// Panics if the bins of `update` overlap the bins of `parent`, `first` or
+/// `second`.
 #[inline]
 fn subtract_feature_two_children(
     parent: &FeatureHistogram,
@@ -614,6 +628,12 @@ fn subtract_feature_two_children(
     second: &FeatureHistogram,
     update: &FeatureHistogram,
 ) {
+    assert!(
+        !bins_overlap(parent.data, update.data)
+            && !bins_overlap(first.data, update.data)
+            && !bins_overlap(second.data, update.data),
+        "destination bin must not alias source bins"
+    );
     parent
         .data
         .iter()
@@ -621,15 +641,9 @@ fn subtract_feature_two_children(
         .zip(second.data.iter())
         .zip(update.data.iter())
         .for_each(|(((parent_bin, first_bin), second_bin), update_bin)| {
-            assert!(
-                !std::ptr::eq(parent_bin, update_bin)
-                    && !std::ptr::eq(first_bin, update_bin)
-                    && !std::ptr::eq(second_bin, update_bin),
-                "destination bin must not alias source bins"
-            );
             // SAFETY: the pointers come from live `UnsafeCell`s so they are
-            // valid and non-null, and the destination bin is distinct from
-            // the source bins.
+            // valid and non-null, and the destination bins do not overlap the
+            // source bins (checked above).
             unsafe {
                 Bin::from_parent_two_children(parent_bin.get(), first_bin.get(), second_bin.get(), update_bin.get())
             }

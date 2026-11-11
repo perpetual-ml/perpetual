@@ -24,9 +24,9 @@ Perpetual is built in Rust and provides high-performance bindings for Python and
 
 | Language   | Installation                    | Documentation                                                                         | Repository                                                      |
 | :--------- | :------------------------------ | :------------------------------------------------------------------------------------ | :-------------------------------------------------------------- |
-| **Python** | `pip install perpetual`         | <a href="https://perpetual-ml.github.io/perpetual" target="_blank">Python API</a>     | <a href="./package-python" target="_blank">`package-python`</a> |
-| **Rust**   | `cargo add perpetual`           | <a href="https://docs.rs/perpetual" target="_blank">docs.rs</a>                       | <a href="./src" target="_blank">`src`</a>                       |
-| **R**      | `install.packages("perpetual")` | <a href="https://perpetual-ml.github.io/perpetual/r" target="_blank">pkgdown Site</a> | <a href="./package-r" target="_blank">`package-r`</a>           |
+| **Python** | `pip install perpetual`         | <a href="https://perpetual-ml.github.io/perpetual" target="_blank">Python API</a>     | <a href="https://github.com/perpetual-ml/perpetual/tree/main/package-python" target="_blank">`package-python`</a> |
+| **Rust**   | `cargo add perpetual`           | <a href="https://docs.rs/perpetual" target="_blank">docs.rs</a>                       | <a href="https://github.com/perpetual-ml/perpetual/tree/main/src" target="_blank">`src`</a>                       |
+| **R**      | `install.packages("perpetual")` | <a href="https://perpetual-ml.github.io/perpetual/r" target="_blank">pkgdown Site</a> | <a href="https://github.com/perpetual-ml/perpetual/tree/main/package-r" target="_blank">`package-r`</a>           |
 
 ## Usage
 
@@ -67,7 +67,7 @@ The following table summarizes the results for the <a href="https://scikit-learn
 | :--------------- | :-------------------- | :----------------- | :---------------- | :----------------- | :---------------- |
 | 0.9              | 100                   | 0.091              | 0.084             | 72x                | 78x               |
 
-The results can be reproduced using the scripts in the <a href="./package-python/examples" target="_blank">examples</a> folder.
+The results can be reproduced using the scripts in the <a href="https://github.com/perpetual-ml/perpetual/tree/main/package-python/examples" target="_blank">examples</a> folder.
 
 ### PerpetualBooster vs. AutoGluon
 
@@ -115,7 +115,7 @@ The results can be reproduced using the <a href="https://github.com/deadsoul44/a
 
 ## Contribution
 
-Contributions are welcome. Check <a href="./CONTRIBUTING.md" target="_blank">CONTRIBUTING.md</a> for the guideline.
+Contributions are welcome. Check <a href="https://github.com/perpetual-ml/perpetual/blob/main/CONTRIBUTING.md" target="_blank">CONTRIBUTING.md</a> for the guideline.
 
 ## Paper
 
