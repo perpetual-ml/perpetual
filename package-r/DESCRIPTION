@@ -1,7 +1,7 @@
 Package: perpetual
 Type: Package
 Title: PerpetualBooster
-Version: 2.4.0
+Version: 2.5.0
 Authors@R: c(
     person("Mutlu", "Simsek", email = "mutlusims3k@gmail.com", role = c("aut", "cre")),
     person("Serkan", "Korkmaz", email = "serkor1@duck.com", role = "aut"),
