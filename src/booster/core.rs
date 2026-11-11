@@ -68,6 +68,55 @@ pub(crate) fn get_available_memory() -> f32 {
     mem_avail
 }
 
+thread_local! {
+    static CURRENT_THREAD_POOL: std::cell::OnceCell< std::sync::Arc<rayon::ThreadPool>> =
+        const { std::cell::OnceCell::new() };
+}
+
+fn current_thread_pool() -> Result<std::sync::Arc<rayon::ThreadPool>, rayon::ThreadPoolBuildError> {
+    CURRENT_THREAD_POOL.with(|cell| {
+        if let Some(pool) = cell.get() {
+            return Ok(std::sync::Arc::clone(pool));
+        }
+        let pool = std::sync::Arc::new(
+            rayon::ThreadPoolBuilder::new()
+                .num_threads(1)
+                .use_current_thread()
+                .build()?,
+        );
+        let _ = cell.set(std::sync::Arc::clone(&pool));
+        Ok(pool)
+    })
+}
+
+/// Build a Rayon thread pool for `fit_trees` / `fit_trees_columnar`.
+///
+/// - When `num_threads == 1`, or when spawning worker threads fails (e.g. on
+///   `wasm32-unknown-emscripten` or when the process hits its thread limit),
+///   reuse a per-thread 1-thread pool backed by the current thread so zero OS
+///   threads are spawned.
+/// - Returns `PerpetualError::ThreadPoolBuildError` instead of panicking if no
+///   pool can be constructed.
+fn build_thread_pool(num_threads: Option<usize>) -> Result<std::sync::Arc<rayon::ThreadPool>, PerpetualError> {
+    let n_threads = match num_threads {
+        Some(n) if n > 0 => n,
+        _ => std::thread::available_parallelism().map(|n| n.get()).unwrap_or(1),
+    };
+
+    if n_threads == 1
+        && let Ok(pool) = current_thread_pool()
+    {
+        return Ok(pool);
+    }
+
+    rayon::ThreadPoolBuilder::new()
+        .num_threads(n_threads)
+        .build()
+        .map(std::sync::Arc::new)
+        .or_else(|_| current_thread_pool())
+        .map_err(|e| PerpetualError::ThreadPoolBuildError(e.to_string()))
+}
+
 type ImportanceFn = fn(&Tree, &mut HashMap<usize, (f32, usize)>);
 
 /// A self-generalizing Gradient Boosting Machine (GBM) with Perpetual Learning.
@@ -389,13 +438,8 @@ impl PerpetualBooster {
         // initialize objective function
         let objective_fn = &self.cfg.objective;
 
-        let n_threads_available = std::thread::available_parallelism().unwrap().get();
-        let num_threads = match self.cfg.num_threads {
-            Some(num_threads) => num_threads,
-            None => n_threads_available,
-        };
-        let builder = rayon::ThreadPoolBuilder::new().num_threads(num_threads);
-        let pool = builder.build().unwrap();
+        let pool = build_thread_pool(self.cfg.num_threads)?;
+        let parallel = pool.current_num_threads() > 1;
 
         // If reset, reset the trees. Otherwise continue training.
         let mut yhat;
@@ -406,7 +450,11 @@ impl PerpetualBooster {
             }
             yhat = vec![self.base_score; y.len()];
         } else {
-            yhat = self.predict(data, true);
+            yhat = if parallel {
+                pool.install(|| self.predict(data, true))
+            } else {
+                self.predict(data, false)
+            };
         }
 
         // calculate gradient and hessian
@@ -527,11 +575,13 @@ impl PerpetualBooster {
                 n.max(3).min(data_rows_cap).min(N_NODES_ALLOC_MAX)
             }
         };
-        let mut hist_arena = if col_amount == col_index.len() {
-            HistogramArena::from_cuts(&binned_data.cuts, &col_index, is_const_hess, n_nodes_alloc)
-        } else {
-            HistogramArena::from_fixed(effective_max_bin, col_amount, is_const_hess, n_nodes_alloc)
-        };
+        let mut hist_arena = pool.install(|| {
+            if col_amount == col_index.len() {
+                HistogramArena::from_cuts(&binned_data.cuts, &col_index, is_const_hess, n_nodes_alloc)
+            } else {
+                HistogramArena::from_fixed(effective_max_bin, col_amount, is_const_hess, n_nodes_alloc)
+            }
+        });
         let mut hist_tree: Vec<NodeHistogram> = hist_arena.as_node_histograms();
 
         let mut split_info_vec: Vec<SplitInfo> = (0..col_amount).map(|_| SplitInfo::default()).collect();
@@ -570,9 +620,17 @@ impl PerpetualBooster {
             };
 
             if col_amount != col_index.len() {
-                hist_tree.iter().for_each(|h| {
-                    update_cuts(h, col_index_fit, &binned_data.cuts, true);
-                });
+                if parallel {
+                    pool.install(|| {
+                        hist_tree.iter().for_each(|h| {
+                            update_cuts(h, col_index_fit, &binned_data.cuts, true);
+                        });
+                    });
+                } else {
+                    hist_tree.iter().for_each(|h| {
+                        update_cuts(h, col_index_fit, &binned_data.cuts, false);
+                    });
+                }
             }
 
             let mut tree = Tree::new();
@@ -725,13 +783,8 @@ impl PerpetualBooster {
         let start = Instant::now();
         let objective_fn = &self.cfg.objective;
 
-        let n_threads_available = std::thread::available_parallelism().unwrap().get();
-        let num_threads = match self.cfg.num_threads {
-            Some(num_threads) => num_threads,
-            None => n_threads_available,
-        };
-        let builder = rayon::ThreadPoolBuilder::new().num_threads(num_threads);
-        let pool = builder.build().unwrap();
+        let pool = build_thread_pool(self.cfg.num_threads)?;
+        let parallel = pool.current_num_threads() > 1;
 
         // If reset, reset the trees. Otherwise continue training.
         let mut yhat;
@@ -743,7 +796,11 @@ impl PerpetualBooster {
             yhat = vec![self.base_score; y.len()];
         } else {
             // For reset=false, predict using the columnar path (zero-copy).
-            yhat = self.predict_columnar(data, true);
+            yhat = if parallel {
+                pool.install(|| self.predict_columnar(data, true))
+            } else {
+                self.predict_columnar(data, false)
+            };
         }
 
         let (mut grad, mut hess, mut loss) = objective_fn.gradient_and_loss(y, &yhat, sample_weight, group);
@@ -852,11 +909,13 @@ impl PerpetualBooster {
             }
         };
 
-        let mut hist_arena = if col_amount == col_index.len() {
-            HistogramArena::from_cuts(&binned_data.cuts, &col_index, is_const_hess, n_nodes_alloc)
-        } else {
-            HistogramArena::from_fixed(effective_max_bin, col_amount, is_const_hess, n_nodes_alloc)
-        };
+        let mut hist_arena = pool.install(|| {
+            if col_amount == col_index.len() {
+                HistogramArena::from_cuts(&binned_data.cuts, &col_index, is_const_hess, n_nodes_alloc)
+            } else {
+                HistogramArena::from_fixed(effective_max_bin, col_amount, is_const_hess, n_nodes_alloc)
+            }
+        });
         let mut hist_tree: Vec<NodeHistogram> = hist_arena.as_node_histograms();
         let mut split_info_vec: Vec<SplitInfo> = (0..col_amount).map(|_| SplitInfo::default()).collect();
         let mut split_info_slice = SplitInfoSlice::new(&mut split_info_vec);
@@ -894,9 +953,17 @@ impl PerpetualBooster {
             };
 
             if col_amount != col_index.len() {
-                hist_tree.iter().for_each(|h| {
-                    update_cuts(h, col_index_fit, &binned_data.cuts, true);
-                })
+                if parallel {
+                    pool.install(|| {
+                        hist_tree.iter().for_each(|h| {
+                            update_cuts(h, col_index_fit, &binned_data.cuts, true);
+                        });
+                    });
+                } else {
+                    hist_tree.iter().for_each(|h| {
+                        update_cuts(h, col_index_fit, &binned_data.cuts, false);
+                    });
+                }
             }
 
             let mut tree = Tree::new();
@@ -1849,5 +1916,47 @@ mod perpetual_booster_test {
         let data = Matrix::new(&[1.0, 2.0, 3.0, 4.0], 2, 2);
         let y = vec![1.0, 2.0];
         booster.fit(&data, &y, None, None).unwrap();
+    }
+
+    #[test]
+    fn test_fit_single_thread_no_spawn_and_repeated_calls() {
+        // Reproduction from issue #95: fit with num_threads=Some(1) must not
+        // require spawning worker threads and must succeed across repeated fits
+        // on the same thread (including continual learning and columnar data).
+        let n = 200;
+        let a: Vec<f64> = (0..n).map(|i| (i % 17) as f64).collect();
+        let b: Vec<f64> = (0..n).map(|i| (i % 5) as f64).collect();
+        let y: Vec<f64> = a.iter().zip(&b).map(|(a, b)| 2.0 * a + b).collect();
+        let data: Vec<f64> = a.iter().copied().chain(b.iter().copied()).collect();
+        let x = Matrix::new(&data, n, 2);
+
+        let mut model = PerpetualBooster::default()
+            .set_budget(0.5)
+            .set_num_threads(Some(1))
+            .set_reset(Some(false));
+        model.fit(&x, &y, None, None).expect("first single-thread fit");
+        model
+            .fit(&x, &y, None, None)
+            .expect("second single-thread fit (warm start)");
+
+        let cols: Vec<&[f64]> = vec![&a, &b];
+        let x_col = crate::ColumnarMatrix::new(cols, None, n);
+        let mut model_col = PerpetualBooster::default()
+            .set_budget(0.5)
+            .set_num_threads(Some(1))
+            .set_reset(Some(false));
+        model_col
+            .fit_columnar(&x_col, &y, None, None)
+            .expect("first columnar fit");
+        model_col
+            .fit_columnar(&x_col, &y, None, None)
+            .expect("second columnar fit");
+
+        // Also verify single-thread fit when invoked from inside an existing Rayon worker thread.
+        let outer_pool = rayon::ThreadPoolBuilder::new().num_threads(2).build().unwrap();
+        outer_pool.install(|| {
+            let mut inner_model = PerpetualBooster::default().set_budget(0.2).set_num_threads(Some(1));
+            inner_model.fit(&x, &y, None, None).expect("fit inside rayon worker");
+        });
     }
 }

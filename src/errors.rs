@@ -24,4 +24,7 @@ pub enum PerpetualError {
     /// First value is the name of the parameter, second is expected, third is what was passed.
     #[error("Invalid parameter value passed for {0}, expected {1} but {2} provided.")]
     InvalidParameter(String, String, String),
+    /// Unable to build thread pool.
+    #[error("Unable to build thread pool: {0}")]
+    ThreadPoolBuildError(String),
 }
