@@ -120,6 +120,12 @@ Using the parent loss and the post-split training and validation losses, Perpetu
 * **Accepted Split** (:math:`\text{generalization} \geq 1.0`): Both training and validation losses decrease relative to the parent node, indicating that the split generalizes to unseen data.
 * **Rejected Split** (:math:`\text{generalization} < 1.0`): The validation loss does not sufficiently improve (or increases) compared to the training loss reduction, so splitting is stopped to prevent overfitting.
 
+.. figure:: _static/how_perpetual_works_generalization.png
+   :alt: Accepted vs. Rejected Node Split Generalization Comparison
+   :width: 100%
+
+   Left: Accepted node split (:math:`\text{generalization} > 1.0`), where both training and validation losses decrease. Right: Rejected node split (:math:`\text{generalization} < 1.0`), where validation loss increases after splitting.
+
 See `src/splitter.rs <https://github.com/perpetual-ml/perpetual/blob/main/src/splitter.rs>`_ for the detailed split evaluation implementation.
 
 How Step Size and Generalization Control Work Together
@@ -131,4 +137,4 @@ Finding the right balance between fitting the data and avoiding overfitting is a
 * **Later Boosting Rounds**: Generalization control becomes increasingly important as boosting progresses. Trees naturally become shallower as less generalizable signal remains in the residuals.
 * **Automatic Early Stopping**: If the algorithm encounters a very simple tree (a single split) with poor generalization (:math:`< 1.0`) three times, it automatically halts the boosting process.
 
-For more details on configuring the ``budget`` and related parameters, please refer to :doc:`parameters_tuning` and :doc:`case_studies`.
+For more details on configuring the ``budget`` and related parameters, please refer to :doc:`parameters_tuning`, :doc:`blog/how_perpetual_works`, and :doc:`case_studies`.

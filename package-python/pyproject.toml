@@ -33,6 +33,12 @@ classifiers = [
   "Programming Language :: Python :: 3.15",
 ]
 
+[project.urls]
+Homepage = "https://perpetual-ml.github.io/perpetual"
+Documentation = "https://perpetual-ml.github.io/perpetual"
+Repository = "https://github.com/perpetual-ml/perpetual"
+Issues = "https://github.com/perpetual-ml/perpetual/issues"
+
 [project.optional-dependencies]
 dev = ["pandas", "polars", "pyarrow", "maturin", "pytest", "seaborn", "scikit-learn", "mkdocs-material", "mkdocstrings[python]", "mkdocs-autorefs", "ruff", "xgboost", "onnxmltools", "onnx", "onnxruntime; python_version < '3.14'", "nbsphinx"]
 xgboost = ["xgboost"]

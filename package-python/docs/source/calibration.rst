@@ -4,7 +4,7 @@ Calibration and Uncertainty Quantification
 PerpetualBooster provides native, high-performance calibration methods for both regression (Prediction Intervals) and classification (Probability Calibration). 
 
 The Fundamental Advantage: Post-Hoc Calibration
-----------------------------------------------
+-----------------------------------------------
 
 Traditional gradient boosting frameworks often require expensive modifications to the training process to produce well-calibrated outputs. For example:
 - **Quantile Regression**: Requires retraining multiple models (one for each quantile).
@@ -114,7 +114,7 @@ On the California Housing dataset at a target coverage rate of ``0.90``, both MA
      - **0.907**
      - **1.450**
 
-See :doc:`case_studies` for additional calibration and decision-making benchmarks.
+See :doc:`blog/confidence`, :doc:`blog/decisioning`, :doc:`blog/scoring`, and :doc:`case_studies` for full articles on Conformalized Quantile Regression, calibrated lending decisions, and profit-driven lead scoring.
 
 Tutorials
 ---------

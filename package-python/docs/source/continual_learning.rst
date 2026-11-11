@@ -184,3 +184,17 @@ Using the California Housing dataset segmented into 24 batches, initial training
      - 2.6x
 
 Across all incremental updates, continual learning maintains the same average test Mean Squared Error (MSE of ``0.197``) as full retraining while exhibiting near-constant per-batch CPU time and linear :math:`O(n)` cumulative training time compared to the quadratic :math:`O(n^2)` growth of retraining from scratch.
+
+.. figure:: _static/continual_cpu_time.png
+   :alt: Per-Batch CPU Time for Continual Learning vs. Retraining
+   :width: 90%
+
+   Per-batch CPU time across batches 0–11. Continual learning stays roughly constant per batch, whereas retraining CPU time increases linearly with cumulative data size.
+
+.. figure:: _static/continual_cum_cpu_time.png
+   :alt: Cumulative CPU Time for Continual Learning vs. Retraining
+   :width: 90%
+
+   Cumulative CPU time across batches 0–11, demonstrating linear :math:`O(n)` scaling for continual learning vs. quadratic :math:`O(n^2)` scaling for retraining.
+
+See :doc:`blog/continual` for the full benchmark article.
